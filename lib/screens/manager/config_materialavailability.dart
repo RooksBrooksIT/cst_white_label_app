@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:intl/intl.dart';
 
 class MaterialAvailability extends StatefulWidget {
   const MaterialAvailability({super.key});
@@ -12,8 +12,6 @@ class MaterialAvailability extends StatefulWidget {
 }
 
 class _MaterialAvailabilityState extends State<MaterialAvailability> {
-  // Removed unused _firestore field
-
   String? _selectedMaterial;
   int _count = 0;
   bool _isLoading = false;
@@ -24,13 +22,13 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
   final TextEditingController _countController = TextEditingController();
   final TextEditingController _editCountController = TextEditingController();
 
-  // New state variables for New/Update mode
+  // Mode variables
   bool _isNewMode = true;
   String? _selectedMaterialToUpdate;
-  int _existingCount = 0; // To store existing count for update mode
+  int _existingCount = 0;
 
-  // New state variables for Update mode checkboxes
-  bool _addToExisting = true; // Default to Add mode
+  // Operation mode toggles
+  bool _addToExisting = true;
   bool _updateExisting = false;
 
   @override
@@ -119,7 +117,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       return;
     }
 
-    // Hide keyboard
     FocusScope.of(context).unfocus();
 
     setState(() {
@@ -132,11 +129,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         'materialsavailablity',
       ).doc(documentId);
 
-      // Check if document exists for today
       final todayDoc = await todayDocRef.get();
 
       if (todayDoc.exists) {
-        // Document exists, update by summing the counts
         final currentCount = todayDoc.data()!['count'] as int;
         final newCount = currentCount + _count;
 
@@ -145,7 +140,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           'lastupdated': FieldValue.serverTimestamp(),
         });
       } else {
-        // Document doesn't exist, create new one
         await todayDocRef.set({
           'materialName': _selectedMaterial,
           'count': _count,
@@ -155,7 +149,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
       _showSuccessDialog('New material added successfully!');
       _resetForm();
-      _loadAvailabilityData(); // Refresh the list
+      _loadAvailabilityData();
     } catch (e) {
       if (!mounted) return;
       _showErrorDialog('Failed to save data: $e');
@@ -180,7 +174,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       return;
     }
 
-    // Hide keyboard
     FocusScope.of(context).unfocus();
 
     setState(() {
@@ -188,17 +181,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     });
 
     try {
-      // Find the existing document for today
       final documentId = _generateDocumentId(_selectedMaterialToUpdate!);
       final todayDocRef = FirestoreService.getCollection(
         'materialsavailablity',
       ).doc(documentId);
 
-      // Check if document exists for today
       final todayDoc = await todayDocRef.get();
 
       if (todayDoc.exists) {
-        // Document exists, handle based on checkbox selection
         final currentCount = todayDoc.data()!['count'] as int;
         final newCount = _addToExisting ? currentCount + _count : _count;
 
@@ -213,7 +203,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               : 'Material count updated successfully! ($_count)',
         );
       } else {
-        // If no document exists for today, check if there's any existing document for this material
         final existingDocs =
             await FirestoreService.getCollection('materialsavailablity')
                 .where('materialName', isEqualTo: _selectedMaterialToUpdate)
@@ -222,7 +211,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 .get();
 
         if (existingDocs.docs.isNotEmpty) {
-          // Update the most recent existing document
           final existingDoc = existingDocs.docs.first;
           final currentCount = existingDoc.data()['count'] as int;
           final newCount = _addToExisting ? currentCount + _count : _count;
@@ -240,7 +228,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 : 'Material count updated successfully! ($_count)',
           );
         } else {
-          // No existing document found, create a new one
           await todayDocRef.set({
             'materialName': _selectedMaterialToUpdate,
             'count': _count,
@@ -251,7 +238,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       }
 
       _resetForm();
-      _loadAvailabilityData(); // Refresh the list
+      _loadAvailabilityData();
     } catch (e) {
       if (!mounted) return;
       _showErrorDialog('Failed to update data: $e');
@@ -264,7 +251,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     }
   }
 
-  // New method to get existing count when material is selected in update mode
   void _onUpdateMaterialSelected(String? materialName) {
     setState(() {
       _selectedMaterialToUpdate = materialName;
@@ -279,7 +265,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Future<void> _fetchExistingCount(String materialName) async {
     try {
-      // First try to get today's document
       final documentId = _generateDocumentId(materialName);
       final todayDoc = await FirestoreService.getCollection(
         'materialsavailablity',
@@ -294,7 +279,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         return;
       }
 
-      // If no today's document, get the most recent one
       final existingDocs =
           await FirestoreService.getCollection('materialsavailablity')
               .where('materialName', isEqualTo: materialName)
@@ -326,7 +310,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     }
   }
 
-  // Handle checkbox changes
   void _onAddToExistingChanged(bool? value) {
     if (value == true) {
       setState(() {
@@ -345,76 +328,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     }
   }
 
-  Future<void> _updateCount(String documentId, int currentCount) async {
-    final newCount = await showDialog<int>(
-      context: context,
-      builder: (BuildContext context) {
-        _editCountController.text = currentCount.toString();
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: Text(
-            'Edit Count',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).primaryColor,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _editCountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'New Count',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final newCount = int.tryParse(_editCountController.text) ?? 0;
-                if (newCount > 0) {
-                  Navigator.of(context).pop(newCount);
-                } else {
-                  _showErrorDialog('Please enter a valid count');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-              ),
-              child: const Text('Update', style: TextStyle()),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (newCount != null && newCount > 0) {
-      try {
-        await FirestoreService.getCollection(
-          'materialsavailablity',
-        ).doc(documentId).update({
-          'count': newCount,
-          'lastupdated': FieldValue.serverTimestamp(),
-        });
-
-        _showSuccessDialog('Count updated successfully!');
-        _loadAvailabilityData(); // Refresh the list
-      } catch (e) {
-        _showErrorDialog('Failed to update count: $e');
-      }
-    }
-  }
-
   void _switchToNewMode() {
     setState(() {
       _isNewMode = true;
@@ -423,7 +336,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       _count = 0;
       _existingCount = 0;
       _countController.clear();
-      // Reset checkboxes to default
       _addToExisting = true;
       _updateExisting = false;
     });
@@ -437,7 +349,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       _count = 0;
       _existingCount = 0;
       _countController.clear();
-      // Reset checkboxes to default
       _addToExisting = true;
       _updateExisting = false;
     });
@@ -449,9 +360,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.check_circle, color: Colors.green, size: 24),
               SizedBox(width: 12),
@@ -464,7 +375,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               ),
             ],
           ),
-          content: Text(message, style: const TextStyle(fontSize: 16)),
+          content: Text(message, style: const TextStyle(fontSize: 15)),
           actions: [
             TextButton(
               onPressed: () {
@@ -490,9 +401,9 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.error_outline, color: Colors.red, size: 24),
               SizedBox(width: 12),
@@ -505,7 +416,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               ),
             ],
           ),
-          content: Text(message, style: const TextStyle(fontSize: 16)),
+          content: Text(message, style: const TextStyle(fontSize: 15)),
           actions: [
             TextButton(
               onPressed: () {
@@ -538,73 +449,57 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
-    final isDesktop = screenWidth >= 1024;
 
-    return GlassScaffold(
-      padding: EdgeInsets.zero,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Material Availability',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Top Header Row
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  Text(
-                    'Material Availability',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                ],
-              ),
-            ),
-
-            // Tab Bar
+            // Mode Switcher Tabs
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: darkCardBg,
-                borderRadius: BorderRadius.circular(18),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: darkCardBg.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -617,8 +512,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: _isNewMode ? theme.primaryColor : Colors.transparent,
-                          borderRadius: BorderRadius.circular(14),
+                          color: _isNewMode ? primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           'NEW',
@@ -627,7 +522,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
-                            color: _isNewMode ? Colors.white : const Color(0xFFCBD5E1),
+                            color: _isNewMode ? Colors.white : const Color(0xFF0A183D),
                           ),
                         ),
                       ),
@@ -640,8 +535,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: !_isNewMode ? theme.primaryColor : Colors.transparent,
-                          borderRadius: BorderRadius.circular(14),
+                          color: !_isNewMode ? primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           'UPDATE',
@@ -650,7 +545,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
-                            color: !_isNewMode ? Colors.white : const Color(0xFFCBD5E1),
+                            color: !_isNewMode ? Colors.white : const Color(0xFF0A183D),
                           ),
                         ),
                       ),
@@ -662,36 +557,22 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
             // Content
             Expanded(
-              child: Center(
+              child: Align(
+                alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
                   child: _isLoadingMaterials
                       ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  theme.primaryColor,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Loading materials...',
-                                style: TextStyle(fontSize: 16, color: Colors.grey),
-                              ),
-                            ],
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
                           ),
                         )
                       : SingleChildScrollView(
                           physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           child: _isNewMode
-                              ? _buildNewMaterialSection(isMobile, isTablet, isDesktop)
-                              : _buildUpdateMaterialSection(isMobile, isTablet, isDesktop),
+                              ? _buildNewMaterialSection()
+                              : _buildUpdateMaterialSection(),
                         ),
                 ),
               ),
@@ -702,29 +583,24 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     );
   }
 
-  // Mode selection buttons removed — now handled inline in build() tab bar
-
-  Widget _buildNewMaterialSection(
-    bool isMobile,
-    bool isTablet,
-    bool isDesktop,
-  ) {
+  Widget _buildNewMaterialSection() {
     final theme = Theme.of(context);
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+    final primaryColor = theme.primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Material Selection Card
+        // Form Card
         Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: darkCardBg,
-            borderRadius: BorderRadius.circular(24),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
             boxShadow: [
               BoxShadow(
-                color: darkCardBg.withValues(alpha: 0.25),
-                blurRadius: 16,
+                color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -732,82 +608,61 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E88E5),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF1E88E5).withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.add_box_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
+                  Icon(
+                    Icons.inventory_2_rounded,
+                    color: Color(0xFF3B82F6),
+                    size: 24,
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Add New Material',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Select material and enter count to add',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFFCBD5E1),
-                          ),
-                        ),
-                      ],
+                  SizedBox(width: 10),
+                  Text(
+                    'Add New Material Availability',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 22),
-              _buildWhiteDropdown(
-                label: 'Select Material',
-                icon: Icons.inventory_2_rounded,
-                value: _selectedMaterial,
-                items: _materialNames
-                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedMaterial = v),
-                hintText: 'Choose a material to add',
-              ),
-              if (_materialNames.isEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'No materials found. Please add materials to the collection first.',
-                  style: TextStyle(
-                    color: Colors.orange[300],
-                    fontSize: 13,
-                  ),
+              const SizedBox(height: 4),
+              const Text(
+                'Record daily material count into company inventory',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
                 ),
-              ],
-              const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 20),
+
+              // Material Name Dropdown
+              _buildWhiteDropdown(
+                label: 'Material Name *',
+                value: _selectedMaterial,
+                icon: Icons.category_rounded,
+                hintText: _isLoadingMaterials ? 'Loading materials...' : 'Select material',
+                items: _materialNames.map((name) {
+                  return DropdownMenuItem<String>(
+                    value: name,
+                    child: Text(name),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedMaterial = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 18),
+
+              // Count Field
               _buildWhiteTextField(
-                label: 'Count to Add',
-                icon: Icons.pin_rounded,
-                hintText: 'Enter count to add',
+                label: 'Available Count *',
+                icon: Icons.numbers_rounded,
+                hintText: 'Enter available quantity',
                 controller: _countController,
                 keyboardType: TextInputType.number,
                 onChanged: (v) => setState(() => _count = int.tryParse(v) ?? 0),
@@ -817,7 +672,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 'Enter a number greater than 0',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Color(0xFFCBD5E1),
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
@@ -825,84 +680,57 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         ),
         const SizedBox(height: 20),
 
-        // Submit Button
         _buildNewSubmitButton(),
 
-        // Info section
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: darkCardBg.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                color: theme.primaryColor,
+        const SizedBox(height: 24),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Recent Availability Records',
+              style: TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0A183D),
+                letterSpacing: -0.3,
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.refresh_rounded,
+                color: primaryColor,
                 size: 20,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'New Material Logic',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: theme.primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      '• If same material exists today, counts will be summed\n'
-                      '• Example: Existing 12 + New 12 = Total 24\n'
-                      '• Use this for adding new stock to existing materials',
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.6,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+              onPressed: _loadAvailabilityData,
+              tooltip: 'Refresh data',
+            ),
+          ],
         ),
+        const SizedBox(height: 10),
+        _buildAvailabilityDataList(),
+        const SizedBox(height: 80),
       ],
     );
   }
 
-  Widget _buildUpdateMaterialSection(
-    bool isMobile,
-    bool isTablet,
-    bool isDesktop,
-  ) {
+  Widget _buildUpdateMaterialSection() {
     final theme = Theme.of(context);
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
-    final availableMaterials = _availabilityData
-        .map((data) => data['materialName'] as String)
-        .toSet()
-        .toList();
+    final primaryColor = theme.primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Material Selection Card
         Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: darkCardBg,
-            borderRadius: BorderRadius.circular(24),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
             boxShadow: [
               BoxShadow(
-                color: darkCardBg.withValues(alpha: 0.25),
-                blurRadius: 16,
+                color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -910,195 +738,162 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF43A047),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF43A047).withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.edit_note_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
+                  Icon(
+                    Icons.edit_note_rounded,
+                    color: Color(0xFF3B82F6),
+                    size: 24,
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Update Material Count',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Modify existing material stock count',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFFCBD5E1),
-                          ),
-                        ),
-                      ],
+                  SizedBox(width: 10),
+                  Text(
+                    'Update Existing Material',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 22),
-              _buildWhiteDropdown(
-                label: 'Select Material to Update',
-                icon: Icons.inventory_2_rounded,
-                value: _selectedMaterialToUpdate,
-                items: availableMaterials
-                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                    .toList(),
-                onChanged: _onUpdateMaterialSelected,
-                hintText: 'Choose a material to update',
+              const SizedBox(height: 4),
+              const Text(
+                'Modify stock count or add to existing inventory',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
+                ),
               ),
-              if (availableMaterials.isEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'No materials available to update. Please add materials first.',
-                  style: TextStyle(color: Colors.orange[300], fontSize: 13),
-                ),
-              ],
+              const SizedBox(height: 20),
 
-              // Operation type checkboxes
-              if (_selectedMaterialToUpdate != null) ...[
-                const SizedBox(height: 20),
-                const Text(
-                  'Operation Type',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+              _buildWhiteDropdown(
+                label: 'Material Name *',
+                value: _selectedMaterialToUpdate,
+                icon: Icons.category_rounded,
+                hintText: _isLoadingMaterials ? 'Loading materials...' : 'Select material to update',
+                items: _materialNames.map((name) {
+                  return DropdownMenuItem<String>(
+                    value: name,
+                    child: Text(name),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    _onUpdateMaterialSelected(value);
+                  }
+                },
+              ),
+              const SizedBox(height: 18),
+
+              const Text(
+                'Update Operation Mode',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0A183D),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _onAddToExistingChanged(true),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _addToExisting ? primaryColor : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _addToExisting ? primaryColor : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_circle_outline_rounded,
+                              size: 18,
+                              color: _addToExisting ? Colors.white : const Color(0xFF0A183D),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Add',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: _addToExisting ? Colors.white : const Color(0xFF0A183D),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => _onAddToExistingChanged(true),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _onUpdateExistingChanged(true),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _updateExisting ? primaryColor : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _updateExisting ? primaryColor : const Color(0xFFCBD5E1),
                           ),
-                          decoration: BoxDecoration(
-                            color: _addToExisting
-                                ? theme.primaryColor
-                                : Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _addToExisting
-                                  ? theme.primaryColor
-                                  : Colors.white.withValues(alpha: 0.25),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.swap_horiz_rounded,
+                              size: 18,
+                              color: _updateExisting ? Colors.white : const Color(0xFF0A183D),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.add_circle_outline_rounded,
-                                size: 18,
-                                color: Colors.white,
+                            const SizedBox(width: 6),
+                            Text(
+                              'Replace',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: _updateExisting ? Colors.white : const Color(0xFF0A183D),
+                                fontSize: 13,
                               ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Add',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => _onUpdateExistingChanged(true),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _updateExisting
-                                ? theme.primaryColor
-                                : Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _updateExisting
-                                  ? theme.primaryColor
-                                  : Colors.white.withValues(alpha: 0.25),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.swap_horiz_rounded,
-                                size: 18,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Replace',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
 
-              // Existing count display
               if (_selectedMaterialToUpdate != null && _existingCount > 0) ...[
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: theme.primaryColor.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
+                    color: primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: theme.primaryColor.withValues(alpha: 0.35),
+                      color: primaryColor.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.inventory_2_outlined,
-                        color: theme.primaryColor,
+                        color: primaryColor,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -1111,7 +906,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFFCBD5E1),
+                                color: Color(0xFF64748B),
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -1120,42 +915,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: theme.primaryColor,
+                                color: primaryColor,
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              if (_selectedMaterialToUpdate != null && _existingCount == 0) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.orange[300],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'No existing count found. This will create a new entry.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.orange[200],
-                          ),
                         ),
                       ),
                     ],
@@ -1167,7 +930,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               _buildWhiteTextField(
                 label: 'New Count',
                 icon: Icons.pin_rounded,
-                hintText: 'Enter new count',
+                hintText: 'Enter count',
                 controller: _countController,
                 keyboardType: TextInputType.number,
                 onChanged: (v) => setState(() => _count = int.tryParse(v) ?? 0),
@@ -1177,7 +940,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 'Enter a number greater than 0',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Color(0xFFCBD5E1),
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
@@ -1185,23 +948,22 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         ),
         const SizedBox(height: 20),
 
-        // Submit Button
         _buildUpdateSubmitButton(),
 
-        // Info section
         const SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: darkCardBg.withValues(alpha: 0.5),
+            color: primaryColor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: primaryColor.withValues(alpha: 0.25)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
                 Icons.info_outline_rounded,
-                color: theme.primaryColor,
+                color: primaryColor,
                 size: 20,
               ),
               const SizedBox(width: 12),
@@ -1214,7 +976,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: theme.primaryColor,
+                        color: primaryColor,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -1229,7 +991,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                       style: const TextStyle(
                         fontSize: 12,
                         height: 1.6,
-                        color: Colors.white70,
+                        color: Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -1238,13 +1000,128 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
             ],
           ),
         ),
+        const SizedBox(height: 80),
       ],
     );
   }
 
-  // _buildOperationCheckboxes replaced by inline toggle buttons in _buildUpdateMaterialSection
+  Widget _buildAvailabilityDataList() {
+    if (_isLoadingAvailability) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-  // Shared white text field helper (matches Material Config style)
+    if (_availabilityData.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+        ),
+        child: const Center(
+          child: Text(
+            'No availability records found.',
+            style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _availabilityData.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final item = _availabilityData[index];
+        final name = item['materialName']?.toString() ?? 'Unnamed';
+        final count = item['count'] ?? 0;
+        final ts = item['lastupdated'];
+        String dateStr = '';
+        if (ts is Timestamp) {
+          dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(ts.toDate());
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.inventory_2_rounded,
+                  color: Color(0xFF3B82F6),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0A183D),
+                      ),
+                    ),
+                    if (dateStr.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        dateStr,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count units',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF059669),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildWhiteTextField({
     required String label,
     required IconData icon,
@@ -1253,7 +1130,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     TextInputType? keyboardType,
     void Function(String)? onChanged,
   }) {
-    final brandIconColor = AppTheme.getDarkAccent(Theme.of(context).primaryColor);
+    final brandIconColor = Theme.of(context).primaryColor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1262,21 +1139,15 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: TextFormField(
             controller: controller,
@@ -1284,14 +1155,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
             onChanged: onChanged,
             style: const TextStyle(
               color: Color(0xFF0A183D),
-              fontSize: 15,
+              fontSize: 14.5,
               fontWeight: FontWeight.w700,
             ),
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
               prefixIcon: Padding(
@@ -1299,13 +1170,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 child: Icon(
                   icon,
                   color: brandIconColor,
-                  size: 22,
+                  size: 20,
                 ),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
+              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -1317,7 +1185,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     );
   }
 
-  // Shared white dropdown helper (matches Material Config style)
   Widget _buildWhiteDropdown({
     required String label,
     required String? value,
@@ -1326,7 +1193,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     IconData icon = Icons.list_alt_rounded,
     String? hintText,
   }) {
-    final brandIconColor = AppTheme.getDarkAccent(Theme.of(context).primaryColor);
+    final brandIconColor = Theme.of(context).primaryColor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1335,27 +1202,21 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
             isExpanded: true,
             dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            value: (value != null && items.any((i) => i.value == value)) ? value : null,
+            borderRadius: BorderRadius.circular(14),
+            initialValue: (value != null && items.any((i) => i.value == value)) ? value : null,
             style: const TextStyle(
               color: Color(0xFF0A183D),
               fontSize: 14.5,
@@ -1365,7 +1226,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               hintText: hintText ?? 'Select $label',
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
               prefixIcon: Padding(
@@ -1373,13 +1234,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 child: Icon(
                   icon,
                   color: brandIconColor,
-                  size: 22,
+                  size: 20,
                 ),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
+              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -1396,20 +1254,19 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
   Widget _buildNewSubmitButton() {
     final theme = Theme.of(context);
     return SizedBox(
-      height: 52,
+      height: 50,
       width: double.infinity,
       child: ElevatedButton(
         onPressed: _isLoading ? null : _submitNewMaterial,
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.primaryColor,
-          foregroundColor: const Color(0xFF0A183D),
+          foregroundColor: Colors.white,
           alignment: Alignment.center,
           padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          elevation: 6,
-          shadowColor: theme.primaryColor.withValues(alpha: 0.4),
+          elevation: 2,
         ),
         child: _isLoading
             ? const SizedBox(
@@ -1417,21 +1274,21 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A183D)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
             : const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_rounded, size: 20, color: Color(0xFF0A183D)),
+                  Icon(Icons.add_rounded, size: 20, color: Colors.white),
                   SizedBox(width: 8),
                   Text(
                     'ADD MATERIAL',
                     style: TextStyle(
-                      color: Color(0xFF0A183D),
-                      fontSize: 15,
+                      color: Colors.white,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
@@ -1443,20 +1300,19 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
   Widget _buildUpdateSubmitButton() {
     final theme = Theme.of(context);
     return SizedBox(
-      height: 52,
+      height: 50,
       width: double.infinity,
       child: ElevatedButton(
         onPressed: _isLoading ? null : _updateExistingMaterial,
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.primaryColor,
-          foregroundColor: const Color(0xFF0A183D),
+          foregroundColor: Colors.white,
           alignment: Alignment.center,
           padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          elevation: 6,
-          shadowColor: theme.primaryColor.withValues(alpha: 0.4),
+          elevation: 2,
         ),
         child: _isLoading
             ? const SizedBox(
@@ -1464,7 +1320,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A183D)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
             : Row(
@@ -1473,16 +1329,16 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                   Icon(
                     _addToExisting ? Icons.add_rounded : Icons.swap_horiz_rounded,
                     size: 20,
-                    color: const Color(0xFF0A183D),
+                    color: Colors.white,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     _addToExisting ? 'ADD TO MATERIAL' : 'UPDATE MATERIAL',
                     style: const TextStyle(
-                      color: Color(0xFF0A183D),
-                      fontSize: 15,
+                      color: Colors.white,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],

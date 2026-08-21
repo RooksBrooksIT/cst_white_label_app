@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import '/services/firestore_service.dart';
+import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/reports/site_status_report_page.dart';
-import '/widgets/glass_scaffold.dart';
-import '/widgets/glass_card.dart';
-import '/widgets/glass_button.dart';
-import '/utils/responsive.dart';
-import '/utils/app_theme.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class SiteStatusReportScreen extends StatefulWidget {
   const SiteStatusReportScreen({super.key});
@@ -22,6 +18,8 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
   double _spendingPercentage = 0.0;
   double _budgetAmount = 0.0;
   double _spentAmount = 0.0;
+
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
@@ -40,15 +38,13 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
       double totalSpent = 0.0;
 
       for (var doc in projectsSnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
 
-        // Extract status
         final statusVal = (data['currentStatus'] ?? data['status'])?.toString();
         if (statusVal != null && statusVal.trim().isNotEmpty) {
           uniqueStatuses.add(statusVal.trim());
         }
 
-        // Aggregate finances
         final budget =
             double.tryParse(data['projectBudget']?.toString() ?? '0') ?? 0.0;
         final spent =
@@ -58,7 +54,6 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
         totalSpent += spent;
       }
 
-      // Ensure there is always a fallback list of statuses to pick from if empty
       if (uniqueStatuses.isEmpty) {
         uniqueStatuses.addAll([
           'In-Progress',
@@ -122,94 +117,187 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isMobile = Responsive.isMobile(context);
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
 
-    return ValueListenableBuilder<Color>(
-      valueListenable: AppTheme.primaryColor,
-      builder: (context, primaryColor, _) {
-        final cardAccent = AppTheme.getCardAccent(primaryColor);
-
-        return GlassScaffold(
-          title: 'Site Status Report',
-          appBarForegroundColor: Colors.white,
-          onBack: () => Navigator.pop(context),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isMobile ? double.infinity : 600,
-              ),
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
-                  ? _buildErrorView(theme)
-                  : SingleChildScrollView(
-                      padding: EdgeInsets.all(isMobile ? 16 : 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildHeaderCard(theme, cardAccent),
-                          const SizedBox(height: 24),
-                          _buildSelectorSection(theme, cardAccent),
-                          const SizedBox(height: 40),
-                          GlassButton(
-                            label: 'GENERATE REPORT',
-                            onPressed:
-                                (_selectedStatus == null || _statusOptions.isEmpty)
-                                ? null
-                                : _handleReport,
-                          ),
-                          const SizedBox(height: 12),
-                          GlassButton(
-                            label: 'CANCEL',
-                            onPressed: () => Navigator.pop(context),
-                            isSecondary: true,
-                          ),
-                        ],
-                      ),
-                    ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Site Status Report',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
-        );
-      },
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 800.0 : (isTablet ? 650.0 : double.infinity),
+            ),
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator(color: primaryColor))
+                : _errorMessage != null
+                    ? _buildErrorView()
+                    : SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.all(isDesktop ? 24 : 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildHeaderCard(),
+                            const SizedBox(height: 20),
+                            _buildSelectorSection(),
+                            const SizedBox(height: 28),
+
+                            // Generate Report Button
+                            SizedBox(
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.check_circle_rounded, size: 20),
+                                label: const Text(
+                                  'GENERATE REPORT',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryColor,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 2,
+                                ),
+                                onPressed: (_selectedStatus == null || _statusOptions.isEmpty)
+                                    ? null
+                                    : _handleReport,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Cancel Button
+                            SizedBox(
+                              height: 50,
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.close_rounded, size: 20),
+                                label: const Text(
+                                  'CANCEL',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: const Color(0xFF0A183D),
+                                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildErrorView(ThemeData theme) {
+  Widget _buildErrorView() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
+            const Icon(Icons.error_outline_rounded, size: 64, color: Colors.red),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0A183D),
+              ),
             ),
             const SizedBox(height: 24),
-            GlassButton(label: 'RETRY', onPressed: _fetchProjectData),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                label: const Text('RETRY', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _fetchProjectData,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeaderCard(ThemeData theme, Color cardAccent) {
-    return GlassCard(
+  Widget _buildHeaderCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: primaryColor.withValues(alpha: 0.25),
+        ),
+      ),
       child: Row(
         children: [
-          Icon(Icons.insights_outlined, color: cardAccent, size: 26),
-          const SizedBox(width: 16),
+          Icon(
+            Icons.insights_rounded,
+            color: primaryColor,
+            size: 24,
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
               'Track project status and financial health. Select a status to generate a detailed analytics report.',
               style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFF0A183D),
                 fontWeight: FontWeight.w600,
-                fontSize: 13.5,
+                fontSize: 13,
                 height: 1.4,
               ),
             ),
@@ -219,60 +307,78 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
     );
   }
 
-  Widget _buildSelectorSection(ThemeData theme, Color cardAccent) {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'FILTER BY STATUS',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: cardAccent,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _selectedStatus,
-            dropdownColor: Colors.white,
-            iconEnabledColor: cardAccent,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-            decoration: InputDecoration(
-              labelText: 'Project State',
-              labelStyle: const TextStyle(
-                color: Color(0xFF5A759E),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+  Widget _buildSelectorSection() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Color(0xFFCBD5E1)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'FILTER BY STATUS',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: Color(0xFF0A183D),
+                letterSpacing: 1.1,
               ),
-              prefixIcon: Icon(Icons.flag_outlined, color: cardAccent),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              filled: true,
-              fillColor: Colors.white,
             ),
-            items: _statusOptions
-                .map((s) => DropdownMenuItem(
-                      value: s,
-                      child: Text(
-                        s,
-                        style: const TextStyle(
-                          color: Color(0xFF0A183D),
-                          fontWeight: FontWeight.w700,
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedStatus,
+              dropdownColor: Colors.white,
+              iconEnabledColor: primaryColor,
+              style: const TextStyle(
+                color: Color(0xFF0A183D),
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Project State',
+                labelStyle: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+                prefixIcon: Icon(Icons.flag_rounded, color: primaryColor, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
+              items: _statusOptions
+                  .map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(
+                          s,
+                          style: const TextStyle(
+                            color: Color(0xFF0A183D),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    ))
-                .toList(),
-            onChanged: (v) => setState(() => _selectedStatus = v),
-          ),
-        ],
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedStatus = v),
+            ),
+          ],
+        ),
       ),
     );
   }

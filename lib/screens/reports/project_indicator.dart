@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '/services/firestore_service.dart';
-import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class ProjectIndicatorPage extends StatefulWidget {
   final String? siteId;
@@ -35,22 +35,31 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeIn));
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeIn,
+    );
     _fetchProjectData();
   }
 
   Future<void> _fetchProjectData() async {
     try {
-      if (widget.siteId == null || widget.siteId!.isEmpty) {
-        setState(() { errorMsg = 'Site ID is missing'; isLoading = false; });
+      if (widget.siteId == null) {
+        setState(() {
+          errorMsg = 'Site ID is required.';
+          isLoading = false;
+        });
         return;
       }
 
       final col = FirestoreService.getCollection('projects');
       var query = await col.where('siteId', isEqualTo: widget.siteId).limit(1).get();
       if (query.docs.isEmpty) {
-        query = await col.where('siteid', isEqualTo: widget.siteId).limit(1).get();
+        query = await col.where('site', isEqualTo: widget.siteId).limit(1).get();
       }
 
       if (query.docs.isNotEmpty) {
@@ -60,10 +69,16 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
         });
         _animationController.forward();
       } else {
-        setState(() { errorMsg = 'Project not found'; isLoading = false; });
+        setState(() {
+          errorMsg = 'Project data not found.';
+          isLoading = false;
+        });
       }
     } catch (e) {
-      setState(() { errorMsg = 'Error loading data: $e'; isLoading = false; });
+      setState(() {
+        errorMsg = 'Failed to load project indicator data: $e';
+        isLoading = false;
+      });
     }
   }
 
@@ -75,13 +90,41 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
 
   @override
   Widget build(BuildContext context) {
-    
-
     final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = Responsive.isMobile(context);
 
-    return GlassScaffold(
-      title: 'Project Performance',
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Project Performance',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),

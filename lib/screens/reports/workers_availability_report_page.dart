@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/screens/supervisor/worker_calendar_availability_page.dart';
 
 class WorkersAvailabilityReportPage extends StatefulWidget {
@@ -29,10 +27,15 @@ class _WorkersAvailabilityReportPageState
     _loadReportData();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadReportData() async {
     setState(() => _isLoading = true);
     try {
-      // Order by updatedAt descending to get most recent data first
       final snapshot = await FirestoreService.getCollection(
         'workersAttendance',
       ).orderBy('updatedAt', descending: true).get();
@@ -60,12 +63,10 @@ class _WorkersAvailabilityReportPageState
           final workersList =
               sitesMap[siteName]!['workers'] as List<Map<String, dynamic>>;
 
-          // Check if worker already added to this site
           bool exists = workersList.any((w) => w['workerId'] == workerId);
           if (!exists) {
             workersList.add({
-              'workerName':
-                  workerId, // In the provided example, the key is the identifier
+              'workerName': workerId,
               'workerDesignation': workerInfo['designation'] ?? 'Worker',
               'workerSalary': workerInfo['salary'] ?? '0',
               'workerId': workerId,
@@ -111,63 +112,174 @@ class _WorkersAvailabilityReportPageState
   @override
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
-
-    final colorScheme = Theme.of(context).colorScheme;
+    final primaryColor = Theme.of(context).primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final selectedMapping = _selectedMapping;
     final workers = List<Map<String, dynamic>>.from(
       selectedMapping?['workers'] ?? [],
     );
 
-    return GlassScaffold(
-      title: 'Workers Availability',
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _buildSummaryHeader(colorScheme),
-                _buildSearchAndFilter(colorScheme),
-                if (selectedMapping != null && selectedMapping.isNotEmpty)
-                  _buildSiteInfoSection(selectedMapping, colorScheme),
-                Expanded(
-                  child: selectedMapping == null || selectedMapping.isEmpty
-                      ? _buildEmptyState()
-                      : _buildWorkerList(
-                          workers.where((w) {
-                            final name =
-                                w['workerName']?.toString().toLowerCase() ?? '';
-                            return name.contains(_searchQuery.toLowerCase());
-                          }).toList(),
-                          colorScheme,
-                        ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Workers Availability',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
                 ),
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 650),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+                    children: [
+                      _buildSummaryHeader(primaryColor),
+                      _buildSearchAndFilter(primaryColor),
+                      if (selectedMapping != null && selectedMapping.isNotEmpty)
+                        _buildSiteInfoSection(selectedMapping, primaryColor),
+                      Expanded(
+                        child: selectedMapping == null || selectedMapping.isEmpty
+                            ? _buildEmptyState(primaryColor)
+                            : _buildWorkerList(
+                                workers.where((w) {
+                                  final name =
+                                      w['workerName']?.toString().toLowerCase() ?? '';
+                                  return name.contains(_searchQuery.toLowerCase());
+                                }).toList(),
+                                primaryColor,
+                              ),
+                      ),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildSearchAndFilter(ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+  Widget _buildSummaryHeader(Color primaryColor) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          Expanded(flex: 2, child: _buildSiteDropdown(colorScheme)),
-          const SizedBox(width: 12),
+          Expanded(
+            child: _buildSummaryStat(
+              'Total Sites',
+              _siteMappings.length.toString(),
+              Icons.location_city_rounded,
+              primaryColor,
+            ),
+          ),
+          Container(
+            height: 36,
+            width: 1,
+            color: const Color(0xFFE2E8F0),
+          ),
+          Expanded(
+            child: _buildSummaryStat(
+              'Total Workers',
+              _totalWorkersCount.toString(),
+              Icons.people_alt_rounded,
+              primaryColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryStat(String label, String value, IconData icon, Color primaryColor) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: primaryColor, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchAndFilter(Color primaryColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(flex: 2, child: _buildSiteDropdown(primaryColor)),
+          const SizedBox(width: 10),
           Expanded(
             flex: 3,
             child: Container(
-              height: 52,
+              height: 46,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.03),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -178,19 +290,19 @@ class _WorkersAvailabilityReportPageState
                 onChanged: (v) => setState(() => _searchQuery = v),
                 style: const TextStyle(
                   color: Color(0xFF0A183D),
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Search worker...',
-                  hintStyle: TextStyle(color: Color(0xFF94A3B8)),
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                   prefixIcon: Icon(
                     Icons.search_rounded,
-                    size: 20,
-                    color: Color(0xFF0A183D),
+                    size: 18,
+                    color: primaryColor,
                   ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
                 ),
               ),
             ),
@@ -200,103 +312,100 @@ class _WorkersAvailabilityReportPageState
     );
   }
 
-  Widget _buildSiteDropdown(ColorScheme colorScheme) {
+  Widget _buildSiteDropdown(Color primaryColor) {
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 46,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButtonFormField<String>(
-          value: _selectedSiteId,
-          dropdownColor: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0A183D)),
-          decoration: const InputDecoration(
-            border: InputBorder.none,
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(vertical: 12),
-          ),
-          hint: const Text(
-            'Site',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF94A3B8),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          style: const TextStyle(
-            color: Color(0xFF0A183D),
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-          ),
-          items: _siteMappings.map((m) {
-            final siteId = m['site'] ?? m['id'];
-            return DropdownMenuItem<String>(
-              value: m['id'] as String?,
-              child: Text('$siteId', style: const TextStyle(fontSize: 13.5)),
-            );
-          }).toList(),
-          onChanged: (v) => setState(() => _selectedSiteId = v),
-          isExpanded: true,
+      child: DropdownButtonFormField<String>(
+        isExpanded: true,
+        initialValue: _selectedSiteId,
+        dropdownColor: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0A183D)),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          prefixIcon: Icon(Icons.location_on_rounded, color: primaryColor, size: 18),
         ),
+        hint: const Text(
+          'Select Site',
+          style: TextStyle(
+            fontSize: 13,
+            color: Color(0xFF94A3B8),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: const TextStyle(
+          color: Color(0xFF0A183D),
+          fontSize: 13.5,
+          fontWeight: FontWeight.w700,
+        ),
+        items: _siteMappings.map((m) {
+          final siteId = m['site'] ?? m['id'];
+          return DropdownMenuItem<String>(
+            value: m['id'] as String?,
+            child: Text(
+              '$siteId',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13.5),
+            ),
+          );
+        }).toList(),
+        onChanged: (v) => setState(() => _selectedSiteId = v),
       ),
     );
   }
 
   Widget _buildSiteInfoSection(
     Map<String, dynamic> mapping,
-    ColorScheme colorScheme,
+    Color primaryColor,
   ) {
     final supervisor = mapping['supervisor'] ?? 'Not Assigned';
+    final workerCount = (mapping['workers'] as List).length;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.person_pin_rounded,
             size: 18,
-            color: Color(0xFF0A183D),
+            color: primaryColor,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           const Text(
             'Supervisor: ',
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0A183D),
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF475569),
             ),
           ),
           Text(
             supervisor,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13.5,
               fontWeight: FontWeight.w800,
-              color: colorScheme.primary,
+              color: primaryColor,
             ),
           ),
           const Spacer(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppTheme.getDarkAccent(colorScheme.primary),
-              borderRadius: BorderRadius.circular(12),
+              color: primaryColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              '${(mapping['workers'] as List).length} Total',
-              style: const TextStyle(
+              '$workerCount Total',
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: primaryColor,
               ),
             ),
           ),
@@ -307,7 +416,7 @@ class _WorkersAvailabilityReportPageState
 
   Widget _buildWorkerList(
     List<Map<String, dynamic>> workers,
-    ColorScheme colorScheme,
+    Color primaryColor,
   ) {
     if (workers.isEmpty) {
       return const Center(
@@ -322,80 +431,98 @@ class _WorkersAvailabilityReportPageState
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
       itemCount: workers.length,
+      physics: const BouncingScrollPhysics(),
       itemBuilder: (context, index) {
         final worker = workers[index];
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: GlassCard(
-            child: ListTile(
-              onTap: () {
-                final mapping = _selectedMapping;
-                final workerName = worker['workerName'] ?? 'Unnamed worker';
-                final siteId = mapping?['site'] ?? mapping?['id'] ?? 'Unknown';
-                final workerId =
-                    worker['workerId']?.toString() ?? '${workerName}_$siteId';
+        final mapping = _selectedMapping;
+        final workerName = worker['workerName'] ?? 'Unnamed worker';
+        final siteId = mapping?['site'] ?? mapping?['id'] ?? 'Unknown';
+        final workerId =
+            worker['workerId']?.toString() ?? '${workerName}_$siteId';
 
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => WorkerCalendarAvailabilityPage(
-                      workerId: workerId,
-                      workerName: workerName,
-                      workerDesignation:
-                          worker['workerDesignation'] ?? 'Worker',
-                      siteId: siteId.toString(),
-                    ),
-                  ),
-                );
-              },
-              leading: CircleAvatar(
-                backgroundColor: colorScheme.primary.withValues(alpha: 0.18),
-                child: Text(
-                  (worker['workerName'] ?? 'W')[0],
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WorkerCalendarAvailabilityPage(
+                    workerId: workerId,
+                    workerName: workerName,
+                    workerDesignation:
+                        worker['workerDesignation'] ?? 'Worker',
+                    siteId: siteId.toString(),
                   ),
                 ),
+              );
+            },
+            leading: CircleAvatar(
+              backgroundColor: primaryColor.withValues(alpha: 0.12),
+              child: Text(
+                (worker['workerName'] ?? 'W')[0].toUpperCase(),
+                style: TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      worker['workerName'] ?? 'Unnamed worker',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  _buildStatusBadge(worker['lastAttendance'] ?? ''),
-                ],
-              ),
-              subtitle: Text(
-                worker['workerDesignation'] ?? 'Worker',
-                style: const TextStyle(color: Color(0xFFCBD5E1)),
-              ),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '₹${worker['workerSalary']}',
+            ),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    worker['workerName'] ?? 'Unnamed worker',
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF22C55E),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: Color(0xFF0A183D),
                     ),
                   ),
-                  const Text(
-                    'Salary',
-                    style: TextStyle(fontSize: 9, color: Color(0xFFCBD5E1)),
-                  ),
-                ],
+                ),
+                _buildStatusBadge(worker['lastAttendance'] ?? ''),
+              ],
+            ),
+            subtitle: Text(
+              worker['workerDesignation'] ?? 'Worker',
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
               ),
+            ),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '₹${worker['workerSalary']}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                    color: primaryColor,
+                  ),
+                ),
+                const Text(
+                  'Daily Wage',
+                  style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                ),
+              ],
             ),
           ),
         );
@@ -404,135 +531,76 @@ class _WorkersAvailabilityReportPageState
   }
 
   Widget _buildStatusBadge(String status) {
-    Color color;
+    Color textColor;
+    Color bgColor;
     String text = status.toUpperCase();
+
     if (status.isEmpty) {
-      color = Colors.grey;
+      textColor = const Color(0xFF64748B);
+      bgColor = const Color(0xFFF1F5F9);
       text = "NO DATA";
     } else {
       switch (status.toLowerCase()) {
         case 'present':
-          color = Colors.green;
+          textColor = const Color(0xFF059669);
+          bgColor = const Color(0xFFDCFCE7);
           break;
         case 'absent':
-          color = Colors.red;
+          textColor = const Color(0xFFDC2626);
+          bgColor = const Color(0xFFFEE2E2);
           break;
         case 'half day':
         case 'half-day':
-          color = Colors.orange;
+          textColor = const Color(0xFFD97706);
+          bgColor = const Color(0xFFFFEDD5);
           break;
         default:
-          color = Colors.blue;
+          textColor = const Color(0xFF2563EB);
+          bgColor = const Color(0xFFDBEAFE);
       }
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
+        color: bgColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: color,
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
+          color: textColor,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
   }
 
-  Widget _buildSummaryHeader(ColorScheme colorScheme) {
-    final darkCardBg = AppTheme.getDarkAccent(colorScheme.primary);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _buildSummaryStat(
-            'Total Sites',
-            _siteMappings.length.toString(),
-            Icons.location_city_rounded,
-          ),
-          const Spacer(),
-          Container(
-            height: 40,
-            width: 1,
-            color: Colors.white.withValues(alpha: 0.2),
-          ),
-          const Spacer(),
-          _buildSummaryStat(
-            'Total Workers',
-            _totalWorkersCount.toString(),
-            Icons.people_alt_rounded,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryStat(String label, String value, IconData icon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: const Color(0xFFCBD5E1), size: 16),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFFCBD5E1),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(Color primaryColor) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.person_search_rounded,
-            size: 64,
-            color: Color(0xFF0A183D),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.person_search_rounded,
+              size: 48,
+              color: primaryColor,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           const Text(
             'No matching site mappings found',
             style: TextStyle(
               color: Color(0xFF0A183D),
               fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],

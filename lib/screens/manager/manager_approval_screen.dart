@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class ManagerApprovalScreen extends StatefulWidget {
@@ -22,6 +20,8 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
   String _searchText = '';
   final TextEditingController _searchController = TextEditingController();
 
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +31,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
 
   void _fetchData() async {
     List<Map<String, dynamic>> fetchedData = await fetchAllSchedules();
+    if (!mounted) return;
     setState(() {
       allRequests = fetchedData;
       pendingRequests = allRequests
@@ -43,21 +44,31 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
   }
 
   Future<List<Map<String, dynamic>>> fetchAllSchedules() async {
-    final QuerySnapshot snapshot = await FirestoreService
-        .siteSupervisorProjectStageSchedule
-        .get();
-    return snapshot.docs
-        .map((doc) => doc.data() as Map<String, dynamic>)
-        .toList();
+    try {
+      final QuerySnapshot snapshot = await FirestoreService
+          .siteSupervisorProjectStageSchedule
+          .get();
+      return snapshot.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching schedules: $e');
+      return [];
+    }
   }
 
   Future<List<Map<String, dynamic>>> fetchAllLabours() async {
-    final QuerySnapshot snapshot = await FirestoreService.getCollection(
-      'labours',
-    ).get();
-    return snapshot.docs
-        .map((doc) => doc.data() as Map<String, dynamic>)
-        .toList();
+    try {
+      final QuerySnapshot snapshot = await FirestoreService.getCollection(
+        'labours',
+      ).get();
+      return snapshot.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching labours: $e');
+      return [];
+    }
   }
 
   void _showRequestDetails(
@@ -68,9 +79,6 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
   ) async {
     final TextEditingController dateController = TextEditingController(
       text: request['reqDays']?.toString() ?? '',
-    );
-    final TextEditingController paymentController = TextEditingController(
-      text: request['estimatedPayment']?.toString() ?? '',
     );
     final List<Map<String, dynamic>> labours = List<Map<String, dynamic>>.from(
       request['reqLabours'] ?? [],
@@ -95,17 +103,14 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
     String? approvedDaysError;
     final maxModalWidth = 700.0;
 
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final modalBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: modalBg,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => SafeArea(
         child: Center(
@@ -115,7 +120,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
               expand: false,
               initialChildSize: 0.85,
               minChildSize: 0.4,
-              maxChildSize: 0.98,
+              maxChildSize: 0.95,
               builder: (context, scrollController) {
                 int calculateLabourTotal() {
                   int total = 0;
@@ -142,478 +147,387 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                   return request['reqDays'] ?? 0;
                 }
 
-                void recalculate() {
-                  setState(() {});
-                }
-
                 return StatefulBuilder(
                   builder: (context, setStateModal) {
-                    void validateApprovedDays(String value) {
-                      final approvedDays = int.tryParse(value) ?? 0;
-                      final estimatedDays = getEstimatedDays();
-                      setStateModal(() {
-                        if (approvedDays > estimatedDays) {
-                          approvedDaysError =
-                              "Approved Days ($approvedDays) cannot be greater than Estimated Days ($estimatedDays).";
-                        } else {
-                          approvedDaysError = null;
-                        }
-                      });
-                      setState(() {}); // Sync main state if needed
-                    }
-
                     return SingleChildScrollView(
                       controller: scrollController,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isDesktop
-                              ? 32
-                              : (isTablet
-                                    ? 24
-                                    : MediaQuery.of(context).size.width * 0.06),
-                        ).copyWith(top: 32, bottom: 32),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 50,
-                                height: 5,
-                                margin: EdgeInsets.only(bottom: 18),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  borderRadius: BorderRadius.circular(10),
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Request Details (${request['wsReqId'] ?? ''})",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _RowInfo(
+                            label: "Site ID",
+                            value: request['siteId'] ?? '',
+                            icon: Icons.place_rounded,
+                          ),
+                          _RowInfo(
+                            label: "Project Name",
+                            value: request['projectName'] ?? '',
+                            icon: Icons.assignment_rounded,
+                          ),
+                          _RowInfo(
+                            label: "Supervisor",
+                            value: request['supervisorName'] ?? '',
+                            icon: Icons.person_rounded,
+                          ),
+                          _RowInfo(
+                            label: "Project Stage",
+                            value: request['projectStage'] ?? '',
+                            icon: Icons.timeline_rounded,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            "Labour Requirements",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: primaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...List.generate(labours.length, (index) {
+                            final designation =
+                                labourDesignationControllers[index].text;
+                            final matched = allLabours.firstWhere(
+                              (l) => l['designation'] == designation,
+                              orElse: () => {},
+                            );
+                            final labourId =
+                                matched['labourId']?.toString() ?? '';
+                            final salary =
+                                int.tryParse(
+                                  matched['salary']?.toString() ?? '0',
+                                ) ??
+                                0;
+                            final count =
+                                int.tryParse(
+                                  labourCountControllers[index].text,
+                                ) ??
+                                0;
+                            final totalSalary = count * salary;
+                            return _LabourRequirementCard(
+                              designation: designation,
+                              labourId: labourId,
+                              salary: salary,
+                              count: count,
+                              total: totalSalary,
+                              color: primaryColor,
+                              onCountChanged: (val) {
+                                labourCountControllers[index].text = val;
+                                setStateModal(() {});
+                              },
+                              editable: true,
+                            );
+                          }),
+                          const SizedBox(height: 16),
+                          Text(
+                            "Days & Estimates",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: primaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Text(
+                                "Estimated Days: ",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF64748B),
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              Text(
+                                '${getEstimatedDays()}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Text(
+                                "Approved Days: ",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0A183D),
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 100,
+                                height: 44,
+                                child: TextField(
+                                  controller: dateController,
+                                  keyboardType: TextInputType.number,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF0A183D),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    final enteredDays = int.tryParse(val) ?? 0;
+                                    final estDays = getEstimatedDays();
+                                    if (enteredDays > estDays) {
+                                      setStateModal(() {
+                                        approvedDaysError =
+                                            "Approved days cannot exceed $estDays";
+                                      });
+                                    } else if (enteredDays <= 0) {
+                                      setStateModal(() {
+                                        approvedDaysError =
+                                            "Approved days must be > 0";
+                                      });
+                                    } else {
+                                      setStateModal(() {
+                                        approvedDaysError = null;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (approvedDaysError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(
+                                approvedDaysError!,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
                                 ),
                               ),
                             ),
-                            Row(
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  "Req ID: ${request['wsReqId'] ?? ''}",
+                                const Text(
+                                  "Approved Total Payment:",
                                   style: TextStyle(
-                                    fontSize: isDesktop ? 24 : 22,
                                     fontWeight: FontWeight.bold,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                                    color: Color(0xFF0A183D),
+                                    fontSize: 13.5,
                                   ),
                                 ),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isDesktop ? 18 : 14,
-                                    vertical: isDesktop ? 10 : 7,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        request['approvalStatus'] == 'Approved'
-                                        ? Colors.green[100]
-                                        : Colors.orange[100],
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    request['approvalStatus'] ?? '',
-                                    style: TextStyle(
-                                      color:
-                                          request['approvalStatus'] ==
-                                              'Approved'
-                                          ? Colors.green[800]
-                                          : Colors.orange[800],
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isDesktop ? 17 : 15,
-                                    ),
+                                Text(
+                                  '₹${getApprovedDays() * calculateLabourTotal()}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    color: Color(0xFF10B981),
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 18),
-                            Divider(),
-                            SizedBox(height: 10),
-                            Text(
-                              "Project Info",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: isDesktop ? 19 : 17,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                            SizedBox(height: 12),
-                            _RowInfo(
-                              label: "Project Name",
-                              value: request['projectName'] ?? '',
-                              icon: Icons.business,
-                              isDesktop: isDesktop,
-                              isTablet: isTablet,
-                              isMobile: isMobile,
-                            ),
-                            _RowInfo(
-                              label: "Site ID",
-                              value: request['siteId'] ?? '',
-                              icon: Icons.location_on,
-                              isDesktop: isDesktop,
-                              isTablet: isTablet,
-                              isMobile: isMobile,
-                            ),
-                            _RowInfo(
-                              label: "Supervisor",
-                              value: request['supervisorName'] ?? '',
-                              icon: Icons.person,
-                              isDesktop: isDesktop,
-                              isTablet: isTablet,
-                              isMobile: isMobile,
-                            ),
-                            _RowInfo(
-                              label: "Project Stage",
-                              value: request['projectStage'] ?? '',
-                              icon: Icons.account_tree,
-                              isDesktop: isDesktop,
-                              isTablet: isTablet,
-                              isMobile: isMobile,
-                            ),
-                            SizedBox(height: 24),
-                            Text(
-                              "Labour Requirements",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: isDesktop ? 19 : 17,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                            SizedBox(height: 12),
-                            ...List.generate(
-                              request['reqLabours']?.length ?? 0,
-                              (index) {
-                                final labour = request['reqLabours'][index];
-                                final designation =
-                                    labour['labourDesignation'] ?? '';
-                                final matched = allLabours.firstWhere(
-                                  (l) => l['designation'] == designation,
-                                  orElse: () => {},
-                                );
-                                final labourId =
-                                    matched['labourId']?.toString() ?? '';
-                                final salary =
-                                    int.tryParse(
-                                      matched['salary']?.toString() ?? '0',
-                                    ) ??
-                                    0;
-                                final count =
-                                    int.tryParse(
-                                      labour['labourCount']?.toString() ?? '0',
-                                    ) ??
-                                    0;
-                                return _LabourRequirementCard(
-                                  designation: designation,
-                                  labourId: labourId,
-                                  salary: salary,
-                                  count: count,
-                                  total: count * salary,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  isDesktop: isDesktop,
-                                  isTablet: isTablet,
-                                  isMobile: isMobile,
-                                );
-                              },
-                            ),
-                            SizedBox(height: 24),
-                            Text(
-                              "Edit Details",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: isDesktop ? 19 : 17,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                            SizedBox(height: 12),
+                          ),
+                          const SizedBox(height: 24),
+                          if (request['approvalStatus'] == "Pending")
                             Row(
                               children: [
-                                Text(
-                                  "Estimated Days: ",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: isDesktop ? 16 : 14,
-                                  ),
-                                ),
-                                Text(
-                                  request['reqDays']?.toString() ?? '0',
-                                  style: TextStyle(
-                                    fontSize: isDesktop ? 16 : 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Text(
-                                  "Estimated Payment: ",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: isDesktop ? 16 : 14,
-                                  ),
-                                ),
-                                Text(
-                                  '₹${request['estimatedPayment'] ?? 0}',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: isDesktop ? 18 : 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 16),
-                            TextFormField(
-                              controller: dateController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'Approved Days',
-                                labelStyle: TextStyle(
-                                  fontSize: isDesktop ? 16 : 14,
-                                ),
-                                errorText: approvedDaysError,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                filled: true,
-                                fillColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary.withOpacity(0.05),
-                              ),
-                              onChanged: (val) {
-                                setState(() {}); // Main UI
-                                setStateModal(() {}); // Modal UI
-                                validateApprovedDays(val);
-                              },
-                            ),
-                            SizedBox(height: 16),
-                            ...List.generate(labours.length, (index) {
-                              final designation =
-                                  labourDesignationControllers[index].text;
-                              final matched = allLabours.firstWhere(
-                                (l) => l['designation'] == designation,
-                                orElse: () => {},
-                              );
-                              final salary =
-                                  int.tryParse(
-                                    matched['salary']?.toString() ?? '0',
-                                  ) ??
-                                  0;
-                              final count =
-                                  int.tryParse(
-                                    labourCountControllers[index].text,
-                                  ) ??
-                                  0;
-                              return _LabourRequirementCard(
-                                designation: designation,
-                                labourId: matched['labourId']?.toString() ?? '',
-                                salary: salary,
-                                count: count,
-                                total: count * salary,
-                                color: Theme.of(context).colorScheme.primary,
-                                editable: true,
-                                countController: labourCountControllers[index],
-                                onChanged: () {
-                                  setState(() {});
-                                  setStateModal(() {});
-                                },
-                                isDesktop: isDesktop,
-                                isTablet: isTablet,
-                                isMobile: isMobile,
-                              );
-                            }),
-                            SizedBox(height: 24),
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.all(isDesktop ? 20 : 16),
-                              decoration: BoxDecoration(
-                                color: Colors.green[50],
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.green.shade200,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "Actual Payment:",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isDesktop ? 18 : 16,
-                                    ),
-                                  ),
-                                  Text(
-                                    '₹${getApprovedDays() * calculateLabourTotal()}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isDesktop ? 20 : 18,
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: 24),
-                            if (request['approvalStatus'] == "Pending")
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  ElevatedButton.icon(
-                                    icon: Icon(
-                                      Icons.check,
-                                      size: isDesktop ? 24 : 20,
-                                    ),
-                                    label: Text(
-                                      "Approve",
-                                      style: TextStyle(
-                                        fontSize: isDesktop ? 16 : 14,
+                                Expanded(
+                                  flex: 3,
+                                  child: SizedBox(
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      icon: const Icon(Icons.check_circle_rounded, size: 20),
+                                      label: const Text(
+                                        "Approve Request",
+                                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
                                       ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green[700],
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: isDesktop ? 24 : 20,
-                                        vertical: isDesktop ? 16 : 12,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF10B981),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
                                       ),
-                                    ),
-                                    onPressed: approvedDaysError != null
-                                        ? null
-                                        : () async {
-                                            final wsReqId = request['wsReqId'];
-                                            final approvedDays =
-                                                int.tryParse(
-                                                  dateController.text,
-                                                ) ??
-                                                request['reqDays'];
+                                      onPressed: approvedDaysError != null
+                                          ? null
+                                          : () async {
+                                              final nav = Navigator.of(context);
+                                              final wsReqId = request['wsReqId'];
+                                              final approvedDays =
+                                                  int.tryParse(
+                                                    dateController.text,
+                                                  ) ??
+                                                  request['reqDays'];
 
-                                            final docSnapshot =
-                                                await FirestoreService
-                                                    .siteSupervisorProjectStageSchedule
-                                                    .where(
-                                                      'wsReqId',
-                                                      isEqualTo: wsReqId,
-                                                    )
-                                                    .limit(1)
-                                                    .get();
+                                              final docSnapshot =
+                                                  await FirestoreService
+                                                      .siteSupervisorProjectStageSchedule
+                                                      .where(
+                                                        'wsReqId',
+                                                        isEqualTo: wsReqId,
+                                                      )
+                                                      .limit(1)
+                                                      .get();
 
-                                            if (docSnapshot.docs.isNotEmpty) {
-                                              final docRef = docSnapshot
-                                                  .docs
-                                                  .first
-                                                  .reference;
-                                              final approvedPayment =
-                                                  getApprovedDays() *
-                                                  calculateLabourTotal();
-                                              final approvedLabours = List.generate(
-                                                labours.length,
-                                                (i) => {
-                                                  'labourCount':
-                                                      int.tryParse(
-                                                        labourCountControllers[i]
+                                              if (docSnapshot.docs.isNotEmpty) {
+                                                final docRef = docSnapshot
+                                                    .docs
+                                                    .first
+                                                    .reference;
+                                                final approvedPayment =
+                                                    getApprovedDays() *
+                                                    calculateLabourTotal();
+                                                final approvedLabours = List.generate(
+                                                  labours.length,
+                                                  (i) => {
+                                                    'labourCount':
+                                                        int.tryParse(
+                                                          labourCountControllers[i]
+                                                              .text,
+                                                        ) ??
+                                                        0,
+                                                    'labourDesignation':
+                                                        labourDesignationControllers[i]
                                                             .text,
-                                                      ) ??
-                                                      0,
-                                                  'labourDesignation':
-                                                      labourDesignationControllers[i]
-                                                          .text,
-                                                },
-                                              );
-
-                                              await docRef.update({
-                                                'appDays': approvedDays,
-                                                'appLabours': approvedLabours,
-                                                'approvedPayment':
-                                                    approvedPayment,
-                                                'approvalStatus': 'Approved',
-                                              });
-
-                                              // Update local state
-                                              _fetchData();
-
-                                              // Notify supervisor
-                                              final supName =
-                                                  request['supervisorName']
-                                                      ?.toString() ??
-                                                  '';
-                                              if (supName.isNotEmpty) {
-                                                await NotificationService.notifySupervisor(
-                                                  supervisorName: supName,
-                                                  title:
-                                                      '✅ Worker Request Approved',
-                                                  body: 'Your request $wsReqId has been approved.',
-                                                  data: {
-                                                    'type': 'worker_approval',
-                                                    'wsReqId': wsReqId,
-                                                    'status': 'Approved',
                                                   },
                                                 );
+
+                                                await docRef.update({
+                                                  'appDays': approvedDays,
+                                                  'appLabours': approvedLabours,
+                                                  'approvedPayment':
+                                                      approvedPayment,
+                                                  'approvalStatus': 'Approved',
+                                                });
+
+                                                _fetchData();
+
+                                                final supName =
+                                                    request['supervisorName']
+                                                        ?.toString() ??
+                                                    '';
+                                                if (supName.isNotEmpty) {
+                                                  await NotificationService.notifySupervisor(
+                                                    supervisorName: supName,
+                                                    title:
+                                                        '✅ Worker Request Approved',
+                                                    body: 'Your request $wsReqId has been approved.',
+                                                    data: {
+                                                      'type': 'worker_approval',
+                                                      'wsReqId': wsReqId,
+                                                      'status': 'Approved',
+                                                    },
+                                                  );
+                                                }
                                               }
-                                            }
-                                            Navigator.pop(context);
-                                          },
-                                  ),
-                                  SizedBox(width: isDesktop ? 16 : 12),
-                                  ElevatedButton.icon(
-                                    icon: Icon(
-                                      Icons.close,
-                                      size: isDesktop ? 24 : 20,
-                                    ),
-                                    label: Text(
-                                      "Reject",
-                                      style: TextStyle(
-                                        fontSize: isDesktop ? 16 : 14,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red[700],
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: isDesktop ? 24 : 20,
-                                        vertical: isDesktop ? 16 : 12,
-                                      ),
-                                    ),
-                                    onPressed: () async {
-                                      final wsReqId = request['wsReqId'];
-                                      final docSnapshot = await FirestoreService
-                                          .siteSupervisorProjectStageSchedule
-                                          .where('wsReqId', isEqualTo: wsReqId)
-                                          .limit(1)
-                                          .get();
-
-                                      if (docSnapshot.docs.isNotEmpty) {
-                                        await docSnapshot.docs.first.reference
-                                            .update({
-                                              'approvalStatus': 'Rejected',
-                                            });
-                                        _fetchData();
-
-                                        final supName =
-                                            request['supervisorName']
-                                                ?.toString() ??
-                                            '';
-                                        if (supName.isNotEmpty) {
-                                          await NotificationService.notifySupervisor(
-                                            supervisorName: supName,
-                                            title: '❌ Worker Request Rejected',
-                                            body: 'Your request $wsReqId has been rejected.',
-                                            data: {
-                                              'type': 'worker_rejection',
-                                              'wsReqId': wsReqId,
-                                              'status': 'Rejected',
+                                              nav.pop();
                                             },
-                                          );
-                                        }
-                                      }
-                                      Navigator.pop(context);
-                                    },
+                                    ),
                                   ),
-                                ],
-                              ),
-                          ],
-                        ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: SizedBox(
+                                    height: 48,
+                                    child: OutlinedButton.icon(
+                                      icon: const Icon(Icons.cancel_rounded, size: 18),
+                                      label: const Text(
+                                        "Reject",
+                                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: const Color(0xFFEF4444),
+                                        side: const BorderSide(color: Color(0xFFEF4444)),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      onPressed: () async {
+                                        final nav = Navigator.of(context);
+                                        final wsReqId = request['wsReqId'];
+                                        final docSnapshot = await FirestoreService
+                                            .siteSupervisorProjectStageSchedule
+                                            .where('wsReqId', isEqualTo: wsReqId)
+                                            .limit(1)
+                                            .get();
+
+                                        if (docSnapshot.docs.isNotEmpty) {
+                                          await docSnapshot.docs.first.reference
+                                              .update({
+                                                'approvalStatus': 'Rejected',
+                                              });
+                                          _fetchData();
+
+                                          final supName =
+                                              request['supervisorName']
+                                                  ?.toString() ??
+                                              '';
+                                          if (supName.isNotEmpty) {
+                                            await NotificationService.notifySupervisor(
+                                              supervisorName: supName,
+                                              title: '❌ Worker Request Rejected',
+                                              body: 'Your request $wsReqId has been rejected.',
+                                              data: {
+                                                'type': 'worker_rejection',
+                                                'wsReqId': wsReqId,
+                                                'status': 'Rejected',
+                                              },
+                                            );
+                                          }
+                                        }
+                                        nav.pop();
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
                       ),
                     );
                   },
@@ -635,22 +549,19 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
     List<Map<String, dynamic>> allLabours = await fetchAllLabours();
     List<Map<String, dynamic>> approvedLabours =
         List<Map<String, dynamic>>.from(request['appLabours'] ?? []);
-    int approvedDays = request['appDays'] ?? request['reqDays'];
+    int approvedDays = request['appDays'] ?? request['reqDays'] ?? 0;
     int approvedPayment =
-        request['approvedPayment'] ?? request['estimatedPayment'];
+        request['approvedPayment'] ?? request['estimatedPayment'] ?? 0;
     final maxModalWidth = 700.0;
 
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final modalBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: modalBg,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => SafeArea(
         child: Center(
@@ -658,120 +569,64 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
             constraints: BoxConstraints(maxWidth: maxModalWidth),
             child: DraggableScrollableSheet(
               expand: false,
-              initialChildSize: 0.9,
+              initialChildSize: 0.85,
               minChildSize: 0.4,
-              maxChildSize: 0.98,
-              builder: (context, scrollController) => SingleChildScrollView(
-                controller: scrollController,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isDesktop
-                        ? 32
-                        : (isTablet
-                              ? 24
-                              : MediaQuery.of(context).size.width * 0.06),
-                  ).copyWith(top: 32, bottom: 32),
+              maxChildSize: 0.95,
+              builder: (context, scrollController) {
+                return SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(20.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Center(
-                        child: Container(
-                          width: 50,
-                          height: 5,
-                          margin: EdgeInsets.only(bottom: 18),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "Req ID: ${request['wsReqId'] ?? ''}",
-                            style: TextStyle(
-                              fontSize: isDesktop ? 24 : 22,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
+                            "Approved Request (${request['wsReqId'] ?? ''})",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              color: Color(0xFF0A183D),
                             ),
                           ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isDesktop ? 18 : 14,
-                              vertical: isDesktop ? 10 : 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green[100],
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              "Approved",
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
-                                fontSize: isDesktop ? 17 : 15,
-                              ),
-                            ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                            onPressed: () => Navigator.pop(context),
                           ),
                         ],
                       ),
-                      SizedBox(height: 18),
-                      Divider(),
-                      SizedBox(height: 10),
-                      // Project Info
-                      Text(
-                        "Project Info",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: isDesktop ? 19 : 17,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      SizedBox(height: 3),
-                      _RowInfo(
-                        label: "Project Name",
-                        value: request['projectName'] ?? '',
-                        icon: Icons.business,
-                        isDesktop: isDesktop,
-                        isTablet: isTablet,
-                        isMobile: isMobile,
-                      ),
+                      const SizedBox(height: 12),
                       _RowInfo(
                         label: "Site ID",
                         value: request['siteId'] ?? '',
-                        icon: Icons.location_on,
-                        isDesktop: isDesktop,
-                        isTablet: isTablet,
-                        isMobile: isMobile,
+                        icon: Icons.place_rounded,
+                      ),
+                      _RowInfo(
+                        label: "Project Name",
+                        value: request['projectName'] ?? '',
+                        icon: Icons.assignment_rounded,
                       ),
                       _RowInfo(
                         label: "Supervisor",
                         value: request['supervisorName'] ?? '',
-                        icon: Icons.person,
-                        isDesktop: isDesktop,
-                        isTablet: isTablet,
-                        isMobile: isMobile,
+                        icon: Icons.person_rounded,
                       ),
                       _RowInfo(
                         label: "Project Stage",
                         value: request['projectStage'] ?? '',
-                        icon: Icons.account_tree,
-                        isDesktop: isDesktop,
-                        isTablet: isTablet,
-                        isMobile: isMobile,
+                        icon: Icons.timeline_rounded,
                       ),
-                      SizedBox(height: 14),
-                      // Approved Labour Requirements
+                      const SizedBox(height: 16),
                       Text(
                         "Approved Labour Requirements",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: isDesktop ? 19 : 17,
-                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 16,
+                          color: primaryColor,
                         ),
                       ),
-                      SizedBox(height: 5),
+                      const SizedBox(height: 8),
                       ...List.generate(approvedLabours.length, (index) {
                         final labour = approvedLabours[index];
                         final designation = labour['labourDesignation'] ?? '';
@@ -797,128 +652,102 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                           salary: salary,
                           count: count,
                           total: totalSalary,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: primaryColor,
                           editable: false,
-                          isDesktop: isDesktop,
-                          isTablet: isTablet,
-                          isMobile: isMobile,
                         );
                       }),
-                      SizedBox(height: 17),
-                      // Approved Details
+                      const SizedBox(height: 16),
                       Text(
                         "Approved Details",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: isDesktop ? 19 : 17,
-                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 16,
+                          color: primaryColor,
                         ),
                       ),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
-                          Text(
+                          const Text(
                             "Days: ",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.blueGrey,
-                              fontSize: isDesktop ? 16 : 14,
+                              color: Color(0xFF64748B),
+                              fontSize: 13.5,
                             ),
                           ),
-                          Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8.0),
-                              child: Text(
-                                approvedDays.toString(),
-                                style: TextStyle(
-                                  fontSize: isDesktop ? 18 : 16,
-                                  color: Colors.blueGrey[900],
-                                ),
-                              ),
+                          Text(
+                            approvedDays.toString(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0A183D),
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
-                          Text(
+                          const Text(
                             "Approved Amount: ",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.blueGrey,
-                              fontSize: isDesktop ? 16 : 14,
+                              color: Color(0xFF64748B),
+                              fontSize: 13.5,
                             ),
                           ),
-                          Expanded(
-                            child: Text(
-                              '₹$approvedPayment',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: isDesktop ? 20 : 18,
-                                color: Colors.green[700],
-                              ),
-                              textAlign: TextAlign.right,
+                          Text(
+                            '₹$approvedPayment',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: Color(0xFF10B981),
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: 22),
+                      const SizedBox(height: 20),
                       Center(
                         child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isDesktop ? 22 : 18,
-                            vertical: isDesktop ? 12 : 8,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.green[100],
-                            borderRadius: BorderRadius.circular(8),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: [
+                            children: const [
                               Icon(
-                                Icons.verified,
-                                color: Colors.green,
-                                size: isDesktop ? 28 : 24,
+                                Icons.verified_rounded,
+                                color: Color(0xFF10B981),
+                                size: 22,
                               ),
                               SizedBox(width: 8),
                               Text(
                                 "Status: Approved",
                                 style: TextStyle(
-                                  color: Colors.green,
+                                  color: Color(0xFF10B981),
                                   fontWeight: FontWeight.bold,
-                                  fontSize: isDesktop ? 18 : 16,
+                                  fontSize: 15,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                      SizedBox(height: 18),
                     ],
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),
       ),
     );
-  }
-
-  void _updateRequestStatus(String wsReqId, String status) {
-    setState(() {
-      allRequests.firstWhere(
-        (req) => req['wsReqId'] == wsReqId,
-      )['approvalStatus'] = status;
-      pendingRequests = allRequests
-          .where((req) => req["approvalStatus"] == "Pending")
-          .toList();
-      approvedRequests = allRequests
-          .where((req) => req["approvalStatus"] == "Approved")
-          .toList();
-    });
-    Navigator.pop(context);
   }
 
   Widget _buildRequestList(
@@ -940,52 +769,58 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
         filteredRequests.insert(0, match);
       }
     }
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
-    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
-    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B);
 
     if (filteredRequests.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.inbox_rounded,
-              size: isDesktop ? 80 : 60,
-              color: iconColor,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "No requests found",
-              style: TextStyle(
-                color: textColor,
-                fontSize: isDesktop ? 20 : 18,
-                fontWeight: FontWeight.w800,
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(
+                Icons.event_available_rounded,
+                size: 64,
+                color: Color(0xFFCBD5E1),
               ),
-            ),
-          ],
+              SizedBox(height: 16),
+              Text(
+                'No Requests Found',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0A183D),
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No schedule requests available under this section.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
+
     return ListView.builder(
-      padding: EdgeInsets.all(isDesktop ? 24 : 16),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(16),
       itemCount: filteredRequests.length,
       itemBuilder: (context, index) {
         final request = filteredRequests[index];
-        final status = request['approvalStatus'] ?? '';
-        final isApproved = status == 'Approved';
-        final badgeColor = isApproved
-            ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF059669))
-            : Colors.amber.shade700;
+        final isPending = request['approvalStatus'] == 'Pending';
 
-        return Padding(
-          padding: EdgeInsets.only(bottom: isDesktop ? 20 : 16),
-          child: GlassCard(
-            title: 'Req ID: ${request['wsReqId'] ?? ""}',
-            subtitle: 'Project: ${request['projectName'] ?? ""}',
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
             onTap: () => isApprovedTab
                 ? _showApprovedRequestDetails(
                     request,
@@ -993,100 +828,123 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     isTablet,
                     isMobile,
                   )
-                : _showRequestDetails(request, isDesktop, isTablet, isMobile),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_rounded,
-                      color: iconColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      request['siteId'] ?? '',
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                : _showRequestDetails(
+                    request,
+                    isDesktop,
+                    isTablet,
+                    isMobile,
+                  ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.event_note_rounded,
+                              color: primaryColor,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            request['wsReqId'] ?? 'N/A',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0A183D),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isDesktop ? 14 : 10,
-                        vertical: isDesktop ? 6 : 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: badgeColor.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: badgeColor,
-                          width: 1.2,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isPending
+                              ? Colors.amber.withValues(alpha: 0.15)
+                              : const Color(0xFF10B981).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: badgeColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: isDesktop ? 13 : 11,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Supervisor',
+                        child: Text(
+                          isPending ? 'Pending' : 'Approved',
                           style: TextStyle(
-                            color: labelColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: isPending ? Colors.amber.shade900 : const Color(0xFF10B981),
                           ),
                         ),
-                        Text(
-                          request['supervisorName'] ?? '-',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Site ID',
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                           ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'Labours',
-                          style: TextStyle(
-                            color: labelColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                          Text(
+                            request['siteId'] ?? '-',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0A183D),
+                            ),
                           ),
-                        ),
-                        Text(
-                          '${(request['reqLabours'] ?? []).length}',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Supervisor',
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+                          Text(
+                            request['supervisorName'] ?? '-',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0A183D),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'Labours',
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                          ),
+                          Text(
+                            '${(request['reqLabours'] ?? []).length}',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1096,159 +954,155 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
     final isDesktop = screenWidth >= 1024;
-    final maxContentWidth = 900.0;
 
-    return GlassScaffold(
-      title: 'Manager Approval',
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Column(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Schedule Request Approval',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
                 ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: TabBar(
-                      controller: _tabController,
-                      tabs: const [
-                        Tab(text: "PENDING"),
-                        Tab(text: "APPROVED"),
-                      ],
-                      labelColor: isDark ? Colors.white : primaryColor,
-                      labelStyle: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: isDesktop ? 16 : 14,
-                      ),
-                      unselectedLabelColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
-                      unselectedLabelStyle: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: isDesktop ? 16 : 14,
-                      ),
-                      indicatorColor: primaryColor,
-                      indicatorWeight: 3,
-                    ),
-                  ),
-                ),
-              ),
-
-              Padding(
-                padding: EdgeInsets.all(isDesktop ? 24 : 16.0),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (text) {
-                        setState(() {
-                          _searchText = text.trim();
-                        });
-                      },
-                      style: TextStyle(
-                        color: isDark ? Colors.white : const Color(0xFF0A183D),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Search Req ID...',
-                        hintStyle: TextStyle(
-                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
-                          size: isDesktop ? 24 : 20,
-                        ),
-                        suffixIcon: _searchText.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(
-                                  Icons.clear,
-                                  color: isDark ? Colors.white70 : const Color(0xFF0A183D),
-                                  size: isDesktop ? 24 : 20,
-                                ),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() {
-                                    _searchText = '';
-                                  });
-                                },
-                              )
-                            : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(
-                            color: isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(
-                            color: isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: primaryColor, width: 1.8),
-                        ),
-                        filled: true,
-                        fillColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+            onPressed: _fetchData,
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 850.0 : (isTablet ? 680.0 : double.infinity),
+            ),
+            child: Column(
               children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: _buildRequestList(
-                      pendingRequests,
-                      isDesktop: isDesktop,
-                      isTablet: isTablet,
-                      isMobile: isMobile,
+                // TabBar Header Container
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    tabs: const [
+                      Tab(text: "PENDING"),
+                      Tab(text: "APPROVED"),
+                    ],
+                    labelColor: primaryColor,
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    unselectedLabelColor: const Color(0xFF64748B),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    indicatorColor: primaryColor,
+                    indicatorWeight: 3,
+                  ),
+                ),
+
+                // Search Box
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (text) {
+                      setState(() {
+                        _searchText = text.trim();
+                      });
+                    },
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search Request ID...',
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 12.5,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: primaryColor,
+                        size: 20,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryColor, width: 1.8),
+                      ),
                     ),
                   ),
                 ),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: _buildRequestList(
-                      approvedRequests,
-                      isApprovedTab: true,
-                      isDesktop: isDesktop,
-                      isTablet: isTablet,
-                      isMobile: isMobile,
-                    ),
+
+                // TabBarView Content
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildRequestList(
+                        pendingRequests,
+                        isApprovedTab: false,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                      _buildRequestList(
+                        approvedRequests,
+                        isApprovedTab: true,
+                        isDesktop: isDesktop,
+                        isTablet: isTablet,
+                        isMobile: isMobile,
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
         ),
       ),
     );
@@ -1259,59 +1113,40 @@ class _RowInfo extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
-  final bool isDesktop;
-  final bool isTablet;
-  final bool isMobile;
 
   const _RowInfo({
     required this.label,
     required this.value,
     required this.icon,
-    required this.isDesktop,
-    required this.isTablet,
-    required this.isMobile,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
-    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
-    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
-
+    final primaryColor = Theme.of(context).colorScheme.primary;
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: isDesktop ? 10 : 6),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: iconColor,
-            size: isDesktop ? 24 : 20,
+          Icon(icon, size: 18, color: primaryColor),
+          const SizedBox(width: 10),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Color(0xFF64748B),
+            ),
           ),
-          SizedBox(width: isDesktop ? 16 : 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: labelColor,
-                  fontSize: isDesktop ? 14 : 12,
-                  fontWeight: FontWeight.w600,
-                ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0A183D),
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: isDesktop ? 16 : 14,
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                ),
-              ),
-            ],
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -1326,12 +1161,8 @@ class _LabourRequirementCard extends StatelessWidget {
   final int count;
   final int total;
   final Color color;
+  final ValueChanged<String>? onCountChanged;
   final bool editable;
-  final TextEditingController? countController;
-  final VoidCallback? onChanged;
-  final bool isDesktop;
-  final bool isTablet;
-  final bool isMobile;
 
   const _LabourRequirementCard({
     required this.designation,
@@ -1340,113 +1171,93 @@ class _LabourRequirementCard extends StatelessWidget {
     required this.count,
     required this.total,
     required this.color,
+    this.onCountChanged,
     this.editable = false,
-    this.countController,
-    this.onChanged,
-    required this.isDesktop,
-    required this.isTablet,
-    required this.isMobile,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final cardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
-    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
-    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
-    final accentColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: isDesktop ? 16 : 12),
-      child: Container(
-        padding: EdgeInsets.all(isDesktop ? 18 : 14),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              designation,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: textColor,
-                fontSize: isDesktop ? 18 : 16,
-              ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 4),
-            Text(
-              'ID: $labourId',
-              style: TextStyle(
-                color: labelColor,
-                fontSize: isDesktop ? 14 : 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Icon(Icons.badge_rounded, color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Salary: ₹$salary',
-                  style: TextStyle(
-                    color: labelColor,
-                    fontSize: isDesktop ? 14 : 12,
-                    fontWeight: FontWeight.w600,
+                  designation,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0A183D),
+                    fontSize: 13.5,
                   ),
                 ),
-                if (editable)
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isDesktop ? 24 : 16,
-                      ),
-                      child: TextFormField(
-                        controller: countController,
-                        style: TextStyle(
-                          color: isDark ? Colors.white : const Color(0xFF0A183D),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                        ),
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          hintText: 'Count',
-                          hintStyle: TextStyle(
-                            color: labelColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          contentPadding: EdgeInsets.symmetric(
-                            vertical: isDesktop ? 14 : 10,
-                            horizontal: isDesktop ? 16 : 12,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: borderColor),
-                          ),
-                          filled: true,
-                          fillColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white,
-                        ),
-                        onChanged: (_) => onChanged?.call(),
-                      ),
-                    ),
-                  ),
                 Text(
-                  'Total: ₹$total',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: accentColor,
-                    fontSize: isDesktop ? 18 : 16,
+                  'Daily Salary: ₹$salary',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF64748B),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          if (editable)
+            SizedBox(
+              width: 70,
+              height: 38,
+              child: TextFormField(
+                initialValue: count.toString(),
+                keyboardType: TextInputType.number,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0A183D),
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Count',
+                  labelStyle: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onChanged: onCountChanged,
+              ),
+            )
+          else
+            Text(
+              'Count: $count',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: Color(0xFF0A183D),
+              ),
+            ),
+          const SizedBox(width: 12),
+          Text(
+            '₹$total',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

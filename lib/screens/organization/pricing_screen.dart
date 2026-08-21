@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
@@ -18,17 +19,21 @@ class PricingScreen extends StatefulWidget {
   final String dateStr;
   final String appName;
   final Color selectedColor;
+  final String? currentPlan;
+  final bool isManagingExisting;
 
   const PricingScreen({
     super.key,
-    required this.orgName,
-    required this.email,
-    required this.phone,
-    required this.username,
-    required this.password,
-    required this.dateStr,
-    required this.appName,
-    required this.selectedColor,
+    this.orgName = '',
+    this.email = '',
+    this.phone = '',
+    this.username = '',
+    this.password = '',
+    this.dateStr = '',
+    this.appName = '',
+    this.selectedColor = const Color(0xFF0B1942),
+    this.currentPlan,
+    this.isManagingExisting = false,
   });
 
   @override
@@ -39,27 +44,46 @@ class _PricingScreenState extends State<PricingScreen> {
   bool _isLoading = false;
   String _selectedPlanType = 'Monthly';
   String _selectedPlan = 'Silver';
-  int _goldProjectsCount = 10;
+  int _platinumProjectsCount = 10;
+  bool _queueUpgrade = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.currentPlan != null && widget.currentPlan!.isNotEmpty) {
+      final normalized = widget.currentPlan!.trim().toLowerCase();
+      if (normalized.contains('gold')) {
+        _selectedPlan = 'Gold';
+      } else if (normalized.contains('platinum')) {
+        _selectedPlan = 'Platinum';
+      } else if (normalized.contains('free')) {
+        _selectedPlan = 'Free Trial';
+        _selectedPlanType = 'Free Trial';
+      } else {
+        _selectedPlan = 'Silver';
+      }
+    }
+  }
 
   double _calculatePlanAmount() {
     if (_selectedPlanType == 'Free Trial') return 0.0;
 
     if (_selectedPlan == 'Silver') {
+      if (_selectedPlanType == '6 Months') return 594.0;
+      if (_selectedPlanType == 'Yearly') return 1188.0;
+      return 99.0;
+    } else if (_selectedPlan == 'Gold') {
       if (_selectedPlanType == '6 Months') return 1194.0;
       if (_selectedPlanType == 'Yearly') return 2388.0;
       return 199.0;
-    } else if (_selectedPlan == 'Gold') {
+    } else if (_selectedPlan == 'Platinum') {
       if (_selectedPlanType == '6 Months') {
-        return (_goldProjectsCount * 599.4).roundToDouble();
+        return (_platinumProjectsCount * 239.4).roundToDouble();
       }
       if (_selectedPlanType == 'Yearly') {
-        return (_goldProjectsCount * 1198.8).roundToDouble();
+        return (_platinumProjectsCount * 478.8).roundToDouble();
       }
-      return (_goldProjectsCount * 99.9).roundToDouble();
-    } else if (_selectedPlan == 'Platinum') {
-      if (_selectedPlanType == '6 Months') return 10794.0;
-      if (_selectedPlanType == 'Yearly') return 21588.0;
-      return 1799.0;
+      return (_platinumProjectsCount * 39.9).roundToDouble();
     }
     return 0.0;
   }
@@ -69,112 +93,243 @@ class _PricingScreenState extends State<PricingScreen> {
     return '₹${price.toString().replaceAllMapped(format, (Match m) => '${m[1]},')}';
   }
 
-  Future<Map<String, String>?> _showPaymentMethodBottomSheet(double amount) async {
-    return await showModalBottomSheet<Map<String, String>>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+
+
+
+  Future<void> _handleExistingPlanUpdate() async {
+    final formattedCurrent = (widget.currentPlan ?? '').trim().toLowerCase();
+    final bool isCurrentPlan = formattedCurrent.isNotEmpty &&
+        (formattedCurrent == _selectedPlan.toLowerCase() ||
+            (formattedCurrent.contains('free') &&
+                _selectedPlan.toLowerCase().contains('free')));
+
+    if (isCurrentPlan) {
+      AppTheme.showSuccessToast(
+          context, 'You are currently on the $_selectedPlan plan.');
+      return;
+    }
+
+    final double amount = _calculatePlanAmount();
+    PayUResult? payuResult;
+
+    if (_selectedPlanType != 'Free Trial' && amount > 0) {
+      final txnId = PayUService.generateTxnId();
+      final payUParams = PayUParams(
+        merchantId: PayUService.activeMerchantId,
+        merchantKey: PayUService.activeMerchantKey,
+        merchantSalt: PayUService.activeMerchantSalt,
+        txnid: txnId,
+        amount: amount,
+        productInfo:
+            '${widget.orgName.isEmpty ? "Subscription" : widget.orgName} $_selectedPlan Plan ($_selectedPlanType)',
+        firstName: widget.orgName.isEmpty
+            ? (widget.username.isEmpty ? 'Organization' : widget.username)
+            : widget.orgName,
+        email: widget.email.isEmpty ? 'customer@example.com' : widget.email,
+        phone: widget.phone.isEmpty ? '9999999999' : widget.phone,
+        isSandbox: !PayUService.isProduction,
+        pg: 'CC',
+        bankcode: 'CC',
+      );
+
+      final result = await Navigator.push<PayUResult>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PayUCheckoutScreen(params: payUParams),
+        ),
+      );
+
+      if (result == null || !result.isSuccess) {
+        if (mounted) {
+          AppTheme.showErrorToast(
+            context,
+            result?.errorMessage ?? 'Payment was cancelled or failed.',
+          );
+        }
+        return;
+      }
+
+      payuResult = result;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final now = DateTime.now();
+      final int durationDays;
+      if (_selectedPlanType == 'Free Trial') {
+        durationDays = 14;
+      } else if (_selectedPlanType == '6 Months') {
+        durationDays = 180;
+      } else if (_selectedPlanType == 'Yearly') {
+        durationDays = 365;
+      } else {
+        durationDays = 30;
+      }
+
+      var doc = await FirestoreService.subscriptionDoc.get();
+      if (!doc.exists) {
+        doc = await FirestoreService.rootOrgDoc.get();
+      }
+
+      DateTime currentEnd = now;
+      if (doc.exists && doc.data() != null) {
+        final currentExpiry = doc.data()!['subscriptionEndDate'] as Timestamp?;
+        if (currentExpiry != null && currentExpiry.toDate().isAfter(now)) {
+          currentEnd = currentExpiry.toDate();
+        }
+      }
+
+      if (_queueUpgrade) {
+        // Queue upgrade after current subscription period ends
+        final queuedStart = currentEnd;
+        final queuedEnd = queuedStart.add(Duration(days: durationDays));
+
+        final updateData = <String, dynamic>{
+          'queuedPlan': _selectedPlan.toLowerCase(),
+          'queuedPlanType': _selectedPlanType,
+          'queuedStartDate': Timestamp.fromDate(queuedStart),
+          'queuedEndDate': Timestamp.fromDate(queuedEnd),
+          'isUpgradeQueued': true,
+          'queuedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        await FirestoreService.subscriptionDoc
+            .set(updateData, SetOptions(merge: true));
+
+        if (mounted) {
+          setState(() => _isLoading = false);
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.schedule_rounded,
+                      color: Color(0xFF10B981), size: 28),
+                  SizedBox(width: 10),
+                  Text('Upgrade Queued',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Select Payment Method",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0A183D)),
-                ),
-                Text(
-                  "₹${amount.toStringAsFixed(0)}",
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF10B981)),
+              content: Text(
+                'Your upgrade to the $_selectedPlan plan ($_selectedPlanType) has been queued successfully.\n\nIt will automatically become active on ${DateFormat('dd MMM yyyy').format(queuedStart)} after your current subscription ends.',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0B1942),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('OK',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            const Text(
-              "Direct app launch powered by PayU",
-              style: TextStyle(fontSize: 12.5, color: Color(0xFF5A759E)),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
-              leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF4285F4))),
-              title: const Text("Google Pay (GPay)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-              subtitle: const Text("Opens GPay app directly", style: TextStyle(fontSize: 12)),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-              onTap: () => Navigator.pop(context, {'pg': 'UPI', 'bankcode': 'TEZ'}),
-            ),
-            const SizedBox(height: 10),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
-              leading: const CircleAvatar(backgroundColor: Color(0xFFF3E8FF), child: Icon(Icons.mobile_friendly_rounded, color: Color(0xFF5F259F))),
-              title: const Text("PhonePe", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-              subtitle: const Text("Opens PhonePe app directly", style: TextStyle(fontSize: 12)),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-              onTap: () => Navigator.pop(context, {'pg': 'UPI', 'bankcode': 'PHONEPE'}),
-            ),
-            const SizedBox(height: 10),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
-              leading: const CircleAvatar(backgroundColor: Color(0xFFE0F2FE), child: Icon(Icons.payment_rounded, color: Color(0xFF00BAF2))),
-              title: const Text("Paytm UPI", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-              subtitle: const Text("Opens Paytm app directly", style: TextStyle(fontSize: 12)),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-              onTap: () => Navigator.pop(context, {'pg': 'UPI', 'bankcode': 'PAYTM'}),
-            ),
-            const SizedBox(height: 10),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
-              leading: const CircleAvatar(backgroundColor: Color(0xFFECFDF5), child: Icon(Icons.apps_rounded, color: Color(0xFF10B981))),
-              title: const Text("Other UPI Apps", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-              subtitle: const Text("Select from all installed UPI apps", style: TextStyle(fontSize: 12)),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-              onTap: () => Navigator.pop(context, {'pg': 'UPI', 'bankcode': 'INTENT'}),
-            ),
-            const SizedBox(height: 10),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0))),
-              leading: const CircleAvatar(backgroundColor: Color(0xFFF1F5F9), child: Icon(Icons.credit_card_rounded, color: Color(0xFF0B1942))),
-              title: const Text("Credit / Debit Card & NetBanking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-              subtitle: const Text("Visa, MasterCard, SBI, HDFC, ICICI", style: TextStyle(fontSize: 12)),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-              onTap: () => Navigator.pop(context, {'pg': 'CC', 'bankcode': 'CC'}),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+          );
+        }
+      } else {
+        // Immediate plan upgrade
+        final endDate = now.add(Duration(days: durationDays));
+        final updateData = <String, dynamic>{
+          'subscriptionPlan': _selectedPlan.toLowerCase(),
+          'subscriptionPlanType': _selectedPlanType,
+          'subscriptionStartDate': Timestamp.fromDate(now),
+          'subscriptionEndDate': Timestamp.fromDate(endDate),
+          'isSubscriptionActive': true,
+          'isUpgradeQueued': false,
+          'queuedPlan': FieldValue.delete(),
+          'queuedPlanType': FieldValue.delete(),
+          'queuedStartDate': FieldValue.delete(),
+          'queuedEndDate': FieldValue.delete(),
+          'maxProjects': _selectedPlan == 'Platinum'
+              ? _platinumProjectsCount
+              : _selectedPlan == 'Gold'
+                  ? 10
+                  : _selectedPlan == 'Silver'
+                      ? 3
+                      : 1,
+          'maxUsers': _selectedPlan == 'Platinum'
+              ? (_platinumProjectsCount * 1.5).round()
+              : _selectedPlan == 'Gold'
+                  ? 15
+                  : _selectedPlan == 'Silver'
+                      ? 5
+                      : 2,
+          'paymentGateway': payuResult != null ? 'PayU' : 'Direct',
+          'paymentTxnId': payuResult?.txnid ?? '',
+          'paymentAmount': amount,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
 
+        await FirestoreService.subscriptionDoc
+            .set(updateData, SetOptions(merge: true));
+
+        if (mounted) {
+          setState(() => _isLoading = false);
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.stars_rounded,
+                      color: Color(0xFF10B981), size: 28),
+                  SizedBox(width: 10),
+                  Text('Plan Upgraded!',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
+              content: Text(
+                'Congratulations! Your subscription has been upgraded to the $_selectedPlan plan ($_selectedPlanType) immediately.',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0B1942),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('OK',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error updating subscription plan: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppTheme.showErrorToast(context, 'Failed to update subscription: $e');
+      }
+    }
+  }
 
   Future<void> _register() async {
     final double amount = _calculatePlanAmount();
     PayUResult? payuResult;
     // Handle PayU Payment Gateway for Paid Plans
     if (_selectedPlanType != 'Free Trial' && amount > 0) {
-      final selectedMethod = await _showPaymentMethodBottomSheet(amount);
-      if (!mounted || selectedMethod == null) return; // User closed sheet or unmounted
-
-
       final txnId = PayUService.generateTxnId();
       final payUParams = PayUParams(
         merchantId: PayUService.activeMerchantId,
@@ -187,8 +342,8 @@ class _PricingScreenState extends State<PricingScreen> {
         email: widget.email.isEmpty ? 'customer@example.com' : widget.email,
         phone: widget.phone.isEmpty ? '9999999999' : widget.phone,
         isSandbox: !PayUService.isProduction,
-        pg: selectedMethod['pg']!,
-        bankcode: selectedMethod['bankcode']!,
+        pg: 'CC',
+        bankcode: 'CC',
       );
 
       final result = await Navigator.push<PayUResult>(
@@ -292,19 +447,19 @@ class _PricingScreenState extends State<PricingScreen> {
         'payerName': widget.orgName,
         'payerEmail': widget.email,
         'payerPhone': widget.phone,
-        'maxProjects': _selectedPlan == 'Gold'
-            ? _goldProjectsCount
+        'maxProjects': _selectedPlan == 'Platinum'
+            ? _platinumProjectsCount
+            : _selectedPlan == 'Gold'
+            ? 10
             : _selectedPlan == 'Silver'
             ? 3
-            : _selectedPlan == 'Platinum'
-            ? 99999
             : 1,
-        'maxUsers': _selectedPlan == 'Gold'
-            ? (_goldProjectsCount * 1.5).round()
+        'maxUsers': _selectedPlan == 'Platinum'
+            ? (_platinumProjectsCount * 1.5).round()
+            : _selectedPlan == 'Gold'
+            ? 15
             : _selectedPlan == 'Silver'
             ? 5
-            : _selectedPlan == 'Platinum'
-            ? 99999
             : 2,
         'createdAt': FieldValue.serverTimestamp(),
       };
@@ -523,9 +678,9 @@ class _PricingScreenState extends State<PricingScreen> {
                             onPressed: () => Navigator.pop(context),
                           ),
                         ),
-                        const Text(
-                          'Choose Your Plan',
-                          style: TextStyle(
+                        Text(
+                          widget.isManagingExisting ? 'Manage Subscription Plan' : 'Choose Your Plan',
+                          style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0A183D),
@@ -537,9 +692,11 @@ class _PricingScreenState extends State<PricingScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // 1 2 3 Step Indicator Card
-                    _buildStepIndicator(isDesktop),
-                    const SizedBox(height: 24),
+                    // 1 2 3 Step Indicator Card (Only for registration)
+                    if (!widget.isManagingExisting) ...[
+                      _buildStepIndicator(isDesktop),
+                      const SizedBox(height: 24),
+                    ],
 
                     // Headline & Subtitle
                     const Padding(
@@ -809,15 +966,15 @@ class _PricingScreenState extends State<PricingScreen> {
           planName: 'Silver',
           description: 'For small teams starting out',
           price: is6Months
-              ? '₹1,194'
+              ? '₹594'
               : isYearly
-              ? '₹2,388'
-              : '₹199',
+              ? '₹1,188'
+              : '₹99',
           originalPrice: is6Months
-              ? '₹1,794'
+              ? '₹894'
               : isYearly
-              ? '₹3,588'
-              : '₹299',
+              ? '₹1,788'
+              : '₹149',
           features: const [
             'Basic Project Management',
             'Task Tracking & Updates',
@@ -829,21 +986,21 @@ class _PricingScreenState extends State<PricingScreen> {
         _buildPlanCard(
           isDesktop: isDesktop,
           planName: 'Gold',
-          description: 'Comprehensive management with project scaling',
+          description: 'Comprehensive management with fixed project quota',
           price: is6Months
-              ? _formatPrice((_goldProjectsCount * 599.4).round())
+              ? '₹1,194'
               : isYearly
-              ? _formatPrice((_goldProjectsCount * 1198.8).round())
-              : _formatPrice((_goldProjectsCount * 99.9).round()),
+              ? '₹2,388'
+              : '₹199',
           originalPrice: is6Months
-              ? _formatPrice((_goldProjectsCount * 899.4).round())
+              ? '₹1,794'
               : isYearly
-              ? _formatPrice((_goldProjectsCount * 1798.8).round())
-              : _formatPrice((_goldProjectsCount * 149.9).round()),
-          features: [
-            'Up to $_goldProjectsCount Projects & Active Sites',
-            'Up to ${(_goldProjectsCount / 2).round().clamp(2, 25)} Managers',
-            'Up to $_goldProjectsCount Supervisors',
+              ? '₹3,588'
+              : '₹299',
+          features: const [
+            'Up to 10 Projects & Active Sites',
+            'Up to 5 Managers',
+            'Up to 10 Supervisors',
             'Advanced collaboration & Site monitoring',
             'Expense tracking & Monthly report views',
           ],
@@ -852,23 +1009,24 @@ class _PricingScreenState extends State<PricingScreen> {
         _buildPlanCard(
           isDesktop: isDesktop,
           planName: 'Platinum',
-          description: 'For enterprise scale & unlimited access',
+          description: 'For enterprise scale with customizable project limits',
           price: is6Months
-              ? '₹10,794'
+              ? _formatPrice((_platinumProjectsCount * 239.4).round())
               : isYearly
-              ? '₹21,588'
-              : '₹1,799',
+              ? _formatPrice((_platinumProjectsCount * 478.8).round())
+              : _formatPrice((_platinumProjectsCount * 39.9).round()),
           originalPrice: is6Months
-              ? '₹14,994'
+              ? _formatPrice((_platinumProjectsCount * 359.4).round())
               : isYearly
-              ? '₹29,988'
-              : '₹2,499',
-          features: const [
-            'Medium & Large teams (up to 20)',
+              ? _formatPrice((_platinumProjectsCount * 718.8).round())
+              : _formatPrice((_platinumProjectsCount * 59.9).round()),
+          features: [
+            'Up to $_platinumProjectsCount Projects & Active Sites',
+            'Up to ${(_platinumProjectsCount / 2).round().clamp(2, 25)} Managers',
+            'Up to $_platinumProjectsCount Supervisors',
             'Advanced collaboration & Workflows',
             'Real-time site monitoring & Live logs',
             'Comprehensive expense tracking & Audits',
-            'Custom monthly & annual reports',
           ],
         ),
       ],
@@ -888,6 +1046,11 @@ class _PricingScreenState extends State<PricingScreen> {
     final is6Months = _selectedPlanType == '6 Months';
     final isYearly = _selectedPlanType == 'Yearly';
     final Color darkNavy = AppTheme.getDarkAccent(widget.selectedColor);
+    final String formattedCurrent = (widget.currentPlan ?? '').trim().toLowerCase();
+    final bool isCurrentPlan = formattedCurrent.isNotEmpty &&
+        (formattedCurrent == planName.toLowerCase() ||
+            (formattedCurrent.contains('free') &&
+                planName.toLowerCase().contains('free')));
 
     return GestureDetector(
       onTap: () {
@@ -951,14 +1114,54 @@ class _PricingScreenState extends State<PricingScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              planName,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0A183D),
-                                letterSpacing: -0.3,
-                              ),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    planName,
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0A183D),
+                                      letterSpacing: -0.3,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (isCurrentPlan) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle_rounded,
+                                          color: Colors.white,
+                                          size: 12,
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'CURRENT PLAN',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -1031,7 +1234,7 @@ class _PricingScreenState extends State<PricingScreen> {
                         const Divider(color: Color(0xFFE2E8F0), height: 1),
                         const SizedBox(height: 16),
 
-                        if (planName == 'Gold') ...[
+                        if (planName == 'Platinum') ...[
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -1057,7 +1260,7 @@ class _PricingScreenState extends State<PricingScreen> {
                                   ),
                                 ),
                                 child: const Text(
-                                  '₹99.9 / project',
+                                  '₹39.9 / project',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 11.5,
@@ -1075,9 +1278,9 @@ class _PricingScreenState extends State<PricingScreen> {
                               // Minus Button
                               GestureDetector(
                                 onTap: () {
-                                  if (_goldProjectsCount > 5) {
+                                  if (_platinumProjectsCount > 5) {
                                     setState(() {
-                                      _goldProjectsCount--;
+                                      _platinumProjectsCount--;
                                     });
                                   }
                                 },
@@ -1085,14 +1288,14 @@ class _PricingScreenState extends State<PricingScreen> {
                                   width: 38,
                                   height: 38,
                                   decoration: BoxDecoration(
-                                    color: _goldProjectsCount > 5
+                                    color: _platinumProjectsCount > 5
                                         ? darkNavy
                                         : const Color(0xFFE2E8F0),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
                                     Icons.remove,
-                                    color: _goldProjectsCount > 5
+                                    color: _platinumProjectsCount > 5
                                         ? Colors.white
                                         : const Color(0xFF94A3B8),
                                     size: 18,
@@ -1118,7 +1321,7 @@ class _PricingScreenState extends State<PricingScreen> {
                                   ),
                                   child: Center(
                                     child: Text(
-                                      '$_goldProjectsCount Projects Limit',
+                                      '$_platinumProjectsCount Projects Limit',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 13.5,
@@ -1133,9 +1336,9 @@ class _PricingScreenState extends State<PricingScreen> {
                               // Plus Button
                               GestureDetector(
                                 onTap: () {
-                                  if (_goldProjectsCount < 50) {
+                                  if (_platinumProjectsCount < 50) {
                                     setState(() {
-                                      _goldProjectsCount++;
+                                      _platinumProjectsCount++;
                                     });
                                   }
                                 },
@@ -1143,14 +1346,14 @@ class _PricingScreenState extends State<PricingScreen> {
                                   width: 38,
                                   height: 38,
                                   decoration: BoxDecoration(
-                                    color: _goldProjectsCount < 50
+                                    color: _platinumProjectsCount < 50
                                         ? darkNavy
                                         : const Color(0xFFE2E8F0),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
                                     Icons.add,
-                                    color: _goldProjectsCount < 50
+                                    color: _platinumProjectsCount < 50
                                         ? Colors.white
                                         : const Color(0xFF94A3B8),
                                     size: 18,
@@ -1167,13 +1370,13 @@ class _PricingScreenState extends State<PricingScreen> {
                             physics: const BouncingScrollPhysics(),
                             child: Row(
                               children: [5, 10, 15, 20, 25, 30, 40, 50].map((presetCount) {
-                                final isChipSelected = _goldProjectsCount == presetCount;
+                                final isChipSelected = _platinumProjectsCount == presetCount;
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8.0),
                                   child: GestureDetector(
                                     onTap: () {
                                       setState(() {
-                                        _goldProjectsCount = presetCount;
+                                        _platinumProjectsCount = presetCount;
                                       });
                                     },
                                     child: AnimatedContainer(
@@ -1261,15 +1464,74 @@ class _PricingScreenState extends State<PricingScreen> {
                           }),
                         ],
 
+                        if (widget.isManagingExisting && !isCurrentPlan) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _queueUpgrade
+                                  ? const Color(0xFF10B981)
+                                      .withValues(alpha: 0.08)
+                                  : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _queueUpgrade
+                                    ? const Color(0xFF10B981)
+                                        .withValues(alpha: 0.5)
+                                    : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: CheckboxListTile(
+                              value: _queueUpgrade,
+                              onChanged: (val) {
+                                setState(() {
+                                  _queueUpgrade = val ?? false;
+                                });
+                              },
+                              activeColor: const Color(0xFF10B981),
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              title: const Text(
+                                'Queue Upgrade',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              ),
+                              subtitle: Text(
+                                _queueUpgrade
+                                    ? 'New plan automatically activates after current subscription ends.'
+                                    : 'Selected plan upgrade activates immediately.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: _queueUpgrade
+                                      ? const Color(0xFF047857)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+
                         const SizedBox(height: 20),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _register,
+                            onPressed: _isLoading
+                                ? null
+                                : (widget.isManagingExisting
+                                    ? _handleExistingPlanUpdate
+                                    : _register),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: darkNavy,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 18.0),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 18.0),
                               elevation: 4,
                               shadowColor: darkNavy.withValues(alpha: 0.3),
                               shape: RoundedRectangleBorder(
@@ -1286,9 +1548,15 @@ class _PricingScreenState extends State<PricingScreen> {
                                     ),
                                   )
                                 : Text(
-                                    isFreeTrial
-                                        ? 'Start Free Trial'
-                                        : 'Upgrade to $planName',
+                                    widget.isManagingExisting
+                                        ? (isCurrentPlan
+                                            ? 'CURRENT PLAN ACTIVE'
+                                            : (_queueUpgrade
+                                                ? 'QUEUE UPGRADE TO ${planName.toUpperCase()}'
+                                                : 'UPGRADE TO ${planName.toUpperCase()}'))
+                                        : (isFreeTrial
+                                            ? 'Start Free Trial'
+                                            : 'Upgrade to $planName'),
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 15.0,

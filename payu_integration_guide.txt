@@ -1,0 +1,233 @@
+================================================================================
+PAYU PAYMENT GATEWAY INTEGRATION GUIDE & REUSABLE ASSET SPECIFICATION
+================================================================================
+
+OVERVIEW:
+This document provides a comprehensive step-by-step guide on how PayU Hosted 
+Checkout & UPI Payments are integrated in this application, along with exact 
+file assets and instructions to replicate this PayU integration in any new 
+Flutter project.
+
+================================================================================
+1. REQUIRED FILES & ASSETS LIST
+================================================================================
+
+To integrate PayU into another Flutter project, you need the following files:
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ File Path in Project            │ Description / Functionality                │
+├─────────────────────────────────┼────────────────────────────────────────────┤
+│ 1. lib/services/payu_service.dart│ Core PayU Service:                          │
+│                                 │ • SHA-512 Request & Response Hash Engine   │
+│                                 │ • Environment Config (Sandbox/Production)  │
+│                                 │ • Phone/Name/Email Data Sanitization       │
+│                                 │ • Cloud Function Hash & Verification API   │
+│                                 │                                            │
+│ 2. lib/screens/organization/    │ PayU Checkout UI & WebView Screen:         │
+│    payu_checkout_screen.dart    │ • In-app WebView self-submitting HTML form │
+│                                 │ • JavaScript Bridge data extraction        │
+│                                 │ • NavigationDelegate URL Interceptor       │
+│                                 │ • Native UPI Intent launching (gpay/phonepe│
+│                                 │   paytm/upi)                               │
+│                                 │ • Sandbox Quick-Test Floating Toolbar      │
+│                                 │                                            │
+│ 3. .env                         │ Environment Credentials File:              │
+│                                 │ • PayU Merchant ID, Key, Salt (Test & Live)│
+│                                 │ • Gateway Endpoints & Success/Failure URLs │
+│                                 │                                            │
+│ 4. pubspec.yaml                 │ Required Pub Packages (see Section 2)      │
+│                                 │                                            │
+│ 5. android/app/src/main/        │ Android OS Config:                         │
+│    AndroidManifest.xml          │ • Package visibility `<queries>` for UPI   │
+│                                 │                                            │
+│ 6. ios/Runner/Info.plist        │ iOS Config:                                │
+│                                 │ • `LSApplicationQueriesSchemes` for UPI    │
+└─────────────────────────────────┴────────────────────────────────────────────┘
+
+================================================================================
+2. STEP-BY-STEP REPLICATION GUIDE FOR A NEW PROJECT
+================================================================================
+
+STEP 1: ADD REQUIRED DEPENDENCIES TO `pubspec.yaml`
+---------------------------------------------------
+Add the following package dependencies to your new project's `pubspec.yaml`:
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  crypto: ^3.0.6            # SHA-512 Hash Generation
+  flutter_dotenv: ^5.2.1    # .env Environment Variable Loader
+  http: ^1.2.0              # Backend API Communications
+  webview_flutter: ^4.13.0  # In-App WebView for PayU Checkout Page
+  url_launcher: ^6.3.1      # External UPI App Intent Launcher
+```
+Then run:
+`flutter pub get`
+
+
+STEP 2: CREATE ENVIRONMENT CONFIGURATION (`.env`)
+---------------------------------------------------
+Create a `.env` file in the root of your project directory:
+
+```env
+# PayU Gateway Configuration
+
+# Environment Mode: sandbox or production
+PAYU_ENVIRONMENT=sandbox
+
+# Sandbox / Test Credentials
+PAYU_TEST_MERCHANT_ID=9193759
+PAYU_TEST_KEY=GZrAha
+PAYU_TEST_SALT=xpfwrDGBXY4sR5Y8O4xU8OB0seurgJMi
+PAYU_TEST_PAY_URL=https://test.payu.in/_payment
+
+# Production / Live Credentials
+PAYU_PROD_MERCHANT_ID=YOUR_LIVE_MERCHANT_ID
+PAYU_PROD_KEY=YOUR_LIVE_MERCHANT_KEY
+PAYU_PROD_SALT=YOUR_LIVE_MERCHANT_SALT
+PAYU_PROD_PAY_URL=https://secure.payu.in/_payment
+
+# PayU Callback URLs
+PAYU_SURL=https://api.payu.in/public/#/success
+PAYU_FURL=https://api.payu.in/public/#/failure
+```
+
+Ensure `.env` is listed under `assets:` in `pubspec.yaml`:
+```yaml
+flutter:
+  assets:
+    - .env
+```
+
+Initialize `flutter_dotenv` in your `main.dart` `main()` function:
+```dart
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
+  runApp(const MyApp());
+}
+```
+
+
+STEP 3: ADD ANDROID PACKAGE VISIBILITY QUERY PERMISSIONS
+---------------------------------------------------
+In Android 11+ (API Level 30+), apps cannot launch third-party UPI apps (GPay, PhonePe, Paytm) 
+unless declared in `AndroidManifest.xml`.
+
+Add the following `<queries>` block inside `<manifest>` in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <queries>
+        <!-- UPI Intent Scheme for Android 11+ Package Visibility -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PAY" />
+            <data android:scheme="upi" />
+        </intent>
+
+        <!-- Installed UPI Application Packages -->
+        <package android:name="com.google.android.apps.nfc.pay" />
+        <package android:name="com.google.android.apps.tez" />
+        <package android:name="com.phonepe.app" />
+        <package android:name="net.one97.paytm" />
+        <package android:name="in.org.npci.upiapp" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.cred.pay" />
+    </queries>
+</manifest>
+```
+
+
+STEP 4: COPY `payu_service.dart` AND `payu_checkout_screen.dart`
+---------------------------------------------------
+1. Copy `payu_service.dart` to your `lib/services/` folder.
+2. Copy `payu_checkout_screen.dart` to your `lib/screens/` or `lib/widgets/` folder.
+3. Update imports if package names differ.
+
+
+STEP 5: LAUNCH PAYU CHECKOUT FROM YOUR FLUTTER UI
+---------------------------------------------------
+Use the following Flutter code snippet to initiate PayU payment checkout from any screen or button:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:demo_cst/services/payu_service.dart';
+import 'package:demo_cst/screens/organization/payu_checkout_screen.dart';
+
+Future<void> openPayUCheckout(BuildContext context) async {
+  // 1. Generate unique transaction ID
+  final String txnId = PayUService.generateTxnId();
+
+  // 2. Prepare PayU Request Parameters
+  final payUParams = PayUParams(
+    merchantId: PayUService.activeMerchantId,
+    merchantKey: PayUService.activeMerchantKey,
+    merchantSalt: PayUService.activeMerchantSalt,
+    txnid: txnId,
+    amount: 999.0, // Payment amount in INR
+    productInfo: 'Gold Plan Subscription',
+    firstName: 'John Doe',
+    email: 'customer@example.com',
+    phone: '9876543210',
+    isSandbox: !PayUService.isProduction,
+  );
+
+  // 3. Navigate to PayU Checkout Screen
+  final PayUResult? result = await Navigator.push<PayUResult>(
+    context,
+    MaterialPageRoute(
+      builder: (context) => PayUCheckoutScreen(params: payUParams),
+    ),
+  );
+
+  // 4. Handle Payment Outcome
+  if (result != null && result.isSuccess) {
+    debugPrint('Payment Successful! TxnId: ${result.txnid}, PayUMoneyId: ${result.payuMoneyId}');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Payment Successful! Ref: ${result.payuMoneyId}')),
+    );
+  } else {
+    debugPrint('Payment Failed/Cancelled: ${result?.errorMessage}');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result?.errorMessage ?? 'Payment was cancelled.')),
+    );
+  }
+}
+```
+
+================================================================================
+3. TECHNICAL INTEGRATION ARCHITECTURE & DETAILS
+================================================================================
+
+1. HASH GENERATION (SHA-512):
+   PayU requires a secure SHA-512 checksum hash for every payment request.
+   Formula:
+   `sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||salt)`
+
+2. RESPONSE HASH VERIFICATION:
+   PayU returns a response hash to verify response authenticity.
+   Formula:
+   `sha512(salt|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)`
+
+3. IN-APP WEBVIEW & JAVASCRIPT BRIDGE:
+   • The app constructs a dynamic, self-submitting HTML form in `PayUCheckoutScreen`.
+   • The WebView executes `form.submit()` using a `POST` request to `https://test.payu.in/_payment` or `https://secure.payu.in/_payment`.
+   • A JavaScript Channel (`PayUBridge`) and `NavigationDelegate` inspect page URL transitions and extract callback parameters (`/success` or `/failure`).
+
+4. UPI INTENT INTERCEPTION:
+   • When users select UPI (GPay/PhonePe/Paytm), PayU sends deep-link URLs (e.g. `tez://pay`, `phonepe://pay`).
+   • `_checkUrlNavigation()` intercepts these schemes and delegates execution to `url_launcher` using `LaunchMode.externalApplication`.
+
+5. SANDBOX TESTING TOOLBAR:
+   • When running in Sandbox mode (`PAYU_ENVIRONMENT=sandbox`), a developer toolbar is rendered at the top of the checkout screen.
+   • Developers can tap "Quick Test Success" or "Quick Test Failure" to instantly simulate gateway callbacks without manually entering test cards.
+
+================================================================================

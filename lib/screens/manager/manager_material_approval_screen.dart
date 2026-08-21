@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_text_field.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
@@ -22,6 +19,8 @@ class _ManagerMaterialApprovalScreenState
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
+
   @override
   void initState() {
     super.initState();
@@ -37,168 +36,170 @@ class _ManagerMaterialApprovalScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
     final isDesktop = screenWidth >= 1024;
-    final maxContentWidth = 900.0;
 
-    return GlassScaffold(
-      title: 'Material Approval',
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Column(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Material Request Approval',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
                 ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: TabBar(
-                      controller: _tabController,
-                      tabs: const [
-                        Tab(text: "PENDING"),
-                        Tab(text: "APPROVED"),
-                      ],
-                      labelColor: isDark ? Colors.white : primaryColor,
-                      labelStyle: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: isDesktop ? 16 : 14,
-                      ),
-                      unselectedLabelColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
-                      unselectedLabelStyle: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: isDesktop ? 16 : 14,
-                      ),
-                      indicatorColor: primaryColor,
-                      indicatorWeight: 3,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 850.0 : (isTablet ? 680.0 : double.infinity),
+            ),
+            child: Column(
+              children: [
+                // TabBar Container
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    tabs: const [
+                      Tab(text: "PENDING"),
+                      Tab(text: "APPROVED"),
+                    ],
+                    labelColor: primaryColor,
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
+                    unselectedLabelColor: const Color(0xFF64748B),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    indicatorColor: primaryColor,
+                    indicatorWeight: 3,
                   ),
                 ),
-              ),
-              Padding(
-                padding: EdgeInsets.all(isDesktop ? 24 : 16.0),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: GlassTextField(
-                      controller: _searchController,
-                      label: 'Search Requests...',
-                      labelColor: isDark ? Colors.white : const Color(0xFF0A183D),
-                      hintText: 'Search Requests...',
-                      icon: Icons.search,
+
+                // Search Bar
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) =>
+                        setState(() => _searchQuery = v.trim().toLowerCase()),
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search Material Requests...',
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 12.5,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: primaryColor,
+                        size: 20,
+                      ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: Icon(
-                                Icons.clear,
-                                color: isDark ? Colors.white70 : const Color(0xFF0A183D),
-                              ),
+                              icon: const Icon(Icons.clear_rounded, color: Color(0xFF64748B)),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _searchQuery = '');
                               },
                             )
                           : null,
-                      onChanged: (v) =>
-                          setState(() => _searchQuery = v.trim().toLowerCase()),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryColor, width: 1.8),
+                      ),
                     ),
                   ),
                 ),
-              ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: _buildRequestsList('Processing'),
-                  ),
-                ),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: _buildRequestsList('Approved'),
+
+                // TabBarView
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildRequestsList('Processing'),
+                      _buildRequestsList('Approved'),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
         ),
       ),
     );
   }
 
   Widget _buildRequestsList(String status) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
-    final isDesktop = screenWidth >= 1024;
-    final maxModalWidth = 700.0;
-
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService.getCollection(
         'siteMaterialsRequest',
       ).orderBy('date', descending: true).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
+          return const Center(
             child: Text(
               'Error loading requests',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              style: TextStyle(color: Colors.red),
             ),
           );
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: primaryColor));
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.inbox_rounded,
-                  size: isDesktop ? 80 : 60,
-                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'No requests found.',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : const Color(0xFF0A183D),
-                    fontSize: isDesktop ? 20 : 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _buildEmptyState(status);
         }
 
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-
-          // Match status case-insensitively
           final docStatus = (data['status'] ?? '').toString().toLowerCase();
           if (docStatus != status.toLowerCase()) return false;
 
@@ -210,169 +211,166 @@ class _ManagerMaterialApprovalScreenState
         }).toList();
 
         if (docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.inbox_rounded,
-                  size: isDesktop ? 80 : 60,
-                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'No $status requests found.',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : const Color(0xFF0A183D),
-                    fontSize: isDesktop ? 20 : 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _buildEmptyState(status);
         }
 
         return ListView.builder(
-          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 24 : 16),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
             final docId = docs[index].id;
-            return _buildRequestCard(
-              data,
-              docId,
-              isDesktop,
-              isTablet,
-              isMobile,
-              maxModalWidth,
-            );
+            return _buildRequestCard(data, docId);
           },
         );
       },
     );
   }
 
-  Widget _buildRequestCard(
-    Map<String, dynamic> data,
-    String docId,
-    bool isDesktop,
-    bool isTablet,
-    bool isMobile,
-    double maxModalWidth,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final status = data['status'] ?? 'Processing';
-    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
-    final subtextColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
-    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
-
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      onTap: () => _showRequestDetails(
-        data,
-        docId,
-        isDesktop,
-        isTablet,
-        isMobile,
-        maxModalWidth,
+  Widget _buildEmptyState(String status) {
+    final displayStatus = status.toLowerCase() == 'processing' ? 'Pending' : status;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.inventory_2_rounded,
+              size: 64,
+              color: Color(0xFFCBD5E1),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No $displayStatus Requests Found',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0A183D),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'No material requests are currently in this list.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    );
+  }
+
+  Widget _buildRequestCard(Map<String, dynamic> data, String docId) {
+    final status = data['status'] ?? 'Processing';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showRequestDetails(data, docId),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                data['matReqId'] ?? 'REQ-N/A',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                  fontSize: 16,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.inventory_rounded,
+                          color: primaryColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        data['matReqId'] ?? 'REQ-N/A',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                  _buildStatusBadge(status),
+                ],
               ),
-              _buildStatusBadge(status),
+              const SizedBox(height: 12),
+              _infoRow(Icons.place_rounded, data['siteId'] ?? 'Unknown Site'),
+              _infoRow(Icons.assignment_rounded, data['projectName'] ?? 'No Project'),
+              _infoRow(Icons.person_rounded, data['supervisorName'] ?? 'No Supervisor'),
+              const Divider(height: 20, color: Color(0xFFE2E8F0)),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.format_list_bulleted_rounded,
+                    size: 16,
+                    color: Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "${(data['materials'] as List?)?.length ?? 0} Items",
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    data['date'] ?? '',
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: primaryColor,
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          _infoRow(
-            Icons.location_on_outlined,
-            data['siteId'] ?? 'Unknown Site',
-            iconColor: iconColor,
-            textColor: textColor,
-          ),
-          _infoRow(
-            Icons.business_outlined,
-            data['projectName'] ?? 'No Project',
-            iconColor: iconColor,
-            textColor: textColor,
-          ),
-          _infoRow(
-            Icons.person_outline,
-            data['supervisorName'] ?? 'No Supervisor',
-            iconColor: iconColor,
-            textColor: textColor,
-          ),
-          Divider(
-            height: 24,
-            color: isDark ? Colors.white24 : const Color(0xFFE2E8F0),
-          ),
-          Row(
-            children: [
-              Icon(
-                Icons.inventory_2_outlined,
-                size: 16,
-                color: subtextColor,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                "${(data['materials'] as List?)?.length ?? 0} Items",
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                data['date'] ?? '',
-                style: TextStyle(
-                  color: subtextColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: iconColor,
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildStatusBadge(String status) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final isApproved = status.toLowerCase() == 'approved';
-    final color = isApproved
-        ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF059669))
-        : Colors.amber.shade700;
+    final color = isApproved ? const Color(0xFF10B981) : Colors.amber.shade900;
+    final displayStatus = status.toLowerCase() == 'processing' ? 'Pending' : status;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
+        color: isApproved
+            ? const Color(0xFF10B981).withValues(alpha: 0.15)
+            : Colors.amber.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color, width: 1.2),
       ),
       child: Text(
-        status.toUpperCase(),
+        displayStatus.toUpperCase(),
         style: TextStyle(
           color: color,
           fontSize: 11,
@@ -383,32 +381,22 @@ class _ManagerMaterialApprovalScreenState
     );
   }
 
-  Widget _infoRow(IconData icon, String value, {Color? iconColor, Color? textColor}) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final effectiveIconColor = iconColor ?? (isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor);
-    final effectiveTextColor = textColor ?? (isDark ? Colors.white : const Color(0xFF0A183D));
-
+  Widget _infoRow(IconData icon, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 16,
-            color: effectiveIconColor,
-          ),
-          const SizedBox(width: 12),
+          Icon(icon, size: 16, color: primaryColor),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                color: effectiveTextColor,
+              style: const TextStyle(
+                color: Color(0xFF0A183D),
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
+                fontSize: 13.5,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -416,80 +404,54 @@ class _ManagerMaterialApprovalScreenState
     );
   }
 
-  void _showRequestDetails(
-    Map<String, dynamic> data,
-    String docId,
-    bool isDesktop,
-    bool isTablet,
-    bool isMobile,
-    double maxModalWidth,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
+  void _showRequestDetails(Map<String, dynamic> data, String docId) {
     final materials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
-    final isProcessing = data['status'] == 'Processing';
-    final cardBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
-    final subtextColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
-    final accentColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
+    final isProcessing = (data['status'] ?? '').toString().toLowerCase() == 'processing';
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxModalWidth),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(
-                color: isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 20,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 700.0),
             child: Padding(
-              padding: EdgeInsets.all(isDesktop ? 32 : (isTablet ? 24 : 24)),
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white30 : const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        data['matReqId'] ?? 'Request Details',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          fontSize: 18,
+                        ),
                       ),
-                    ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    data['matReqId'] ?? 'Request Details',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: textColor,
-                      fontSize: 20,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _infoRow(Icons.calendar_today_outlined, data['date'] ?? '', iconColor: accentColor, textColor: textColor),
-                  _infoRow(Icons.person_outline, data['supervisorName'] ?? '', iconColor: accentColor, textColor: textColor),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.calendar_today_rounded, data['date'] ?? ''),
+                  _infoRow(Icons.person_rounded, data['supervisorName'] ?? ''),
+                  _infoRow(Icons.place_rounded, data['siteId'] ?? ''),
+                  const SizedBox(height: 20),
                   Text(
                     'REQUESTED MATERIALS',
                     style: TextStyle(
-                      letterSpacing: 1.2,
-                      color: accentColor,
+                      letterSpacing: 1.1,
+                      color: primaryColor,
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
                     ),
@@ -499,24 +461,24 @@ class _ManagerMaterialApprovalScreenState
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: materials.length,
-                      separatorBuilder: (_, index) => Divider(
+                      separatorBuilder: (_, index) => const Divider(
                         height: 1,
-                        color: isDark ? Colors.white24 : const Color(0xFFE2E8F0),
+                        color: Color(0xFFE2E8F0),
                       ),
                       itemBuilder: (c, i) => ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           materials[i]['materialName'] ?? 'Unknown',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.w800,
-                            color: textColor,
-                            fontSize: 15,
+                            color: Color(0xFF0A183D),
+                            fontSize: 14.5,
                           ),
                         ),
                         subtitle: Text(
                           '${materials[i]['materialQty']} ${materials[i]['materialUnit']}',
-                          style: TextStyle(
-                            color: subtextColor,
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
                           ),
@@ -528,35 +490,32 @@ class _ManagerMaterialApprovalScreenState
                     ),
                   ),
                   if (isProcessing) ...[
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
+                      height: 48,
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.check_circle_rounded, size: 20),
                         label: const Text(
                           'APPROVE REQUEST',
                           style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
+                          backgroundColor: const Color(0xFF10B981),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          elevation: 4,
-                          shadowColor: primaryColor.withValues(alpha: 0.4),
                         ),
                         onPressed: () async {
+                          final nav = Navigator.of(ctx);
                           await FirestoreService.getCollection(
                             'siteMaterialsRequest',
                           ).doc(docId).update({'status': 'Approved'});
 
-                          // Notify supervisor of material approval
                           final supName =
                               data['supervisorName']?.toString() ?? '';
                           final reqId = data['matReqId']?.toString() ?? '';
@@ -575,7 +534,7 @@ class _ManagerMaterialApprovalScreenState
                             );
                           }
 
-                          if (mounted) Navigator.pop(context);
+                          nav.pop();
                         },
                       ),
                     ),
@@ -590,13 +549,13 @@ class _ManagerMaterialApprovalScreenState
   }
 
   Widget _buildPriorityChip(String priority) {
-    final color = priority.toLowerCase() == 'high' ? Colors.red : Colors.blue;
+    final isHigh = priority.toLowerCase() == 'high';
+    final color = isHigh ? Colors.red.shade700 : primaryColor;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         priority.toUpperCase(),

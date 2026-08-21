@@ -6,6 +6,7 @@ import 'package:demo_cst/screens/reports/site_summary_page.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/list_extensions.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
@@ -256,10 +257,38 @@ class _OrganizationInsightsScreenState
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    return GlassScaffold(
-      title: 'Expenses Report',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
+    final darkAccent = AppTheme.getDarkAccent(theme.primaryColor);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Site/Project Expenses Report',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  theme.primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -439,8 +468,25 @@ class _OrganizationInsightsScreenState
 
                       SizedBox(
                         width: double.infinity,
-                        child: GlassButton(
-                          label: 'GENERATE REPORT',
+                        height: 52,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.analytics_rounded, size: 20),
+                          label: const Text(
+                            'GENERATE REPORT',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 3,
+                          ),
                           onPressed: _openReport,
                         ),
                       ),

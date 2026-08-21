@@ -9,7 +9,6 @@ import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/expense_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class ManagerExpenses extends StatefulWidget {
   final bool hideAppBar;
@@ -50,9 +49,7 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   File? _selectedBillImage;
   final ImagePicker _picker = ImagePicker();
 
-  /// Generation counter to prevent stale async responses from overwriting
-  /// current data when the user switches sites quickly.
-  int _loadGeneration = 0;
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
@@ -85,7 +82,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   Future<void> _loadSiteIds() async {
     setState(() => isLoadingSites = true);
     try {
-      // 1. Fetch site names from the master Site collection
       final sitesSnapshot = await FirestoreService.sites.get();
       final Map<String, String> names = {
         for (var doc in sitesSnapshot.docs)
@@ -102,11 +98,9 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         siteIds = fetchedSiteIds..sort();
         isLoadingSites = false;
 
-        // Auto-select if only one site ID exists
         if (siteIds.length == 1) {
           selectedSiteId = siteIds.first;
           _loadSiteDetails(selectedSiteId!);
-          // Don't load existing expenses — bill list starts empty
         }
       });
     } catch (e) {
@@ -122,7 +116,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     String? projectName;
 
     try {
-      // 1. Try to fetch from siteSupervisorMap (by document ID first, then by field)
       final docRef = FirestoreService.siteSupervisorMap.doc(siteId);
       final docSnap = await docRef.get();
 
@@ -132,7 +125,6 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         projectPhase = data['projectStage']?.toString();
         projectName = (data['projectName'] ?? data['project_name'])?.toString();
       } else {
-        // Fallback: search by 'site' field
         final mapSnapshot = await FirestoreService.siteSupervisorMap
             .where('site', isEqualTo: siteId)
             .limit(1)
@@ -146,133 +138,41 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         }
       }
 
-      // 1.5 Fetch supervisor name if supervisorId exists
       if (supervisorId != null && supervisorId.isNotEmpty) {
-        final supervisorSnap = await FirestoreService.supervisors
-            .doc(supervisorId)
-            .get();
-        if (supervisorSnap.exists) {
-          final sData = supervisorSnap.data();
-          supervisorName =
-              sData?['supervisorName']?.toString() ??
-              sData?['name']?.toString() ??
-              supervisorId;
-        } else {
-          supervisorName = supervisorId;
+        try {
+          final supDoc =
+              await FirestoreService.supervisors.doc(supervisorId).get();
+          if (supDoc.exists) {
+            final supData = supDoc.data();
+            supervisorName =
+                supData?['username'] ??
+                supData?['UserName'] ??
+                supData?['name'];
+          }
+        } catch (e) {
+          debugPrint('Error fetching supervisor details: $e');
         }
       }
 
-      // 2. Fetch from projects collection (high priority for name)
-      final projectSnapshot = await FirestoreService.projects
-          .where('siteId', isEqualTo: siteId.trim())
-          .limit(1)
-          .get();
+      projectName ??= siteNameMap[siteId] ?? 'N/A';
 
-      if (projectSnapshot.docs.isNotEmpty) {
-        final pData = projectSnapshot.docs.first.data();
-        final pName = pData['projectName']?.toString();
-        if (pName != null && pName.trim().isNotEmpty) {
-          projectName = pName;
-        }
-        // Also get phase if missing
-        if (projectPhase == null || projectPhase.isEmpty) {
-          projectPhase = (pData['projectStage'] ?? pData['status'])?.toString();
-        }
-      }
-
-      // 3. Last fallback to Site Name from master list
-      if (projectName == null || projectName.trim().isEmpty) {
-        projectName = siteNameMap[siteId] ?? 'Project $siteId';
-      }
-
-      if (!mounted) return;
-      setState(() {
-        selectedSupervisorId = supervisorId;
-        selectedSupervisorName = supervisorName;
-        selectedProjectPhase = projectPhase;
-        selectedProjectName = projectName;
-
-        supervisorIdController.text = supervisorId ?? 'Not Assigned';
-        projectPhaseController.text = projectPhase ?? 'N/A';
-        projectNameController.text = projectName ?? 'Unknown Project';
-      });
-    } catch (e) {
-      debugPrint('Error loading site details: $e');
       if (mounted) {
         setState(() {
-          projectNameController.text = siteNameMap[siteId] ?? siteId;
+          selectedSupervisorId = supervisorId ?? 'NOT_ASSIGNED';
+          selectedSupervisorName = supervisorName ?? supervisorId ?? 'N/A';
+          selectedProjectPhase = projectPhase ?? 'N/A';
+          selectedProjectName = projectName;
+
+          supervisorIdController.text =
+              supervisorName != null && supervisorName.isNotEmpty
+                  ? '$supervisorName ($supervisorId)'
+                  : (supervisorId ?? 'Not Assigned');
+          projectPhaseController.text = projectPhase ?? 'Not Assigned';
+          projectNameController.text = projectName ?? 'Not Assigned';
         });
       }
-    }
-  }
-
-  Future<void> _loadExistingExpenses() async {
-    if (selectedSiteId == null) return;
-
-    // Increment generation so any in-flight request from a previous site
-    // selection will be discarded when it completes.
-    final thisGeneration = ++_loadGeneration;
-
-    setState(() {
-      isLoadingBills = true;
-      // Clear immediately so stale data is never visible
-      bills = [];
-      initialBills = [];
-      existingDailyTotal = 0.0;
-    });
-
-    final formattedDate = DateFormat('ddMMyyyy').format(selectedDate);
-    final docId = '${selectedSiteId}_$formattedDate';
-
-    try {
-      final docSnap = await FirestoreService.managerExpenses.doc(docId).get();
-
-      // If the user switched site while we were fetching, discard this result.
-      if (!mounted || _loadGeneration != thisGeneration) return;
-
-      if (docSnap.exists) {
-        final data = docSnap.data();
-        if (data != null) {
-          if (data['bills'] != null) {
-            final List<dynamic> loadedBills = data['bills'];
-            double loadedTotal = 0.0;
-            for (var bill in loadedBills) {
-              final amount = bill['billAmount'];
-              double parsed = 0.0;
-              if (amount is num) {
-                parsed = amount.toDouble();
-              } else if (amount is String) {
-                parsed =
-                    double.tryParse(amount.replaceAll(RegExp(r'[^\d.]'), '')) ??
-                    0.0;
-              }
-              loadedTotal += parsed;
-            }
-            setState(() {
-              bills = loadedBills
-                  .map((b) => Map<String, dynamic>.from(b))
-                  .toList();
-              initialBills = loadedBills
-                  .map((b) => Map<String, dynamic>.from(b))
-                  .toList();
-              existingDailyTotal = loadedTotal;
-            });
-          } else if (data['totalAmount'] != null) {
-            // Document exists but no bills array, use top-level total
-            final amount = data['totalAmount'];
-            if (amount is num) {
-              existingDailyTotal = amount.toDouble();
-            }
-          }
-        }
-      }
-      // If no document exists, bills stay empty (already cleared above)
     } catch (e) {
-      debugPrint('Error loading existing expenses: $e');
-    } finally {
-      if (mounted && _loadGeneration == thisGeneration) {
-        setState(() => isLoadingBills = false);
-      }
+      debugPrint('Error loading site details: $e');
     }
   }
 
@@ -281,14 +181,26 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
       context: context,
       initialDate: selectedDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime(2101),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: primaryColor,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: const Color(0xFF0A183D),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && picked != selectedDate) {
       setState(() {
         selectedDate = picked;
-        billDateController.text = DateFormat('dd/MM/yyyy').format(picked);
+        billDateController.text = DateFormat('dd/MM/yyyy').format(selectedDate);
       });
-      _loadExistingExpenses();
     }
   }
 
@@ -331,7 +243,10 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
     ]);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Data refreshed successfully!')),
+      const SnackBar(
+        content: Text('Data refreshed successfully!'),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -340,22 +255,28 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         billVendorController.text.isEmpty ||
         billAmountController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all bill fields')),
+        const SnackBar(
+          content: Text('Please fill all bill fields'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
 
     if (selectedSiteId == null || selectedProjectName == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select Site first')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Site first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
     setState(() => isUploadingImage = true);
 
     try {
-      String billUrl = "billURL"; // Default as per user's structure
+      String billUrl = "billURL";
       if (_selectedBillImage != null) {
         final uploadedUrl = await _uploadBillImage(
           _selectedBillImage!,
@@ -383,215 +304,693 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         _selectedBillImage = null;
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error adding bill: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error adding bill: $e')));
+      }
     } finally {
       setState(() => isUploadingImage = false);
     }
   }
 
+  void _removeBill(int index) {
+    setState(() {
+      bills.removeAt(index);
+    });
+  }
+
+  Future<void> _handleSubmit() async {
+    if (selectedSiteId == null ||
+        selectedSupervisorId == null ||
+        selectedProjectPhase == null ||
+        selectedProjectName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a valid site'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (bills.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one bill'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final dateStr = DateFormat('ddMMyyyy').format(selectedDate);
+    final docId = '${selectedSiteId}_$dateStr';
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Confirm Expense Submission',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Site ID: $selectedSiteId', style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569))),
+            Text('Project: $selectedProjectName', style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569))),
+            Text('Total Bills: ${bills.length}', style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569))),
+            const SizedBox(height: 12),
+            const Text(
+              'Are you sure you want to submit these manager expenses?',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Submit', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => isSubmitting = true);
+
+    try {
+      final docRef = FirestoreService.managerEntries.doc(docId);
+
+      double newSessionTotal = 0.0;
+      for (var bill in bills) {
+        final amount = bill['billAmount'];
+        if (amount is num) {
+          newSessionTotal += amount.toDouble();
+        }
+      }
+
+      final docSnap = await docRef.get();
+
+      if (docSnap.exists) {
+        final existingData = docSnap.data() as Map<String, dynamic>;
+        final List<dynamic> existingBills = existingData['bills'] ?? [];
+
+        final combinedBills = [...existingBills, ...bills];
+
+        double totalAmount = 0.0;
+        for (var bill in combinedBills) {
+          final amount = bill['billAmount'];
+          if (amount is num) {
+            totalAmount += amount.toDouble();
+          }
+        }
+
+        await docRef.update({
+          'bills': combinedBills,
+          'totalAmount': totalAmount,
+          'managerId': managerId,
+          'entryDate': Timestamp.now(),
+        });
+      } else {
+        await docRef.set({
+          'bills': bills,
+          'entryDate': Timestamp.now(),
+          'managerId': managerId,
+          'projectName': selectedProjectName,
+          'projectStage': selectedProjectPhase,
+          'siteId': selectedSiteId,
+          'supervisorName': selectedSupervisorId,
+          'totalAmount': newSessionTotal,
+        });
+      }
+
+      double managerExpenseTotalAmount = 0;
+      final allEntrySnap = await docRef.get();
+      if (allEntrySnap.exists) {
+        final data = allEntrySnap.data() as Map<String, dynamic>;
+        final billsList = data['bills'] as List<dynamic>? ?? [];
+        for (var bill in billsList) {
+          final amt = (bill['billAmount'] ?? 0).toDouble();
+          managerExpenseTotalAmount += amt;
+        }
+      }
+
+      final summaryData = {
+        'date': selectedDate.toIso8601String(),
+        'managerExpenseTotalAmount': managerExpenseTotalAmount,
+        'managerId': managerId ?? '',
+        'projectName': selectedProjectName ?? '',
+        'projectStage': selectedProjectPhase ?? '',
+        'siteId': selectedSiteId ?? '',
+      };
+
+      await FirestoreService.managerExpenseSummary.doc(docId).set(summaryData);
+
+      await ExpenseService.updateTotalMgrExpenseForSite(selectedSiteId!);
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20.0),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 60.0),
+                const SizedBox(height: 16.0),
+                const Text(
+                  'Expenses Submitted!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18.0,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0A183D),
+                  ),
+                ),
+                const SizedBox(height: 6.0),
+                const Text(
+                  'Manager expense entry has been successfully logged.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+
+        setState(() {
+          bills = [];
+          initialBills = [];
+          existingDailyTotal = 0.0;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error submitting expenses: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit expenses: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isSubmitting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
     final isDesktop = screenWidth >= 1024;
 
-    return GlassScaffold(
-      title: widget.hideAppBar ? null : 'Manager Expenses',
-      onBack: widget.hideAppBar ? null : () => Navigator.pop(context),
-      actions: [
-        if (!widget.hideAppBar)
-          Center(
-            child: Container(
-              width: 38,
-              height: 38,
-              margin: const EdgeInsets.only(right: 16),
-              decoration: BoxDecoration(
-                color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                icon: const Icon(
-                  Icons.refresh_rounded,
+    Widget content = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isDesktop ? 850.0 : (isTablet ? 680.0 : double.infinity),
+        ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.all(isDesktop ? 28.0 : 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header Banner Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
                   color: Colors.white,
-                  size: 20,
-                ),
-                onPressed: _refreshData,
-                tooltip: 'Refresh',
-              ),
-            ),
-          ),
-      ],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isMobile ? double.infinity : 600,
-          ),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(
-              isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0),
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: isDesktop ? 900.0 : double.infinity,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildInfoSection(theme, isDesktop, isTablet, isMobile),
-                    SizedBox(height: isDesktop ? 32.0 : 24.0),
-                    _buildBillFormSection(theme, isDesktop, isTablet, isMobile),
-                    SizedBox(height: isDesktop ? 32.0 : 24.0),
-                    _buildBillsListSection(
-                      theme,
-                      isDesktop,
-                      isTablet,
-                      isMobile,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
-                    SizedBox(height: isDesktop ? 40.0 : 32.0),
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: isSubmitting || bills.isEmpty
-                            ? null
-                            : _handleSubmit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
-                          foregroundColor: const Color(0xFF0A183D),
-                          disabledBackgroundColor: const Color(0xFF0B1942),
-                          disabledForegroundColor: const Color(0xFF94A3B8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: primaryColor,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Manager Expenses',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0A183D),
+                              letterSpacing: -0.3,
+                            ),
                           ),
-                          elevation: 6,
-                        ),
-                        child: isSubmitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Color(0xFF0A183D),
-                                ),
-                              )
-                            : const Text(
-                                'SUBMIT EXPENSES',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Record manager expenditure, vendor bills & stage logs',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+              const SizedBox(height: 20),
+
+              // SECTION 1: SITE & PROJECT INFO
+              _buildSectionHeader(
+                title: '1. Site & Project Details',
+                subtitle: 'Choose site ID and verify supervisor/phase info',
+                icon: Icons.location_on_rounded,
+                color: primaryColor,
+              ),
+              const SizedBox(height: 16),
+              isLoadingSites
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Site ID *',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0A183D),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          initialValue: siteIds.contains(selectedSiteId) ? selectedSiteId : null,
+                          isExpanded: true,
+                          dropdownColor: Colors.white,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            color: Color(0xFF0A183D),
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Select Site ID',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.business_rounded,
+                              color: primaryColor,
+                              size: 20.0,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: primaryColor, width: 1.8),
+                            ),
+                          ),
+                          items: siteIds
+                              .map(
+                                (site) => DropdownMenuItem<String>(
+                                  value: site,
+                                  child: Text(
+                                    site,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF0A183D),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedSiteId = value;
+                              selectedSupervisorId = null;
+                              selectedProjectPhase = null;
+                              selectedProjectName = null;
+                              supervisorIdController.clear();
+                              projectPhaseController.clear();
+                              projectNameController.clear();
+                              bills = [];
+                              initialBills = [];
+                              existingDailyTotal = 0.0;
+                            });
+                            if (value != null) {
+                              _loadSiteDetails(value);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                    ),
+              _buildCustomField(
+                label: 'Supervisor',
+                controller: supervisorIdController,
+                icon: Icons.person_rounded,
+                readOnly: true,
+              ),
+              _buildCustomField(
+                label: 'Project Phase',
+                controller: projectPhaseController,
+                icon: Icons.timeline_rounded,
+                readOnly: true,
+              ),
+              _buildCustomField(
+                label: 'Project Name',
+                controller: projectNameController,
+                icon: Icons.assignment_rounded,
+                readOnly: true,
+              ),
+
+              // Date Picker Row
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Entry Date *',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0A183D),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  InkWell(
+                    onTap: () => _selectDate(context),
+                    borderRadius: BorderRadius.circular(12.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12.0),
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            color: primaryColor,
+                            size: 20.0,
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Expense Date:',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            DateFormat('dd/MM/yyyy').format(selectedDate),
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0A183D),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+              const Divider(color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 16),
+
+              // SECTION 2: ADD BILL DETAILS
+              _buildSectionHeader(
+                title: '2. Add Bill Details',
+                subtitle: 'Upload bill copy, vendor and amount',
+                icon: Icons.receipt_long_rounded,
+                color: Colors.indigo,
+              ),
+              const SizedBox(height: 16),
+              _buildImagePicker(isDesktop, isTablet, isMobile),
+              const SizedBox(height: 14),
+              _buildCustomField(
+                label: 'Bill Number',
+                controller: billNoController,
+                icon: Icons.numbers_rounded,
+              ),
+              _buildCustomField(
+                label: 'Bill Date',
+                controller: billDateController,
+                icon: Icons.calendar_today_rounded,
+                readOnly: true,
+              ),
+              _buildCustomField(
+                label: 'Vendor Name',
+                controller: billVendorController,
+                icon: Icons.storefront_rounded,
+              ),
+              _buildCustomField(
+                label: 'Amount (₹)',
+                controller: billAmountController,
+                icon: Icons.currency_rupee_rounded,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: isUploadingImage ? null : _addBill,
+                  icon: const Icon(
+                    Icons.add_circle_outline_rounded,
+                    color: Colors.white,
+                    size: 20.0,
+                  ),
+                  label: const Text(
+                    "Add Bill to List",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    elevation: 2.0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+              const Divider(color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 16),
+
+              // SECTION 3: BILLS OVERVIEW
+              _buildSectionHeader(
+                title: '3. Expense Bills Overview',
+                subtitle: 'Review added bills before final submission',
+                icon: Icons.list_alt_rounded,
+                color: Colors.teal,
+              ),
+              const SizedBox(height: 16),
+              _buildBillsListSection(isDesktop, isTablet, isMobile),
+
+              const SizedBox(height: 28),
+
+              // SUBMIT BUTTON
+              SizedBox(
+                height: 50,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 3.0,
+                    shadowColor: primaryColor.withValues(alpha: 0.35),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14.0),
+                    ),
+                  ),
+                  onPressed: isSubmitting || bills.isEmpty ? null : _handleSubmit,
+                  icon: const Icon(Icons.check_circle_rounded, size: 20),
+                  label: isSubmitting
+                      ? const SizedBox(
+                          width: 22.0,
+                          height: 22.0,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Text(
+                          'Submit Manager Expenses',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.0,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
-  }
 
-  Widget _buildInfoSection(
-    ThemeData theme,
-    bool isDesktop,
-    bool isTablet,
-    bool isMobile,
-  ) {
-    final darkCardBg = AppTheme.getDarkAccent(theme.colorScheme.primary);
+    if (widget.hideAppBar) {
+      return Container(
+        color: const Color(0xFFF1F5F9),
+        child: SafeArea(child: content),
+      );
+    }
 
-    return Container(
-      padding: EdgeInsets.all(isDesktop ? 28.0 : 20.0),
-      decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Site & Project Details',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              fontSize: isDesktop ? 20.0 : 18.0,
-              letterSpacing: -0.4,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Manager Expenses',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
-          SizedBox(height: isDesktop ? 24.0 : 20.0),
-          isLoadingSites
-              ? const LinearProgressIndicator()
-              : _buildDropdown(
-                  'Select Site ID',
-                  siteIds,
-                  selectedSiteId,
-                  (v) {
-                    setState(() {
-                      selectedSiteId = v;
-                      selectedSupervisorId = null;
-                      selectedProjectPhase = null;
-                      selectedProjectName = null;
-                      supervisorIdController.clear();
-                      projectPhaseController.clear();
-                      projectNameController.clear();
-                      bills = [];
-                      initialBills = [];
-                      existingDailyTotal = 0.0;
-                    });
-                    if (v != null) {
-                      _loadSiteDetails(v);
-                    }
-                  },
-                  isDesktop,
-                  isTablet,
-                  isMobile,
-                ),
-          SizedBox(height: isDesktop ? 16.0 : 14.0),
-          _buildCustomField(
-            label: 'Supervisor',
-            controller: supervisorIdController,
-            icon: Icons.person_rounded,
-            readOnly: true,
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+            onPressed: _refreshData,
+            tooltip: 'Refresh',
           ),
-          SizedBox(height: isDesktop ? 16.0 : 14.0),
-          _buildCustomField(
-            label: 'Project Phase',
-            controller: projectPhaseController,
-            icon: Icons.timeline_rounded,
-            readOnly: true,
-          ),
-          SizedBox(height: isDesktop ? 16.0 : 14.0),
-          _buildCustomField(
-            label: 'Project Name',
-            controller: projectNameController,
-            icon: Icons.assignment_rounded,
-            readOnly: true,
-          ),
-          SizedBox(height: isDesktop ? 16.0 : 14.0),
-          _buildDatePicker(theme, isDesktop, isTablet, isMobile),
         ],
       ),
+      body: SafeArea(child: content),
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0A183D),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -609,194 +1008,95 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
         Text(
           label,
           style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
+            fontSize: 12.5,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+        TextFormField(
+          controller: controller,
+          readOnly: readOnly,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-          child: TextFormField(
-            controller: controller,
-            readOnly: readOnly,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            hintText: 'Enter $label',
+            hintStyle: TextStyle(
+              color: Colors.grey.shade400,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w400,
             ),
-            decoration: InputDecoration(
-              hintText: 'Enter $label',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              prefixIcon: Icon(
-                icon,
-                color: const Color(0xFF0A183D),
-                size: 20,
-              ),
+            filled: true,
+            fillColor: readOnly ? Colors.grey.shade100 : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
+            ),
+            prefixIcon: Icon(
+              icon,
+              color: primaryColor,
+              size: 20,
             ),
           ),
         ),
+        const SizedBox(height: 14),
       ],
     );
   }
 
-  Widget _buildBillFormSection(
-    ThemeData theme,
-    bool isDesktop,
-    bool isTablet,
-    bool isMobile,
-  ) {
-    final primaryColor = theme.colorScheme.primary;
-    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
-
-    return Container(
-      padding: EdgeInsets.all(isDesktop ? 28.0 : 20.0),
-      decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Add Bill',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              fontSize: isDesktop ? 20.0 : 18.0,
-              letterSpacing: -0.4,
-            ),
-          ),
-          SizedBox(height: isDesktop ? 24.0 : 20.0),
-          _buildImagePicker(theme, isDesktop, isTablet, isMobile),
-          SizedBox(height: isDesktop ? 16.0 : 14.0),
-          _buildCustomField(
-            label: 'Bill Number',
-            controller: billNoController,
-            icon: Icons.receipt_long_rounded,
-          ),
-          SizedBox(height: isDesktop ? 16.0 : 14.0),
-          _buildCustomField(
-            label: 'Bill Date',
-            controller: billDateController,
-            icon: Icons.calendar_today_rounded,
-            readOnly: true,
-          ),
-          SizedBox(height: isDesktop ? 16.0 : 14.0),
-          _buildCustomField(
-            label: 'Vendor Name',
-            controller: billVendorController,
-            icon: Icons.storefront_rounded,
-          ),
-          SizedBox(height: isDesktop ? 16.0 : 14.0),
-          _buildCustomField(
-            label: 'Amount (₹)',
-            controller: billAmountController,
-            icon: Icons.currency_rupee_rounded,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          ),
-          SizedBox(height: isDesktop ? 24.0 : 20.0),
-          Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: isUploadingImage ? null : _addBill,
-                icon: const Icon(Icons.add_rounded, size: 20),
-                label: const Text(
-                  'ADD BILL',
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: const Color(0xFF0A183D),
-                  disabledBackgroundColor: const Color(0xFF1E293B),
-                  disabledForegroundColor: const Color(0xFF94A3B8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: BorderSide(
-                      color: isUploadingImage
-                          ? const Color(0xFF334155)
-                          : Colors.transparent,
-                    ),
-                  ),
-                  elevation: 4,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildImagePicker(
-    ThemeData theme,
     bool isDesktop,
     bool isTablet,
     bool isMobile,
   ) {
-    final primaryColor = theme.colorScheme.primary;
     return InkWell(
       onTap: _pickBillImage,
-      borderRadius: BorderRadius.circular(16.0),
+      borderRadius: BorderRadius.circular(12.0),
       child: Container(
-        height: isDesktop ? 180.0 : 150.0,
+        height: 130.0,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16.0),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.0),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2),
-            width: 1.5,
+            color: const Color(0xFFCBD5E1),
+            width: 1.2,
           ),
         ),
         child: _selectedBillImage != null
             ? ClipRRect(
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: BorderRadius.circular(12.0),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
                     Image.file(_selectedBillImage!, fit: BoxFit.cover),
                     Positioned(
-                      top: isDesktop ? 12.0 : 8.0,
-                      right: isDesktop ? 12.0 : 8.0,
+                      top: 8.0,
+                      right: 8.0,
                       child: CircleAvatar(
-                        backgroundColor: const Color(0xFF0B1942),
+                        backgroundColor: const Color(0xFF0A183D),
+                        radius: 16,
                         child: IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.white),
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
                           onPressed: () =>
                               setState(() => _selectedBillImage = null),
                         ),
@@ -810,15 +1110,15 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
                 children: [
                   Icon(
                     Icons.add_a_photo_rounded,
-                    size: isDesktop ? 48.0 : 38.0,
+                    size: 36.0,
                     color: primaryColor,
                   ),
-                  SizedBox(height: isDesktop ? 12.0 : 8.0),
+                  const SizedBox(height: 8.0),
                   const Text(
                     'Upload Bill Copy (Optional)',
                     style: TextStyle(
-                      color: Color(0xFFCBD5E1),
-                      fontSize: 13.5,
+                      color: Color(0xFF64748B),
+                      fontSize: 13.0,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -829,451 +1129,162 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
   }
 
   Widget _buildBillsListSection(
-    ThemeData theme,
     bool isDesktop,
     bool isTablet,
     bool isMobile,
   ) {
-    final primaryColor = theme.colorScheme.primary;
-    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
-
     if (isLoadingBills) {
-      return Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: darkCardBg,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
-    if (bills.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: EdgeInsets.all(isDesktop ? 28.0 : 20.0),
-      decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Bills List',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              fontSize: isDesktop ? 20.0 : 18.0,
-              letterSpacing: -0.4,
-            ),
-          ),
-          SizedBox(height: isDesktop ? 20.0 : 16.0),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF0A183D),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(const Color(0xFF05112E)),
-                  headingTextStyle: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    fontSize: 13.5,
-                  ),
-                  dataTextStyle: const TextStyle(
-                    color: Color(0xFFE2E8F0),
-                    fontSize: 13,
-                  ),
-                  horizontalMargin: 16,
-                  columnSpacing: isDesktop ? 32.0 : 24.0,
-                  columns: const [
-                    DataColumn(label: Text('Bill No')),
-                    DataColumn(label: Text('Vendor')),
-                    DataColumn(label: Text('Amount')),
-                    DataColumn(label: Text('Action')),
-                  ],
-                  rows: bills.asMap().entries.map((entry) {
-                    final bill = entry.value;
-                    final amount = bill['billAmount'];
-                    String amountStr = '0.00';
-                    if (amount is num) {
-                      amountStr = amount.toStringAsFixed(2);
-                    } else if (amount is String) {
-                      amountStr = amount.replaceAll(RegExp(r'[^\d.]'), '');
-                    }
 
-                    return DataRow(
-                      cells: [
-                        DataCell(
-                          Text(
-                            bill['billNo']?.toString() ?? '',
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            bill['billVendor']?.toString() ?? '',
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              color: Color(0xFFCBD5E1),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            '₹ $amountStr',
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: Color(0xFFF87171),
-                              size: 20,
-                            ),
-                            onPressed: () =>
-                                setState(() => bills.removeAt(entry.key)),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
+    if (bills.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              Icon(
+                Icons.receipt_long_rounded,
+                size: 44,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'No bills added yet',
+                style: TextStyle(
+                  color: Color(0xFF0A183D),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDropdown(
-    String label,
-    List<String> items,
-    String? value,
-    Function(String?) onChanged,
-    bool isDesktop,
-    bool isTablet,
-    bool isMobile,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$label *',
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+              const SizedBox(height: 4),
+              Text(
+                'Add bill details above and tap "Add Bill to List"',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
-          child: DropdownButtonFormField<String>(
-            isExpanded: true,
-            value: value,
-            dropdownColor: Colors.white,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-            ),
-            decoration: InputDecoration(
-              hintText: label,
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-              prefixIcon: const Icon(
-                Icons.location_on_rounded,
-                color: Color(0xFF0A183D),
-                size: 20,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16.0),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-            ),
-            items: items.map((id) {
-              final name = siteNameMap[id] ?? 'Unnamed Site';
-              return DropdownMenuItem(
-                value: id,
-                child: Text(
-                  '$id - $name',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    color: Color(0xFF0A183D),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              );
-            }).toList(),
-            onChanged: onChanged,
-          ),
         ),
-      ],
-    );
-  }
+      );
+    }
 
-  Widget _buildDatePicker(
-    ThemeData theme,
-    bool isDesktop,
-    bool isTablet,
-    bool isMobile,
-  ) {
+    double total = 0;
+    for (var bill in bills) {
+      final amt = bill['billAmount'];
+      if (amt is num) {
+        total += amt.toDouble();
+      }
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Date *',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${bills.length} Bill(s) Added',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0A183D),
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                'Total: ₹${total.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: primaryColor,
+                  fontSize: 14,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: () => _selectDate(context),
-          borderRadius: BorderRadius.circular(16.0),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_rounded,
-                  size: 20,
-                  color: Color(0xFF0A183D),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    DateFormat('dd MMM yyyy').format(selectedDate),
-                    style: const TextStyle(
-                      color: Color(0xFF0A183D),
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
+        const SizedBox(height: 12),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: bills.length,
+          itemBuilder: (context, index) {
+            final bill = bills[index];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.receipt_rounded,
+                      color: primaryColor,
+                      size: 18,
                     ),
                   ),
-                ),
-                const Icon(
-                  Icons.edit_calendar_rounded,
-                  size: 18,
-                  color: Color(0xFF0A183D),
-                ),
-              ],
-            ),
-          ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          bill['billVendor']?.toString() ?? 'Vendor',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0A183D),
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        Text(
+                          'Bill No: ${bill['billNo']?.toString() ?? 'N/A'}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '₹${bill['billAmount']?.toString() ?? '0'}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: primaryColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 18,
+                    ),
+                    onPressed: () => _removeBill(index),
+                    tooltip: 'Remove Bill',
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ],
     );
-  }
-
-  Future<void> _handleSubmit() async {
-    if (selectedSiteId == null || selectedProjectName == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select Site')));
-      return;
-    }
-
-    setState(() => isSubmitting = true);
-    try {
-      final formattedDate = DateFormat('ddMMyyyy').format(selectedDate);
-      final docId = '${selectedSiteId}_$formattedDate';
-
-      // 1. Fetch existing bills from Firestore to merge and preserve other fields if needed
-      final docSnap = await FirestoreService.managerExpenses.doc(docId).get();
-      List<Map<String, dynamic>> mergedBills = [];
-      List<Map<String, dynamic>> newBills = [];
-
-      final Map<String, dynamic> docData = {
-        'siteId': selectedSiteId,
-        'projectName': selectedProjectName,
-        'projectStage': selectedProjectPhase ?? 'N/A',
-        'supervisorName': selectedSupervisorName ?? managerId ?? 'demo',
-        'entryDate': Timestamp.now(),
-        'totalAmount': 0.0, // Will be updated below
-        'expenseId': docId,
-        'managerId': managerId ?? 'UNKNOWN_MANAGER',
-        'status': 'Pending',
-        'timestamp': FieldValue.serverTimestamp(),
-      };
-
-      if (docSnap.exists) {
-        final existingData = docSnap.data();
-        if (existingData != null) {
-          if (existingData['bills'] != null) {
-            final List<dynamic> dbBills = existingData['bills'];
-            mergedBills = dbBills
-                .map((b) => Map<String, dynamic>.from(b))
-                .toList();
-          }
-          docData['status'] = existingData['status'] ?? 'Pending';
-          docData['entryDate'] =
-              existingData['entryDate'] ?? docData['entryDate'];
-          if (existingData['timestamp'] != null) {
-            docData['timestamp'] = existingData['timestamp'];
-          }
-        }
-
-        // Identify new bills not present in the initially loaded list
-        for (final bill in bills) {
-          final isExisting = initialBills.any(
-            (b) =>
-                b['billNo'] == bill['billNo'] &&
-                b['billVendor'] == bill['billVendor'] &&
-                b['billAmount'] == bill['billAmount'],
-          );
-          if (!isExisting) {
-            newBills.add(bill);
-          }
-        }
-        mergedBills.addAll(newBills);
-      } else {
-        mergedBills = List<Map<String, dynamic>>.from(bills);
-        newBills = List<Map<String, dynamic>>.from(bills);
-      }
-
-      docData['bills'] = mergedBills;
-
-      // Robustly calculate the sum total of all bills inside the list
-      double totalAmount = 0.0;
-      for (var bill in mergedBills) {
-        final amount = bill['billAmount'];
-        if (amount is num) {
-          totalAmount += amount.toDouble();
-        } else if (amount is String) {
-          totalAmount +=
-              double.tryParse(amount.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
-        }
-      }
-      docData['totalAmount'] = totalAmount;
-
-      // Calculate increment from new bills only
-      double increment = 0.0;
-      for (var bill in newBills) {
-        final amount = bill['billAmount'];
-        if (amount is num) {
-          increment += amount.toDouble();
-        } else if (amount is String) {
-          increment +=
-              double.tryParse(amount.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
-        }
-      }
-
-      // 2. Save manager expense document
-      await FirestoreService.managerExpenses.doc(docId).set(docData);
-
-      // 3. Save corresponding summary in managerExpenseSummary
-      final summary = {
-        'date': selectedDate.toIso8601String(),
-        'mgrExpenseTotalAmount': totalAmount,
-        'projectName': selectedProjectName,
-        'projectStage': selectedProjectPhase ?? '',
-        'siteId': selectedSiteId ?? '',
-      };
-      await FirestoreService.managerExpenseSummary.doc(docId).set(summary);
-
-      // 4. Atomically update totalMgrExpense and totalAllExpenses in totalSiteExpensesPerDay collection
-      try {
-        final totalsRef = FirestoreService.getCollection(
-          'totalSiteExpensesPerDay',
-        ).doc(selectedSiteId!);
-        await FirebaseFirestore.instance.runTransaction((txn) async {
-          final snap = await txn.get(totalsRef);
-          double existingMgr = 0.0;
-          double existingAll = 0.0;
-          if (snap.exists) {
-            final Map<String, dynamic>? d = snap.data();
-            if (d != null) {
-              final v1 = d['totalMgrExpense'];
-              final v2 = d['totalAllExpenses'];
-              if (v1 is num) existingMgr = v1.toDouble();
-              if (v2 is num) existingAll = v2.toDouble();
-            }
-          }
-          txn.set(totalsRef, {
-            'siteId': selectedSiteId,
-            'totalMgrExpense': existingMgr + increment,
-            'totalAllExpenses': existingAll + increment,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        });
-      } catch (e) {
-        debugPrint('Failed to increment totals: $e');
-      }
-
-      // 5. Update totalMgrExpense in totalSiteExpensesPerDay and sync project document
-      await ExpenseService.updateTotalMgrExpenseForSite(selectedSiteId!);
-
-      if (mounted) {
-        setState(() {
-          bills = [];
-          initialBills = [];
-          existingDailyTotal = 0.0;
-          billNoController.clear();
-          billVendorController.clear();
-          billAmountController.clear();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Expenses submitted successfully')),
-        );
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => isSubmitting = false);
-    }
   }
 }

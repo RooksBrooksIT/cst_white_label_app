@@ -30,29 +30,44 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: colorScheme.primary,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         centerTitle: true,
-        title: Text(
+        title: const Text(
           "Financial Report",
           style: TextStyle(
-            color: colorScheme.onPrimary,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.getDarkAccent(colorScheme.primary),
+                Color.alphaBlend(
+                  colorScheme.primary.withValues(alpha: 0.35),
+                  AppTheme.getDarkAccent(colorScheme.primary),
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         leading: IconButton(
-          icon: Icon(
+          icon: const Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: colorScheme.onPrimary,
-            size: 20,
+            color: Colors.white,
+            size: 18,
           ),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf_outlined),
+            icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
             onPressed: () => _generatePdf(context, siteId ?? 'N/A', paymentPeriod ?? 'N/A'),
           ),
         ],

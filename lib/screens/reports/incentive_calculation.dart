@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_button.dart';
 import 'package:demo_cst/screens/reports/incentive_calculation_sheet.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
@@ -27,6 +24,8 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
 
   bool _loading = true;
 
+  Color get primaryColor => Theme.of(context).colorScheme.primary;
+
   @override
   void initState() {
     super.initState();
@@ -34,115 +33,162 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
   }
 
   Future<void> _fetchSiteSupervisorData() async {
-    final snapshot = await FirestoreService.siteSupervisorEntries.get();
-    final siteIds = <String>{};
-    final siteSupervisors = <String, String>{};
-    final siteProjectStages = <String, Set<String>>{};
+    try {
+      final snapshot = await FirestoreService.siteSupervisorEntries.get();
+      final siteIds = <String>{};
+      final siteSupervisors = <String, String>{};
+      final siteProjectStages = <String, Set<String>>{};
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      final site = data['siteId'] as String? ?? '';
-      final supervisor = data['supervisorId'] as String? ?? '';
-      final projectStage = data['projectStage'] as String? ?? '';
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final site = data['siteId'] as String? ?? '';
+        final supervisor = data['supervisorId'] as String? ?? '';
+        final projectStage = data['projectStage'] as String? ?? '';
 
-      if (site.isNotEmpty) siteIds.add(site);
-      if (site.isNotEmpty && supervisor.isNotEmpty) {
-        siteSupervisors[site] = supervisor;
+        if (site.isNotEmpty) siteIds.add(site);
+        if (site.isNotEmpty && supervisor.isNotEmpty) {
+          siteSupervisors[site] = supervisor;
+        }
+        if (site.isNotEmpty && projectStage.isNotEmpty) {
+          siteProjectStages.putIfAbsent(site, () => <String>{}).add(projectStage);
+        }
       }
-      if (site.isNotEmpty && projectStage.isNotEmpty) {
-        siteProjectStages.putIfAbsent(site, () => <String>{}).add(projectStage);
-      }
+
+      if (!mounted) return;
+      setState(() {
+        _siteIds = siteIds.toList();
+        _siteSupervisors = siteSupervisors;
+        _siteProjectStages = siteProjectStages;
+        _filteredProjectStages = [];
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching site supervisor data: $e');
+      if (!mounted) return;
+      setState(() => _loading = false);
     }
-
-    if (!mounted) return;
-    setState(() {
-      _siteIds = siteIds.toList();
-      _siteSupervisors = siteSupervisors;
-      _siteProjectStages = siteProjectStages;
-      _filteredProjectStages = [];
-      _loading = false;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
     final isDesktop = screenWidth >= 1024;
-    final maxContentWidth = 900.0;
 
-    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
-    final subtextColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
-    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
-    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
-    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
-
-    return GlassScaffold(
-      title: 'Incentive Calculation',
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: _loading
-          ? Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-              ),
-            )
-          : SingleChildScrollView(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxContentWidth),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop ? 24 : (isTablet ? 20 : 16),
-                      vertical: isDesktop ? 24 : 20,
-                    ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Incentive Calculation',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 800.0 : (isTablet ? 650.0 : double.infinity),
+            ),
+            child: _loading
+                ? Center(child: CircularProgressIndicator(color: primaryColor))
+                : SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.all(isDesktop ? 24.0 : 16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        GlassCard(
+                        // Main Calculation Card
+                        Card(
+                          elevation: 0,
+                          color: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(20.0),
                             child: Form(
                               key: _formKey,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Calculate Incentives',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      color: textColor,
-                                      fontSize: 20,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: primaryColor.withValues(alpha: 0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.calculate_rounded,
+                                          color: primaryColor,
+                                          size: 22,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: const [
+                                          Text(
+                                            'Calculate Incentives',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0A183D),
+                                              fontSize: 18,
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Select site details to calculate incentives',
+                                            style: TextStyle(
+                                              color: Color(0xFF64748B),
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Select site details to calculate incentives',
-                                    style: TextStyle(
-                                      color: subtextColor,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Text(
+                                  const Divider(height: 28, color: Color(0xFFE2E8F0)),
+
+                                  const Text(
                                     'Site Information',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w800,
-                                      color: textColor,
-                                      fontSize: 16,
+                                      color: Color(0xFF0A183D),
+                                      fontSize: 15,
                                     ),
                                   ),
                                   const SizedBox(height: 16),
+
                                   _buildDropdown(
-                                    label: 'Site ID',
+                                    label: 'Site ID *',
                                     value: _selectedSiteId,
                                     items: _siteIds,
                                     onChanged: (newValue) {
@@ -164,45 +210,47 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                         : null,
                                   ),
                                   const SizedBox(height: 16),
+
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
+                                      const Text(
                                         'Supervisor Name',
                                         style: TextStyle(
-                                          color: labelColor,
-                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF0A183D),
+                                          fontWeight: FontWeight.bold,
                                           fontSize: 13,
                                         ),
                                       ),
                                       const SizedBox(height: 6),
                                       TextFormField(
-                                        style: TextStyle(
-                                          color: textColor,
+                                        style: const TextStyle(
+                                          color: Color(0xFF0A183D),
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 15,
+                                          fontSize: 14.5,
                                         ),
                                         decoration: InputDecoration(
                                           prefixIcon: Icon(
-                                            Icons.person_outline,
-                                            color: iconColor,
+                                            Icons.person_rounded,
+                                            color: primaryColor,
+                                            size: 20,
                                           ),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: BorderSide(color: borderColor),
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: BorderSide(color: borderColor),
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
+                                            borderRadius: BorderRadius.circular(12),
                                             borderSide: BorderSide(color: primaryColor, width: 1.8),
                                           ),
                                           filled: true,
-                                          fillColor: fieldBg,
+                                          fillColor: Colors.white,
                                           contentPadding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
+                                            horizontal: 14,
                                             vertical: 14,
                                           ),
                                         ),
@@ -214,8 +262,9 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                     ],
                                   ),
                                   const SizedBox(height: 16),
+
                                   _buildDropdown(
-                                    label: 'Project Stage',
+                                    label: 'Project Stage *',
                                     value: _selectedProjectStage,
                                     items: _filteredProjectStages,
                                     onChanged: (newValue) {
@@ -228,47 +277,91 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                         : null,
                                   ),
                                   const SizedBox(height: 28),
-                                  GlassButton(
-                                    label: 'CALCULATE',
-                                    onPressed: _calculate,
+
+                                  // Calculate Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton.icon(
+                                      icon: const Icon(Icons.check_circle_rounded, size: 20),
+                                      label: const Text(
+                                        'CALCULATE',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: primaryColor,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        elevation: 2,
+                                      ),
+                                      onPressed: _calculate,
+                                    ),
                                   ),
                                   const SizedBox(height: 12),
-                                  GlassButton(
-                                    label: 'RESET',
-                                    onPressed: _reset,
-                                    isSecondary: true,
+
+                                  // Reset Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: OutlinedButton.icon(
+                                      icon: const Icon(Icons.refresh_rounded, size: 20),
+                                      label: const Text(
+                                        'RESET',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: const Color(0xFF0A183D),
+                                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                      ),
+                                      onPressed: _reset,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
+
+                        // Information Card
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: primaryColor.withValues(alpha: isDark ? 0.15 : 0.08),
+                            color: primaryColor.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: primaryColor.withValues(alpha: 0.3),
-                              width: 1.0,
+                              color: primaryColor.withValues(alpha: 0.25),
                             ),
                           ),
                           child: Row(
                             children: [
                               Icon(
-                                Icons.info_outline,
-                                color: iconColor,
-                                size: 24,
+                                Icons.info_outline_rounded,
+                                color: primaryColor,
+                                size: 22,
                               ),
-                              const SizedBox(width: 16),
+                              const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
-                                  'Select a site to view available project stages and calculate incentives',
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13.5,
+                                  'Select a site to view available project stages and calculate performance incentives.',
+                                  style: const TextStyle(
+                                    color: Color(0xFF0A183D),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ),
@@ -278,9 +371,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ),
+          ),
         ),
       ),
     );
@@ -293,23 +384,14 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
     required ValueChanged<String?> onChanged,
     String? Function(String?)? validator,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
-    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
-    final iconColor = isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor;
-    final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: labelColor,
-            fontWeight: FontWeight.w700,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontWeight: FontWeight.bold,
             fontSize: 13,
           ),
         ),
@@ -317,31 +399,31 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
         DropdownButtonFormField<String>(
           value: (value != null && items.contains(value)) ? value : null,
           isExpanded: true,
-          dropdownColor: isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white,
+          dropdownColor: Colors.white,
           decoration: InputDecoration(
-            prefixIcon: Icon(Icons.list_alt, color: iconColor),
+            prefixIcon: Icon(Icons.list_alt_rounded, color: primaryColor, size: 20),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: borderColor),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: borderColor),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: primaryColor, width: 1.8),
             ),
             filled: true,
-            fillColor: fieldBg,
+            fillColor: Colors.white,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
+              horizontal: 14,
               vertical: 14,
             ),
           ),
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 14,
-            color: textColor,
+            color: Color(0xFF0A183D),
             fontWeight: FontWeight.w700,
           ),
           items: items.map((String val) {
@@ -349,9 +431,9 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
               value: val,
               child: Text(
                 val,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
-                  color: textColor,
+                  color: Color(0xFF0A183D),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -360,11 +442,11 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
           onChanged: onChanged,
           validator: validator,
           hint: Text(
-            'Select $label',
+            'Select ${label.replaceAll(' *', '')}',
             style: TextStyle(
-              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+              color: Colors.grey.shade400,
               fontWeight: FontWeight.w600,
-              fontSize: 14,
+              fontSize: 13.5,
             ),
           ),
         ),

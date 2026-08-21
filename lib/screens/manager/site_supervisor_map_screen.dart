@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class SiteSupervisorMapScreen extends StatefulWidget {
   const SiteSupervisorMapScreen({super.key});
@@ -15,6 +14,9 @@ class SiteSupervisorMapScreen extends StatefulWidget {
 
 class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   bool isEntrySelected = true;
+  int _infoCurrentPage = 1;
+  final int _infoItemsPerPage = 10;
+  String _infoSearchQuery = '';
 
   String? selectedSite;
   String? selectedSupervisor;
@@ -28,7 +30,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   Map<String, String> _siteToDocId = {};
   Map<String, Map<String, dynamic>> _docCache = {};
-  Map<String, Map<String, dynamic>> _siteDocCache = {};
 
   final locationController = TextEditingController();
   final commentsController = TextEditingController();
@@ -36,7 +37,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   List<String> siteList = [];
   List<Map<String, String>> _supervisorList = [];
 
-  Color get primaryColor => Theme.of(context).colorScheme.primary;
+  Color get primaryColor => Theme.of(context).primaryColor;
 
   @override
   void initState() {
@@ -45,220 +46,175 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     _fetchSupervisors();
   }
 
-  void _fetchSupervisors() async {
+  @override
+  void dispose() {
+    locationController.dispose();
+    commentsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchSupervisors() async {
     try {
       final snapshot = await FirestoreService.getCollection('supervisor').get();
       if (!mounted) return;
-      final List<Map<String, String>> supervisors = [];
-      final Set<String> seenIds = {};
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final supId = (data['SupervisorId']?.toString() ?? doc.id).trim();
-        final fullName = (data['FullName']?.toString() ?? '').trim();
-        if (supId.isNotEmpty && !seenIds.contains(supId)) {
-          seenIds.add(supId);
-          supervisors.add({'id': supId, 'fullName': fullName});
+
+      final loaded = <Map<String, String>>[];
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>? ?? {};
+        final supId = (data['SupervisorId'] ?? doc.id).toString();
+        final fullName = (data['FullName'] ?? '').toString();
+
+        if (supId.isNotEmpty) {
+          loaded.add({
+            'id': supId,
+            'fullName': fullName,
+          });
         }
       }
+
       setState(() {
-        _supervisorList = supervisors;
+        _supervisorList = loaded;
       });
     } catch (e) {
       debugPrint('Error fetching supervisors: $e');
     }
   }
 
-  void _fetchSiteSupervisorMapDocs() async {
+  Future<void> _fetchSiteSupervisorMapDocs() async {
     try {
-      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
-      final List<String> allSiteIds = [];
-      final Map<String, Map<String, dynamic>> siteDocCache = {};
-      for (final doc in sitesSnapshot.docs) {
-        if (doc.id.isNotEmpty) {
-          allSiteIds.add(doc.id);
-          siteDocCache[doc.id] = doc.data();
-        }
-      }
-
-      final snapshot = await FirestoreService.getCollection(
+      final querySnapshot = await FirestoreService.getCollection(
         'siteSupervisorMap',
       ).get();
-      if (!mounted) return;
 
-      final Map<String, String> siteToDocId = {};
-      final Map<String, Map<String, dynamic>> docCache = {};
+      final tempSiteList = <String>[];
+      final tempSiteToDocId = <String, String>{};
+      final tempCache = <String, Map<String, dynamic>>{};
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final site = data['site']?.toString();
-        if (site != null && site.isNotEmpty) {
-          siteToDocId[site] = doc.id;
-          docCache[doc.id] = data;
-        }
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>? ?? {};
+        final docId = doc.id;
+        final siteName = data['site'] ?? data['siteName'] ?? data['siteId'] ?? docId;
+
+        tempSiteList.add(siteName);
+        tempSiteToDocId[siteName] = docId;
+        tempCache[docId] = data;
       }
 
+      if (!mounted) return;
       setState(() {
-        _siteToDocId = siteToDocId;
-        _docCache = docCache;
-        _siteDocCache = siteDocCache;
-        siteList = allSiteIds..sort();
+        siteList = tempSiteList;
+        _siteToDocId = tempSiteToDocId;
+        _docCache = tempCache;
       });
-    } catch (error) {
-      debugPrint('Error fetching siteSupervisorMap: $error');
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error fetching site list')),
+        SnackBar(content: Text('Error fetching site mapping docs: $e')),
       );
     }
   }
 
-  Future<Map<String, dynamic>> _fetchProjectDataForSite(String siteId) async {
+  Future<void> _autoFillFromSite(String siteName) async {
     try {
-      var projSnap = await FirestoreService.getCollection('projects')
-          .where('siteId', isEqualTo: siteId)
+      final docId = _siteToDocId[siteName] ?? siteName;
+
+      Map<String, dynamic>? data = _docCache[docId];
+
+      if (data == null) {
+        final docSnap = await FirestoreService.getCollection(
+          'siteSupervisorMap',
+        ).doc(docId).get();
+        if (docSnap.exists) {
+          data = docSnap.data();
+          if (data != null) _docCache[docId] = data;
+        }
+      }
+
+      if (data != null) {
+        _applyMapData(data);
+        return;
+      }
+
+      final siteSnap = await FirestoreService.getCollection('sites')
+          .where('siteName', isEqualTo: siteName)
           .limit(1)
           .get();
 
-      if (projSnap.docs.isEmpty) {
-        final siteData = _siteDocCache[siteId];
-        final sName = siteData?['siteName']?.toString();
-        if (sName != null && sName.isNotEmpty && sName != siteId) {
-          projSnap = await FirestoreService.getCollection('projects')
-              .where('siteName', isEqualTo: sName)
-              .limit(1)
-              .get();
-        }
-      }
-
-      if (projSnap.docs.isNotEmpty) {
-        return projSnap.docs.first.data();
+      if (siteSnap.docs.isNotEmpty) {
+        final siteData = siteSnap.docs.first.data();
+        _applyMapData(siteData);
       }
     } catch (e) {
-      debugPrint('Error fetching project data for site $siteId: $e');
+      debugPrint('Error auto-filling from site: $e');
     }
-    return {};
   }
 
-  String _extractProjectName(Map<String, dynamic> pData) {
-    final name = (pData['projectName']?.toString() ?? '').trim();
-    if (name.isNotEmpty) return name;
-    return (pData['siteName']?.toString() ?? '').trim();
-  }
-
-  void _autoFillFromSite(String siteName) async {
-    final docId = _siteToDocId[siteName];
-    if (docId != null) {
-      final data = _docCache[docId];
-      if (data != null) {
-        String pName = (data['projectName']?.toString() ?? '').trim();
-        String pStage = (data['projectStage']?.toString() ?? '').trim();
-        String loc = (data['location']?.toString() ?? '').trim();
-        DateTime? sDate = _parseDate(data['startDate']);
-        DateTime? eDate = _parseDate(data['endDate']);
-
-        if (pName.isEmpty || sDate == null || eDate == null) {
-          final pData = await _fetchProjectDataForSite(siteName);
-          if (pData.isNotEmpty) {
-            if (pName.isEmpty) pName = _extractProjectName(pData);
-            if (pStage.isEmpty)
-              pStage = (pData['projectStage']?.toString() ?? '').trim();
-            if (loc.isEmpty)
-              loc = (pData['location'] ?? pData['siteLocation'])?.toString() ??
-                  '';
-            sDate ??= _parseDate(pData['plannedStartDate']) ??
-                _parseDate(pData['startDate']);
-            eDate ??= _parseDate(pData['plannedEndDate']) ??
-                _parseDate(pData['endDate']);
-          }
-        }
-
-        if (pName.isEmpty) {
-          final siteData = _siteDocCache[siteName];
-          pName = (siteData?['siteName']?.toString() ?? '').trim();
-          if (loc.isEmpty)
-            loc = (siteData?['location']?.toString() ?? '').trim();
-          sDate ??= _parseDate(siteData?['startDate']);
-          eDate ??= _parseDate(siteData?['endDate']);
-        }
-
-        if (!mounted) return;
-        setState(() {
-          selectedSupervisorId = data['Supervisor ID']?.toString() ?? '';
-          selectedSupervisor = data['supervisor']?.toString() ?? '';
-          projectName = pName;
-          selectedProjectStage = pStage;
-          locationController.text = loc;
-          commentsController.text = data['siteComments']?.toString() ?? '';
-          startDate = sDate;
-          endDate = eDate;
-          joinedDate = _parseDate(data['joinedOn']);
-        });
-        return;
-      }
-    }
-
+  void _applyMapData(Map<String, dynamic> data) {
+    if (!mounted) return;
     setState(() {
-      selectedSupervisorId = '';
-      selectedSupervisor = '';
-      projectName = '';
-      selectedProjectStage = '';
-      locationController.clear();
-      commentsController.clear();
-      startDate = null;
-      endDate = null;
-      joinedDate = null;
+      projectName = data['projectName'] ?? data['project'] ?? '';
+
+      final rawSupervisorId = (data['Supervisor ID'] ?? data['supervisorId'] ?? data['SupervisorId'] ?? '').toString();
+      final rawSupervisorName = (data['supervisor'] ?? data['supervisorName'] ?? data['FullName'] ?? '').toString();
+
+      if (rawSupervisorId.isNotEmpty) {
+        selectedSupervisorId = rawSupervisorId;
+      }
+
+      if (rawSupervisorName.isNotEmpty) {
+        selectedSupervisor = rawSupervisorName;
+      } else if (selectedSupervisorId != null && selectedSupervisorId!.isNotEmpty) {
+        final match = _supervisorList.firstWhere(
+          (s) => s['id'] == selectedSupervisorId,
+          orElse: () => {'id': '', 'fullName': ''},
+        );
+        selectedSupervisor = match['fullName'];
+      }
+
+      selectedProjectStage = data['projectStage'] ?? data['stage'] ?? '';
+      selectedSite = data['site'] ?? data['siteName'] ?? data['siteId'] ?? selectedSite;
+
+      locationController.text = data['location'] ?? data['address'] ?? '';
+      commentsController.text = data['siteComments'] ?? data['comments'] ?? '';
+
+      startDate = _parseDate(data['startDate'] ?? data['start_date']);
+      endDate = _parseDate(data['endDate'] ?? data['end_date']);
+
+      joinedDate = _parseDate(data['joinedDate'] ?? data['joined_date'] ?? data['Joined On']);
     });
-
-    try {
-      final pData = await _fetchProjectDataForSite(siteName);
-      String pName = '';
-      String pStage = '';
-      String loc = '';
-      DateTime? sDate;
-      DateTime? eDate;
-
-      if (pData.isNotEmpty) {
-        pName = _extractProjectName(pData);
-        pStage = (pData['projectStage']?.toString() ?? '').trim();
-        loc = (pData['location'] ?? pData['siteLocation'])?.toString() ?? '';
-        sDate = _parseDate(pData['plannedStartDate']) ??
-            _parseDate(pData['startDate']);
-        eDate = _parseDate(pData['plannedEndDate']) ??
-            _parseDate(pData['endDate']);
-      }
-
-      final siteData = _siteDocCache[siteName];
-      if (siteData != null) {
-        if (pName.isEmpty)
-          pName = (siteData['siteName']?.toString() ?? '').trim();
-        if (loc.isEmpty)
-          loc = (siteData['location']?.toString() ?? '').trim();
-        sDate ??= _parseDate(siteData['startDate']);
-        eDate ??= _parseDate(siteData['endDate']);
-      }
-
-      if (!mounted) return;
-      setState(() {
-        projectName = pName;
-        selectedProjectStage = pStage;
-        locationController.text = loc;
-        startDate = sDate;
-        endDate = eDate;
-      });
-    } catch (e) {
-      debugPrint('Error auto-filling for new site $siteName: $e');
-    }
   }
 
-  DateTime? _parseDate(dynamic value) {
-    if (value == null) return null;
-    if (value is Timestamp) return value.toDate();
-    if (value is String && value.isNotEmpty) {
+  DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    if (val is Timestamp) return val.toDate();
+    if (val is String && val.isNotEmpty) {
       try {
-        return DateTime.parse(value);
+        return DateTime.parse(val);
       } catch (_) {}
     }
     return null;
+  }
+
+  Future<void> _selectAnyDate(BuildContext context, {required String dateType}) async {
+    DateTime initial = DateTime.now();
+    if (dateType == 'joined' && joinedDate != null) initial = joinedDate!;
+    if (dateType == 'start' && startDate != null) initial = startDate!;
+    if (dateType == 'end' && endDate != null) initial = endDate!;
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (dateType == 'joined') joinedDate = picked;
+        if (dateType == 'start') startDate = picked;
+        if (dateType == 'end') endDate = picked;
+      });
+    }
   }
 
   void resetForm() {
@@ -269,136 +225,169 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       selectedProjectStage = null;
       projectName = null;
       siteComments = null;
-      locationController.clear();
-      commentsController.clear();
       joinedDate = null;
       startDate = null;
       endDate = null;
+
+      locationController.clear();
+      commentsController.clear();
     });
   }
 
-  void saveForm() async {
+  Future<void> _showSaveConfirmationDialog(BuildContext context) async {
     if (selectedSite == null || selectedSite!.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a site.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a site')),
+      );
+      return;
+    }
+    if (selectedSupervisorId == null || selectedSupervisorId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a supervisor ID')),
+      );
       return;
     }
 
-    try {
-      final docIdToUse =
-          _siteToDocId[selectedSite] ?? selectedSite!.replaceAll(' ', '');
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'Confirm Save',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
+          ),
+          content: Text(
+            'Are you sure you want to save mapping for site "$selectedSite" with supervisor "$selectedSupervisor" ($selectedSupervisorId)?',
+            style: const TextStyle(color: Color(0xFF64748B)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('SAVE'),
+            ),
+          ],
+        );
+      },
+    );
 
-      final Map<String, dynamic> dataToSave = {
-        'site': selectedSite,
-        'Supervisor ID': selectedSupervisorId ?? '',
-        'supervisor': selectedSupervisor ?? '',
-        'projectName': projectName ?? '',
-        'projectStage': selectedProjectStage ?? '',
-        'location': locationController.text.trim(),
-        'siteComments': commentsController.text.trim(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
-      if (startDate != null) dataToSave['startDate'] = startDate;
-      if (endDate != null) dataToSave['endDate'] = endDate;
-      if (joinedDate != null) dataToSave['joinedOn'] = joinedDate;
-
-      await FirestoreService.getCollection('siteSupervisorMap')
-          .doc(docIdToUse)
-          .set(dataToSave, SetOptions(merge: true));
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Form saved successfully!')),
-      );
-
-      _fetchSiteSupervisorMapDocs();
-      resetForm();
-    } catch (e) {
-      debugPrint('Error saving form: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error saving form.')));
+    if (result == true) {
+      await _saveMappingData();
     }
   }
 
-  @override
-  void dispose() {
-    locationController.dispose();
-    commentsController.dispose();
-    super.dispose();
+  Future<void> _saveMappingData() async {
+    try {
+      final docId = _siteToDocId[selectedSite] ?? selectedSite!;
+
+      final mappingData = {
+        'site': selectedSite,
+        'siteName': selectedSite,
+        'projectName': projectName ?? '',
+        'location': locationController.text.trim(),
+        'Supervisor ID': selectedSupervisorId ?? '',
+        'supervisorId': selectedSupervisorId ?? '',
+        'supervisor': selectedSupervisor ?? '',
+        'supervisorName': selectedSupervisor ?? '',
+        'projectStage': selectedProjectStage ?? '',
+        'siteComments': commentsController.text.trim(),
+        'startDate': startDate != null ? DateFormat('yyyy-MM-dd').format(startDate!) : '',
+        'endDate': endDate != null ? DateFormat('yyyy-MM-dd').format(endDate!) : '',
+        'Joined On': joinedDate != null ? DateFormat('yyyy-MM-dd').format(joinedDate!) : '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await FirestoreService.getCollection('siteSupervisorMap')
+          .doc(docId)
+          .set(mappingData, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Site-Supervisor mapping saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      _docCache[docId] = mappingData;
+
+      setState(() {
+        isEntrySelected = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save mapping: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
-    final Color darkCardBg = AppTheme.getDarkAccent(primaryColor);
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return GlassScaffold(
-      padding: EdgeInsets.zero,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Site Supervisor Mapping',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header Row ──────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  Text(
-                    'Site-Supervisor Mapping',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                ],
-              ),
-            ),
-
-            // ── Dark Pill Mode Switcher ──────────────────────────────────────
+            // Mode Switcher Bar
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: darkCardBg,
-                borderRadius: BorderRadius.circular(18),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: darkCardBg.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -411,31 +400,25 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: isEntrySelected
-                              ? primaryColor
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(14),
+                          color: isEntrySelected ? primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.edit_note_rounded,
-                              size: 18,
-                              color: isEntrySelected
-                                  ? Colors.white
-                                  : const Color(0xFFCBD5E1),
+                              size: 16,
+                              color: isEntrySelected ? Colors.white : const Color(0xFF0A183D),
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'ENTRY',
+                              'MAPPING ENTRY',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                                color: isEntrySelected
-                                    ? Colors.white
-                                    : const Color(0xFFCBD5E1),
+                                letterSpacing: 0.4,
+                                color: isEntrySelected ? Colors.white : const Color(0xFF0A183D),
                               ),
                             ),
                           ],
@@ -450,31 +433,25 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: !isEntrySelected
-                              ? primaryColor
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(14),
+                          color: !isEntrySelected ? primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.info_outline_rounded,
-                              size: 18,
-                              color: !isEntrySelected
-                                  ? Colors.white
-                                  : const Color(0xFFCBD5E1),
+                              Icons.map_rounded,
+                              size: 16,
+                              color: !isEntrySelected ? Colors.white : const Color(0xFF0A183D),
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'INFO',
+                              'MAPPING INFO',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                                color: !isEntrySelected
-                                    ? Colors.white
-                                    : const Color(0xFFCBD5E1),
+                                letterSpacing: 0.4,
+                                color: !isEntrySelected ? Colors.white : const Color(0xFF0A183D),
                               ),
                             ),
                           ],
@@ -486,23 +463,22 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
             ),
 
-            // ── Scrollable Tab Content ──────────────────────────────────────
+            // Content Body
             Expanded(
-              child: Center(
+              child: Align(
+                alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: isMobile ? double.infinity : 600,
-                  ),
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    child: isEntrySelected
-                        ? _buildEntrySection(darkCardBg, primaryColor)
-                        : _buildInfoTableSection(darkCardBg, primaryColor),
-                  ),
+                  constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+                  child: isEntrySelected
+                      ? SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          child: _buildEntrySection(),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          child: _buildInfoTableSection(),
+                        ),
                 ),
               ),
             ),
@@ -512,20 +488,20 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     );
   }
 
-  // ── ENTRY SECTION ─────────────────────────────────────────────────────────
-  Widget _buildEntrySection(Color darkCardBg, Color primaryColor) {
+  Widget _buildEntrySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: darkCardBg,
-            borderRadius: BorderRadius.circular(24),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
             boxShadow: [
               BoxShadow(
-                color: darkCardBg.withValues(alpha: 0.25),
-                blurRadius: 16,
+                color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -533,22 +509,30 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Mapping Details',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: -0.3,
-                ),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.connect_without_contact_rounded,
+                    color: Color(0xFF3B82F6),
+                    size: 24,
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    'Mapping Details',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
 
-              // Select Site Dropdown
               _buildSiteDropdown(),
               const SizedBox(height: 14),
 
-              // Project Name (read-only)
               _buildTextField(
                 label: 'Project Name',
                 controller: TextEditingController(text: projectName ?? ''),
@@ -558,7 +542,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Location
               _buildTextField(
                 label: 'Location',
                 controller: locationController,
@@ -567,11 +550,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Supervisor ID Dropdown
               _buildSupervisorIdDropdown(),
               const SizedBox(height: 14),
 
-              // Supervisor Name (read-only)
               _buildTextField(
                 label: 'Supervisor Name',
                 controller: TextEditingController(text: selectedSupervisor ?? ''),
@@ -581,7 +562,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Project Stage (read-only)
               _buildTextField(
                 label: 'Project Stage',
                 controller: TextEditingController(text: selectedProjectStage ?? ''),
@@ -591,7 +571,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Site (read-only)
               _buildTextField(
                 label: 'Site',
                 controller: TextEditingController(text: selectedSite ?? ''),
@@ -601,7 +580,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Site Comments
               _buildTextField(
                 label: 'Site Comments',
                 controller: commentsController,
@@ -611,7 +589,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Start Date (read-only)
               _buildTextField(
                 label: 'Start Date',
                 controller: TextEditingController(
@@ -625,7 +602,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
               const SizedBox(height: 14),
 
-              // End Date (read-only)
               _buildTextField(
                 label: 'End Date',
                 controller: TextEditingController(
@@ -639,7 +615,6 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Joined On Date Picker
               _buildDateField(
                 label: 'Joined On',
                 date: joinedDate,
@@ -650,15 +625,14 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         ),
         const SizedBox(height: 20),
 
-        // Action buttons
-        _buildActionButtons(primaryColor),
-        const SizedBox(height: 24),
+        _buildActionButtons(),
+        const SizedBox(height: 80),
       ],
     );
   }
 
   Widget _buildSiteDropdown() {
-    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+    final brandIconColor = Theme.of(context).primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -668,27 +642,21 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
             value: selectedSite,
             isExpanded: true,
             dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             style: const TextStyle(
               color: Color(0xFF0A183D),
               fontSize: 14.5,
@@ -698,7 +666,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               hintText: 'Select Site',
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
               prefixIcon: Padding(
@@ -706,13 +674,10 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 child: Icon(
                   Icons.location_on_rounded,
                   color: brandIconColor,
-                  size: 22,
+                  size: 20,
                 ),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
+              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -742,7 +707,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   }
 
   Widget _buildSupervisorIdDropdown() {
-    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+    final brandIconColor = Theme.of(context).primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,21 +717,15 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
             value: (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
@@ -774,7 +733,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 : null,
             isExpanded: true,
             dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             style: const TextStyle(
               color: Color(0xFF0A183D),
               fontSize: 14.5,
@@ -784,7 +743,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               hintText: 'Select Supervisor ID',
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
               prefixIcon: Padding(
@@ -792,13 +751,10 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 child: Icon(
                   Icons.badge_rounded,
                   color: brandIconColor,
-                  size: 22,
+                  size: 20,
                 ),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
+              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -837,7 +793,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     int maxLines = 1,
     IconData? icon,
   }) {
-    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+    final brandIconColor = Theme.of(context).primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -847,21 +803,15 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: TextField(
             controller: controller,
@@ -869,26 +819,23 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             maxLines: maxLines,
             style: const TextStyle(
               color: Color(0xFF0A183D),
-              fontSize: 15,
+              fontSize: 14.5,
               fontWeight: FontWeight.w700,
             ),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
               prefixIcon: icon != null
                   ? Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(icon, color: brandIconColor, size: 22),
+                      child: Icon(icon, color: brandIconColor, size: 20),
                     )
                   : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
+              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -905,7 +852,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     required DateTime? date,
     required VoidCallback onTap,
   }) {
-    final brandIconColor = AppTheme.getDarkAccent(primaryColor);
+    final brandIconColor = Theme.of(context).primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -915,25 +862,19 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
             ),
             child: Row(
               children: [
@@ -962,41 +903,40 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     );
   }
 
-  Widget _buildActionButtons(Color primaryColor) {
+  Widget _buildActionButtons() {
     return Row(
       children: [
         Expanded(
           flex: 2,
           child: SizedBox(
-            height: 52,
+            height: 50,
             child: ElevatedButton(
               onPressed: () => _showSaveConfirmationDialog(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
-                foregroundColor: const Color(0xFF0A183D),
+                foregroundColor: Colors.white,
                 padding: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                elevation: 6,
-                shadowColor: primaryColor.withValues(alpha: 0.4),
+                elevation: 2,
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.save_rounded,
-                    size: 20,
-                    color: Color(0xFF0A183D),
+                    size: 18,
+                    color: Colors.white,
                   ),
                   SizedBox(width: 8),
                   Text(
                     'SAVE MAPPING',
                     style: TextStyle(
-                      color: Color(0xFF0A183D),
-                      fontSize: 14,
+                      color: Colors.white,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
@@ -1006,29 +946,28 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         ),
         const SizedBox(width: 12),
         SizedBox(
-          height: 52,
-          child: ElevatedButton(
+          height: 50,
+          child: OutlinedButton(
             onPressed: resetForm,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.15),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF0A183D),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
               ),
-              elevation: 0,
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
             ),
             child: const Row(
               children: [
-                Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+                Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF0A183D)),
                 SizedBox(width: 6),
                 Text(
                   'RESET',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: Color(0xFF0A183D),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -1040,13 +979,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     );
   }
 
-  // ── INFO TABLE SECTION ────────────────────────────────────────────────────
-  Widget _buildInfoTableSection(Color darkCardBg, Color primaryColor) {
-    if (_docCache.isNotEmpty) {
-      return _buildInfoCards(darkCardBg, primaryColor, _docCache);
-    }
-    return FutureBuilder<QuerySnapshot>(
-      future: FirestoreService.getCollection('siteSupervisorMap').get(),
+  Widget _buildInfoTableSection() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
@@ -1085,9 +1020,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Create your first mapping in the "ENTRY" tab',
+                  'Create your first mapping in the "MAPPING ENTRY" tab',
                   style: TextStyle(
-                    color: Color(0xFF475569),
+                    color: Color(0xFF64748B),
                     fontSize: 13,
                   ),
                 ),
@@ -1100,319 +1035,389 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           for (final doc in docs)
             doc.id: doc.data() as Map<String, dynamic>? ?? {},
         };
-        return _buildInfoCards(darkCardBg, primaryColor, tempCache);
+        return _buildInfoCards(tempCache);
       },
     );
   }
 
-  Widget _buildInfoCards(
-    Color darkCardBg,
-    Color primaryColor,
-    Map<String, Map<String, dynamic>> cache,
-  ) {
-    final entries = cache.entries.toList();
-    if (entries.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.map_rounded,
-              size: 64,
-              color: primaryColor.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No site mapping data available',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0A183D),
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Create your first mapping in the "ENTRY" tab',
-              style: TextStyle(
-                color: Color(0xFF475569),
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      );
+  Widget _buildInfoCards(Map<String, Map<String, dynamic>> cache) {
+    final allEntries = cache.entries.toList();
+
+    final filteredEntries = allEntries.where((entry) {
+      final docId = entry.key.toLowerCase();
+      final data = entry.value;
+      final site = (data['site'] ?? data['siteName'] ?? data['siteId'] ?? '').toString().toLowerCase();
+      final supervisor = (data['supervisor'] ?? data['supervisorName'] ?? data['FullName'] ?? '').toString().toLowerCase();
+      final supervisorId = (data['Supervisor ID'] ?? data['supervisorId'] ?? data['SupervisorId'] ?? '').toString().toLowerCase();
+      final projectNameVal = (data['projectName'] ?? data['project'] ?? '').toString().toLowerCase();
+      final projectStage = (data['projectStage'] ?? data['stage'] ?? '').toString().toLowerCase();
+      final location = (data['location'] ?? data['address'] ?? '').toString().toLowerCase();
+
+      final query = _infoSearchQuery.trim().toLowerCase();
+      return query.isEmpty ||
+          docId.contains(query) ||
+          site.contains(query) ||
+          supervisor.contains(query) ||
+          supervisorId.contains(query) ||
+          projectNameVal.contains(query) ||
+          projectStage.contains(query) ||
+          location.contains(query);
+    }).toList();
+
+    final totalItems = filteredEntries.length;
+    final totalPages = (totalItems / _infoItemsPerPage).ceil().clamp(1, 999999);
+    if (_infoCurrentPage > totalPages) {
+      _infoCurrentPage = totalPages;
     }
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final docId = entries[index].key;
-        final data = entries[index].value;
+    final startIndex = (totalItems == 0) ? 0 : (_infoCurrentPage - 1) * _infoItemsPerPage;
+    final endIndex = (startIndex + _infoItemsPerPage).clamp(0, totalItems);
+    final paginatedEntries = filteredEntries.sublist(startIndex, endIndex);
 
-        final site = data['site']?.toString() ?? '-';
-        final supervisor = data['supervisor']?.toString() ?? '-';
-        final supervisorId = data['Supervisor ID']?.toString() ?? '-';
-        final projectNameVal = data['projectName']?.toString() ?? '-';
-        final projectStage = data['projectStage']?.toString() ?? '-';
-        final location = data['location']?.toString() ?? '-';
-        final siteComments = data['siteComments']?.toString() ?? '';
-
-        final startDateStr = _parseDate(data['startDate']) != null
-            ? DateFormat('yyyy-MM-dd').format(_parseDate(data['startDate'])!)
-            : '-';
-        final endDateStr = _parseDate(data['endDate']) != null
-            ? DateFormat('yyyy-MM-dd').format(_parseDate(data['endDate'])!)
-            : '-';
-        final joinedStr = _parseDate(data['joinedOn']) != null
-            ? DateFormat('yyyy-MM-dd').format(_parseDate(data['joinedOn'])!)
-            : '-';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 14),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: darkCardBg,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: darkCardBg.withValues(alpha: 0.2),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: primaryColor.withValues(alpha: 0.18),
-                    ),
-                    child: Icon(Icons.location_city_rounded,
-                        color: primaryColor, size: 22),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          site != '-' && site.isNotEmpty ? site : 'No Site',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            docId,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: primaryColor,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 10.0),
-                child: Divider(height: 1, color: Color(0xFF334155)),
-              ),
-
-              _infoRow(Icons.person_rounded, 'Supervisor', supervisor),
-              _infoRow(Icons.badge_rounded, 'Supervisor ID', supervisorId),
-              _infoRow(Icons.business_rounded, 'Project', projectNameVal),
-              _infoRow(Icons.timeline_rounded, 'Stage', projectStage),
-              _infoRow(Icons.location_on_rounded, 'Location', location),
-              if (siteComments.isNotEmpty)
-                _infoRow(Icons.comment_rounded, 'Comments', siteComments),
-
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _dateChip(Icons.calendar_today_rounded, 'Start', startDateStr),
-                  _dateChip(Icons.event_available_rounded, 'End', endDateStr),
-                  _dateChip(Icons.login_rounded, 'Joined', joinedStr),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 15, color: const Color(0xFFCBD5E1)),
-          const SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFFCBD5E1),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _dateChip(IconData icon, String label, String value) {
     return Column(
       children: [
-        Icon(icon, size: 14, color: const Color(0xFFCBD5E1)),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF94A3B8),
-            fontWeight: FontWeight.w500,
+        // Live Search Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              onChanged: (val) {
+                setState(() {
+                  _infoSearchQuery = val;
+                  _infoCurrentPage = 1;
+                });
+              },
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0A183D),
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search mapping by site, supervisor, project, stage...',
+                hintStyle: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF94A3B8),
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: primaryColor,
+                  size: 20,
+                ),
+                suffixIcon: _infoSearchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                        onPressed: () {
+                          setState(() {
+                            _infoSearchQuery = '';
+                            _infoCurrentPage = 1;
+                          });
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
           ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
+        const SizedBox(height: 10),
+
+        Expanded(
+          child: filteredEntries.isEmpty
+              ? const Center(
+                  child: Text(
+                    'No matching site mappings found',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: paginatedEntries.length,
+                  itemBuilder: (context, index) {
+                    final entry = paginatedEntries[index];
+                    final data = entry.value;
+
+                    final siteName = data['site'] ?? data['siteName'] ?? data['siteId'] ?? entry.key;
+                    final supervisorName = data['supervisor'] ?? data['supervisorName'] ?? data['FullName'] ?? 'Not Assigned';
+                    final supervisorId = data['Supervisor ID'] ?? data['supervisorId'] ?? data['SupervisorId'] ?? '';
+                    final pName = data['projectName'] ?? data['project'] ?? '';
+                    final pStage = data['projectStage'] ?? data['stage'] ?? '';
+                    final loc = data['location'] ?? data['address'] ?? '';
+                    final sDate = data['startDate'] ?? '';
+                    final eDate = data['endDate'] ?? '';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.location_on_rounded, color: primaryColor, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      siteName,
+                                      style: const TextStyle(
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0A183D),
+                                      ),
+                                    ),
+                                    if (pName.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        pName,
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          color: Color(0xFF64748B),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (pStage.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    pStage,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 10.0),
+                            child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                          ),
+                          Row(
+                            children: [
+                              const Icon(Icons.person_rounded, size: 16, color: Color(0xFF64748B)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Supervisor: ',
+                                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  supervisorName + (supervisorId.isNotEmpty ? ' ($supervisorId)' : ''),
+                                  style: const TextStyle(fontSize: 13.5, color: Color(0xFF0A183D), fontWeight: FontWeight.w700),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (loc.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(Icons.place_outlined, size: 16, color: Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    loc,
+                                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (sDate.isNotEmpty || eDate.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(Icons.date_range_rounded, size: 16, color: Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Duration: ${sDate.isEmpty ? 'N/A' : sDate} to ${eDate.isEmpty ? 'N/A' : eDate}',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+
+        // Pagination Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: _buildPaginationControls(
+            currentPage: _infoCurrentPage,
+            totalPages: totalPages,
+            totalItems: totalItems,
+            itemsPerPage: _infoItemsPerPage,
+            onPageChanged: (newPage) {
+              setState(() => _infoCurrentPage = newPage);
+            },
           ),
         ),
+        const SizedBox(height: 80),
       ],
     );
   }
 
-  void _selectAnyDate(BuildContext context, {required String dateType}) async {
-    DateTime? initialDate;
-    if (dateType == 'start') {
-      initialDate = startDate ?? DateTime.now();
-    } else if (dateType == 'end') {
-      initialDate = endDate ?? DateTime.now();
-    } else if (dateType == 'joined') {
-      initialDate = joinedDate ?? DateTime.now();
-    }
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate!,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2035),
-      builder: (context, child) {
-        final themeColor = Theme.of(context).colorScheme.primary;
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: themeColor,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: themeColor,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        if (dateType == 'start') {
-          startDate = picked;
-        } else if (dateType == 'end') {
-          endDate = picked;
-        } else if (dateType == 'joined') {
-          joinedDate = picked;
-        }
-      });
-    }
-  }
+  Widget _buildPaginationControls({
+    required int currentPage,
+    required int totalPages,
+    required int totalItems,
+    required int itemsPerPage,
+    required Function(int) onPageChanged,
+  }) {
+    if (totalItems == 0) return const SizedBox.shrink();
 
-  void _showSaveConfirmationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+    final startItem = (currentPage - 1) * itemsPerPage + 1;
+    final endItem = (currentPage * itemsPerPage).clamp(1, totalItems);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
-          title: Text(
-            'Confirm Save',
-            style: TextStyle(
-              color: primaryColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 19,
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              '$startItem–$endItem of $totalItems',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          content: const Text(
-            'Your details will be saved. Do you want to continue?',
-            style: TextStyle(fontSize: 15),
-          ),
-          actionsPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: const Color(0xFF0A183D),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                icon: Icon(
+                  Icons.first_page_rounded,
+                  size: 18,
+                  color: currentPage > 1 ? primaryColor : Colors.grey.shade300,
+                ),
+                onPressed: currentPage > 1 ? () => onPageChanged(1) : null,
+                tooltip: 'First Page',
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                icon: Icon(
+                  Icons.chevron_left_rounded,
+                  size: 18,
+                  color: currentPage > 1 ? primaryColor : Colors.grey.shade300,
+                ),
+                onPressed: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
+                tooltip: 'Previous Page',
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '$currentPage/$totalPages',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-              child: const Text(
-                'Save',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                icon: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: currentPage < totalPages ? primaryColor : Colors.grey.shade300,
+                ),
+                onPressed: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
+                tooltip: 'Next Page',
               ),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                saveForm();
-              },
-            ),
-          ],
-        );
-      },
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                icon: Icon(
+                  Icons.last_page_rounded,
+                  size: 18,
+                  color: currentPage < totalPages ? primaryColor : Colors.grey.shade300,
+                ),
+                onPressed: currentPage < totalPages ? () => onPageChanged(totalPages) : null,
+                tooltip: 'Last Page',
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

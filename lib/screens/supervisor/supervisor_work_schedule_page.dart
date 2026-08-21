@@ -189,29 +189,78 @@ class _SupervisorWorkSchedulePageState
       _supervisorSiteError = null;
     });
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'siteSupervisorMap',
-      ).where('Supervisor ID', isEqualTo: widget.supervisorId).get();
+      final mapColl = FirestoreService.getCollection('siteSupervisorMap');
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs = [];
 
-      if (querySnapshot.docs.isNotEmpty) {
-        List<Map<String, dynamic>> tempSiteMaps = [];
-        for (var d in querySnapshot.docs) {
-          final data = d.data();
-          data['id'] = d['site'];
-          final siteDoc = await FirestoreService.getCollection(
-            'sites',
-          ).doc(d['site']).get();
-          final siteName = siteDoc.exists
-              ? (siteDoc.data()?['siteName'] ?? '')
-              : '';
+      // 1. Query by Supervisor ID variants
+      if (widget.supervisorId.isNotEmpty) {
+        var snap = await mapColl.where('Supervisor ID', isEqualTo: widget.supervisorId).get();
+        docs = snap.docs;
+        if (docs.isEmpty) {
+          snap = await mapColl.where('supervisorId', isEqualTo: widget.supervisorId).get();
+          docs = snap.docs;
+        }
+        if (docs.isEmpty) {
+          snap = await mapColl.where('supervisor', isEqualTo: widget.supervisorId).get();
+          docs = snap.docs;
+        }
+      }
+
+      // 2. Query by Supervisor Name variants
+      if (docs.isEmpty && widget.supervisorName.isNotEmpty) {
+        var snap = await mapColl.where('supervisor', isEqualTo: widget.supervisorName).get();
+        docs = snap.docs;
+        if (docs.isEmpty) {
+          snap = await mapColl.where('supervisorName', isEqualTo: widget.supervisorName).get();
+          docs = snap.docs;
+        }
+      }
+
+      // 3. Fallback: load all siteSupervisorMap docs
+      if (docs.isEmpty) {
+        final snap = await mapColl.get();
+        docs = snap.docs;
+      }
+
+      // 4. Fetch site details from master Site collection
+      final sitesSnap = await FirestoreService.sites.get();
+      final Map<String, String> siteNameMap = {
+        for (var doc in sitesSnap.docs)
+          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
+      };
+
+      List<Map<String, dynamic>> tempSiteMaps = [];
+
+      if (docs.isNotEmpty) {
+        for (var d in docs) {
+          final data = Map<String, dynamic>.from(d.data());
+          final siteId = data['site']?.toString() ?? d.id;
+          data['id'] = siteId;
+          final siteName = siteNameMap[siteId] ?? '';
           data['displayName'] = siteName.isNotEmpty
-              ? '${d['site']}_$siteName'
-              : d['site'];
+              ? '${siteId}_$siteName'
+              : siteId;
           tempSiteMaps.add(data);
         }
-        _siteMaps = tempSiteMaps;
+      } else if (sitesSnap.docs.isNotEmpty) {
+        // Fallback: master sites list if mapping collection is empty
+        for (var sDoc in sitesSnap.docs) {
+          final sId = sDoc.id;
+          final sName = sDoc.data()['siteName']?.toString() ?? 'Unnamed Site';
+          tempSiteMaps.add({
+            'id': sId,
+            'site': sId,
+            'displayName': '${sId}_$sName',
+            'location': sDoc.data()['location']?.toString() ?? 'N/A',
+            'projectStage': sDoc.data()['projectStage']?.toString() ?? 'N/A',
+            'supervisor': widget.supervisorName,
+          });
+        }
+      }
 
-        _selectedSiteId = _siteMaps[0]['id'] as String?;
+      if (tempSiteMaps.isNotEmpty) {
+        _siteMaps = tempSiteMaps;
+        _selectedSiteId = _siteMaps[0]['id']?.toString();
         _updateSiteDetails(_selectedSiteId);
 
         if (!mounted) return;
@@ -222,17 +271,26 @@ class _SupervisorWorkSchedulePageState
         if (!mounted) return;
         setState(() {
           _isLoadingSupervisorSite = false;
-          _supervisorSiteError =
-              'No site assignment found for this supervisor.';
+          _supervisorSiteError = 'No active sites found in system.';
         });
       }
     } catch (e) {
+      debugPrint('Error loading site assignment: $e');
       if (!mounted) return;
       setState(() {
         _isLoadingSupervisorSite = false;
         _supervisorSiteError = 'Error loading site assignment: $e';
       });
     }
+  }
+
+  String? _parseStringOrTimestamp(dynamic val) {
+    if (val == null) return null;
+    if (val is String) return val;
+    if (val is Timestamp) {
+      return DateFormat('dd MMM yyyy').format(val.toDate());
+    }
+    return val.toString();
   }
 
   void _updateSiteDetails(String? siteId) {
@@ -242,20 +300,20 @@ class _SupervisorWorkSchedulePageState
       orElse: () => {},
     );
     setState(() {
-      _siteLocation = site['location'] as String?;
-      _projectStage = site['projectStage'] as String?;
-      _joinedOn = site['joinedOn'] as String?;
-      _siteComments = site['siteComments'] as String?;
-      _supervisorName = site['supervisor'] as String?;
+      _siteLocation = _parseStringOrTimestamp(site['location']);
+      _projectStage = _parseStringOrTimestamp(site['projectStage']);
+      _joinedOn = _parseStringOrTimestamp(site['joinedOn']);
+      _siteComments = _parseStringOrTimestamp(site['siteComments']);
+      _supervisorName = _parseStringOrTimestamp(site['supervisor']);
 
       _locationController.text = _siteLocation ?? '';
       _supervisorController.text = _supervisorName ?? '';
-      _projectNameController.text = site['projectName'] ?? '';
-      _projectPhaseController.text = site['projectStage'] ?? '';
+      _projectNameController.text = _parseStringOrTimestamp(site['projectName']) ?? '';
+      _projectPhaseController.text = _projectStage ?? '';
       _selectedProjectPhase =
           (_projectStage != null && _projectPhases.contains(_projectStage))
-          ? _projectStage
-          : null;
+              ? _projectStage
+              : null;
     });
   }
 
@@ -345,7 +403,7 @@ class _SupervisorWorkSchedulePageState
             .limit(1)
             .get();
         if (querySnapshot.docs.isNotEmpty) {
-          final lastId = querySnapshot.docs.first['wsReqId'] as String?;
+          final lastId = querySnapshot.docs.first['wsReqId']?.toString();
           if (lastId != null && lastId.startsWith('WSR')) {
             final numPart = int.tryParse(lastId.substring(3)) ?? 0;
             wsReqId = 'WSR${(numPart + 1).toString().padLeft(3, '0')}';

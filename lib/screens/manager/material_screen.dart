@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -50,6 +49,8 @@ class _MaterialScreenState extends State<MaterialScreen>
   final updateMaterialIdController = TextEditingController();
   final updateMaterialUnitController = TextEditingController();
   final updateMaterialPriceController = TextEditingController();
+  final searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -70,6 +71,7 @@ class _MaterialScreenState extends State<MaterialScreen>
     updateMaterialUnitController.dispose();
     updateMaterialPriceController.dispose();
     materialUnitController.dispose();
+    searchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -198,205 +200,338 @@ class _MaterialScreenState extends State<MaterialScreen>
       final materialsRef = FirestoreService.getCollection('materials');
       final duplicate = await materialsRef
           .where('materialName', isEqualTo: name)
-          .limit(1)
           .get();
       if (duplicate.docs.isNotEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Name already exists'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      final counterRef = FirestoreService.getCollection(
-        'counters',
-      ).doc('materials');
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final counterSnap = await transaction.get(counterRef);
-        int nextNum =
-            (counterSnap.exists
-                ? (counterSnap.get('lastMaterialId') ?? 0)
-                : 0) +
-            1;
-        String id = 'MT${nextNum.toString().padLeft(3, '0')}';
-
-        transaction.set(materialsRef.doc(id), {
-          'materialId': id,
-          'materialName': name,
-          'materialCategory': selectedCategoryRef,
-          'materialSubCategory': selectedSubCategoryRef,
-          'materialUnit': selectedUnitRef,
-          'materialPrice': price,
-          'description': description,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-        transaction.set(counterRef, {
-          'lastMaterialId': nextNum,
-        }, SetOptions(merge: true));
-      });
-
-      if (mounted) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Material Saved'),
-            backgroundColor: Colors.green,
+            content: Text('Material with this name already exists'),
           ),
         );
-        _resetForm();
+        return;
       }
+    } catch (_) {}
+
+    try {
+      await FirestoreService.materials.add({
+        'materialId': materialIdController.text,
+        'materialCategoryRef': selectedCategoryRef,
+        'materialSubCategoryRef': selectedSubCategoryRef,
+        'materialName': name,
+        'materialUnitRef': selectedUnitRef,
+        'materialPrice': price,
+        'description': description,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Material Saved Successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      setState(() => _isSaved = true);
+      _resetForm();
+      _fetchNextMaterialId();
+      _fetchMaterials();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save material: $e')),
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
-  void _resetForm() {
-    if (!mounted) return;
-    materialNameController.clear();
-    unitPriceController.clear();
-    descriptionController.clear();
-    materialUnitController.clear();
-    if (mounted) {
-      setState(() {
-        _isSaved = false;
-        _fetchCategories();
-        _fetchNextMaterialId();
-      });
     }
   }
 
   Future<void> _fetchMaterials() async {
     if (mounted) setState(() => isLoadingMaterials = true);
     try {
-      final snapshot = await FirestoreService.materials
-          .orderBy('materialId')
-          .limit(50)
-          .get();
+      final snapshot = await FirestoreService.materials.get();
       if (!mounted) return;
-      materials = snapshot.docs
-          .map(
-            (doc) => {
-              'ref': doc.reference,
-              ...doc.data() as Map<String, dynamic>,
-            },
-          )
-          .toList();
+
+      final loadedMaterials = <Map<String, dynamic>>[];
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        String unitName = '';
+
+        if (data['materialUnitRef'] != null) {
+          try {
+            final unitDoc =
+                await (data['materialUnitRef'] as DocumentReference).get();
+            unitName = unitDoc['matUnit'] ?? '';
+          } catch (_) {}
+        }
+
+        loadedMaterials.add({
+          'ref': doc.reference,
+          'materialId': data['materialId'] ?? '',
+          'materialName': data['materialName'] ?? '',
+          'materialPrice': data['materialPrice'] ?? '',
+          'materialUnit': unitName,
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          materials = loadedMaterials;
+          if (materials.isNotEmpty) {
+            _onMaterialSelected(materials.first);
+          } else {
+            selectedMaterialRef = null;
+            selectedMaterialId = null;
+            selectedMaterialUnit = null;
+            selectedMaterialPrice = null;
+            updateMaterialIdController.clear();
+            updateMaterialUnitController.clear();
+            updateMaterialPriceController.clear();
+          }
+        });
+      }
     } finally {
       if (mounted) setState(() => isLoadingMaterials = false);
     }
   }
 
-  void _onMaterialSelected(Map<String, dynamic> data) async {
-    selectedMaterialRef = data['ref'];
-    selectedMaterialId = data['materialId'];
-    selectedMaterialPrice = data['materialPrice']?.toString() ?? '';
-    updateMaterialIdController.text = selectedMaterialId ?? '';
-    updateMaterialPriceController.text = selectedMaterialPrice ?? '';
+  void _onMaterialSelected(Map<String, dynamic> mat) {
+    setState(() {
+      selectedMaterialRef = mat['ref'];
+      selectedMaterialId = mat['materialId'];
+      selectedMaterialUnit = mat['materialUnit'];
+      selectedMaterialPrice = mat['materialPrice'];
 
-    if (data['materialUnit'] is DocumentReference) {
-      final unitSnap = await (data['materialUnit'] as DocumentReference).get();
-      if (!mounted) return;
-      if (unitSnap.exists) {
-        selectedMaterialUnit = unitSnap['matUnit'] as String?;
-      }
-    } else {
-      selectedMaterialUnit = data['materialUnit']?.toString();
-    }
-    if (mounted) {
+      updateMaterialIdController.text = selectedMaterialId ?? '';
       updateMaterialUnitController.text = selectedMaterialUnit ?? '';
-      setState(() => isEditingPrice = false);
-    }
+      updateMaterialPriceController.text = selectedMaterialPrice ?? '';
+      isEditingPrice = false;
+    });
+  }
+
+  void _resetForm() {
+    setState(() {
+      if (categories.isNotEmpty) {
+        selectedCategoryRef = categories.first['ref'];
+        selectedCategoryName = categories.first['name'];
+      }
+      unitPriceController.clear();
+      descriptionController.clear();
+      _isSaved = false;
+    });
+    _fetchSubCategories();
+  }
+
+  void _showMaterialSearchSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        String modalQuery = '';
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final filteredList = materials.where((m) {
+              final name = m['materialName'].toString().toLowerCase();
+              final id = m['materialId'].toString().toLowerCase();
+              return modalQuery.isEmpty ||
+                  name.contains(modalQuery.toLowerCase()) ||
+                  id.contains(modalQuery.toLowerCase());
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Row(
+                    children: [
+                      Icon(Icons.manage_search_rounded, color: Color(0xFF0A183D), size: 24),
+                      SizedBox(width: 10),
+                      Text(
+                        'Find Material',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: TextField(
+                      autofocus: true,
+                      onChanged: (val) => setModalState(() => modalQuery = val),
+                      style: const TextStyle(
+                        color: Color(0xFF0A183D),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: 'Search material by name or MT-ID...',
+                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF0A183D), size: 20),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Expanded(
+                    child: filteredList.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No matching materials found.',
+                              style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: filteredList.length,
+                            separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                            itemBuilder: (context, index) {
+                              final mat = filteredList[index];
+                              final isSelected = selectedMaterialRef == mat['ref'];
+                              return ListTile(
+                                leading: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF3B82F6), size: 18),
+                                ),
+                                title: Text(
+                                  mat['materialName'] ?? '',
+                                  style: TextStyle(
+                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                                    color: const Color(0xFF0A183D),
+                                    fontSize: 14.5,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'ID: ${mat['materialId']} | Unit: ${mat['materialUnit']}',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                ),
+                                trailing: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '₹${mat['materialPrice']}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF059669),
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                onTap: () {
+                                  _onMaterialSelected(mat);
+                                  Navigator.pop(context);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
 
-    return GlassScaffold(
-      padding: EdgeInsets.zero,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Material Config',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Top Header Row
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  Text(
-                    'Material Config',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                ],
-              ),
-            ),
-
-            // Tab Bar Container
+            // Tab Bar Switcher Container
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: darkCardBg,
-                borderRadius: BorderRadius.circular(18),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: darkCardBg.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: TabBar(
                 controller: _tabController,
                 indicator: BoxDecoration(
-                  color: theme.primaryColor,
-                  borderRadius: BorderRadius.circular(14),
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
                 labelColor: Colors.white,
-                unselectedLabelColor: const Color(0xFFCBD5E1),
+                unselectedLabelColor: const Color(0xFF0A183D),
                 labelStyle: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -404,7 +539,7 @@ class _MaterialScreenState extends State<MaterialScreen>
                 ),
                 unselectedLabelStyle: const TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
                 tabs: const [
                   Tab(text: 'NEW MATERIAL'),
@@ -414,7 +549,8 @@ class _MaterialScreenState extends State<MaterialScreen>
             ),
 
             Expanded(
-              child: Center(
+              child: Align(
+                alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
                   child: TabBarView(
@@ -432,11 +568,11 @@ class _MaterialScreenState extends State<MaterialScreen>
 
   Widget _buildNewTab() {
     final theme = Theme.of(context);
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+    final primaryColor = theme.primaryColor;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Form(
         key: _formKey,
         child: Column(
@@ -446,12 +582,13 @@ class _MaterialScreenState extends State<MaterialScreen>
             Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: darkCardBg,
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: darkCardBg.withValues(alpha: 0.25),
-                    blurRadius: 16,
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -459,57 +596,35 @@ class _MaterialScreenState extends State<MaterialScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  const Row(
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E88E5),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF1E88E5).withValues(alpha: 0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
+                      Icon(
+                        Icons.inventory_2_rounded,
+                        color: Color(0xFF3B82F6),
+                        size: 24,
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Core Details',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Define primary material specifications',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFFCBD5E1),
-                              ),
-                            ),
-                          ],
+                      SizedBox(width: 10),
+                      Text(
+                        'Core Details',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          letterSpacing: -0.3,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Define primary material specifications',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   _buildCustomTextField(
                     controller: materialIdController,
                     label: 'Material ID',
@@ -582,12 +697,13 @@ class _MaterialScreenState extends State<MaterialScreen>
             Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: darkCardBg,
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: darkCardBg.withValues(alpha: 0.25),
-                    blurRadius: 16,
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -595,57 +711,35 @@ class _MaterialScreenState extends State<MaterialScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  const Row(
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.payments_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
+                      Icon(
+                        Icons.payments_rounded,
+                        color: Color(0xFF10B981),
+                        size: 24,
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Pricing & Specs',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Set unit measurement and pricing details',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFFCBD5E1),
-                              ),
-                            ),
-                          ],
+                      SizedBox(width: 10),
+                      Text(
+                        'Pricing & Specs',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          letterSpacing: -0.3,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Set unit measurement and pricing details',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   _buildCustomTextField(
                     controller: materialUnitController,
                     label: 'Unit',
@@ -671,35 +765,34 @@ class _MaterialScreenState extends State<MaterialScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
 
             // Action Buttons
             Row(
               children: [
                 Expanded(
                   child: SizedBox(
-                    height: 52,
+                    height: 50,
                     child: OutlinedButton(
                       onPressed: _resetForm,
                       style: OutlinedButton.styleFrom(
                         backgroundColor: Colors.white,
-                        side: BorderSide(color: darkCardBg, width: 1.8),
+                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
                         alignment: Alignment.center,
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        elevation: 2,
                       ),
-                      child: Center(
+                      child: const Center(
                         child: Text(
                           'RESET',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: darkCardBg,
-                            fontSize: 15,
+                            color: Color(0xFF0A183D),
+                            fontSize: 14,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
@@ -709,38 +802,37 @@ class _MaterialScreenState extends State<MaterialScreen>
                 const SizedBox(width: 14),
                 Expanded(
                   child: SizedBox(
-                    height: 52,
+                    height: 50,
                     child: ElevatedButton(
                       onPressed: _isSaving ? null : _saveForm,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primaryColor,
-                        foregroundColor: const Color(0xFF0A183D),
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
                         alignment: Alignment.center,
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        elevation: 6,
-                        shadowColor: theme.primaryColor.withValues(alpha: 0.4),
+                        elevation: 2,
                       ),
                       child: _isSaving
                           ? const SizedBox(
-                              width: 24,
-                              height: 24,
+                              width: 20,
+                              height: 20,
                               child: CircularProgressIndicator(
-                                color: Color(0xFF0A183D),
-                                strokeWidth: 2.5,
+                                color: Colors.white,
+                                strokeWidth: 2,
                               ),
                             )
                           : const Center(
                               child: Text(
-                                'SAVE',
+                                'SAVE MATERIAL',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Color(0xFF0A183D),
-                                  fontSize: 15,
+                                  color: Colors.white,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ),
@@ -749,7 +841,7 @@ class _MaterialScreenState extends State<MaterialScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -758,26 +850,37 @@ class _MaterialScreenState extends State<MaterialScreen>
 
   Widget _buildUpdateTab() {
     final theme = Theme.of(context);
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+    final primaryColor = theme.primaryColor;
+
+    final filteredMaterials = materials.where((m) {
+      final name = m['materialName'].toString().toLowerCase();
+      final id = m['materialId'].toString().toLowerCase();
+      return _searchQuery.isEmpty ||
+          name.contains(_searchQuery.toLowerCase()) ||
+          id.contains(_searchQuery.toLowerCase());
+    }).toList();
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Form(
         key: _updateFormKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Quick Search & Material Finder Bar
             Container(
-              padding: const EdgeInsets.all(22),
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: darkCardBg,
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: darkCardBg.withValues(alpha: 0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -786,61 +889,134 @@ class _MaterialScreenState extends State<MaterialScreen>
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF8B5CF6),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.edit_note_rounded,
-                          color: Colors.white,
-                          size: 24,
+                      Icon(Icons.manage_search_rounded, color: primaryColor, size: 22),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Easy Material Finder',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Search & Update',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: -0.3,
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: _showMaterialSearchSheet,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.list_alt_rounded, size: 14, color: primaryColor),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Full List (${materials.length})',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: primaryColor,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Select an existing material to modify price',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFFCBD5E1),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 10),
+                  Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: TextField(
+                      controller: searchController,
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        color: Color(0xFF0A183D),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Type to filter material by name or MT-ID...',
+                        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        prefixIcon: Icon(Icons.search_rounded, color: primaryColor, size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                                onPressed: () {
+                                  searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Form Card
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.edit_note_rounded,
+                        color: Color(0xFF8B5CF6),
+                        size: 24,
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Search & Update',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Select an existing material to modify price',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   _buildWhiteDropdown(
                     label: 'Material Name',
                     value: selectedMaterialRef?.path,
                     icon: Icons.search_rounded,
-                    hintText: 'Search Material Name',
-                    items: materials
+                    hintText: 'Select Material Name',
+                    items: filteredMaterials
                         .map(
                           (m) => DropdownMenuItem(
                             value: (m['ref'] as DocumentReference).path,
@@ -890,8 +1066,8 @@ class _MaterialScreenState extends State<MaterialScreen>
                       Padding(
                         padding: const EdgeInsets.only(bottom: 2),
                         child: SizedBox(
-                          width: 50,
-                          height: 50,
+                          width: 48,
+                          height: 48,
                           child: ElevatedButton(
                             onPressed: selectedMaterialRef == null
                                 ? null
@@ -901,16 +1077,17 @@ class _MaterialScreenState extends State<MaterialScreen>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isEditingPrice
                                   ? const Color(0xFFEF4444)
-                                  : const Color(0xFF1E88E5),
+                                  : primaryColor,
                               foregroundColor: Colors.white,
                               padding: EdgeInsets.zero,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
+                              elevation: 2,
                             ),
                             child: Icon(
                               isEditingPrice ? Icons.close_rounded : Icons.edit_rounded,
-                              size: 22,
+                              size: 20,
                             ),
                           ),
                         ),
@@ -920,10 +1097,10 @@ class _MaterialScreenState extends State<MaterialScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             if (isEditingPrice)
               SizedBox(
-                height: 52,
+                height: 50,
                 child: ElevatedButton(
                   onPressed: () async {
                     final price = updateMaterialPriceController.text;
@@ -939,31 +1116,30 @@ class _MaterialScreenState extends State<MaterialScreen>
                     if (mounted) setState(() => isEditingPrice = false);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.primaryColor,
-                    foregroundColor: const Color(0xFF0A183D),
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
                     alignment: Alignment.center,
                     padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    elevation: 6,
-                    shadowColor: theme.primaryColor.withValues(alpha: 0.4),
+                    elevation: 2,
                   ),
                   child: const Center(
                     child: Text(
                       'UPDATE PRICE',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Color(0xFF0A183D),
-                        fontSize: 15,
+                        color: Colors.white,
+                        fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
                 ),
               ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -980,7 +1156,7 @@ class _MaterialScreenState extends State<MaterialScreen>
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
-    final brandIconColor = AppTheme.getDarkAccent(Theme.of(context).primaryColor);
+    final brandIconColor = Theme.of(context).primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,21 +1166,15 @@ class _MaterialScreenState extends State<MaterialScreen>
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: TextFormField(
             controller: controller,
@@ -1015,14 +1185,14 @@ class _MaterialScreenState extends State<MaterialScreen>
             validator: validator,
             style: const TextStyle(
               color: Color(0xFF0A183D),
-              fontSize: 15,
+              fontSize: 14.5,
               fontWeight: FontWeight.w700,
             ),
             decoration: InputDecoration(
               hintText: 'Enter $label',
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
               prefixIcon: Padding(
@@ -1030,13 +1200,10 @@ class _MaterialScreenState extends State<MaterialScreen>
                 child: Icon(
                   icon,
                   color: brandIconColor,
-                  size: 22,
+                  size: 20,
                 ),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
+              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -1056,7 +1223,7 @@ class _MaterialScreenState extends State<MaterialScreen>
     IconData icon = Icons.list_alt_rounded,
     String? hintText,
   }) {
-    final brandIconColor = AppTheme.getDarkAccent(Theme.of(context).primaryColor);
+    final brandIconColor = Theme.of(context).primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1066,26 +1233,20 @@ class _MaterialScreenState extends State<MaterialScreen>
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
             isExpanded: true,
             dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             initialValue: (value != null && items.any((i) => i.value == value))
                 ? value
                 : null,
@@ -1098,7 +1259,7 @@ class _MaterialScreenState extends State<MaterialScreen>
               hintText: hintText ?? 'Select $label',
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
               prefixIcon: Padding(
@@ -1106,13 +1267,10 @@ class _MaterialScreenState extends State<MaterialScreen>
                 child: Icon(
                   icon,
                   color: brandIconColor,
-                  size: 22,
+                  size: 20,
                 ),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
+              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,

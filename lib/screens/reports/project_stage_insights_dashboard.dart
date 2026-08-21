@@ -10,6 +10,7 @@ import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 // --- SupervisorEntry Model ---
 class SupervisorEntry {
@@ -565,11 +566,38 @@ class _ProjectstageInsightsDashboardState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
+    final darkAccent = AppTheme.getDarkAccent(theme.primaryColor);
 
-    return GlassScaffold(
-      title: 'Project Stage Insights',
-      onBack: () => Navigator.pop(context),
-      appBarForegroundColor: Colors.white,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Advanced Financial Analytics',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  theme.primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -867,11 +895,30 @@ class _ProjectstageInsightsDashboardState
                     const SizedBox(height: 32),
 
                     // Generate Report Button
-                    GlassButton(
-                      label: 'GENERATE REPORT',
-                      icon: Icons.analytics_outlined,
-                      onPressed: () =>
-                          _handleGenerateReport(theme, snapshot.data!),
+                    SizedBox(
+                      height: 52,
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.analytics_rounded, size: 20),
+                        label: const Text(
+                          'GENERATE REPORT',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 3,
+                        ),
+                        onPressed: () =>
+                            _handleGenerateReport(theme, snapshot.data!),
+                      ),
                     ),
                     const SizedBox(height: 32),
                     GlassCard(

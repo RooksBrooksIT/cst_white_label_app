@@ -1,0 +1,221 @@
+================================================================================
+CST WHITE LABEL APPLICATION - ROLE-WISE MODULE & FOLDER STRUCTURE
+================================================================================
+
+PROJECT OVERVIEW:
+This document details the modular project structure of the CST White Label 
+Application categorized by user roles, core services, utilities, and widgets.
+
+--------------------------------------------------------------------------------
+1. COMPLETE FOLDER TREE
+--------------------------------------------------------------------------------
+
+lib/
+│
+├── main.dart                               # App Entry Point & Initialization
+├── firebase_options.dart                   # Firebase Platform Config
+│
+├── screens/                                # Role-Wise & Feature Screens
+│   │
+│   ├── organization/                       # ROLE: Organization Admin (Org Owner)
+│   │   ├── organisation_landing_page.dart  # Org Portal Landing
+│   │   ├── organisation_login_page.dart    # Org Admin Login
+│   │   ├── organisation_registration_page.dart # New Org Sign-up
+│   │   ├── organization_dashboard.dart     # Org Main Dashboard
+│   │   ├── org_information_screen.dart     # Company Details & Settings
+│   │   ├── org_menu_screen.dart            # Org Navigation Menu
+│   │   ├── org_sub_menu_screen.dart        # Org Secondary Options
+│   │   ├── org_subscription_page.dart      # Subscription Status & Billing
+│   │   ├── pricing_screen.dart             # Subscription Plans (Silver, Gold, Platinum)
+│   │   ├── payu_checkout_screen.dart       # PayU Payment Gateway Integration
+│   │   ├── organization_site_entry.dart    # Org Level Site Management
+│   │   ├── org_site_payment_screen.dart    # Org Site Payments & Accounts
+│   │   ├── organization_expenses.dart      # Org Overall Financials & Expenses
+│   │   ├── organization_insights_screen.dart # Org High-Level Analytics
+│   │   ├── org_notification_page.dart      # Org Notifications
+│   │   ├── org_reset_password_screen.dart  # Org Security & Password Reset
+│   │   └── org_site_supervisor_daily_week_report.dart # Org Site Audits
+│   │
+│   ├── manager/                            # ROLE: Project Manager
+│   │   ├── manager_config_screen.dart      # Manager Main Hub & Config
+│   │   ├── project_setup_wizard.dart       # Project Creation & Onboarding Wizard
+│   │   ├── project_screen.dart             # Project Overview & Management
+│   │   ├── project_configuration_screen.dart # Project Master Settings
+│   │   ├── project_category_screen.dart    # Project Categories
+│   │   ├── project_sub_category_screen.dart# Project Sub-Categories
+│   │   ├── project_stage_config.dart       # Stage Configurations
+│   │   ├── project_status_screen.dart      # Project Status Tracking
+│   │   ├── project_contract_screen.dart    # Project Contract Terms
+│   │   ├── site_screen.dart                # Construction Site Overview
+│   │   ├── manager_site_entry_page.dart    # Manager Site Data Entry
+│   │   ├── site_supervisor_config.dart     # Supervisor Assignment & Config
+│   │   ├── site_supervisor_map_screen.dart # Mapping Supervisors to Sites
+│   │   ├── contractor_page.dart            # Contractor Management
+│   │   ├── contractor_entry_page.dart      # Contractor Registration & Entry
+│   │   ├── contractor_report_page.dart     # Contractor Work Reports
+│   │   ├── material_screen.dart            # Material Catalog & Inventory
+│   │   ├── config_materials.dart           # Material Master Setup
+│   │   ├── config_material_information.dart# Material Stock Details
+│   │   ├── config_mat_sub_cat.dart         # Material Sub-Categories
+│   │   ├── config_materialavailability.dart# Material Availability Check
+│   │   ├── manager_material_approval_screen.dart # Material Request Approvals
+│   │   ├── manager_approval_screen.dart    # General Approval Queue
+│   │   ├── manager_expenses_homescreen.dart# Manager Expenses Dashboard
+│   │   ├── manager_expenses.dart           # Site Expenses Processing
+│   │   ├── labour_screen.dart              # Labour Management
+│   │   ├── labour_config_page.dart         # Labour Master Config
+│   │   ├── workers_config_page.dart        # Worker Information & Roles
+│   │   ├── workers_site_mapping_page.dart  # Mapping Workers to Sites
+│   │   ├── vehicle_config_page.dart        # Vehicle Master Setup
+│   │   ├── vehicle_details_page.dart       # Vehicle Specs & Logs
+│   │   ├── vehicle_driver_config_page.dart # Driver Assignment
+│   │   ├── vehicle_inventory_page.dart     # Vehicle Stock & Assets
+│   │   ├── tools_master_page.dart          # Equipment & Tools Master
+│   │   ├── tools_inventory_details.dart    # Tools Asset Tracking
+│   │   ├── config_account_dashboard.dart   # Manager Financial Accounts
+│   │   └── config_layout_and_drawing.dart  # Blueprints & Architectural Drawings
+│   │
+│   ├── supervisor/                         # ROLE: Site Supervisor
+│   │   ├── supervisor_login_page.dart      # Supervisor Auth Login
+│   │   ├── supervisor_dashboard.dart       # Field Supervisor Dashboard
+│   │   ├── site_entry_page.dart            # Daily Site Logs & Entries
+│   │   ├── supervisor_material_information.dart # Site Material Stock View
+│   │   ├── material_at_site_entry_page.dart# Material Arrival Logging
+│   │   ├── material_request_form.dart      # Submit Material Indents/Requests
+│   │   ├── supervisor_material_view_request_screen.dart # Track Material Requests
+│   │   ├── supervisor_view_request_screen.dart # Track General Requests
+│   │   ├── supervisor_verification_page.dart # Site Verification Checklist
+│   │   ├── supervisor_work_schedule_page.dart # Daily Work Scheduling & Tasks
+│   │   ├── projectstage_daily_site_report.dart # Stage Progress Reporting
+│   │   ├── site_contractor_entry_page.dart # On-site Contractor Logs
+│   │   ├── supervisor_worker_att_page.dart # Worker Daily Attendance
+│   │   ├── worker_calendar_availability_page.dart # Worker Shift Scheduling
+│   │   ├── supervisor_tool_movement.dart   # Equipment Issues & Transfers
+│   │   └── tools_movement_page.dart        # Detailed Tool Movement Records
+│   │
+│   ├── customer/                           # ROLE: Customer / Client / Owner
+│   │   ├── customer_login_page.dart        # Customer Auth Login
+│   │   ├── customer_dashboard.dart         # Customer Summary Portal
+│   │   ├── customer_project_details.dart   # Client View of Project Progress
+│   │   ├── customer_site_status_report.dart# Site Progress & Photos
+│   │   ├── customer_project_financial_statusreport.dart # Payment & Financial View
+│   │   ├── customer_insights_screen.dart   # High-level Client Insights
+│   │   ├── customer_insight_dashboard.dart # Client Analytics Dashboard
+│   │   ├── customer_worker_details.dart    # On-site Manpower Summary
+│   │   └── customer_workers_summary.dart   # Worker Deployment Summary
+│   │
+│   ├── reports/                            # MODULE: Reports & Analytics
+│   │   ├── insights_dashboard.dart         # Overall Business Intelligence
+│   │   ├── daily_site_report.dart          # Comprehensive Daily Site Report
+│   │   ├── financial_status_report.dart    # Financial Audit Report
+│   │   ├── site_expenses_report_page.dart  # Detailed Site Expenditure Report
+│   │   ├── site_weekly_financial_report.dart # Weekly Site Cashflow (v1)
+│   │   ├── site_weekly_financial_report2.dart# Weekly Site Cashflow (v2)
+│   │   ├── project_financial_status_report_page.dart # Project Budgeting Report
+│   │   ├── project_stage_expenses_report_page.dart # Stage Expense Breakdown
+│   │   ├── project_stage_insights_dashboard.dart # Stage Progress Analytics
+│   │   ├── project_stage_site_summary_report.dart # Stage Summary Audit
+│   │   ├── site_status_report.dart         # Site Operational Status
+│   │   ├── site_status_report_page.dart    # Site Activity Audit
+│   │   ├── site_summary_page.dart          # Site Overview Report
+│   │   ├── material_report.dart            # Material Usage & Consumption Report
+│   │   ├── tools_inventory_report.dart     # Equipment & Tools Audit Report
+│   │   ├── vehicle_inventory_pdf.dart      # Vehicle Fleet PDF Export
+│   │   ├── worker_summary_report_page.dart # Manpower Summary Report
+│   │   ├── workers_availability_report_page.dart # Labour Availability Audit
+│   │   ├── worker_report_pdf_helper.dart   # Manpower PDF Generation
+│   │   ├── incentive_calculation.dart      # Labour Incentive Calculator
+│   │   ├── incentive_calculation_sheet.dart# Incentive Audit Sheet
+│   │   ├── project_indicator.dart          # Project KPI Indicators
+│   │   ├── overall_report_pdf_helper.dart  # Consolidated PDF Engine
+│   │   └── pdf_preview_page.dart           # In-App PDF Viewer
+│   │
+│   ├── branding/                           # MODULE: App Customization & Themes
+│   │   ├── branding_screen.dart            # White-label Branding Dashboard
+│   │   └── branding_edit_screen.dart       # App Name, Colors & Logo Config
+│   │
+│   └── common/                             # MODULE: Shared Authentication & System
+│       ├── splash_screen.dart              # App Splash & Startup
+│       ├── welcome_screen.dart             # Welcome / Onboarding Screen
+│       ├── landing_page.dart               # Role Selection Landing Page
+│       ├── main_dashboard.dart             # Unified App Hub
+│       ├── config_login.dart               # Multi-role Login Selector
+│       ├── reset_password_screen.dart      # Password Reset Screen
+│       ├── join_by_referral_page.dart      # Organization Referral Signup
+│       ├── account_settings_screen.dart    # User Profile & Preferences
+│       ├── notification_page.dart          # In-app Notifications
+│       ├── construction_documents.dart     # Document Repository
+│       ├── contact_support_screen.dart     # Support & Help Desk
+│       ├── about_us_screen.dart            # App Version & Legal Info
+│       ├── no_internet_screen.dart         # Offline Fallback Screen
+│       └── web_view_screen.dart            # Embedded In-App Browser View
+│
+├── services/                               # Core Backend Services
+│   ├── auth_service.dart                   # Firebase Authentication Service
+│   ├── firestore_service.dart              # Cloud Firestore Database Engine
+│   ├── expense_service.dart                # Expense Processing & Calculation
+│   ├── payu_service.dart                   # PayU Payment Gateway Backend
+│   ├── notification_service.dart           # Push & In-App Notification Engine
+│   └── location_service.dart               # GPS Location & Geofencing Service
+│
+├── utils/                                  # Utilities & Helper Functions
+│   ├── app_theme.dart                      # Dynamic Styling & Hex Color Engine
+│   ├── terms_helper.dart                   # Terms & Conditions / Refund Policy
+│   ├── dialog_utils.dart                   # Standardized Dialog Helper
+│   ├── firestore_error_handler.dart        # Global Exception Handler
+│   ├── pdf_templates.dart                  # PDF Layout & Formatting Rules
+│   ├── project_stage_pdf_helper.dart       # Stage PDF Document Generator
+│   ├── project_info_utils.dart             # Project Calculation Helpers
+│   ├── responsive.dart                     # Screen Breakpoints (Mobile/Desktop)
+│   ├── list_extensions.dart                # Custom Dart List Helper Methods
+│   └── enums.dart                          # Global Application Enums
+│
+└── widgets/                                # Reusable UI Components
+    ├── glass_scaffold.dart                 # Glassmorphic Main Layout Scaffold
+    ├── glass_card.dart                     # Glassmorphic Card Container
+    ├── glass_button.dart                   # Glassmorphic Action Button
+    ├── glass_text_field.dart               # Glassmorphic Input Text Field
+    ├── irregular_background.dart           # Dynamic Ambient Mesh Background
+    ├── site_dropdown.dart                  # Reusable Construction Site Picker
+    └── connectivity_wrapper.dart           # Real-time Offline Connectivity Banner
+
+================================================================================
+2. ROLE-BASED MODULE SUMMARY
+================================================================================
+
+┌───────────────────────┬──────────────────────────────────────────────────────┐
+│ Role Module           │ Core Responsibilities & Capabilities                 │
+├───────────────────────┼──────────────────────────────────────────────────────┤
+│ 1. Organization Admin │ • Managed under `lib/screens/organization/`          │
+│                       │ • Company registration & workspace setup             │
+│                       │ • Subscription plan management (Silver/Gold/Platinum)│
+│                       │ • PayU payment gateway checkout & billing audit       │
+│                       │ • Organization-wide financial & site oversight       │
+│                       │                                                      │
+│ 2. Project Manager    │ • Managed under `lib/screens/manager/`               │
+│                       │ • Creation and configuration of projects & sites     │
+│                       │ • Approval of material requests & site expenses      │
+│                       │ • Inventory management (Materials, Vehicles, Tools)  │
+│                       │ • Assignment of supervisors, contractors, & workers  │
+│                       │                                                      │
+│ 3. Site Supervisor    │ • Managed under `lib/screens/supervisor/`            │
+│                       │ • Daily site entry and work schedule execution       │
+│                       │ • Recording worker daily attendance & shift logs     │
+│                       │ • Material arrival logging & indent requests         │
+│                       │ • Equipment/tool movements between sites             │
+│                       │                                                      │
+│ 4. Customer / Client  │ • Managed under `lib/screens/customer/`              │
+│                       │ • Read-only client view of project progress & sites  │
+│                       │ • Financial progress & payment milestone reports     │
+│                       │ • Deployed manpower and site activity summaries      │
+│                       │                                                      │
+│ 5. Reports & Audits   │ • Managed under `lib/screens/reports/`               │
+│                       │ • Comprehensive PDF generation (Daily logs, PDF export)│
+│                       │ • Financial, material, worker, and vehicle audits    │
+│                       │ • Interactive KPI & analytics dashboards             │
+│                       │                                                      │
+│ 6. Branding Engine    │ • Managed under `lib/screens/branding/`              │
+│                       │ • White-label customization (App Name, Primary Color)│
+│                       │ • Dynamic theme persistence across all screens       │
+└───────────────────────┴──────────────────────────────────────────────────────┘
+================================================================================

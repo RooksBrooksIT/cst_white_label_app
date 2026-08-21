@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class SiteScreen extends StatefulWidget {
   const SiteScreen({super.key});
@@ -18,6 +19,9 @@ class SiteScreen extends StatefulWidget {
 class _SiteScreenState extends State<SiteScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  String _siteSearchQuery = '';
+  int _allSitesCurrentPage = 1;
+  final int _allSitesItemsPerPage = 10;
 
   // Site Details Controllers
   final TextEditingController _siteNameController = TextEditingController();
@@ -95,7 +99,7 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<List<String>> fetchProjectSubCategories() async {
-    try {
+    try { 
       final snapshot = await FirestoreService.getCollection(
         'projectSubCategories',
       ).get();
@@ -630,7 +634,13 @@ class _SiteScreenState extends State<SiteScreen>
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [primaryColor, primaryColor.withValues(alpha: 0.8)],
+              colors: [
+                AppTheme.getDarkAccent(primaryColor),
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  AppTheme.getDarkAccent(primaryColor),
+                ),
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -653,7 +663,8 @@ class _SiteScreenState extends State<SiteScreen>
         ),
       ),
       body: SafeArea(
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: isMobile ? double.infinity : 650,
@@ -1096,6 +1107,7 @@ class _SiteScreenState extends State<SiteScreen>
   Widget _buildAllSiteTab() {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService.getCollection('Site').snapshots(),
@@ -1109,91 +1121,448 @@ class _SiteScreenState extends State<SiteScreen>
         }
         if (snapshot.hasError) {
           return Center(
-            child: Text(
-              'Error: ${snapshot.error}',
-              style: const TextStyle(color: Color(0xFF0A183D)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                'Error loading sites: ${snapshot.error}',
+                style: const TextStyle(color: Color(0xFF0A183D)),
+              ),
             ),
           );
         }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.isEmpty) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.location_city_rounded,
+                      size: 48,
+                      color: primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No Sites Found',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0A183D),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Create your first construction site in the "New Setup" tab.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Filter sites by search query if any
+        final filteredSites = docs.where((doc) {
+          final data = (doc.data() as Map<String, dynamic>?) ?? {};
+          final name = (data['siteName'] ?? '').toString().toLowerCase();
+          final id = (data['siteId'] ?? doc.id).toString().toLowerCase();
+          final loc = (data['location'] ?? '').toString().toLowerCase();
+          final cat = (data['projectCategory'] ?? '').toString().toLowerCase();
+
+          final query = _siteSearchQuery.trim().toLowerCase();
+          return query.isEmpty ||
+              name.contains(query) ||
+              id.contains(query) ||
+              loc.contains(query) ||
+              cat.contains(query);
+        }).toList();
+
+        final totalItems = filteredSites.length;
+        final totalPages = (totalItems / _allSitesItemsPerPage).ceil().clamp(1, 999999);
+        if (_allSitesCurrentPage > totalPages) {
+          _allSitesCurrentPage = totalPages;
+        }
+        final startIndex = (totalItems == 0) ? 0 : (_allSitesCurrentPage - 1) * _allSitesItemsPerPage;
+        final endIndex = (startIndex + _allSitesItemsPerPage).clamp(0, totalItems);
+        final paginatedSites = filteredSites.sublist(startIndex, endIndex);
+
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              // Search Bar & Count Header
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        onChanged: (val) {
+                          setState(() {
+                            _siteSearchQuery = val;
+                            _allSitesCurrentPage = 1;
+                          });
+                        },
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0A183D),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search sites by name, ID, location...',
+                          hintStyle: TextStyle(
+                            fontSize: 12.5,
+                            color: Colors.grey.shade500,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            color: primaryColor,
+                            size: 18,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: darkAccent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${filteredSites.length} Sites',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Sites Cards List
+              Expanded(
+                child: filteredSites.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No matching sites found',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: paginatedSites.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final doc = paginatedSites[index];
+                          final data = (doc.data() as Map<String, dynamic>?) ?? {};
+                          return _buildSiteCard(context, doc.id, data);
+                        },
+                      ),
+              ),
+
+              // Pagination Bar
+              _buildPaginationControls(
+                currentPage: _allSitesCurrentPage,
+                totalPages: totalPages,
+                totalItems: totalItems,
+                itemsPerPage: _allSitesItemsPerPage,
+                darkCardBg: darkAccent,
+                primaryColor: primaryColor,
+                onPageChanged: (newPage) {
+                  setState(() => _allSitesCurrentPage = newPage);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPaginationControls({
+    required int currentPage,
+    required int totalPages,
+    required int totalItems,
+    required int itemsPerPage,
+    required Color darkCardBg,
+    required Color primaryColor,
+    required Function(int) onPageChanged,
+  }) {
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    final startItem = (currentPage - 1) * itemsPerPage + 1;
+    final endItem = (currentPage * itemsPerPage).clamp(1, totalItems);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Text(
+            'Showing $startItem–$endItem of $totalItems',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            icon: Icon(
+              Icons.first_page_rounded,
+              size: 20,
+              color: currentPage > 1 ? darkCardBg : Colors.grey.shade300,
+            ),
+            onPressed: currentPage > 1 ? () => onPageChanged(1) : null,
+            tooltip: 'First Page',
+          ),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            icon: Icon(
+              Icons.chevron_left_rounded,
+              size: 20,
+              color: currentPage > 1 ? darkCardBg : Colors.grey.shade300,
+            ),
+            onPressed: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
+            tooltip: 'Previous Page',
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: darkCardBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '$currentPage / $totalPages',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            icon: Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: currentPage < totalPages ? darkCardBg : Colors.grey.shade300,
+            ),
+            onPressed: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
+            tooltip: 'Next Page',
+          ),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            icon: Icon(
+              Icons.last_page_rounded,
+              size: 20,
+              color: currentPage < totalPages ? darkCardBg : Colors.grey.shade300,
+            ),
+            onPressed: currentPage < totalPages ? () => onPageChanged(totalPages) : null,
+            tooltip: 'Last Page',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSiteCard(BuildContext context, String docId, Map<String, dynamic> data) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+    final siteId = (data['siteId'] as String?) ?? docId;
+    final siteName = (data['siteName'] as String?) ?? 'Unnamed Site';
+    final location = (data['location'] as String?) ?? 'No location provided';
+    final category = (data['projectCategory'] as String?) ?? '';
+    final status = (data['status'] as String?) ?? 'In Progress';
+
+    final isCompleted = status.toLowerCase() == 'completed';
+    final statusColor = isCompleted ? const Color(0xFF10B981) : const Color(0xFF3B82F6);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Row: Site ID Badge + Status Chip
+            Row(
               children: [
-                Icon(
-                  Icons.location_off_rounded,
-                  size: 64,
-                  color: primaryColor.withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'No sites available',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0A183D),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: darkAccent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    siteId,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Create a new site in the "NEW SITE" tab',
-                  style: TextStyle(
-                    color: Color(0xFF475569),
-                    fontSize: 13,
+                if (category.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      category,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          );
-        }
+            const SizedBox(height: 12),
 
-        final sites = snapshot.data!.docs;
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columnSpacing: 26,
-            headingRowColor: WidgetStateProperty.all(
-              primaryColor.withValues(alpha: 0.1),
+            // Site Name
+            Text(
+              siteName,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0A183D),
+                letterSpacing: -0.3,
+              ),
             ),
-            headingTextStyle: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-              color: primaryColor,
-            ),
-            columns: const [
-              DataColumn(label: Text('Site ID')),
-              DataColumn(label: Text('Site Name')),
-              DataColumn(label: Text('Location')),
-              DataColumn(label: Text('Category')),
-              DataColumn(label: Text('Status')),
-            ],
-            rows: List<DataRow>.generate(sites.length, (index) {
-              final site = sites[index];
-              final data = (site.data() as Map<String, dynamic>?) ?? const {};
-              final siteId = (data['siteId'] as String?) ?? site.id;
-              final siteName = (data['siteName'] as String?) ?? '';
-              final location = (data['location'] as String?) ?? '';
-              final projectCategory =
-                  (data['projectCategory'] as String?) ?? '';
-              final status = (data['status'] as String?) ?? '';
+            const SizedBox(height: 6),
 
-              return DataRow(
-                color: WidgetStateProperty.resolveWith<Color?>(
-                  (states) => index % 2 == 0 ? Colors.white : Colors.grey[50],
+            // Location Row
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.location_on_rounded,
+                  size: 16,
+                  color: Color(0xFFEF4444),
                 ),
-                cells: [
-                  DataCell(Text(siteId)),
-                  DataCell(Text(siteName)),
-                  DataCell(Text(location)),
-                  DataCell(Text(projectCategory)),
-                  DataCell(Text(status)),
-                ],
-              );
-            }),
-          ),
-        );
-      },
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    location,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1316,7 +1685,6 @@ class _SiteScreenState extends State<SiteScreen>
     required String hint,
     required void Function(String?) onChanged,
   }) {
-    final theme = Theme.of(context);
     final isValidValue = value != null && items.contains(value);
 
     return Column(

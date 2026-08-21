@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/terms_helper.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/screens/organization/pricing_screen.dart';
+import 'package:demo_cst/screens/common/contact_support_screen.dart';
 
 class OrganizationSubscriptionPage extends StatefulWidget {
   const OrganizationSubscriptionPage({super.key});
@@ -20,12 +21,22 @@ class _OrganizationSubscriptionPageState
   String _planName = 'Loading...';
   String _status = 'Loading...';
   String _expiryDate = 'Loading...';
+  int _daysRemaining = 0;
   bool _isActive = false;
+  bool _isUpgradeQueued = false;
+  String _queuedPlanName = '';
+  String _queuedStartDate = '';
+
+  int _siteCount = 0;
+  int _supervisorCount = 0;
+
+  Color get primaryColor => Theme.of(context).primaryColor;
 
   @override
   void initState() {
     super.initState();
     _fetchSubscriptionData();
+    _fetchUsageData();
   }
 
   Future<void> _fetchSubscriptionData() async {
@@ -47,10 +58,30 @@ class _OrganizationSubscriptionPageState
           
           bool isExpired = false;
           if (expiry != null) {
-            isExpired = DateTime.now().isAfter(expiry.toDate());
-            _expiryDate = DateFormat('dd MMM yyyy').format(expiry.toDate());
+            final expDate = expiry.toDate();
+            final now = DateTime.now();
+            isExpired = now.isAfter(expDate);
+            _daysRemaining = expDate.difference(now).inDays;
+            if (_daysRemaining < 0) _daysRemaining = 0;
+            _expiryDate = DateFormat('dd MMM yyyy').format(expDate);
           } else {
-            _expiryDate = 'Lifetime';
+            _expiryDate = 'Lifetime Active';
+            _daysRemaining = 365;
+          }
+
+          final isQueued = data['isUpgradeQueued'] as bool? ?? false;
+          final queuedPlanRaw = data['queuedPlan'] as String?;
+          final queuedStartTs = data['queuedStartDate'] as Timestamp?;
+          if (isQueued && queuedPlanRaw != null && queuedPlanRaw.isNotEmpty) {
+            _isUpgradeQueued = true;
+            _queuedPlanName = _formatPlanName(queuedPlanRaw);
+            if (queuedStartTs != null) {
+              _queuedStartDate = DateFormat('dd MMM yyyy').format(queuedStartTs.toDate());
+            } else {
+              _queuedStartDate = _expiryDate;
+            }
+          } else {
+            _isUpgradeQueued = false;
           }
 
           _isActive = isActiveField && !isExpired;
@@ -62,14 +93,28 @@ class _OrganizationSubscriptionPageState
       debugPrint('Error fetching subscription data: $e');
       if (mounted) {
         setState(() {
-          _planName = 'Free Trial';
+          _planName = 'Standard Plan';
           _status = 'Active';
-          _expiryDate = '22 Aug 2026';
+          _expiryDate = '31 Dec 2026';
+          _daysRemaining = 130;
           _isActive = true;
           _isLoading = false;
         });
       }
     }
+  }
+
+  Future<void> _fetchUsageData() async {
+    try {
+      final sitesSnap = await FirestoreService.getCollection('Site').get();
+      final supSnap = await FirestoreService.getCollection('Supervisors').get();
+      if (mounted) {
+        setState(() {
+          _siteCount = sitesSnap.docs.length;
+          _supervisorCount = supSnap.docs.length;
+        });
+      }
+    } catch (_) {}
   }
 
   String _formatPlanName(String raw) {
@@ -86,202 +131,375 @@ class _OrganizationSubscriptionPageState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
 
     return PopScope(
       canPop: _isActive,
-      child: GlassScaffold(
-        padding: EdgeInsets.zero,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text(
+            'Manage Subscription',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              letterSpacing: -0.3,
+            ),
+          ),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  darkAccent,
+                  Color.alphaBlend(
+                    primaryColor.withValues(alpha: 0.35),
+                    darkAccent,
+                  ),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          leading: _isActive
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                  onPressed: () => Navigator.pop(context),
+                )
+              : null,
+        ),
         body: SafeArea(
-          child: Column(
-            children: [
-              // Top Header Row
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 680),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // ── 1. Hero Plan & Billing Card ───────────────────
+                          _buildCurrentPlanCard(darkAccent),
+                          const SizedBox(height: 16),
+
+                          // ── 2. Usage & Quota Overview Card ────────────────
+                          _buildUsageMetricsCard(darkAccent),
+                          const SizedBox(height: 16),
+
+                          // ── 3. Plan Features / Entitlements ───────────────
+                          _buildPlanDetailsSection(darkAccent),
+                          const SizedBox(height: 16),
+
+                          // ── 4. Upgrade / Manage Plan Action Card ──────────
+                          _buildChangePlanSection(darkAccent),
+                          const SizedBox(height: 20),
+
+                          // ── 5. Terms & Refund Policy Link ────────────────
+                          Center(
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.description_rounded, size: 16, color: Color(0xFF0284C7)),
+                              label: const Text(
+                                'Terms & Conditions • Refund Policy',
+                                style: TextStyle(
+                                  color: Color(0xFF0284C7),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                              onPressed: () {
+                                TermsHelper.showTermsDialog(
+                                  context,
+                                  onAccepted: () {},
+                                  readOnly: true,
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          Center(
+                            child: Text(
+                              'CST Cloud Infrastructure • Enterprise Encryption',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        onPressed: _isActive ? () => Navigator.pop(context) : null,
-                      ),
                     ),
-                    Text(
-                      'Manage Subscription',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(width: 40),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-                    child: _isLoading
-                        ? const Center(
-                            child: CircularProgressIndicator(color: Color(0xFF0A183D)),
-                          )
-                        : SingleChildScrollView(
-                            physics: const BouncingScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // 1. Current Plan Section Card
-                                _buildCurrentPlanCard(darkCardBg),
-
-                                const SizedBox(height: 20),
-
-                                // 2. Plan Features Section Card
-                                _buildPlanDetailsSection(darkCardBg),
-
-                                const SizedBox(height: 20),
-
-                                // 3. Need to Change Plan Section Card
-                                _buildSupportSection(darkCardBg),
-
-                                const SizedBox(height: 24),
-
-                                // Terms & Conditions Link
-                                Center(
-                                  child: TextButton(
-                                    onPressed: () {
-                                      TermsHelper.showTermsDialog(
-                                        context,
-                                        onAccepted: () {},
-                                        readOnly: true,
-                                      );
-                                    },
-                                    child: const Text(
-                                      'View Terms & Conditions & Refund Policy',
-                                      style: TextStyle(
-                                        color: Color(0xFF1E88E5),
-                                        decoration: TextDecoration.underline,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 100),
-                              ],
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCurrentPlanCard(Color darkCardBg) {
+  // ---------------------------------------------------------------------------
+  // UI SECTIONS
+  // ---------------------------------------------------------------------------
+
+  Widget _buildCurrentPlanCard(Color darkAccent) {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: darkCardBg,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            darkAccent,
+            Color.alphaBlend(primaryColor.withValues(alpha: 0.45), darkAccent),
+          ],
+        ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
+            color: darkAccent.withValues(alpha: 0.25),
             blurRadius: 16,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _isActive ? Icons.stars_rounded : Icons.warning_rounded,
-              color: _isActive ? const Color(0xFF10B981) : Colors.orangeAccent,
-              size: 32,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            _planName,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-            decoration: BoxDecoration(
-              color: _isActive ? const Color(0xFF10B981) : Colors.orangeAccent,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              _status.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
-          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Next Billing Date',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFCBD5E1),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 16),
+                    const SizedBox(width: 5),
+                    Text(
+                      'SUBSCRIPTION TIER',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _isActive
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFEF4444),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _status.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // Plan Name
+          Text(
+            _planName,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _isActive
+                ? '$_daysRemaining days remaining until next renewal'
+                : 'Your subscription period has ended',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Renewal / Billing Card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.event_repeat_rounded, color: Colors.white70, size: 18),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Renewal Date',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  _expiryDate,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (_isUpgradeQueued) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.amber.shade400.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.schedule_rounded,
+                    color: Colors.amber,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Queued Upgrade: $_queuedPlanName (Activates $_queuedStartDate)',
+                      style: const TextStyle(
+                        color: Colors.amber,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUsageMetricsCard(Color darkAccent) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.data_usage_rounded, color: primaryColor, size: 20),
+              const SizedBox(width: 8),
               Text(
-                _expiryDate,
-                style: const TextStyle(
+                'Workspace Capacity & Usage',
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: darkAccent,
+                ),
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(color: Color(0xFFF1F5F9), height: 1),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _buildUsageStatItem(
+                  'Active Sites',
+                  '$_siteCount',
+                  'Unlimited',
+                  Icons.location_city_rounded,
+                  const Color(0xFF10B981),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildUsageStatItem(
+                  'Supervisors',
+                  '$_supervisorCount',
+                  'Unlimited',
+                  Icons.supervisor_account_rounded,
+                  const Color(0xFF0284C7),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildUsageStatItem(
+                  'Cloud Backups',
+                  'Auto',
+                  'Daily',
+                  Icons.cloud_done_rounded,
+                  const Color(0xFF8B5CF6),
                 ),
               ),
             ],
@@ -291,17 +509,65 @@ class _OrganizationSubscriptionPageState
     );
   }
 
-  Widget _buildPlanDetailsSection(Color darkCardBg) {
+  Widget _buildUsageStatItem(
+    String title,
+    String value,
+    String limit,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanDetailsSection(Color darkAccent) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -311,38 +577,39 @@ class _OrganizationSubscriptionPageState
           Row(
             children: [
               Container(
-                width: 34,
-                height: 34,
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.verified_user_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
+                child: const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 18),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'PLAN FEATURES',
+              Text(
+                'Included Entitlements & Features',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 1.0,
+                  color: darkAccent,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          _buildFeatureItem('Unlimited Projects & Sites'),
-          const SizedBox(height: 12),
-          _buildFeatureItem('Real-time Financial Tracking'),
-          const SizedBox(height: 12),
-          _buildFeatureItem('Dynamic Report Generation'),
-          const SizedBox(height: 12),
-          _buildFeatureItem('Custom Branding Tools'),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(color: Color(0xFFF1F5F9), height: 1),
+          ),
+          _buildFeatureItem('Unlimited Construction Projects & Sites'),
+          const SizedBox(height: 10),
+          _buildFeatureItem('Real-time Financial & Expense Verifications'),
+          const SizedBox(height: 10),
+          _buildFeatureItem('Dynamic PDF & Excel Analytics Reports'),
+          const SizedBox(height: 10),
+          _buildFeatureItem('Material Requisitions & Approval Workflows'),
+          const SizedBox(height: 10),
+          _buildFeatureItem('Tools Inventory Tracking & Site Transfers'),
+          const SizedBox(height: 10),
+          _buildFeatureItem('White-label Branding & Custom Theme'),
         ],
       ),
     );
@@ -354,16 +621,16 @@ class _OrganizationSubscriptionPageState
         const Icon(
           Icons.check_circle_rounded,
           color: Color(0xFF10B981),
-          size: 20,
+          size: 18,
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFFCBD5E1),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF334155),
             ),
           ),
         ),
@@ -371,68 +638,95 @@ class _OrganizationSubscriptionPageState
     );
   }
 
-  Widget _buildSupportSection(Color darkCardBg) {
+  Widget _buildChangePlanSection(Color darkAccent) {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Need to change your plan?',
+          Text(
+            'Upgrade or Modify Subscription',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 15.5,
               fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.3,
+              color: darkAccent,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           const Text(
-            'Contact our support team to upgrade your subscription or manage billing details.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFFCBD5E1),
-              height: 1.35,
-            ),
+            'Explore multi-tier plans, switch billing periods, or scale your operations with additional seats.',
+            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.3),
           ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/contactSupport');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0B1942),
-                foregroundColor: Colors.white,
-                elevation: 4,
-                shadowColor: const Color(0xFF0B1942).withValues(alpha: 0.35),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      final theme = Theme.of(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PricingScreen(
+                            orgName: '',
+                            email: '',
+                            phone: '',
+                            username: '',
+                            password: '',
+                            dateStr: '',
+                            appName: '',
+                            selectedColor: theme.primaryColor,
+                            currentPlan: _planName,
+                            isManagingExisting: true,
+                          ),
+                        ),
+                      ).then((_) => _fetchSubscriptionData());
+                    },
+                    icon: const Icon(Icons.upgrade_rounded, size: 20),
+                    label: const Text(
+                      'MANAGE / UPGRADE PLAN',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.4),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
                 ),
               ),
-              child: const Text(
-                'CONTACT SUPPORT',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
+              const SizedBox(width: 10),
+              IconButton.outlined(
+                tooltip: 'Contact Billing Support',
+                icon: Icon(Icons.help_outline_rounded, color: primaryColor),
+                style: IconButton.styleFrom(
+                  side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.all(12),
                 ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ContactSupportScreen()),
+                  );
+                },
               ),
-            ),
+            ],
           ),
         ],
       ),

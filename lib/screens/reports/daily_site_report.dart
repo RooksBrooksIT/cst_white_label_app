@@ -10,6 +10,7 @@ import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
 import '/utils/pdf_templates.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class DailySiteExpensesReportPage extends StatefulWidget {
   final String supervisorId;
@@ -162,16 +163,46 @@ class _DailySiteExpensesReportPageState
     final isMobile = Responsive.isMobile(context);
     final dateStr = DateFormat('dd MMM yyyy').format(widget.date);
 
-    return GlassScaffold(
-      title: 'Daily Site Report',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-          onPressed: () => _handlePdfExport(context),
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Daily Site Report',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-      ],
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+            onPressed: () => _handlePdfExport(context),
+            tooltip: 'Export PDF Report',
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(

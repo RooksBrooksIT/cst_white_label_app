@@ -4,8 +4,6 @@ import 'package:demo_cst/screens/manager/contractor_report_page.dart';
 import 'package:demo_cst/screens/organization/organization_insights_screen.dart';
 import 'package:demo_cst/screens/reports/project_financial_status_report_page.dart';
 import 'package:demo_cst/screens/reports/site_status_report.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class InsightsDashboard extends StatelessWidget {
@@ -13,130 +11,159 @@ class InsightsDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final isDesktop = screenWidth >= 1024;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
-    final horizontalPadding = isDesktop ? 40.0 : (isTablet ? 32.0 : 16.0);
+    final isDesktop = screenWidth >= 1024;
+    final horizontalPadding = isDesktop ? 32.0 : (isTablet ? 24.0 : 16.0);
 
-    return ValueListenableBuilder<Color>(
-      valueListenable: AppTheme.primaryColor,
-      builder: (context, primaryColor, _) {
-        return GlassScaffold(
-          title: 'Insights Dashboard',
-          onBack: () => Navigator.pop(context),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isMobile ? double.infinity : 600,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Insights Dashboard',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 800.0 : (isTablet ? 650.0 : double.infinity),
+            ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: isMobile ? 16 : 24,
               ),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: horizontalPadding,
-                  vertical: isMobile ? 16 : 24,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Analytics & Reports',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0A183D),
-                        fontSize: 22,
-                        letterSpacing: -0.4,
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Analytics & Reports',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                      fontSize: 20,
+                      letterSpacing: -0.3,
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Access detailed reports and insights for your projects and sites',
-                      style: TextStyle(
-                        color: Color(0xFF475569),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Access detailed reports and insights for your projects and sites',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
-                    const SizedBox(height: 24),
-                    _buildSectionCard(
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSectionCard(
+                    context,
+                    icon: Icons.receipt_long_rounded,
+                    title: 'Site/Project Expenses Report',
+                    description:
+                        'View and analyze all expenses related to your site or project in detail.',
+                    primaryColor: primaryColor,
+                    onTap: () => Navigator.push(
                       context,
-                      icon: Icons.receipt_long_outlined,
-                      title: 'Site/Project Expenses Report',
-                      description:
-                          'View and analyze all expenses related to your site or project in detail.',
-                      primaryColor: primaryColor,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const OrganizationInsightsScreen(),
-                        ),
+                      MaterialPageRoute(
+                        builder: (_) => const OrganizationInsightsScreen(),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildSectionCard(
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSectionCard(
+                    context,
+                    icon: Icons.timeline_rounded,
+                    title: 'Site/Project Stage Expenses',
+                    description:
+                        'Track expenses by project stage for better cost management.',
+                    primaryColor: primaryColor,
+                    onTap: () => Navigator.push(
                       context,
-                      icon: Icons.timeline_outlined,
-                      title: 'Site/Project Stage Expenses',
-                      description:
-                          'Track expenses by project stage for better cost management.',
-                      primaryColor: primaryColor,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ProjectstageInsightsDashboard(),
-                        ),
+                      MaterialPageRoute(
+                        builder: (_) => const ProjectstageInsightsDashboard(),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildSectionCard(
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSectionCard(
+                    context,
+                    icon: Icons.bar_chart_rounded,
+                    title: 'Site/Project Status Report',
+                    description:
+                        'Monitor the current status and progress of your site or project.',
+                    primaryColor: primaryColor,
+                    onTap: () => Navigator.push(
                       context,
-                      icon: Icons.bar_chart_outlined,
-                      title: 'Site/Project Status Report',
-                      description:
-                          'Monitor the current status and progress of your site or project.',
-                      primaryColor: primaryColor,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SiteStatusReportScreen(),
-                        ),
+                      MaterialPageRoute(
+                        builder: (_) => const SiteStatusReportScreen(),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildSectionCard(
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSectionCard(
+                    context,
+                    icon: Icons.account_balance_wallet_rounded,
+                    title: 'Financial Status Report',
+                    description:
+                        'Get a detailed overview of your project\'s financial health and budget utilization.',
+                    primaryColor: primaryColor,
+                    onTap: () => Navigator.push(
                       context,
-                      icon: Icons.account_balance_wallet_outlined,
-                      title: 'Financial Status Report',
-                      description:
-                          'Get a detailed overview of your project\'s financial health and budget utilization.',
-                      primaryColor: primaryColor,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProjectFinancialStatusReportPage(),
-                        ),
+                      MaterialPageRoute(
+                        builder: (_) => ProjectFinancialStatusReportPage(),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildSectionCard(
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSectionCard(
+                    context,
+                    icon: Icons.assignment_rounded,
+                    title: 'Contractor Report',
+                    description:
+                        'View contractor-wise entries and totals saved via Contractor Entry.',
+                    primaryColor: primaryColor,
+                    onTap: () => Navigator.push(
                       context,
-                      icon: Icons.assignment_outlined,
-                      title: 'Contractor Report',
-                      description:
-                          'View contractor-wise entries and totals saved via Contractor Entry.',
-                      primaryColor: primaryColor,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => ContractorReportPage()),
-                      ),
+                      MaterialPageRoute(builder: (_) => ContractorReportPage()),
                     ),
-                    const SizedBox(height: 40),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -148,69 +175,76 @@ class InsightsDashboard extends StatelessWidget {
     required Color primaryColor,
     required VoidCallback onTap,
   }) {
-    return GlassCard(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: primaryColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: primaryColor.withValues(alpha: 0.25),
-                width: 1,
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: primaryColor, size: 22),
               ),
-            ),
-            child: Icon(icon, color: primaryColor, size: 26),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0A183D),
-                    fontSize: 16,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    color: Color(0xFF334155),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'View Report',
-                      style: TextStyle(
-                        color: primaryColor,
+                      title,
+                      style: const TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 13.5,
+                        color: Color(0xFF0A183D),
+                        fontSize: 15,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      color: primaryColor,
-                      size: 15,
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12.5,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'View Report',
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          color: primaryColor,
+                          size: 14,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

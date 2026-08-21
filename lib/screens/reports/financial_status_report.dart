@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '/services/firestore_service.dart';
 import '/utils/pdf_templates.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
@@ -72,51 +73,20 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
         }
       }
 
-      Map<String, dynamic> data = {};
       if (query.docs.isNotEmpty) {
-        data = query.docs.first.data();
-      }
-
-      // Also fetch from 'Site' collection to get the location if missing
-      try {
-        final siteDoc = await FirestoreService.getCollection(
-          'Site',
-        ).doc(widget.siteId).get();
-        if (siteDoc.exists) {
-          final siteData = siteDoc.data()!;
-          // Merge location and other site details if they are missing in projectData
-          if (data['siteLocation'] == null && data['location'] == null) {
-            data['siteLocation'] = siteData['location'];
-          }
-          if (data['siteName'] == null) {
-            data['siteName'] = siteData['siteName'];
-          }
-          // Merge start date if missing
-          if (data['actualStartDate'] == null &&
-              data['actualStateDate'] == null &&
-              data['plannedStartDate'] == null &&
-              data['startDate'] == null) {
-            data['actualStartDate'] = siteData['startDate'];
-          }
-        }
-      } catch (e) {
-        debugPrint('Error fetching site details: $e');
-      }
-
-      if (data.isNotEmpty) {
         setState(() {
-          projectData = data;
+          projectData = query.docs.first.data();
           isLoading = false;
         });
       } else {
         setState(() {
-          errorMsg = 'Project data not found for site: ${widget.siteId}';
+          errorMsg = 'No project data found for site ID: ${widget.siteId}';
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
-        errorMsg = 'Error loading project: $e';
+        errorMsg = 'Failed to load project data: $e';
         isLoading = false;
       });
     }
@@ -125,13 +95,47 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return GlassScaffold(
-      title: 'Financial Status Report',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Financial Status Report',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+            onPressed: projectData != null ? _generateAndPreviewPDF : null,
+            tooltip: 'Export PDF Report',
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(

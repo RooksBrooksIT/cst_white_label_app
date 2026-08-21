@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 import 'package:intl/intl.dart';
 
@@ -119,7 +118,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       final sitesSnapshot = await FirestoreService.getCollection('Site').get();
       final Map<String, Map<String, dynamic>> siteDetails = {
         for (var doc in sitesSnapshot.docs)
-          doc.id: doc.data() as Map<String, dynamic>
+          doc.id: doc.data()
       };
 
       final mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap').get();
@@ -162,24 +161,63 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     }
   }
 
+  int _parseCount(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  int _tsMillis(dynamic v) {
+    try {
+      if (v == null) return -1;
+      if (v is Timestamp) return v.millisecondsSinceEpoch;
+      if (v is DateTime) return v.millisecondsSinceEpoch;
+      if (v is String) return DateTime.tryParse(v)?.millisecondsSinceEpoch ?? -1;
+      return -1;
+    } catch (_) {
+      return -1;
+    }
+  }
+
   Future<void> _loadMaterialData() async {
     try {
-      final materialsSnapshot = await FirestoreService.getCollection(
-        'materials',
-      ).get();
+      final Map<String, Map<String, dynamic>> materialMap = {};
+
+      // Fetch exclusively from materialsavailablity collection
+      try {
+        final availSnapshot = await FirestoreService.getCollection('materialsavailablity').get();
+        for (final doc in availSnapshot.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
+          if (name.isEmpty) continue;
+          final count = _parseCount(data['count'] ?? data['availableCount']);
+          final lastUpdatedMs = _tsMillis(data['lastupdated'] ?? data['lastUpdated']);
+
+          if (!materialMap.containsKey(name) || lastUpdatedMs > (materialMap[name]!['lastupdatedMillis'] as int? ?? -1)) {
+            materialMap[name] = {
+              'materialId': doc.id,
+              'materialName': name,
+              'displayName': name,
+              'count': count,
+              'lastupdatedMillis': lastUpdatedMs,
+            };
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching materialsavailablity: $e');
+      }
+
+      final list = materialMap.values.toList()
+        ..sort(
+          (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
+                (b['displayName'] as String).toLowerCase(),
+              ),
+        );
 
       if (mounted) {
         setState(() {
-          materialsList = materialsSnapshot.docs.map((doc) {
-            final data = doc.data();
-            final availableCount = data['availableCount'] ?? data['count'] ?? 0;
-            return {
-              'materialId': doc.id,
-              'materialName': data['materialName'] ?? doc.id,
-              'displayName': data['materialName'] ?? doc.id,
-              'count': availableCount,
-            };
-          }).toList();
+          materialsList = list;
           _isLoadingMaterials = false;
         });
       }
@@ -197,21 +235,56 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
   Future<void> _loadSiteMaterialData(String siteId) async {
     try {
-      final materialsSnapshot = await FirestoreService.getCollection(
-        'siteMaterials',
-      ).doc(siteId).collection('materials').get();
+      final Map<String, Map<String, dynamic>> siteMatMap = {};
+
+      // 1. Fetch from materialatsite
+      try {
+        final snap = await FirestoreService.getCollection('materialatsite')
+            .where('siteid', isEqualTo: siteId).get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
+          if (name.isEmpty) continue;
+          final count = _parseCount(data['count'] ?? data['availableCount']);
+          siteMatMap[name] = {
+            'materialId': doc.id,
+            'materialName': name,
+            'displayName': name,
+            'count': count,
+          };
+        }
+      } catch (_) {}
+
+      // 2. Fetch from siteMaterials/{siteId}/materials
+      try {
+        final snap = await FirestoreService.getCollection('siteMaterials')
+            .doc(siteId).collection('materials').get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
+          if (name.isEmpty) continue;
+          final count = _parseCount(data['count'] ?? data['availableCount']);
+          if (!siteMatMap.containsKey(name) || (siteMatMap[name]!['count'] as int? ?? 0) == 0) {
+            siteMatMap[name] = {
+              'materialId': doc.id,
+              'materialName': name,
+              'displayName': name,
+              'count': count,
+            };
+          }
+        }
+      } catch (_) {}
+
+      final list = siteMatMap.values.toList()
+        ..sort(
+          (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
+                (b['displayName'] as String).toLowerCase(),
+              ),
+        );
 
       if (mounted) {
         setState(() {
-          siteMaterialsList = materialsSnapshot.docs.map((doc) {
-            final data = doc.data();
-            return {
-              'materialId': doc.id,
-              'materialName': data['materialName'] ?? doc.id,
-              'displayName': data['materialName'] ?? doc.id,
-              'count': data['count'] ?? 0,
-            };
-          }).toList();
+          siteMaterialsList = list;
           _isLoadingMaterials = false;
         });
       }
@@ -265,10 +338,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         _selectedMaterialName = materialName;
         final list = _transferMode == 0 ? materialsList : siteMaterialsList;
         final material = list.firstWhere(
-          (m) => m['materialName'] == materialName,
+          (m) => (m['materialName'] ?? m['displayName']) == materialName,
           orElse: () => {'count': 0},
         );
-        availableCount = material['count'] ?? 0;
+        availableCount = _parseCount(material['count']);
       });
     }
   }
@@ -416,7 +489,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     }
   }
 
-  bool _validateForm() {
+  bool _validateCompanyToSiteForm() {
     if (_managerNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter manager name')),
@@ -502,8 +575,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     return true;
   }
 
-  Future<void> _transferMaterials() async {
-    if (!_validateForm()) return;
+  Future<void> _saveCompanyToSiteTransfer() async {
+    if (!_validateCompanyToSiteForm()) return;
 
     try {
       final transferData = {
@@ -522,6 +595,25 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       for (var material in materialsToTransfer) {
         final materialName = material['materialName'];
         final neededCount = material['neededCount'];
+
+        // Update materialsavailablity collection
+        try {
+          final availSnapshot = await FirestoreService.getCollection('materialsavailablity').get();
+          for (final doc in availSnapshot.docs) {
+            final data = doc.data();
+            final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
+            if (name == materialName) {
+              final currentCount = _parseCount(data['count'] ?? data['availableCount']);
+              final newCount = (currentCount - neededCount).clamp(0, double.infinity).toInt();
+              await FirestoreService.getCollection('materialsavailablity').doc(doc.id).update({
+                'count': newCount,
+                'lastupdated': FieldValue.serverTimestamp(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error updating materialsavailablity: $e');
+        }
 
         final materialQuery = await FirestoreService.getCollection('materials')
             .where('materialName', isEqualTo: materialName)
@@ -697,6 +789,25 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           });
         }
 
+        // Update materialsavailablity collection
+        try {
+          final availSnapshot = await FirestoreService.getCollection('materialsavailablity').get();
+          for (final doc in availSnapshot.docs) {
+            final data = doc.data();
+            final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
+            if (name == materialName) {
+              final currentCount = _parseCount(data['count'] ?? data['availableCount']);
+              final newCount = currentCount + neededCount;
+              await FirestoreService.getCollection('materialsavailablity').doc(doc.id).update({
+                'count': newCount,
+                'lastupdated': FieldValue.serverTimestamp(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error updating materialsavailablity on return: $e');
+        }
+
         final materialQuery = await FirestoreService.getCollection('materials')
             .where('materialName', isEqualTo: materialName)
             .get();
@@ -735,7 +846,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
-    final Color darkCardBg = AppTheme.getDarkAccent(primaryColor);
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     final String pageTitle = _transferMode == 0
@@ -744,67 +855,52 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             ? 'Site To Site Transfer'
             : 'Site To Company Transfer';
 
-    return GlassScaffold(
-      padding: EdgeInsets.zero,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          pageTitle,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header Row ──────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  Text(
-                    pageTitle,
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                ],
-              ),
-            ),
-
-            // ── Dark Pill Mode Switcher (CTS / STS / STC) ───────────────────
+            // ── Pill Mode Switcher (CTS / STS / STC) ───────────────────
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: darkCardBg,
-                borderRadius: BorderRadius.circular(18),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: darkCardBg.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -828,7 +924,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
-                      vertical: 16,
+                      vertical: 12,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -836,7 +932,6 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         if (_transferMode == 0) ...[
                           // ── CTS: Company To Site UI ──────────────────────
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -848,101 +943,108 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                   hint: 'Enter manager name',
                                   icon: Icons.person_rounded,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildSiteDropdown(),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _projectNameController,
-                                  label: 'Project Name *',
-                                  hint: 'Project name will auto-fill',
+                                  label: 'Project Name',
+                                  hint: 'Auto-filled project name',
                                   enabled: false,
                                   icon: Icons.business_rounded,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _supervisorNameController,
-                                  label: 'Supervisor Name *',
-                                  hint: 'Supervisor name will auto-fill',
+                                  label: 'Supervisor Name',
+                                  hint: 'Auto-filled supervisor name',
                                   enabled: false,
-                                  icon: Icons.supervisor_account_rounded,
+                                  icon: Icons.badge_rounded,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _dateController,
                                   label: 'Date *',
-                                  hint: 'Select date',
-                                  onTap: () => _selectDate(context, _dateController),
+                                  hint: 'YYYY-MM-DD',
                                   icon: Icons.calendar_today_rounded,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now(),
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (picked != null) {
+                                      _dateController.text = DateFormat(
+                                        'yyyy-MM-dd',
+                                      ).format(picked);
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 20),
-
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('Materials Information'),
+                                _buildSectionHeader('Material Details'),
                                 const SizedBox(height: 18),
                                 _buildMaterialDropdown(),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 Row(
                                   children: [
                                     Expanded(
                                       child: _buildCountBox(
                                         'Available Count',
-                                        availableCount.toString(),
-                                        availableCount > 0
-                                            ? const Color(0xFF4ADE80)
-                                            : const Color(0xFFF87171),
-                                        Icons.inventory_2_rounded,
+                                        '$availableCount',
+                                        const Color(0xFF10B981),
+                                        Icons.check_circle_rounded,
                                       ),
                                     ),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 12),
                                     Expanded(
                                       child: _buildTextField(
                                         controller: _neededCountController,
-                                        label: 'Needed Count *',
+                                        label: 'Transfer Count *',
                                         hint: 'Enter count',
                                         keyboardType: TextInputType.number,
-                                        icon: Icons.edit_rounded,
+                                        icon: Icons.numbers_rounded,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 20),
                                 _buildAddClearMaterialButtons(primaryColor),
                                 if (materialsToTransfer.isNotEmpty) ...[
-                                  const SizedBox(height: 18),
+                                  const SizedBox(height: 24),
                                   _buildMaterialsList(),
                                 ],
                               ],
                             ),
                           ),
                           const SizedBox(height: 20),
-
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('Final Actions'),
-                                const SizedBox(height: 18),
                                 _buildTransferActionsButton(
                                   primaryColor: primaryColor,
-                                  actionText: 'Transfer Materials',
-                                  onPressed: _transferMaterials,
+                                  actionText: 'Transfer to Site',
+                                  onPressed: () {
+                                    if (_validateCompanyToSiteForm()) {
+                                      _saveCompanyToSiteTransfer();
+                                    }
+                                  },
                                 ),
                                 const SizedBox(height: 20),
                                 _buildHowItWorksBox(
                                   primaryColor: primaryColor,
                                   items: const [
-                                    'Available count decreases automatically',
-                                    'Materials are added to site inventory',
-                                    'Transfer history is saved for tracking',
-                                    'Multiple materials can be transferred at once',
+                                    'Materials are transferred from Company Inventory to Site',
+                                    'Company available count decreases automatically',
+                                    'Site material count increases automatically',
+                                    'Transfer history is saved with "CompanyToSite" info',
                                   ],
                                 ),
                               ],
@@ -951,94 +1053,84 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         ] else if (_transferMode == 1) ...[
                           // ── STS: Site To Site UI ─────────────────────────
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('From Site'),
+                                _buildSectionHeader('From Site (Source)'),
                                 const SizedBox(height: 18),
-                                _buildTextField(
-                                  controller: _fromManagerController,
-                                  label: 'Manager Name *',
-                                  hint: 'Enter manager name',
-                                  icon: Icons.person_rounded,
-                                ),
-                                const SizedBox(height: 14),
                                 _buildSiteDropdownGeneric(
                                   selectedId: _fromSiteId,
-                                  onChanged: (v) async {
+                                  onChanged: (v) {
                                     if (v != null) {
                                       setState(() {
                                         _fromSiteId = v;
-                                        _selectedMaterialName = null;
-                                        availableCount = 0;
-                                        _neededCountController.clear();
-                                        _isLoadingMaterials = true;
                                       });
-                                      await _fetchAndFillSiteDetails(
-                                        v,
-                                        mode: 1,
-                                        isFromSite: true,
-                                      );
-                                      await _loadSiteMaterialData(v);
+                                      _fetchAndFillSiteDetails(v, mode: 1);
                                     }
                                   },
-                                  label: 'Site *',
+                                  label: 'From Site *',
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _fromSiteNameController,
-                                  label: 'Site Name',
-                                  hint: 'Auto-filled from selection',
+                                  label: 'From Site Name',
+                                  hint: 'Auto-filled site name',
                                   enabled: false,
-                                  icon: Icons.location_on_rounded,
+                                  icon: Icons.location_city_rounded,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
+                                _buildTextField(
+                                  controller: _fromManagerController,
+                                  label: 'From Manager Name',
+                                  hint: 'Enter manager name',
+                                  icon: Icons.person_rounded,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildTextField(
+                                  controller: _fromSupervisorController,
+                                  label: 'From Supervisor Name',
+                                  hint: 'Auto-filled supervisor name',
+                                  enabled: false,
+                                  icon: Icons.badge_rounded,
+                                ),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _fromProjectNameController,
-                                  label: 'Project Name',
-                                  hint: 'Auto-filled from selection',
+                                  label: 'From Project Name',
+                                  hint: 'Auto-filled project name',
                                   enabled: false,
                                   icon: Icons.business_rounded,
                                 ),
-                                const SizedBox(height: 14),
-                                _buildTextField(
-                                  controller: _fromSupervisorController,
-                                  label: 'Supervisor Name',
-                                  hint: 'Auto-filled from selection',
-                                  enabled: false,
-                                  icon: Icons.supervisor_account_rounded,
-                                ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _fromDateController,
-                                  label: 'Date *',
-                                  hint: 'Select date',
-                                  onTap: () => _selectDate(
-                                    context,
-                                    _fromDateController,
-                                  ),
+                                  label: 'From Date *',
+                                  hint: 'YYYY-MM-DD',
                                   icon: Icons.calendar_today_rounded,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now(),
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (picked != null) {
+                                      _fromDateController.text = DateFormat(
+                                        'yyyy-MM-dd',
+                                      ).format(picked);
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 20),
-
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('To Site'),
+                                _buildSectionHeader('To Site (Destination)'),
                                 const SizedBox(height: 18),
-                                _buildTextField(
-                                  controller: _toManagerController,
-                                  label: 'Manager Name *',
-                                  hint: 'Enter manager name',
-                                  icon: Icons.person_rounded,
-                                ),
-                                const SizedBox(height: 14),
                                 _buildSiteDropdownGeneric(
                                   selectedId: _toSiteId,
                                   onChanged: (v) {
@@ -1046,242 +1138,241 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                       setState(() {
                                         _toSiteId = v;
                                       });
-                                      _fetchAndFillSiteDetails(
-                                        v,
-                                        mode: 1,
-                                        isFromSite: false,
-                                      );
+                                      _fetchAndFillSiteDetails(v, mode: 2);
                                     }
                                   },
-                                  label: 'Site *',
+                                  label: 'To Site *',
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _toSiteNameController,
-                                  label: 'Site Name',
-                                  hint: 'Auto-filled from selection',
+                                  label: 'To Site Name',
+                                  hint: 'Auto-filled site name',
                                   enabled: false,
-                                  icon: Icons.location_on_rounded,
+                                  icon: Icons.location_city_rounded,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
+                                _buildTextField(
+                                  controller: _toManagerController,
+                                  label: 'To Manager Name',
+                                  hint: 'Enter manager name',
+                                  icon: Icons.person_rounded,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildTextField(
+                                  controller: _toSupervisorController,
+                                  label: 'To Supervisor Name',
+                                  hint: 'Auto-filled supervisor name',
+                                  enabled: false,
+                                  icon: Icons.badge_rounded,
+                                ),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _toProjectNameController,
-                                  label: 'Project Name',
-                                  hint: 'Auto-filled from selection',
+                                  label: 'To Project Name',
+                                  hint: 'Auto-filled project name',
                                   enabled: false,
                                   icon: Icons.business_rounded,
                                 ),
-                                const SizedBox(height: 14),
-                                _buildTextField(
-                                  controller: _toSupervisorController,
-                                  label: 'Supervisor Name',
-                                  hint: 'Auto-filled from selection',
-                                  enabled: false,
-                                  icon: Icons.supervisor_account_rounded,
-                                ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _toDateController,
-                                  label: 'Date *',
-                                  hint: 'Select date',
-                                  onTap: () => _selectDate(
-                                    context,
-                                    _toDateController,
-                                  ),
+                                  label: 'To Date *',
+                                  hint: 'YYYY-MM-DD',
                                   icon: Icons.calendar_today_rounded,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now(),
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (picked != null) {
+                                      _toDateController.text = DateFormat(
+                                        'yyyy-MM-dd',
+                                      ).format(picked);
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 20),
-
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('Materials Information'),
+                                _buildSectionHeader('Material Details'),
                                 const SizedBox(height: 18),
                                 _buildMaterialDropdown(),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 Row(
                                   children: [
                                     Expanded(
                                       child: _buildCountBox(
                                         'Available Count',
-                                        availableCount.toString(),
-                                        availableCount > 0
-                                            ? const Color(0xFF4ADE80)
-                                            : const Color(0xFFF87171),
-                                        Icons.inventory_2_rounded,
+                                        '$availableCount',
+                                        const Color(0xFF10B981),
+                                        Icons.check_circle_rounded,
                                       ),
                                     ),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 12),
                                     Expanded(
                                       child: _buildTextField(
                                         controller: _neededCountController,
-                                        label: 'Needed Count *',
+                                        label: 'Transfer Count *',
                                         hint: 'Enter count',
                                         keyboardType: TextInputType.number,
-                                        icon: Icons.edit_rounded,
+                                        icon: Icons.numbers_rounded,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 20),
                                 _buildAddClearMaterialButtons(primaryColor),
                                 if (materialsToTransfer.isNotEmpty) ...[
-                                  const SizedBox(height: 18),
+                                  const SizedBox(height: 24),
                                   _buildMaterialsList(),
                                 ],
                               ],
                             ),
                           ),
                           const SizedBox(height: 20),
-
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('Final Actions'),
-                                const SizedBox(height: 18),
                                 _buildTransferActionsButton(
                                   primaryColor: primaryColor,
-                                  actionText: 'Transfer Materials',
+                                  actionText: 'Transfer Site to Site',
                                   onPressed: () {
                                     if (_validateSiteToSiteForm()) {
                                       _saveSiteToSiteTransfer();
                                     }
                                   },
                                 ),
+                                const SizedBox(height: 20),
+                                _buildHowItWorksBox(
+                                  primaryColor: primaryColor,
+                                  items: const [
+                                    'Materials are transferred directly between two construction sites',
+                                    'Source Site material count decreases automatically',
+                                    'Destination Site material count increases automatically',
+                                    'Transfer history is saved with "SiteToSite" info',
+                                  ],
+                                ),
                               ],
                             ),
                           ),
-                        ] else if (_transferMode == 2) ...[
-                          // ── STC: Site To Company UI ───────────────────────
+                        ] else ...[
+                          // ── STC: Site To Company UI ──────────────────────
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('Site Information'),
+                                _buildSectionHeader('Basic Information'),
                                 const SizedBox(height: 18),
-                                _buildTextField(
-                                  controller: _siteToCompanyManagerController,
-                                  label: 'Manager Name *',
-                                  hint: 'Enter manager name',
-                                  icon: Icons.person_rounded,
-                                ),
-                                const SizedBox(height: 14),
                                 _buildSiteDropdownGeneric(
                                   selectedId: _selectedSiteId,
-                                  onChanged: (v) async {
+                                  onChanged: (v) {
                                     if (v != null) {
                                       setState(() {
                                         _selectedSiteId = v;
-                                        _selectedMaterialName = null;
-                                        availableCount = 0;
-                                        _neededCountController.clear();
-                                        _isLoadingMaterials = true;
                                       });
-                                      await _fetchAndFillSiteDetails(v, mode: 2);
-                                      await _loadSiteMaterialData(v);
+                                      _fetchAndFillSiteDetails(v, mode: 3);
                                     }
                                   },
-                                  label: 'Site *',
+                                  label: 'From Site *',
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _siteToCompanySiteNameController,
                                   label: 'Site Name',
-                                  hint: 'Auto-filled from selection',
+                                  hint: 'Auto-filled site name',
                                   enabled: false,
-                                  icon: Icons.location_on_rounded,
+                                  icon: Icons.location_city_rounded,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
-                                  controller: _projectNameController,
-                                  label: 'Project Name',
-                                  hint: 'Auto-filled from selection',
-                                  enabled: false,
-                                  icon: Icons.business_rounded,
+                                  controller: _siteToCompanyManagerController,
+                                  label: 'Manager Name',
+                                  hint: 'Enter manager name',
+                                  icon: Icons.person_rounded,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _siteToCompanySupervisorController,
                                   label: 'Supervisor Name',
-                                  hint: 'Auto-filled from selection',
+                                  hint: 'Auto-filled supervisor name',
                                   enabled: false,
-                                  icon: Icons.supervisor_account_rounded,
+                                  icon: Icons.badge_rounded,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _siteToCompanyDateController,
                                   label: 'Date *',
-                                  hint: 'Select date',
-                                  onTap: () => _selectDate(
-                                    context,
-                                    _siteToCompanyDateController,
-                                  ),
+                                  hint: 'YYYY-MM-DD',
                                   icon: Icons.calendar_today_rounded,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now(),
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (picked != null) {
+                                      _siteToCompanyDateController.text = DateFormat(
+                                        'yyyy-MM-dd',
+                                      ).format(picked);
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 20),
-
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('Materials to Return'),
+                                _buildSectionHeader('Material Details'),
                                 const SizedBox(height: 18),
                                 _buildMaterialDropdown(),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 Row(
                                   children: [
                                     Expanded(
                                       child: _buildCountBox(
                                         'Available Count',
-                                        availableCount.toString(),
-                                        availableCount > 0
-                                            ? const Color(0xFF4ADE80)
-                                            : const Color(0xFFF87171),
-                                        Icons.inventory_2_rounded,
+                                        '$availableCount',
+                                        const Color(0xFF10B981),
+                                        Icons.check_circle_rounded,
                                       ),
                                     ),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 12),
                                     Expanded(
                                       child: _buildTextField(
                                         controller: _neededCountController,
-                                        label: 'Return Count *',
-                                        hint: 'Enter count to return',
+                                        label: 'Transfer Count *',
+                                        hint: 'Enter count',
                                         keyboardType: TextInputType.number,
-                                        icon: Icons.edit_rounded,
+                                        icon: Icons.numbers_rounded,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 20),
                                 _buildAddClearMaterialButtons(primaryColor),
                                 if (materialsToTransfer.isNotEmpty) ...[
-                                  const SizedBox(height: 18),
+                                  const SizedBox(height: 24),
                                   _buildMaterialsList(),
                                 ],
                               ],
                             ),
                           ),
                           const SizedBox(height: 20),
-
                           _buildCardContainer(
-                            darkCardBg: darkCardBg,
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionHeader('Final Actions'),
-                                const SizedBox(height: 18),
                                 _buildTransferActionsButton(
                                   primaryColor: primaryColor,
                                   actionText: 'Return to Company',
@@ -1337,7 +1428,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: isSelected ? primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             label,
@@ -1346,7 +1437,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               fontSize: 13,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.5,
-              color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
+              color: isSelected ? Colors.white : const Color(0xFF0A183D),
             ),
           ),
         ),
@@ -1355,18 +1446,18 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   }
 
   Widget _buildCardContainer({
-    required Color darkCardBg,
     required Widget child,
   }) {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
         boxShadow: [
           BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 16,
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
@@ -1381,7 +1472,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       style: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w800,
-        color: Colors.white,
+        color: Color(0xFF0A183D),
         letterSpacing: -0.3,
       ),
     );
@@ -1407,21 +1498,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: enabled ? Colors.white : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: enabled ? Colors.white : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: TextField(
             controller: controller,
@@ -1430,26 +1515,23 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             onTap: onTap,
             style: const TextStyle(
               color: Color(0xFF0A183D),
-              fontSize: 15,
+              fontSize: 14.5,
               fontWeight: FontWeight.w700,
             ),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
               prefixIcon: icon != null
                   ? Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(icon, color: brandIconColor, size: 22),
+                      child: Icon(icon, color: brandIconColor, size: 20),
                     )
                   : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
+              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -1477,21 +1559,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: _isLoadingSites
               ? const Padding(
@@ -1515,7 +1591,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   value: selectedId,
                   isExpanded: true,
                   dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   style: const TextStyle(
                     color: Color(0xFF0A183D),
                     fontSize: 14.5,
@@ -1533,13 +1609,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       child: Icon(
                         Icons.location_on_rounded,
                         color: brandIconColor,
-                        size: 22,
+                        size: 20,
                       ),
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
+                    border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
@@ -1585,21 +1658,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: _isLoadingMaterials
               ? const Padding(
@@ -1623,7 +1690,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   value: _selectedMaterialName,
                   isExpanded: true,
                   dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   style: const TextStyle(
                     color: Color(0xFF0A183D),
                     fontSize: 14.5,
@@ -1641,13 +1708,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       child: Icon(
                         Icons.inventory_2_rounded,
                         color: brandIconColor,
-                        size: 22,
+                        size: 20,
                       ),
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
+                    border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
@@ -1657,7 +1721,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       .map((material) {
                         final materialName = material['materialName'];
                         final displayName = material['displayName'];
-                        final count = material['count'] ?? 0;
+                        final count = _parseCount(material['count']);
 
                         return DropdownMenuItem<String>(
                           value: materialName,
@@ -1719,7 +1783,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 8),
@@ -1728,14 +1792,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: Row(
             children: [
@@ -1766,24 +1824,23 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               onPressed: _addMaterial,
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
-                foregroundColor: const Color(0xFF0A183D),
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                elevation: 4,
-                shadowColor: primaryColor.withValues(alpha: 0.4),
+                elevation: 2,
               ),
               icon: const Icon(
                 Icons.add_circle_outline_rounded,
                 size: 20,
-                color: Color(0xFF0A183D),
+                color: Colors.white,
               ),
               label: const Text(
                 'Add Material',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF0A183D),
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -1796,25 +1853,25 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             child: ElevatedButton.icon(
               onPressed: _clearMaterial,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: 0.15),
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF0A183D),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
                 ),
                 elevation: 0,
               ),
               icon: const Icon(
                 Icons.close_rounded,
                 size: 18,
-                color: Colors.white,
+                color: Color(0xFF0A183D),
               ),
               label: const Text(
                 'Clear Material',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: Color(0xFF0A183D),
                 ),
               ),
             ),
@@ -1833,15 +1890,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 15,
-            color: Colors.white,
+            color: Color(0xFF0A183D),
           ),
         ),
         const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: Column(
             children: materialsToTransfer.asMap().entries.map((entry) {
@@ -1854,7 +1911,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -1867,26 +1924,26 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       material['displayName'],
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        color: Color(0xFF0A183D),
                         fontSize: 14,
                       ),
                     ),
                     subtitle: Text(
                       'Quantity: ${material['neededCount']} units',
                       style: const TextStyle(
-                        color: Color(0xFFCBD5E1),
+                        color: Color(0xFF64748B),
                         fontSize: 12,
                       ),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete_rounded, color: Color(0xFFF87171)),
+                      icon: const Icon(Icons.delete_rounded, color: Color(0xFFEF4444)),
                       onPressed: () => _removeMaterial(index),
                     ),
                   ),
                   if (!isLast)
-                    Divider(
+                    const Divider(
                       height: 1,
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: Color(0xFFCBD5E1),
                       indent: 16,
                       endIndent: 16,
                     ),
@@ -1900,7 +1957,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           'Total Materials: ${materialsToTransfer.length}',
           style: const TextStyle(
             fontSize: 12,
-            color: Color(0xFFCBD5E1),
+            color: Color(0xFF64748B),
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -1921,11 +1978,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             child: ElevatedButton(
               onPressed: _clearAll,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: 0.15),
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF0A183D),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
                 ),
                 elevation: 0,
               ),
@@ -1935,7 +1992,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.5,
-                  color: Colors.white,
+                  color: Color(0xFF0A183D),
                 ),
               ),
             ),
@@ -1950,13 +2007,12 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               onPressed: onPressed,
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
-                foregroundColor: const Color(0xFF0A183D),
+                foregroundColor: Colors.white,
                 padding: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                elevation: 6,
-                shadowColor: primaryColor.withValues(alpha: 0.4),
+                elevation: 2,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1964,13 +2020,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   const Icon(
                     Icons.swap_horiz_rounded,
                     size: 22,
-                    color: Color(0xFF0A183D),
+                    color: Colors.white,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     actionText.toUpperCase(),
                     style: const TextStyle(
-                      color: Color(0xFF0A183D),
+                      color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.6,
@@ -1992,9 +2048,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: primaryColor.withValues(alpha: 0.18),
+        color: primaryColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: primaryColor.withValues(alpha: 0.35)),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2026,7 +2082,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('• ', style: TextStyle(fontSize: 12, color: Color(0xFFCBD5E1))),
+          const Text('• ', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
           Expanded(
             child: Text(
               text,

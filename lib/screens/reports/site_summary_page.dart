@@ -323,21 +323,37 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
 
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: Text(
-          'Site Summary',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-            color: Colors.white,
-          ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Site Summary Report',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        backgroundColor: primaryColor,
-        iconTheme: IconThemeData(color: Colors.white),
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Center(
         child: ConstrainedBox(

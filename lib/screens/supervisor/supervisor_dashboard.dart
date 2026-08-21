@@ -1,20 +1,23 @@
-import 'package:demo_cst/screens/supervisor/material_at_site_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_material_information.dart';
-import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
+import 'package:demo_cst/services/auth_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/utils/responsive.dart';
+import 'package:demo_cst/screens/common/notification_page.dart';
+import 'package:demo_cst/screens/supervisor/supervisor_verification_page.dart';
 import 'package:demo_cst/screens/supervisor/material_request_form.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_material_view_request_screen.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_tool_movement.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_verification_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_view_request_screen.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_work_schedule_page.dart';
+import 'package:demo_cst/screens/supervisor/supervisor_view_request_screen.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_worker_att_page.dart';
-import '/widgets/glass_scaffold.dart';
-import '/services/auth_service.dart';
-import '/widgets/glass_card.dart';
-import '/utils/responsive.dart';
+import 'package:demo_cst/screens/supervisor/material_at_site_entry_page.dart';
+import 'package:demo_cst/screens/supervisor/supervisor_material_information.dart';
+import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
+import 'package:demo_cst/screens/common/construction_documents.dart';
 import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
 
 class SupervisorDashboard extends StatefulWidget {
@@ -29,7 +32,7 @@ class SupervisorDashboard extends StatefulWidget {
   });
 
   @override
-  _SupervisorDashboardState createState() => _SupervisorDashboardState();
+  State<SupervisorDashboard> createState() => _SupervisorDashboardState();
 }
 
 class _CategoryData {
@@ -37,7 +40,6 @@ class _CategoryData {
   final String subtitle;
   final IconData icon;
   final Color color;
-  final List<Color> gradientColors;
   final List<SubMenuItem> items;
 
   _CategoryData({
@@ -45,7 +47,6 @@ class _CategoryData {
     required this.subtitle,
     required this.icon,
     required this.color,
-    required this.gradientColors,
     required this.items,
   });
 }
@@ -53,6 +54,9 @@ class _CategoryData {
 class _SupervisorDashboardState extends State<SupervisorDashboard> {
   final ScrollController _scrollController = ScrollController();
   DateTime? _lastBackPressTime;
+  String _requestFilter = 'All'; // 'All', 'Pending', 'Approved', 'Rejected'
+
+  Color get primaryColor => Theme.of(context).primaryColor;
 
   @override
   void dispose() {
@@ -65,36 +69,29 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Row(
           children: [
-            Icon(Icons.logout_rounded, color: Colors.red[300], size: 28),
-            const SizedBox(width: 12),
-            const Text(
+            Icon(Icons.logout_rounded, color: Colors.redAccent, size: 24),
+            SizedBox(width: 10),
+            Text(
               'Confirm Logout',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
           ],
         ),
         content: const Text(
-          'Are you sure you want to logout?',
-          style: TextStyle(fontSize: 16),
+          'Are you sure you want to end your active supervisor session and log out?',
+          style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Cancel',
+            child: const Text(
+              'CANCEL',
               style: TextStyle(
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -111,16 +108,16 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              elevation: 0,
             ),
             child: const Text(
-              'Logout',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              'LOGOUT',
+              style: TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
         ],
@@ -130,12 +127,10 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth < 600 ? 3 : (screenWidth < 900 ? 4 : 6);
-
-    final categories = _getCategories(colorScheme);
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final crossAxisCount = isMobile ? 3 : (MediaQuery.of(context).size.width < 900 ? 4 : 6);
+    final categories = _getCategories();
 
     return PopScope(
       canPop: false,
@@ -146,41 +141,143 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
           _lastBackPressTime = now;
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Press back again to exit'),
-                duration: const Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            );
+            AppTheme.showSuccessToast(context, 'Press back again to exit');
           }
         } else {
           SystemNavigator.pop();
         }
       },
-      child: GlassScaffold(
-        title: 'Supervisor Dashboard',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.white),
-            tooltip: 'Logout',
-            onPressed: () => _showLogoutDialog(context),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text(
+            'Supervisor Portal',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              letterSpacing: -0.3,
+            ),
           ),
-        ],
-        padding: EdgeInsets.zero,
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
-            child: CustomScrollView(
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                ..._buildGridSections(context, theme, categories, crossAxisCount),
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
-              ],
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  darkAccent,
+                  Color.alphaBlend(
+                    primaryColor.withValues(alpha: 0.35),
+                    darkAccent,
+                  ),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          actions: [
+            // Notifications Bell Icon
+            StreamBuilder<int>(
+              stream: NotificationService.unreadCountForSupervisor(
+                widget.supervisorName,
+              ),
+              builder: (context, snapshot) {
+                final unread = snapshot.data ?? 0;
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.notifications_outlined,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      tooltip: 'Notifications',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => NotificationPage(
+                              supervisorName: widget.supervisorName,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    if (unread > 0)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEF4444),
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            '$unread',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 22),
+              tooltip: 'Logout',
+              onPressed: () => _showLogoutDialog(context),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 920),
+              child: CustomScrollView(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  // 1. Supervisor Profile Header Banner
+                  SliverToBoxAdapter(
+                    child: _buildProfileHeaderBanner(context, darkAccent),
+                  ),
+
+                  // 2. Metrics & Project Status Summary
+                  SliverToBoxAdapter(
+                    child: _buildSupervisorMetricsAndStatus(context, darkAccent),
+                  ),
+
+                  // 3. Supervisor Requests Section
+                  SliverToBoxAdapter(
+                    child: _buildSupervisorRequestsSection(context, darkAccent),
+                  ),
+
+                  // 4. Categorized Quick Action Modules Grid
+                  ..._buildGridSections(
+                    context,
+                    darkAccent,
+                    categories,
+                    crossAxisCount,
+                  ),
+
+                  const SliverToBoxAdapter(child: SizedBox(height: 60)),
+                ],
+              ),
             ),
           ),
         ),
@@ -188,9 +285,1235 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // 1. PROFILE HEADER BANNER
+  // ---------------------------------------------------------------------------
+
+  Widget _buildProfileHeaderBanner(BuildContext context, Color darkAccent) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 14),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              darkAccent,
+              Color.alphaBlend(primaryColor.withValues(alpha: 0.45), darkAccent),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: darkAccent.withValues(alpha: 0.25),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.15),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.35),
+                  width: 2,
+                ),
+              ),
+              child: const Icon(
+                Icons.supervisor_account_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Site Operations Supervisor',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.supervisorName,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: -0.4,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'ID: ${widget.supervisorId.isNotEmpty ? widget.supervisorId : "SUP-ACTIVE"}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.sensors_rounded,
+                    color: Color(0xFF34D399),
+                    size: 14,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'ACTIVE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. METRICS & STATUS BREAKDOWN
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSupervisorMetricsAndStatus(BuildContext context, Color darkAccent) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreService.getCollection('Site').snapshots(),
+      builder: (context, sitesSnap) {
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
+          builder: (context, mapSnap) {
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirestoreService.getCollection('supervisor_requests').snapshots(),
+              builder: (context, reqSnap) {
+                final Set<String> assignedSiteNames = {};
+                final List<Map<String, dynamic>> assignedSiteDocs = [];
+
+                if (mapSnap.hasData) {
+                  for (var doc in mapSnap.data!.docs) {
+                    final data = doc.data();
+                    final supName = data['supervisor']?.toString() ?? '';
+                    final supId = data['supervisorId']?.toString() ?? '';
+                    if (supName == widget.supervisorName || supId == widget.supervisorId) {
+                      final site = data['site']?.toString() ?? '';
+                      if (site.isNotEmpty) assignedSiteNames.add(site);
+                    }
+                  }
+                }
+
+                if (sitesSnap.hasData) {
+                  for (var doc in sitesSnap.data!.docs) {
+                    final data = doc.data();
+                    final docId = doc.id;
+                    final siteName = data['siteName']?.toString() ?? docId;
+                    final supName = data['assignedSupervisor']?.toString() ?? data['supervisor']?.toString() ?? '';
+                    final supId = data['supervisorId']?.toString() ?? '';
+
+                    if (supName == widget.supervisorName ||
+                        supId == widget.supervisorId ||
+                        assignedSiteNames.contains(docId) ||
+                        assignedSiteNames.contains(siteName)) {
+                      assignedSiteDocs.add(data);
+                      assignedSiteNames.add(siteName);
+                    }
+                  }
+                }
+
+                int totalAssignedSites = assignedSiteDocs.length;
+                int inProgressCount = 0;
+                int notStartedCount = 0;
+                int onHoldCount = 0;
+                int completedCount = 0;
+
+                for (var doc in assignedSiteDocs) {
+                  final rawStatus = (doc['currentStatus'] ?? doc['status'] ?? 'In Progress')
+                      .toString()
+                      .trim()
+                      .toLowerCase();
+
+                  if (rawStatus.contains('progress') ||
+                      rawStatus.contains('active') ||
+                      rawStatus.contains('ongoing') ||
+                      rawStatus.contains('execution')) {
+                    inProgressCount++;
+                  } else if (rawStatus.contains('complete') ||
+                      rawStatus.contains('finish') ||
+                      rawStatus.contains('done') ||
+                      rawStatus.contains('closed')) {
+                    completedCount++;
+                  } else if (rawStatus.contains('plan') ||
+                      rawStatus.contains('start') ||
+                      rawStatus.contains('draft') ||
+                      rawStatus.contains('upcoming')) {
+                    notStartedCount++;
+                  } else if (rawStatus.contains('hold') ||
+                      rawStatus.contains('pause') ||
+                      rawStatus.contains('delay') ||
+                      rawStatus.contains('suspend')) {
+                    onHoldCount++;
+                  } else {
+                    inProgressCount++;
+                  }
+                }
+
+                int pendingRequestsCount = 0;
+                if (reqSnap.hasData) {
+                  for (var doc in reqSnap.data!.docs) {
+                    final data = doc.data();
+                    final supName = data['supervisorName']?.toString() ?? '';
+                    final supId = data['supervisorId']?.toString() ?? '';
+                    final status = data['status']?.toString() ?? 'Pending';
+                    if ((supName == widget.supervisorName || supId == widget.supervisorId) &&
+                        status == 'Pending') {
+                      pendingRequestsCount++;
+                    }
+                  }
+                }
+
+                return Padding(
+                  padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 4 KPI Summary Cards
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetricKpiCard(
+                              title: 'Sites',
+                              value: '$totalAssignedSites',
+                              subtitle: 'Allocated',
+                              icon: Icons.location_city_rounded,
+                              accentColor: const Color(0xFF10B981),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricKpiCard(
+                              title: 'Progress',
+                              value: '$inProgressCount',
+                              subtitle: 'Active',
+                              icon: Icons.engineering_rounded,
+                              accentColor: const Color(0xFF3B82F6),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricKpiCard(
+                              title: 'Pending',
+                              value: '$pendingRequestsCount',
+                              subtitle: 'Requests',
+                              icon: Icons.pending_actions_rounded,
+                              accentColor: const Color(0xFFF59E0B),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricKpiCard(
+                              title: 'Finished',
+                              value: '$completedCount',
+                              subtitle: 'Completed',
+                              icon: Icons.task_alt_rounded,
+                              accentColor: const Color(0xFF8B5CF6),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Project Status Summary Progress Bar & Chips
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.pie_chart_outline_rounded,
+                                  color: Color(0xFF0A183D),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Site Status Distribution',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0A183D),
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '$totalAssignedSites Total Sites',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Segmented Status Bar
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 8,
+                                width: double.infinity,
+                                color: const Color(0xFFF1F5F9),
+                                child: Row(
+                                  children: [
+                                    if (inProgressCount > 0)
+                                      Expanded(
+                                        flex: inProgressCount,
+                                        child: Container(color: const Color(0xFF3B82F6)),
+                                      ),
+                                    if (notStartedCount > 0)
+                                      Expanded(
+                                        flex: notStartedCount,
+                                        child: Container(color: const Color(0xFF94A3B8)),
+                                      ),
+                                    if (onHoldCount > 0)
+                                      Expanded(
+                                        flex: onHoldCount,
+                                        child: Container(color: const Color(0xFFF59E0B)),
+                                      ),
+                                    if (completedCount > 0)
+                                      Expanded(
+                                        flex: completedCount,
+                                        child: Container(color: const Color(0xFF10B981)),
+                                      ),
+                                    if (totalAssignedSites == 0)
+                                      Expanded(
+                                        child: Container(color: const Color(0xFFCBD5E1)),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Status Details Pills Row
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                _buildStatusSummaryPill(
+                                  label: 'In Progress',
+                                  count: inProgressCount,
+                                  color: const Color(0xFF3B82F6),
+                                ),
+                                _buildStatusSummaryPill(
+                                  label: 'Not Started',
+                                  count: notStartedCount,
+                                  color: const Color(0xFF64748B),
+                                ),
+                                _buildStatusSummaryPill(
+                                  label: 'On Hold',
+                                  count: onHoldCount,
+                                  color: const Color(0xFFF59E0B),
+                                ),
+                                _buildStatusSummaryPill(
+                                  label: 'Completed',
+                                  count: completedCount,
+                                  color: const Color(0xFF10B981),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMetricKpiCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: accentColor, size: 15),
+              ),
+              const Spacer(),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: accentColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0A183D),
+              letterSpacing: -0.4,
+            ),
+          ),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0A183D),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusSummaryPill({
+    required String label,
+    required int count,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. REQUESTS & ANNOUNCEMENTS SECTION
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSupervisorRequestsSection(BuildContext context, Color darkAccent) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.rate_review_rounded,
+                    color: primaryColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Requests & Communication',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        'Track organizational approvals & submit notices',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _showSendRequestDialog(context),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Send Request'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Filter Chips
+            Row(
+              children: ['All', 'Pending', 'Approved', 'Rejected'].map((cat) {
+                final isSelected = _requestFilter == cat;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    selected: isSelected,
+                    showCheckmark: false,
+                    label: Text(cat),
+                    labelStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected ? Colors.white : const Color(0xFF0A183D),
+                    ),
+                    backgroundColor: const Color(0xFFF8FAFC),
+                    selectedColor: primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(
+                        color: isSelected ? primaryColor : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    onSelected: (val) {
+                      HapticFeedback.lightImpact();
+                      setState(() => _requestFilter = cat);
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+
+            // Stream of Requests
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirestoreService.getCollection('supervisor_requests').snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  );
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                final supervisorRequests = docs.where((doc) {
+                  final data = doc.data();
+                  final supName = data['supervisorName']?.toString() ?? '';
+                  final supId = data['supervisorId']?.toString() ?? '';
+                  final matchesSup =
+                      supName == widget.supervisorName || supId == widget.supervisorId;
+                  final status = data['status']?.toString() ?? 'Pending';
+
+                  if (!matchesSup) return false;
+                  if (_requestFilter == 'All') return true;
+                  return status.toLowerCase() == _requestFilter.toLowerCase();
+                }).toList();
+
+                if (supervisorRequests.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.inbox_rounded, color: Colors.grey.shade400, size: 36),
+                        const SizedBox(height: 6),
+                        Text(
+                          'No ${_requestFilter == "All" ? "" : _requestFilter} requests found',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0A183D),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Tap "Send Request" to submit a request to the organization.',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: supervisorRequests.length > 5 ? 5 : supervisorRequests.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final doc = supervisorRequests[index];
+                    final data = doc.data();
+                    final title = data['title']?.toString() ?? 'Supervisor Request';
+                    final category = data['category']?.toString() ?? 'General Request';
+                    final site = data['site']?.toString() ?? 'All Sites';
+                    final description = data['description']?.toString() ?? '';
+                    final status = data['status']?.toString() ?? 'Pending';
+                    final adminRemark = data['adminRemark']?.toString() ?? '';
+                    final createdAt = data['createdAt'];
+
+                    String dateStr = 'Just now';
+                    if (createdAt is Timestamp) {
+                      dateStr = DateFormat('MMM dd, yyyy • hh:mm a').format(createdAt.toDate());
+                    }
+
+                    Color statusColor = const Color(0xFFF59E0B);
+                    IconData statusIcon = Icons.hourglass_top_rounded;
+
+                    if (status.toLowerCase() == 'approved') {
+                      statusColor = const Color(0xFF10B981);
+                      statusIcon = Icons.check_circle_rounded;
+                    } else if (status.toLowerCase() == 'rejected') {
+                      statusColor = const Color(0xFFEF4444);
+                      statusIcon = Icons.cancel_rounded;
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  category,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(statusIcon, color: statusColor, size: 13),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      status,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: statusColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            description,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF475569),
+                              height: 1.3,
+                            ),
+                          ),
+                          if (adminRemark.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline_rounded, size: 14, color: statusColor),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Org Remark: $adminRemark',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: statusColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on_rounded, size: 12, color: Colors.grey.shade600),
+                              const SizedBox(width: 3),
+                              Text(
+                                site,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              const Spacer(),
+                              Icon(Icons.access_time_rounded, size: 12, color: Colors.grey.shade500),
+                              const SizedBox(width: 3),
+                              Text(
+                                dateStr,
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                              ),
+                              if (status.toLowerCase() == 'pending') ...[
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () async {
+                                    await doc.reference.delete();
+                                    if (context.mounted) {
+                                      AppTheme.showSuccessToast(context, 'Request cancelled');
+                                    }
+                                  },
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSendRequestDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.send_rounded, color: primaryColor, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Select Request Type',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.inventory_2_rounded, color: Colors.orange),
+                ),
+                title: const Text('Material Request', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Request cement, steel, tools & site supplies'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MaterialRequestForm(
+                        supervisorId: widget.supervisorId,
+                        supervisorName: widget.supervisorName,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.event_available_rounded, color: Colors.green),
+                ),
+                title: const Text('Work Schedule Request', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Submit work stage timeline & labour requirements'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SupervisorWorkSchedulePage(
+                        supervisorId: widget.supervisorId,
+                        supervisorName: widget.supervisorName,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.rate_review_rounded, color: Colors.blue),
+                ),
+                title: const Text('General Announcement / Request', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Send a custom operational notice or request to org'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showGeneralRequestFormDialog(context);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showGeneralRequestFormDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    String selectedCategory = 'General Request';
+    String selectedSite = 'General Site';
+    List<String> assignedSites = ['General Site'];
+
+    FirestoreService.getCollection('Site').get().then((snap) {
+      final List<String> sites = [];
+      for (var doc in snap.docs) {
+        final data = doc.data();
+        final siteName = data['siteName']?.toString() ?? doc.id;
+        final supName = data['assignedSupervisor']?.toString() ?? data['supervisor']?.toString() ?? '';
+        final supId = data['supervisorId']?.toString() ?? '';
+
+        if (supName == widget.supervisorName || supId == widget.supervisorId) {
+          sites.add(siteName);
+        }
+      }
+      if (sites.isNotEmpty) {
+        assignedSites = sites;
+        selectedSite = sites.first;
+      }
+    });
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.send_rounded, color: primaryColor, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'General Request',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Request Category',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A183D),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedCategory,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: [
+                        'General Request',
+                        'Site Approval Request',
+                        'Equipment / Tools Request',
+                      ].map((cat) {
+                        return DropdownMenuItem(value: cat, child: Text(cat, style: const TextStyle(fontSize: 13)));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedCategory = val);
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    const Text(
+                      'Target Site',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: assignedSites.contains(selectedSite) ? selectedSite : assignedSites.first,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: assignedSites.map((site) {
+                        return DropdownMenuItem(value: site, child: Text(site, style: const TextStyle(fontSize: 13)));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedSite = val);
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    const Text(
+                      'Request Title',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: titleController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g., Site Safety Inspection Needed',
+                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    const Text(
+                      'Details / Description',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Provide complete details or reason for this request...',
+                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final title = titleController.text.trim();
+                    final desc = descController.text.trim();
+
+                    if (title.isEmpty || desc.isEmpty) {
+                      AppTheme.showErrorToast(context, 'Please fill in both title and description');
+                      return;
+                    }
+
+                    Navigator.pop(dialogCtx);
+
+                    try {
+                      final docRef = await FirestoreService.getCollection('supervisor_requests').add({
+                        'supervisorId': widget.supervisorId,
+                        'supervisorName': widget.supervisorName,
+                        'title': title,
+                        'category': selectedCategory,
+                        'site': selectedSite,
+                        'description': desc,
+                        'status': 'Pending',
+                        'createdAt': FieldValue.serverTimestamp(),
+                        'orgId': FirestoreService.currentOrgId,
+                      });
+
+                      await NotificationService.notifyOrganisation(
+                        title: 'New Supervisor Request: $title',
+                        body: '${widget.supervisorName} submitted a $selectedCategory for site $selectedSite',
+                        data: {
+                          'type': 'supervisor_request',
+                          'requestId': docRef.id,
+                          'supervisorName': widget.supervisorName,
+                        },
+                      );
+
+                      if (context.mounted) {
+                        AppTheme.showSuccessToast(context, 'Request submitted to Organization!');
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        AppTheme.showErrorToast(context, 'Failed to submit request: $e');
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Submit Request'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. CATEGORIZED QUICK ACTION MODULES GRID
+  // ---------------------------------------------------------------------------
+
   List<Widget> _buildGridSections(
     BuildContext context,
-    ThemeData theme,
+    Color darkAccent,
     List<_CategoryData> categories,
     int crossAxisCount,
   ) {
@@ -203,58 +1526,60 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
             child: Row(
               children: [
                 Container(
                   width: 4,
-                  height: 24,
+                  height: 22,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [category.color, category.color.withOpacity(0.5)],
+                      colors: [
+                        category.color,
+                        category.color.withValues(alpha: 0.5),
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         category.title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: darkAccent,
                           letterSpacing: -0.3,
                         ),
                       ),
                       Text(
                         category.subtitle,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
-                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
                         ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: category.color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
+                    color: category.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${category.items.length}',
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w800,
                       color: category.color,
                     ),
                   ),
@@ -265,20 +1590,20 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         ),
       );
 
-      // Items Grid for this section
+      // Grid Items for this section
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverGrid(
             delegate: SliverChildBuilderDelegate((context, index) {
               final item = category.items[index];
-              return _buildGridItem(context, item);
+              return _buildGridItem(context, item, darkAccent);
             }, childCount: category.items.length),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 0.8,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.88,
             ),
           ),
         ),
@@ -288,62 +1613,48 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     return slivers;
   }
 
-  Widget _buildGridItem(BuildContext context, SubMenuItem item) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: theme.cardColor,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          item.onTap();
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: theme.cardColor,
-            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 12,
-                spreadRadius: 1,
-                offset: const Offset(0, 4),
-              ),
-            ],
+  Widget _buildGridItem(BuildContext context, SubMenuItem item, Color darkAccent) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            item.onTap();
+          },
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [item.color, item.color.withOpacity(0.7)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: item.color.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: item.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(item.icon, color: Colors.white, size: 20),
+                  child: Icon(item.icon, color: item.color, size: 22),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   item.title,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: darkAccent,
                     letterSpacing: -0.2,
                   ),
                   textAlign: TextAlign.center,
@@ -353,10 +1664,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 const SizedBox(height: 2),
                 Text(
                   item.subtitle,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.2,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
+                    height: 1.15,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,
@@ -370,23 +1682,19 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     );
   }
 
-  List<_CategoryData> _getCategories(ColorScheme colorScheme) {
-    final primary = colorScheme.primary;
-    final secondary = colorScheme.secondary;
-
+  List<_CategoryData> _getCategories() {
     return [
       _CategoryData(
         title: "Expenses & Finance",
-        subtitle: "Manage site expenses and verifications",
+        subtitle: "Manage site expenses & verifications",
         icon: Icons.account_balance_wallet_rounded,
-        color: primary,
-        gradientColors: [primary, primary.withOpacity(0.7)],
+        color: primaryColor,
         items: [
           SubMenuItem(
-            title: 'Site Supervisor Expenses',
-            subtitle: 'Log and track daily site expenses',
+            title: 'Supervisor Expenses',
+            subtitle: 'Log and verify daily expenses',
             icon: Icons.monetization_on_rounded,
-            color: primary,
+            color: primaryColor,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -401,19 +1709,15 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       ),
       _CategoryData(
         title: "Material Requests",
-        subtitle: "Request and track materials and tools",
+        subtitle: "Request and track materials & supplies",
         icon: Icons.inventory_2_rounded,
-        color: primary.withBlue(150), // Use a variation of brand color
-        gradientColors: [
-          primary.withBlue(150),
-          primary.withBlue(150).withOpacity(0.7),
-        ],
+        color: const Color(0xFF0284C7),
         items: [
           SubMenuItem(
             title: 'Materials Request Form',
             subtitle: 'Submit new material requests',
             icon: Icons.add_shopping_cart_rounded,
-            color: primary.withBlue(150),
+            color: const Color(0xFF0284C7),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -425,10 +1729,10 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             ),
           ),
           SubMenuItem(
-            title: 'Materials Approvals',
-            subtitle: 'Check status of material requests',
+            title: 'Material Approvals',
+            subtitle: 'Check material request statuses',
             icon: Icons.fact_check_rounded,
-            color: primary.withBlue(180),
+            color: const Color(0xFF0EA5E9),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -443,16 +1747,15 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       ),
       _CategoryData(
         title: "Site Operations",
-        subtitle: "Schedules, attendance and site info",
+        subtitle: "Schedules, approvals & labour attendance",
         icon: Icons.engineering_rounded,
-        color: secondary,
-        gradientColors: [secondary, secondary.withOpacity(0.7)],
+        color: const Color(0xFF10B981),
         items: [
           SubMenuItem(
             title: 'Work Schedule Request',
-            subtitle: 'Manage site work schedules',
+            subtitle: 'Manage site work timelines',
             icon: Icons.calendar_today_rounded,
-            color: secondary,
+            color: const Color(0xFF10B981),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -465,9 +1768,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           ),
           SubMenuItem(
             title: 'Site Approvals',
-            subtitle: 'View pending site approvals',
+            subtitle: 'View pending operational approvals',
             icon: Icons.check_circle_rounded,
-            color: secondary.withOpacity(0.8).withBlue(200),
+            color: const Color(0xFF059669),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -482,7 +1785,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             title: 'Workers Attendance',
             subtitle: 'Track worker daily attendance',
             icon: Icons.people_rounded,
-            color: secondary.withOpacity(0.9),
+            color: const Color(0xFF34D399),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -496,20 +1799,16 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         ],
       ),
       _CategoryData(
-        title: "Inventory & Tools",
-        subtitle: "Manage materials and tool movements",
+        title: "Inventory & Drawings",
+        subtitle: "Manage materials, tools & construction plans",
         icon: Icons.construction_rounded,
-        color: primary.withGreen(150),
-        gradientColors: [
-          primary.withGreen(150),
-          primary.withGreen(150).withOpacity(0.7),
-        ],
+        color: const Color(0xFF8B5CF6),
         items: [
           SubMenuItem(
             title: 'Materials at Site',
-            subtitle: 'Current material stock at site',
+            subtitle: 'Live stock & materials inventory',
             icon: Icons.warehouse_rounded,
-            color: primary.withGreen(150),
+            color: const Color(0xFF8B5CF6),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -521,29 +1820,38 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             ),
           ),
           SubMenuItem(
-            title: 'Materials Information',
-            subtitle: 'General material specifications',
+            title: 'Materials Info',
+            subtitle: 'Material specifications catalog',
             icon: Icons.info_rounded,
-            color: primary.withGreen(180),
+            color: const Color(0xFFA855F7),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => SupervisorMaterialInfoScreen(),
+                builder: (context) => const SupervisorMaterialInfoScreen(),
               ),
             ),
           ),
           SubMenuItem(
             title: 'Tools Movement',
-            subtitle: 'Track tools return and movement',
+            subtitle: 'Move tools between sites & company',
             icon: Icons.handyman_rounded,
-            color: primary.withGreen(200),
+            color: const Color(0xFF7C3AED),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => SiteToCompanyReturn(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
+                builder: (context) => const ToolsMovementPage(),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Construction Drawings',
+            subtitle: 'View architectural & layout plans',
+            icon: Icons.architecture_rounded,
+            color: const Color(0xFF6D28D9),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ConstructionDocuments(),
               ),
             ),
           ),

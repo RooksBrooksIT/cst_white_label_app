@@ -5,9 +5,6 @@ import 'package:demo_cst/services/expense_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_button.dart';
 
 class ContractorEntryPage extends StatefulWidget {
   final String userName;
@@ -26,21 +23,15 @@ class ContractorEntryPage extends StatefulWidget {
 }
 
 class _ContractorEntryPageState extends State<ContractorEntryPage> {
-  // --- Color Configuration and Utilities ---
   Color get _primaryColor => Theme.of(context).primaryColor;
-  Color get _textColor => Colors.white;
-  Color get _labelColor => const Color(0xFFCBD5E1);
-  Color get _borderColor => const Color.fromARGB(255, 76, 86, 99);
-  Color get _secondaryColor => Theme.of(context).colorScheme.secondary;
-  Color get _sectionBgColor => Theme.of(context).scaffoldBackgroundColor;
-  Color get _actionTextColor => const Color.fromARGB(255, 0, 0, 0);
-  Color get _successColor => const Color(0xFF10B981);
+  Color get _textColor => const Color(0xFF0A183D);
+  Color get _borderColor => const Color(0xFFCBD5E1);
   Color get _errorColor => Theme.of(context).colorScheme.error;
 
   double getPad(double w) {
     if (w < 400) return 8;
     if (w < 600) return 12;
-    return 24;
+    return 20;
   }
 
   String _formatDate(dynamic date) {
@@ -158,7 +149,46 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     super.dispose();
   }
 
-  // --- Data fetching as in your logic, no change ---
+  Future<void> _fetchContractors() async {
+    setState(() => isLoadingContractors = true);
+    try {
+      final snap = await FirestoreService.getCollection('contractors').get();
+      contractorDocs = snap.docs.map((d) => d.data()).toList();
+      contractorOptions = contractorDocs
+          .map((d) => (d['contractorName'] ?? '').toString())
+          .where((n) => n.isNotEmpty)
+          .toSet()
+          .toList();
+      if (_selectedContractorName != null) {
+        await _fetchProjectForContractor(_selectedContractorName!);
+        await _fetchSiteIds();
+      }
+    } catch (e) {
+      debugPrint('Error fetching contractors: $e');
+    } finally {
+      if (mounted) setState(() => isLoadingContractors = false);
+    }
+  }
+
+  Future<void> _fetchProjectForContractor(String name) async {
+    try {
+      final snap = await FirestoreService.getCollection('contractors')
+          .where('contractorName', isEqualTo: name)
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        final field = snap.docs.first.data()['contractorField'] as String?;
+        if (field != null && field.isNotEmpty) {
+          setState(() {
+            _selectedProjectField = field;
+            _projectFieldController.text = field;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching project field for contractor: $e');
+    }
+  }
 
   Future<void> _fetchSiteIds() async {
     setState(() {
@@ -166,444 +196,137 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
       siteIdError = null;
     });
     try {
-      // 1. Fetch site names from FirestoreService.sites
-      final sitesSnapshot = await FirestoreService.sites.get();
-      final Map<String, String> names = {
-        for (var doc in sitesSnapshot.docs)
-          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
-      };
+      Query query = FirestoreService.getCollection('siteSupervisorMap');
 
-      // 2. Fetch projects matching contractor
-      final contractor =
-          _selectedContractorName ?? widget.userDetails['contractorName'];
+      final userRole = widget.userDetails['role'] ?? '';
+      final userSupervisorName = widget.userDetails['name'] ?? widget.userName;
 
-      Query<Map<String, dynamic>> query = FirestoreService.projects.where(
-        'isContractWork',
-        isEqualTo: true,
-      );
-
-      if (widget.showLogout && contractor != null) {
-        query = query.where('contractorName', isEqualTo: contractor);
+      if (userRole == 'Supervisor') {
+        query = query.where('supervisor', isEqualTo: userSupervisorName);
+      } else if (_selectedContractorName != null) {
+        query = query.where('supervisor', isEqualTo: _selectedContractorName);
       }
 
       final snapshot = await query.get();
+      final docs = snapshot.docs;
+
       final ids = <String>[];
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final id = data['siteId']?.toString() ?? '';
-        if (id.isNotEmpty) ids.add(id);
+      final Map<String, String> names = {};
+
+      for (var doc in docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final siteId = data['site'] as String?;
+        final siteName = data['projectName'] as String?;
+        if (siteId != null && siteId.isNotEmpty) {
+          ids.add(siteId);
+          names[siteId] = siteName ?? 'Unnamed Site';
+        }
       }
+
       setState(() {
-        siteNameMap = names;
         siteIdOptions = ids;
-        selectedSiteIdForEntry = siteIdOptions.isNotEmpty
-            ? siteIdOptions.first
-            : null;
+        siteNameMap = names;
+        if (siteIdOptions.isNotEmpty) {
+          selectedSiteIdForEntry = siteIdOptions.first;
+          _fetchContractDates(selectedSiteIdForEntry!);
+        } else {
+          selectedSiteIdForEntry = null;
+        }
         isLoadingSiteIds = false;
       });
-      if (siteIdOptions.isNotEmpty) {
-        await _fetchContractDates(siteIdOptions.first);
-      } else {
-        setState(() {
-          contractStartDate = null;
-          contractEndDate = null;
-        });
-      }
     } catch (e) {
       setState(() {
-        siteIdError = 'Failed to load Site IDs: $e';
+        siteIdError = 'Failed to load site IDs: $e';
         isLoadingSiteIds = false;
       });
     }
   }
 
-  Future<void> _fetchContractDates(String? siteId) async {
-    if (siteId == null || siteId.isEmpty) {
-      setState(() {
-        contractStartDate = null;
-        contractEndDate = null;
-        if (!widget.showLogout) {
-          _contractorNameController.clear();
-          _projectFieldController.clear();
-          _selectedContractorName = null;
-          _selectedProjectField = null;
-        }
-      });
-      return;
-    }
+  Future<void> _fetchContractDates(String siteId) async {
     try {
-      final contractor =
-          _selectedContractorName ?? widget.userDetails['contractorName'];
-
-      Query<Map<String, dynamic>> query = FirestoreService.projects
-          .where('siteId', isEqualTo: siteId)
-          .limit(1);
-
-      // Only filter by contractor if it's a contractor logging in
-      if (widget.showLogout && contractor != null) {
-        query = query.where('contractorName', isEqualTo: contractor);
-      }
-
-      final snapshot = await query.get();
-      if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data() as Map<String, dynamic>;
+      final snap = await FirestoreService.getCollection('siteSupervisorMap')
+          .where('site', isEqualTo: siteId)
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        final data = snap.docs.first.data();
         setState(() {
           contractStartDate = data['contractStartDate'];
           contractEndDate = data['contractEndDate'];
-          if (!widget.showLogout) {
-            _contractorNameController.text = data['contractorName'] ?? '';
-            _selectedContractorName = data['contractorName'] ?? '';
-            _projectFieldController.text = data['projectStage'] ?? '';
-            _selectedProjectField = data['projectStage'] ?? '';
-          }
-        });
-      } else {
-        setState(() {
-          contractStartDate = null;
-          contractEndDate = null;
         });
       }
     } catch (e) {
-      setState(() {
-        contractStartDate = null;
-        contractEndDate = null;
-      });
+      debugPrint('Error fetching contract dates: $e');
     }
   }
 
   Future<void> _fetchMaterialOptions() async {
-    setState(() {
-      isLoadingMaterials = true;
-      materialError = null;
-    });
     try {
-      // 1. Fetch materialCategories to build a lookup map
-      final categoriesSnapshot = await FirestoreService.getCollection(
-        'materialCategories',
-      ).get();
-      final categoryMap = <String, String>{};
-      for (var doc in categoriesSnapshot.docs) {
-        final data = doc.data();
-        final name = (data['matCategory'] ?? '').toString().trim();
-        if (name.isNotEmpty) {
-          categoryMap[doc.reference.path] = name;
-          categoryMap[doc.id] = name;
-        }
-      }
-
-      // 2. Fetch specific materials
-      final snapshot = await FirestoreService.getCollection('materials').get();
+      final snap = await FirestoreService.getCollection('materials').get();
       final options = <String>[];
       final prices = <String, num>{};
-      for (var doc in snapshot.docs) {
+      for (var doc in snap.docs) {
         final data = doc.data();
-
-        // Resolve materialCategory reference
-        String? resolvedCategory;
-        final catRef = data['materialCategory'];
-        if (catRef is DocumentReference) {
-          resolvedCategory = categoryMap[catRef.path] ?? categoryMap[catRef.id];
-        } else if (catRef is String && catRef.isNotEmpty) {
-          resolvedCategory =
-              categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
-        }
-
-        // Fallback if not resolved
-        final name =
-            (resolvedCategory ??
-                    data['materialName'] ??
-                    data['matCategory'] ??
-                    '')
-                .toString()
-                .trim();
-        if (name.isNotEmpty) {
+        final name = data['materialName'] as String?;
+        final price = data['unitPrice'] as num? ?? 0;
+        if (name != null && name.isNotEmpty) {
           options.add(name);
-          var priceRaw = data['materialPrice'];
-          num price = 0;
-          if (priceRaw is num) {
-            price = priceRaw;
-          } else if (priceRaw is String)
-            price =
-                num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           prices[name] = price;
         }
       }
       setState(() {
         materialOptions = options;
         materialPrices = prices;
-        selectedMaterial = materialOptions.isNotEmpty
-            ? materialOptions.first
-            : null;
+        if (options.isNotEmpty) {
+          selectedMaterial = options.first;
+        }
         isLoadingMaterials = false;
       });
     } catch (e) {
       setState(() {
-        materialError = 'Failed to load materials';
+        materialError = 'Failed to load materials: $e';
         isLoadingMaterials = false;
       });
     }
   }
 
   Future<void> _fetchLabourOptions() async {
-    setState(() {
-      isLoadingLabours = true;
-      labourError = null;
-    });
     try {
-      final snapshot = await FirestoreService.getCollection('labours').get();
+      final snap = await FirestoreService.getCollection('labours').get();
       final options = <String>[];
       final salaries = <String, num>{};
-      for (var doc in snapshot.docs) {
+      for (var doc in snap.docs) {
         final data = doc.data();
-        if (data.containsKey('designation')) {
-          final designation = data['designation']?.toString() ?? '';
-          if (designation.isNotEmpty) {
-            options.add(designation);
-            var salaryRaw = data['salary'];
-            num salary = 0;
-            if (salaryRaw is num) {
-              salary = salaryRaw;
-            } else if (salaryRaw is String)
-              salary =
-                  num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ??
-                  0;
-            salaries[designation] = salary;
-          }
+        final des = data['designation'] as String?;
+        final salaryStr = data['salary'] as String?;
+        final salaryNum = num.tryParse(salaryStr ?? '') ?? 0;
+        if (des != null && des.isNotEmpty) {
+          options.add(des);
+          salaries[des] = salaryNum;
         }
       }
       setState(() {
         labourOptions = options;
         labourSalaries = salaries;
-        selectedLabour = labourOptions.isNotEmpty ? labourOptions.first : null;
+        if (options.isNotEmpty) {
+          selectedLabour = options.first;
+        }
         isLoadingLabours = false;
       });
     } catch (e) {
       setState(() {
-        labourError = 'Failed to load labours';
+        labourError = 'Failed to load labours: $e';
         isLoadingLabours = false;
       });
     }
-  }
-
-  Future<void> _fetchContractors() async {
-    setState(() {
-      isLoadingContractors = true;
-    });
-    try {
-      final snapshot = await FirestoreService.contractors.get();
-      final docs = <Map<String, dynamic>>[];
-      final options = <String>[];
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final name = data['contractorName']?.toString() ?? '';
-        if (name.isNotEmpty) {
-          docs.add(data);
-          options.add(name);
-        }
-      }
-      setState(() {
-        contractorDocs = docs;
-        contractorOptions = options;
-        // If pre-selected contractor exists, keep it; else set first
-        if (_selectedContractorName == null ||
-            !contractorOptions.contains(_selectedContractorName)) {
-          _selectedContractorName = contractorOptions.isNotEmpty
-              ? contractorOptions.first
-              : null;
-          if (_selectedContractorName != null) {
-            _contractorNameController.text = _selectedContractorName!;
-          }
-        }
-        isLoadingContractors = false;
-      });
-      // If we have a selected contractor, auto-fill project field
-      if (_selectedContractorName != null) {
-        await _fetchProjectForContractor(_selectedContractorName!);
-      }
-    } catch (e) {
-      debugPrint('Failed to load contractors: $e');
-      setState(() {
-        isLoadingContractors = false;
-      });
-    }
-  }
-
-  Future<void> _fetchProjectForContractor(String contractorName) async {
-    try {
-      // Find the contractor doc from our stored list
-      final contractorDoc = contractorDocs.firstWhere(
-        (doc) => doc['contractorName'] == contractorName,
-        orElse: () => {},
-      );
-      final contractorField =
-          contractorDoc['contractorField']?.toString() ?? '';
-      setState(() {
-        _selectedProjectField = contractorField;
-        _projectFieldController.text = contractorField;
-      });
-    } catch (e) {
-      debugPrint('Failed to fetch project for contractor: $e');
-      setState(() {
-        _selectedProjectField = null;
-        _projectFieldController.clear();
-      });
-    }
-  }
-
-  // --- Add/Remove Logic as in your code, unchanged ---
-
-  void _addMaterial() {
-    int qty = int.tryParse(materialQtyController.text) ?? 0;
-    if (selectedMaterial != null && qty > 0) {
-      setState(() {
-        materials.add({'type': selectedMaterial!, 'quantity': qty});
-        materialQty = 0;
-        materialQtyController.text = '0';
-      });
-    }
-  }
-
-  void _addLabour() {
-    int qty = int.tryParse(labourQtyController.text) ?? 0;
-    if (selectedLabour != null && qty > 0) {
-      setState(() {
-        labours.add({'type': selectedLabour!, 'count': qty});
-        labourQty = 0;
-        labourQtyController.text = '0';
-      });
-    }
-  }
-
-  void _addCustomMaterial() {
-    final name = _customMaterialNameController.text.trim();
-    final qty = int.tryParse(_customMaterialQtyController.text) ?? 0;
-    final price = int.tryParse(_customMaterialPriceController.text) ?? 0;
-    if (name.isNotEmpty && qty > 0) {
-      setState(() {
-        materials.add({'type': name, 'quantity': qty});
-        materialPrices[name] = price;
-        _showCustomMaterialFields = false;
-        _customMaterialNameController.clear();
-        _customMaterialQtyController.text = '0';
-        _customMaterialPriceController.text = '0';
-      });
-    }
-  }
-
-  void _addCustomLabour() {
-    final name = _customLabourNameController.text.trim();
-    final qty = int.tryParse(_customLabourQtyController.text) ?? 0;
-    final salary = int.tryParse(_customLabourSalaryController.text) ?? 0;
-    if (name.isNotEmpty && qty > 0) {
-      setState(() {
-        labours.add({'type': name, 'count': qty});
-        labourSalaries[name] = salary;
-        _showCustomLabourFields = false;
-        _customLabourNameController.clear();
-        _customLabourQtyController.text = '0';
-        _customLabourSalaryController.text = '0';
-      });
-    }
-  }
-
-  void _removeMaterial(int index) {
-    setState(() => materials.removeAt(index));
-  }
-
-  void _removeLabour(int index) {
-    setState(() => labours.removeAt(index));
-  }
-
-  String _calculateMaterialAmount(String material, int qty) {
-    final price = materialPrices[material] ?? 0;
-    return '₹${(price * qty).toStringAsFixed(0)}';
-  }
-
-  String _calculateLabourAmount(String labour, int qty) {
-    final salary = labourSalaries[labour] ?? 0;
-    return '₹${(salary * qty).toStringAsFixed(0)}';
-  }
-
-  int _getTotalAmount() {
-    int total = 0;
-    for (var m in materials) {
-      final price = materialPrices[m['type'] ?? ''] ?? 0;
-      total += (price * (m['quantity'] ?? 0)).toInt();
-    }
-    for (var l in labours) {
-      final salary = labourSalaries[l['type'] ?? ''] ?? 0;
-      total += (salary * (l['count'] ?? 0)).toInt();
-    }
-    total += int.tryParse(foodCost.text) ?? 0;
-    total += int.tryParse(transportCost.text) ?? 0;
-    total += int.tryParse(fuelCost.text) ?? 0;
-    return total;
   }
 
   Future<void> _pickDate() async {
-    // Parse contractStartDate and contractEndDate to DateTime
-    DateTime? startDate;
-    DateTime? endDate;
-    if (contractStartDate != null) {
-      if (contractStartDate is DateTime) {
-        startDate = contractStartDate;
-      } else if (contractStartDate is String) {
-        startDate = DateTime.tryParse(contractStartDate);
-      } else if (contractStartDate.runtimeType.toString() == 'Timestamp' &&
-          contractStartDate.toDate != null) {
-        startDate = contractStartDate.toDate();
-      }
-    }
-    if (contractEndDate != null) {
-      if (contractEndDate is DateTime) {
-        endDate = contractEndDate;
-      } else if (contractEndDate is String) {
-        endDate = DateTime.tryParse(contractEndDate);
-      } else if (contractEndDate.runtimeType.toString() == 'Timestamp' &&
-          contractEndDate.toDate != null) {
-        endDate = contractEndDate.toDate();
-      }
-    }
-    // Ensure initialDate is within range
-    DateTime? initial = selectedDate;
-    if (startDate != null && endDate != null) {
-      if (initial == null ||
-          initial.isBefore(startDate) ||
-          initial.isAfter(endDate)) {
-        initial = startDate;
-      }
-    } else if (startDate != null) {
-      initial = startDate;
-    } else if (endDate != null) {
-      initial = endDate;
-    } else {
-      initial = DateTime.now();
-    }
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial,
-      firstDate: startDate ?? DateTime(2000),
-      lastDate: endDate ?? DateTime(2100),
-      selectableDayPredicate: (date) {
-        if (startDate != null && endDate != null) {
-          return !date.isBefore(startDate) && !date.isAfter(endDate);
-        } else if (startDate != null) {
-          return date.isAtSameMomentAs(startDate);
-        } else if (endDate != null) {
-          return date.isAtSameMomentAs(endDate);
-        }
-        return false;
-      },
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: _primaryColor,
-            onPrimary: Colors.white,
-            onSurface: Colors.black,
-          ),
-        ),
-        child: child!,
-      ),
+      initialDate: selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
     );
     if (picked != null) {
       setState(() {
@@ -613,539 +336,15 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
     }
   }
 
-  Future<void> _saveToFirestore() async {
-    if (_selectedContractorName == null ||
-        _selectedContractorName!.isEmpty ||
-        _selectedProjectField == null ||
-        _selectedProjectField!.isEmpty ||
-        selectedDate == null ||
-        selectedSiteIdForEntry == null ||
-        selectedSiteIdForEntry!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Select contractor, project field, date and site ID'),
-          backgroundColor: _errorColor,
-        ),
-      );
-      return;
-    }
-
-    setState(() => isSaving = true);
-
-    try {
-      final laboursList = labours.map((l) {
-        final type = (l['type'] ?? '').toString();
-        final count = (l['count'] ?? 0) as int;
-        final unitSalary = labourSalaries[type] ?? 0;
-        final amount = (unitSalary * count).toInt();
-        return {
-          'amount': amount,
-          'count': count,
-          'type': type,
-          'unitSalary': unitSalary is int ? unitSalary : (unitSalary).toInt(),
-        };
-      }).toList();
-
-      final materialsList = materials.map((m) {
-        final type = (m['type'] ?? '').toString();
-        final qty = (m['quantity'] ?? 0) as int;
-        final unitPrice = materialPrices[type] ?? 0;
-        final amount = (unitPrice * qty).toInt();
-        return {
-          'amount': amount,
-          'quantity': qty,
-          'type': type,
-          'unitPrice': unitPrice is int ? unitPrice : (unitPrice).toInt(),
-        };
-      }).toList();
-
-      final totalAmount = _getTotalAmount().toInt();
-      final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate!);
-      final contractorNameForId = _selectedContractorName!.trim().replaceAll(
-        RegExp(r'[^A-Za-z0-9_-]'),
-        '-',
-      );
-      final siteIdForId = (selectedSiteIdForEntry ?? '').trim().replaceAll(
-        RegExp(r'[^A-Za-z0-9_-]'),
-        '-',
-      );
-      final docId = '${contractorNameForId}_$dateStr$siteIdForId';
-
-      final duplicateQuery = await FirestoreService.contractorEntries
-          .where('contractorName', isEqualTo: _selectedContractorName)
-          .where('siteId', isEqualTo: selectedSiteIdForEntry)
-          .where('date', isEqualTo: dateStr)
-          .limit(1)
-          .get();
-      if (duplicateQuery.docs.isNotEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Entry for this contractor, site, and date already exists.',
-            ),
-            backgroundColor: _errorColor,
-          ),
-        );
-        setState(() => isSaving = false);
-        return;
-      }
-
-      final data = {
-        'contractorName': _selectedContractorName,
-        'projectStage': _selectedProjectField ?? '',
-        'date': dateStr,
-        'siteId': selectedSiteIdForEntry ?? '',
-        'food': int.tryParse(foodCost.text) ?? 0,
-        'fuel': int.tryParse(fuelCost.text) ?? 0,
-        'labours': laboursList,
-        'materials': materialsList,
-        'totalAmount': totalAmount,
-        'transport': int.tryParse(transportCost.text) ?? 0,
-        'contractorStartDate': contractStartDate,
-        'contractorEndDate': contractEndDate,
-      };
-
-      await FirestoreService.contractorEntries.doc(docId).set(data);
-
-      // If manager is editing, update the project details as well
-      if (!widget.showLogout && selectedSiteIdForEntry != null) {
-        try {
-          final projectQuery = await FirestoreService.projects
-              .where('siteId', isEqualTo: selectedSiteIdForEntry)
-              .limit(1)
-              .get();
-          if (projectQuery.docs.isNotEmpty) {
-            await projectQuery.docs.first.reference.update({
-              'contractStartDate': contractStartDate != null
-                  ? (contractStartDate is DateTime
-                        ? Timestamp.fromDate(contractStartDate)
-                        : contractStartDate)
-                  : null,
-              'contractEndDate': contractEndDate != null
-                  ? (contractEndDate is DateTime
-                        ? Timestamp.fromDate(contractEndDate)
-                        : contractEndDate)
-                  : null,
-              'contractorName': _selectedContractorName,
-              'projectStage': _selectedProjectField,
-            });
-          }
-        } catch (e) {
-          debugPrint('Failed to update project dates: $e');
-        }
-      }
-
-      try {
-        await ExpenseService.recalcTotalsAndSyncProject(
-          selectedSiteIdForEntry!,
-        );
-      } catch (e) {
-        debugPrint(
-          'Failed to update totals for siteId $selectedSiteIdForEntry: $e',
-        );
-      }
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Contractor entry saved'),
-          backgroundColor: _successColor,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save entry: $e'),
-          backgroundColor: _errorColor,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => isSaving = false);
-    }
-  }
-
-  Future<void> _handleLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Logout', style: TextStyle(color: _errorColor)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await AuthService().logout();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/landing',
-          (route) => false,
-        );
-      }
-    }
-  }
-
-  // ------------------
-  // Section Headers
-  // ------------------
-  Widget _buildSectionHeader(String title, IconData icon, {Color? color}) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: (color ?? _primaryColor).withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: color ?? _primaryColor, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 17,
-            color: Colors.white,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ------------------
-  // Input Wrapper
-  // ------------------
-  Widget _buildInputField({required String label, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            color: Color(0xFFCBD5E1),
-            fontSize: 13.5,
-            letterSpacing: 0.3,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: child,
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildCostInput(
-    String label,
-    TextEditingController controller,
-    IconData icon,
-  ) {
-    return _buildInputField(
-      label: label,
-      child: TextField(
-        controller: controller,
-        style: const TextStyle(
-          color: Color(0xFF0A183D),
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-        ),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          prefixIcon: Icon(icon, size: 20, color: _primaryColor),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-        keyboardType: TextInputType.number,
-        onChanged: (_) => setState(() {}),
-      ),
-    );
-  }
-
-  Widget _buildSummaryTable() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columnSpacing: 16,
-          horizontalMargin: 16,
-          headingRowHeight: 44,
-          dataRowHeight: 48,
-          headingRowColor: WidgetStateProperty.all(
-            Colors.white.withValues(alpha: 0.1),
-          ),
-          headingTextStyle: const TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            fontSize: 13,
-          ),
-          columns: const [
-            DataColumn(label: Text('Type')),
-            DataColumn(label: Text('Item')),
-            DataColumn(label: Text('Qty')),
-            DataColumn(label: Text('Amount')),
-            DataColumn(label: SizedBox(width: 40)),
-          ],
-          rows: [
-            ...materials.asMap().entries.map((entry) {
-              int idx = entry.key;
-              var m = entry.value;
-              return DataRow(
-                cells: [
-                  const DataCell(
-                    Text(
-                      'Material',
-                      style: TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      m['type']?.toString() ?? '',
-                      style: const TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      '${m['quantity'] ?? 0}',
-                      style: const TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      _calculateMaterialAmount(
-                        m['type']?.toString() ?? '',
-                        m['quantity'] ?? 0,
-                      ),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    IconButton(
-                      icon: Icon(
-                        Icons.delete_outline_rounded,
-                        color: _errorColor,
-                        size: 20,
-                      ),
-                      onPressed: () => _removeMaterial(idx),
-                    ),
-                  ),
-                ],
-              );
-            }),
-            ...labours.asMap().entries.map((entry) {
-              int idx = entry.key;
-              var l = entry.value;
-              return DataRow(
-                cells: [
-                  const DataCell(
-                    Text(
-                      'Labour',
-                      style: TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      l['type']?.toString() ?? '',
-                      style: const TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      '${l['count'] ?? 0}',
-                      style: const TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      _calculateLabourAmount(
-                        l['type']?.toString() ?? '',
-                        l['count'] ?? 0,
-                      ),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    IconButton(
-                      icon: Icon(
-                        Icons.delete_outline_rounded,
-                        color: _errorColor,
-                        size: 20,
-                      ),
-                      onPressed: () => _removeLabour(idx),
-                    ),
-                  ),
-                ],
-              );
-            }),
-            DataRow(
-              cells: [
-                const DataCell(
-                  Text(
-                    'Food',
-                    style: TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)),
-                  ),
-                ),
-                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
-                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
-                DataCell(
-                  Text(
-                    '₹${foodCost.text}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const DataCell(SizedBox.shrink()),
-              ],
-            ),
-            DataRow(
-              cells: [
-                const DataCell(
-                  Text(
-                    'Transport',
-                    style: TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)),
-                  ),
-                ),
-                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
-                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
-                DataCell(
-                  Text(
-                    '₹${transportCost.text}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const DataCell(SizedBox.shrink()),
-              ],
-            ),
-            DataRow(
-              cells: [
-                const DataCell(
-                  Text(
-                    'Fuel',
-                    style: TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)),
-                  ),
-                ),
-                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
-                const DataCell(Text('-', style: TextStyle(fontSize: 13, color: Colors.white))),
-                DataCell(
-                  Text(
-                    '₹${fuelCost.text}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const DataCell(SizedBox.shrink()),
-              ],
-            ),
-            DataRow(
-              color: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.12)),
-              cells: [
-                const DataCell(SizedBox.shrink()),
-                const DataCell(SizedBox.shrink()),
-                const DataCell(
-                  Text(
-                    'TOTAL',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                DataCell(
-                  Text(
-                    '₹${_getTotalAmount()}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                      color: _primaryColor,
-                    ),
-                  ),
-                ),
-                const DataCell(SizedBox.shrink()),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --------- Section Cards -----------
   Future<void> _pickContractStartDate() async {
-    if (widget.showLogout) return;
-    DateTime? initial = contractStartDate is DateTime
+    final initial = contractStartDate is DateTime
         ? contractStartDate
-        : (contractStartDate != null &&
-                  contractStartDate.runtimeType.toString() == 'Timestamp' &&
-                  contractStartDate.toDate != null
-              ? contractStartDate.toDate()
-              : DateTime.now());
-
+        : DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(2000),
+      firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: _primaryColor,
-            onPrimary: Colors.white,
-            onSurface: Colors.black,
-          ),
-        ),
-        child: child!,
-      ),
     );
     if (picked != null) {
       setState(() => contractStartDate = picked);
@@ -1153,217 +352,584 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   }
 
   Future<void> _pickContractEndDate() async {
-    if (widget.showLogout) return;
-    DateTime? initial = contractEndDate is DateTime
+    final initial = contractEndDate is DateTime
         ? contractEndDate
-        : (contractEndDate != null &&
-                  contractEndDate.runtimeType.toString() == 'Timestamp' &&
-                  contractEndDate.toDate != null
-              ? contractEndDate.toDate()
-              : DateTime.now());
-
+        : DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(2000),
+      firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: _primaryColor,
-            onPrimary: Colors.white,
-            onSurface: Colors.black,
-          ),
-        ),
-        child: child!,
-      ),
     );
     if (picked != null) {
       setState(() => contractEndDate = picked);
     }
   }
 
-  Widget _buildContractorDetailsCard() {
-    return GlassCard(
+  void _addMaterial() {
+    if (selectedMaterial == null) return;
+    final qty = int.tryParse(materialQtyController.text) ?? 0;
+    if (qty <= 0) return;
+    final unitPrice = materialPrices[selectedMaterial] ?? 0;
+    setState(() {
+      materials.add({
+        'name': selectedMaterial,
+        'qty': qty,
+        'unitPrice': unitPrice,
+        'totalPrice': qty * unitPrice,
+      });
+      materialQtyController.text = '0';
+    });
+  }
+
+  void _addCustomMaterial() {
+    final name = _customMaterialNameController.text.trim();
+    final qty = int.tryParse(_customMaterialQtyController.text) ?? 0;
+    final price = num.tryParse(_customMaterialPriceController.text) ?? 0;
+    if (name.isEmpty || qty <= 0 || price < 0) return;
+    setState(() {
+      materials.add({
+        'name': name,
+        'qty': qty,
+        'unitPrice': price,
+        'totalPrice': qty * price,
+      });
+      _customMaterialNameController.clear();
+      _customMaterialQtyController.text = '0';
+      _customMaterialPriceController.text = '0';
+      _showCustomMaterialFields = false;
+    });
+  }
+
+  void _removeMaterial(int index) {
+    setState(() => materials.removeAt(index));
+  }
+
+  void _addLabour() {
+    if (selectedLabour == null) return;
+    final count = int.tryParse(labourQtyController.text) ?? 0;
+    if (count <= 0) return;
+    final salary = labourSalaries[selectedLabour] ?? 0;
+    setState(() {
+      labours.add({
+        'type': selectedLabour,
+        'count': count,
+        'salary': salary,
+        'totalSalary': count * salary,
+      });
+      labourQtyController.text = '0';
+    });
+  }
+
+  void _addCustomLabour() {
+    final type = _customLabourNameController.text.trim();
+    final count = int.tryParse(_customLabourQtyController.text) ?? 0;
+    final salary = num.tryParse(_customLabourSalaryController.text) ?? 0;
+    if (type.isEmpty || count <= 0 || salary < 0) return;
+    setState(() {
+      labours.add({
+        'type': type,
+        'count': count,
+        'salary': salary,
+        'totalSalary': count * salary,
+      });
+      _customLabourNameController.clear();
+      _customLabourQtyController.text = '0';
+      _customLabourSalaryController.text = '0';
+      _showCustomLabourFields = false;
+    });
+  }
+
+  void _removeLabour(int index) {
+    setState(() => labours.removeAt(index));
+  }
+
+  num _getTotalMaterialCost() {
+    return materials.fold(
+      0,
+      (acc, item) => acc + ((item['totalPrice'] as num?) ?? 0),
+    );
+  }
+
+  num _getTotalLabourCost() {
+    return labours.fold(
+      0,
+      (acc, item) => acc + ((item['totalSalary'] as num?) ?? 0),
+    );
+  }
+
+  num _getAdditionalCosts() {
+    final food = num.tryParse(foodCost.text) ?? 0;
+    final trans = num.tryParse(transportCost.text) ?? 0;
+    final fuel = num.tryParse(fuelCost.text) ?? 0;
+    return food + trans + fuel;
+  }
+
+  num _getTotalAmount() {
+    return _getTotalMaterialCost() +
+        _getTotalLabourCost() +
+        _getAdditionalCosts();
+  }
+
+  Future<void> _handleLogout() async {
+    await AuthService().logout();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed('/');
+  }
+
+  Future<void> _saveToFirestore() async {
+    if (selectedSiteIdForEntry == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a Site ID.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+    if (_selectedContractorName == null || _selectedContractorName!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select or enter Contractor Name.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => isSaving = true);
+    try {
+      final docId =
+          'CT_${selectedSiteIdForEntry}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}';
+      final totalAmount = _getTotalAmount();
+
+      final data = {
+        'contractorName': _selectedContractorName,
+        'contractorField': _selectedProjectField,
+        'date': Timestamp.fromDate(selectedDate!),
+        'siteId': selectedSiteIdForEntry,
+        'siteName': siteNameMap[selectedSiteIdForEntry] ?? '',
+        'contractStartDate': contractStartDate != null
+            ? (contractStartDate is DateTime
+                ? Timestamp.fromDate(contractStartDate)
+                : contractStartDate)
+            : null,
+        'contractEndDate': contractEndDate != null
+            ? (contractEndDate is DateTime
+                ? Timestamp.fromDate(contractEndDate)
+                : contractEndDate)
+            : null,
+        'materials': materials,
+        'labours': labours,
+        'additionalCosts': {
+          'food': num.tryParse(foodCost.text) ?? 0,
+          'transport': num.tryParse(transportCost.text) ?? 0,
+          'fuel': num.tryParse(fuelCost.text) ?? 0,
+        },
+        'totalAmount': totalAmount,
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': widget.userName,
+      };
+
+      await FirestoreService.getCollection('ContractorEntry').doc(docId).set(data);
+
+      await ExpenseService.recalcTotalsAndSyncProject(selectedSiteIdForEntry!);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Contractor Entry saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      setState(() {
+        materials.clear();
+        labours.clear();
+        foodCost.text = '0';
+        transportCost.text = '0';
+        fuelCost.text = '0';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save entry: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
+    final double width = MediaQuery.of(context).size.width;
+    final double hPad = getPad(width);
+    final darkAccent = AppTheme.getDarkAccent(_primaryColor);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Contractor Daily Entry',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  _primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: widget.showLogout
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
+                  onPressed: _handleLogout,
+                  tooltip: 'Logout',
+                ),
+              ]
+            : null,
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 600,
+            ),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 16),
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  _buildContractorDetailsCard(),
+                  const SizedBox(height: 14),
+                  _buildMaterialSection(),
+                  const SizedBox(height: 14),
+                  _buildLabourSection(),
+                  const SizedBox(height: 14),
+                  _buildAdditionalCostsSection(),
+                  const SizedBox(height: 14),
+                  _buildSummarySection(),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : _saveToFirestore,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: isSaving
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'SAVE ENTRY',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.6,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 80),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader(
-            'Contractor Details',
-            Icons.engineering,
-            color: _primaryColor,
-          ),
-          const SizedBox(height: 18),
-          isLoadingContractors
-              ? Center(child: CircularProgressIndicator(color: _primaryColor))
-              : _buildInputField(
-                  label: 'Contractor Name',
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    value: contractorOptions.contains(_selectedContractorName)
-                        ? _selectedContractorName
-                        : null,
-                    items: contractorOptions
-                        .map(
-                          (name) => DropdownMenuItem<String>(
-                            value: name,
-                            child: Text(name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: widget.showLogout
-                        ? null
-                        : (val) async {
-                            setState(() {
-                              _selectedContractorName = val;
-                              if (val != null) {
-                                _contractorNameController.text = val;
-                              }
-                            });
-                            if (val != null) {
-                              await _fetchProjectForContractor(val);
-                              // Also refresh site IDs since they depend on contractor
-                              await _fetchSiteIds();
-                            }
-                          },
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      hintText: 'Select contractor',
-                    ),
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-          _buildInputField(
-            label: 'Project Field',
-            child: TextField(
-              controller: _projectFieldController,
-              readOnly: widget.showLogout || _selectedContractorName != null,
-              onChanged: (val) => _selectedProjectField = val,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: 'Select a contractor to auto-fill',
+                child: Icon(icon, size: 18, color: iconColor),
               ),
-            ),
-          ),
-          _buildInputField(
-            label: 'Date',
-            child: TextField(
-              controller: _dateController,
-              readOnly: true,
-              onTap: _pickDate,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                suffixIcon: Icon(Icons.calendar_today, color: _secondaryColor),
-              ),
-            ),
-          ),
-          isLoadingSiteIds
-              ? Center(child: CircularProgressIndicator(color: _primaryColor))
-              : siteIdError != null
-              ? Text(siteIdError!, style: TextStyle(color: _errorColor))
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInputField(
-                      label: 'Site ID',
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        value: selectedSiteIdForEntry,
-                        items: siteIdOptions
-                            .map(
-                              (id) => DropdownMenuItem<String>(
-                                value: id,
-                                child: Text(
-                                  '$id - ${siteNameMap[id] ?? "Unnamed Site"}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (val) async {
-                          setState(() => selectedSiteIdForEntry = val);
-                          await _fetchContractDates(val);
-                        },
-                        decoration: InputDecoration(border: InputBorder.none),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildInputField(
-                            label: 'Contract Start Date',
-                            child: InkWell(
-                              onTap: widget.showLogout
-                                  ? null
-                                  : _pickContractStartDate,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                child: Text(
-                                  _formatDate(contractStartDate).isEmpty
-                                      ? 'Select Date'
-                                      : _formatDate(contractStartDate),
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildInputField(
-                            label: 'Contract End Date',
-                            child: InkWell(
-                              onTap: widget.showLogout
-                                  ? null
-                                  : _pickContractEndDate,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                child: Text(
-                                  _formatDate(contractEndDate).isEmpty
-                                      ? 'Select Date'
-                                      : _formatDate(contractEndDate),
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w800,
+                  color: _textColor,
+                  letterSpacing: -0.3,
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...children,
         ],
       ),
     );
   }
 
-  Widget _buildMaterialSection() {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionHeader(
-            'Material Details',
-            Icons.add_box,
-            color: Colors.brown,
-          ),
-          const SizedBox(height: 16),
-          isLoadingMaterials
-              ? Center(child: CircularProgressIndicator(color: _primaryColor))
-              : materialError != null
-              ? Text(materialError!, style: TextStyle(color: _errorColor))
-              : Column(
-                  children: [
-                    TextField(
-                      decoration: InputDecoration(
-                        labelText: 'Search Material...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+  Widget _buildContractorDetailsCard() {
+    return _buildSectionCard(
+      title: 'Contractor & Site Details',
+      icon: Icons.assignment_ind_rounded,
+      iconColor: _primaryColor,
+      children: [
+        isLoadingContractors
+            ? const Center(child: CircularProgressIndicator())
+            : _buildInputField(
+                label: 'Contractor Name',
+                child: DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: contractorOptions.contains(_selectedContractorName)
+                      ? _selectedContractorName
+                      : null,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                  items: contractorOptions
+                      .map(
+                        (name) => DropdownMenuItem<String>(
+                          value: name,
+                          child: Text(name),
                         ),
-                        prefixIcon: Icon(Icons.search, color: _secondaryColor),
+                      )
+                      .toList(),
+                  onChanged: widget.showLogout
+                      ? null
+                      : (val) async {
+                          setState(() {
+                            _selectedContractorName = val;
+                            if (val != null) {
+                              _contractorNameController.text = val;
+                            }
+                          });
+                          if (val != null) {
+                            await _fetchProjectForContractor(val);
+                            await _fetchSiteIds();
+                          }
+                        },
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    hintText: 'Select contractor',
+                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5, fontWeight: FontWeight.w400),
+                  ),
+                ),
+              ),
+        const SizedBox(height: 12),
+        _buildInputField(
+          label: 'Project Field',
+          child: TextField(
+            controller: _projectFieldController,
+            readOnly: widget.showLogout || _selectedContractorName != null,
+            onChanged: (val) => _selectedProjectField = val,
+            style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintText: 'Auto-filled project stage',
+              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5, fontWeight: FontWeight.w400),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildInputField(
+          label: 'Date',
+          child: TextField(
+            controller: _dateController,
+            readOnly: true,
+            onTap: _pickDate,
+            style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              suffixIcon: Icon(Icons.calendar_today_rounded, color: _primaryColor, size: 18),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        isLoadingSiteIds
+            ? const Center(child: CircularProgressIndicator())
+            : siteIdError != null
+            ? Text(siteIdError!, style: TextStyle(color: _errorColor))
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInputField(
+                    label: 'Site ID',
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: selectedSiteIdForEntry,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                      items: siteIdOptions
+                          .map(
+                            (id) => DropdownMenuItem<String>(
+                              value: id,
+                              child: Text(
+                                '$id - ${siteNameMap[id] ?? "Unnamed Site"}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) async {
+                        setState(() => selectedSiteIdForEntry = val);
+                        if (val != null) await _fetchContractDates(val);
+                      },
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInputField(
+                          label: 'Contract Start Date',
+                          child: InkWell(
+                            onTap: widget.showLogout ? null : _pickContractStartDate,
+                            borderRadius: BorderRadius.circular(14),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              child: Text(
+                                _formatDate(contractStartDate).isEmpty
+                                    ? 'Select Date'
+                                    : _formatDate(contractStartDate),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: _textColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildInputField(
+                          label: 'Contract End Date',
+                          child: InkWell(
+                            onTap: widget.showLogout ? null : _pickContractEndDate,
+                            borderRadius: BorderRadius.circular(14),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              child: Text(
+                                _formatDate(contractEndDate).isEmpty
+                                    ? 'Select Date'
+                                    : _formatDate(contractEndDate),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: _textColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+      ],
+    );
+  }
+
+  Widget _buildMaterialSection() {
+    return _buildSectionCard(
+      title: 'Material Details',
+      icon: Icons.inventory_2_rounded,
+      iconColor: const Color(0xFFD97706),
+      children: [
+        isLoadingMaterials
+            ? const Center(child: CircularProgressIndicator())
+            : materialError != null
+            ? Text(materialError!, style: TextStyle(color: _errorColor))
+            : Column(
+                children: [
+                  Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _borderColor),
+                    ),
+                    child: TextField(
+                      style: TextStyle(color: _textColor, fontSize: 13.5, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(
+                        hintText: 'Search Material...',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.search_rounded, color: _primaryColor, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                       ),
                       onChanged: (query) {
                         setState(() {
@@ -1372,169 +938,182 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                               .where((item) => item.toLowerCase().contains(q))
                               .toList();
                           _filteredMaterialOptions = filtered;
-                          if (filtered.isNotEmpty &&
-                              !filtered.contains(selectedMaterial)) {
+                          if (filtered.isNotEmpty && !filtered.contains(selectedMaterial)) {
                             selectedMaterial = filtered.first;
                           }
                         });
                       },
                     ),
-                    const SizedBox(height: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        DropdownButtonFormField<String>(
-                          value:
-                              (_filteredMaterialOptions ?? materialOptions)
-                                  .contains(selectedMaterial)
-                              ? selectedMaterial
-                              : null,
-                          decoration: InputDecoration(
-                            labelText: 'Material',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInputField(
+                    label: 'Material',
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: (_filteredMaterialOptions ?? materialOptions).contains(selectedMaterial)
+                          ? selectedMaterial
+                          : null,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      items: (_filteredMaterialOptions ?? materialOptions)
+                          .map(
+                            (item) => DropdownMenuItem<String>(
+                              value: item,
+                              child: Text(item),
                             ),
-                          ),
-                          items: (_filteredMaterialOptions ?? materialOptions)
-                              .map(
-                                (item) => DropdownMenuItem<String>(
-                                  value: item,
-                                  child: Text(item),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) =>
-                              setState(() => selectedMaterial = value),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: materialQtyController,
-                          decoration: InputDecoration(
-                            labelText: 'Qty',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() => selectedMaterial = value),
                     ),
-                    const SizedBox(height: 12),
-                    GlassButton(
+                  ),
+                  const SizedBox(height: 10),
+                  _buildInputField(
+                    label: 'Quantity',
+                    child: TextField(
+                      controller: materialQtyController,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton.icon(
                       onPressed: _addMaterial,
-                      label: 'Add Material',
-                      icon: Icons.add,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add Material', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                  ],
-                ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => setState(
-              () => _showCustomMaterialFields = !_showCustomMaterialFields,
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _secondaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                  ),
+                ],
               ),
-            ),
-            child: Text('Custom Material'),
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: () => setState(() => _showCustomMaterialFields = !_showCustomMaterialFields),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _primaryColor,
+            side: BorderSide(color: _primaryColor),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          if (_showCustomMaterialFields) ...[
-            const SizedBox(height: 16),
-            TextField(
+          icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+          label: const Text('Custom Material'),
+        ),
+        if (_showCustomMaterialFields) ...[
+          const SizedBox(height: 14),
+          _buildInputField(
+            label: 'Custom Material Name',
+            child: TextField(
               controller: _customMaterialNameController,
-              decoration: InputDecoration(
-                labelText: 'Material Name',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputField(
+                  label: 'Qty',
                   child: TextField(
                     controller: _customMaterialQtyController,
-                    decoration: InputDecoration(
-                      labelText: 'Qty',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
                     keyboardType: TextInputType.number,
+                    style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildInputField(
+                  label: 'Unit Price (₹)',
                   child: TextField(
                     controller: _customMaterialPriceController,
-                    decoration: InputDecoration(
-                      labelText: 'Unit Price (₹)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
                     keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _addCustomMaterial,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryColor,
-                      foregroundColor: Colors.white,
+                    style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
-                    child: Text('Add'),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        setState(() => _showCustomMaterialFields = false),
-                    child: Text('Cancel'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _addCustomMaterial,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
+                  child: const Text('Add Custom Material'),
                 ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: () => setState(() => _showCustomMaterialFields = false),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
         ],
-      ),
+      ],
     );
   }
 
   Widget _buildLabourSection() {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionHeader(
-            'Labour Details',
-            Icons.groups,
-            color: Colors.teal[700],
-          ),
-          const SizedBox(height: 16),
-          isLoadingLabours
-              ? Center(child: CircularProgressIndicator(color: _primaryColor))
-              : labourError != null
-              ? Text(labourError!, style: TextStyle(color: _errorColor))
-              : Column(
-                  children: [
-                    TextField(
+    return _buildSectionCard(
+      title: 'Labour Details',
+      icon: Icons.groups_rounded,
+      iconColor: const Color(0xFF2563EB),
+      children: [
+        isLoadingLabours
+            ? const Center(child: CircularProgressIndicator())
+            : labourError != null
+            ? Text(labourError!, style: TextStyle(color: _errorColor))
+            : Column(
+                children: [
+                  Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _borderColor),
+                    ),
+                    child: TextField(
+                      style: TextStyle(color: _textColor, fontSize: 13.5, fontWeight: FontWeight.w600),
                       decoration: InputDecoration(
-                        labelText: 'Search Labour...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        prefixIcon: Icon(Icons.search, color: _secondaryColor),
+                        hintText: 'Search Labour...',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.search_rounded, color: _primaryColor, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                       ),
                       onChanged: (query) {
                         setState(() {
@@ -1543,325 +1122,322 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                               .where((item) => item.toLowerCase().contains(q))
                               .toList();
                           _filteredLabourOptions = filtered;
-                          if (filtered.isNotEmpty &&
-                              !filtered.contains(selectedLabour)) {
+                          if (filtered.isNotEmpty && !filtered.contains(selectedLabour)) {
                             selectedLabour = filtered.first;
                           }
                         });
                       },
                     ),
-                    const SizedBox(height: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        DropdownButtonFormField<String>(
-                          value:
-                              (_filteredLabourOptions ?? labourOptions)
-                                  .contains(selectedLabour)
-                              ? selectedLabour
-                              : null,
-                          decoration: InputDecoration(
-                            labelText: 'Labour',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInputField(
+                    label: 'Labour Type',
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: (_filteredLabourOptions ?? labourOptions).contains(selectedLabour)
+                          ? selectedLabour
+                          : null,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      items: (_filteredLabourOptions ?? labourOptions)
+                          .map(
+                            (item) => DropdownMenuItem<String>(
+                              value: item,
+                              child: Text(item),
                             ),
-                          ),
-                          items: (_filteredLabourOptions ?? labourOptions)
-                              .map(
-                                (item) => DropdownMenuItem<String>(
-                                  value: item,
-                                  child: Text(item),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) =>
-                              setState(() => selectedLabour = value),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: labourQtyController,
-                          decoration: InputDecoration(
-                            labelText: 'Count',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() => selectedLabour = value),
                     ),
-                    const SizedBox(height: 12),
-                    GlassButton(
+                  ),
+                  const SizedBox(height: 10),
+                  _buildInputField(
+                    label: 'Count',
+                    child: TextField(
+                      controller: labourQtyController,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton.icon(
                       onPressed: _addLabour,
-                      label: 'Add Labour',
-                      icon: Icons.add,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add Labour', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                  ],
-                ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => setState(
-              () => _showCustomLabourFields = !_showCustomLabourFields,
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _secondaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                  ),
+                ],
               ),
-            ),
-            child: Text('Custom Labour'),
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: () => setState(() => _showCustomLabourFields = !_showCustomLabourFields),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _primaryColor,
+            side: BorderSide(color: _primaryColor),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          if (_showCustomLabourFields) ...[
-            const SizedBox(height: 16),
-            TextField(
+          icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+          label: const Text('Custom Labour'),
+        ),
+        if (_showCustomLabourFields) ...[
+          const SizedBox(height: 14),
+          _buildInputField(
+            label: 'Labour Type Name',
+            child: TextField(
               controller: _customLabourNameController,
-              decoration: InputDecoration(
-                labelText: 'Labour Type',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _customLabourSalaryController,
-              decoration: InputDecoration(
-                labelText: 'Salary',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _customLabourQtyController,
-              decoration: InputDecoration(
-                labelText: 'Count',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _addCustomLabour,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryColor,
-                      foregroundColor: Colors.white,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputField(
+                  label: 'Salary (₹)',
+                  child: TextField(
+                    controller: _customLabourSalaryController,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
-                    child: Text('Add'),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        setState(() => _showCustomLabourFields = false),
-                    child: Text('Cancel'),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildInputField(
+                  label: 'Count',
+                  child: TextField(
+                    controller: _customLabourQtyController,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _addCustomLabour,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Add Custom Labour'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: () => setState(() => _showCustomLabourFields = false),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
         ],
-      ),
+      ],
     );
   }
 
   Widget _buildAdditionalCostsSection() {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionHeader(
-            'Additional Costs',
-            Icons.attach_money,
-            color: Colors.deepOrange,
-          ),
-          const SizedBox(height: 16),
-          _buildCostInput('Food Cost', foodCost, Icons.fastfood),
-          _buildCostInput(
-            'Transport Cost',
-            transportCost,
-            Icons.directions_car,
-          ),
-          _buildCostInput('Fuel Cost', fuelCost, Icons.local_gas_station),
-        ],
-      ),
+    return _buildSectionCard(
+      title: 'Additional Costs',
+      icon: Icons.payments_rounded,
+      iconColor: const Color(0xFFEA580C),
+      children: [
+        _buildCostInput('Food Cost', foodCost, Icons.fastfood_rounded),
+        const SizedBox(height: 10),
+        _buildCostInput('Transport Cost', transportCost, Icons.directions_bus_rounded),
+        const SizedBox(height: 10),
+        _buildCostInput('Fuel Cost', fuelCost, Icons.local_gas_station_rounded),
+      ],
     );
   }
 
   Widget _buildSummarySection() {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildSectionHeader(
-                  'Summary',
-                  Icons.summarize,
-                  color: _primaryColor,
-                ),
-                Text(
-                  'Total: ₹${_getTotalAmount()}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: _primaryColor,
-                  ),
-                ),
-              ],
+    return _buildSectionCard(
+      title: 'Entry Summary',
+      icon: Icons.summarize_rounded,
+      iconColor: const Color(0xFF16A34A),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Total Entry Cost',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
             ),
+            Text(
+              '₹${_getTotalAmount()}',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 20,
+                color: _primaryColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _buildSummaryTable(),
+      ],
+    );
+  }
+
+  Widget _buildInputField({required String label, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: _textColor,
           ),
-          const SizedBox(height: 8),
-          SizedBox(width: double.infinity, child: _buildSummaryTable()),
-        ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _borderColor),
+          ),
+          child: child,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCostInput(String label, TextEditingController controller, IconData icon) {
+    return _buildInputField(
+      label: label,
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        onChanged: (_) => setState(() {}),
+        style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          prefixIcon: Icon(icon, color: _primaryColor, size: 20),
+          prefixText: '₹ ',
+          prefixStyle: TextStyle(color: _textColor, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
-
-    final double width = MediaQuery.of(context).size.width;
-    final double hPad = getPad(width);
-    final double sectionSpacing = width < 400
-        ? 8
-        : width < 600
-        ? 12
-        : 18;
-
-    return GlassScaffold(
-      title: 'CONTRACTOR ENTRY',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      actions: widget.showLogout
-          ? [
-              Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: Center(
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.logout_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                      onPressed: _handleLogout,
-                      tooltip: 'Logout',
+  Widget _buildSummaryTable() {
+    return Column(
+      children: [
+        if (materials.isNotEmpty) ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Materials Added',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...materials.asMap().entries.map((e) {
+            final idx = e.key;
+            final item = e.value;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${item['name']} (x${item['qty']})',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
                     ),
                   ),
-                ),
+                  Text(
+                    '₹${item['totalPrice']}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline_rounded, size: 18, color: Colors.redAccent),
+                    onPressed: () => _removeMaterial(idx),
+                  ),
+                ],
               ),
-            ]
-          : null,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isMobile ? double.infinity : 600,
-          ),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: hPad,
-              vertical: sectionSpacing,
+            );
+          }),
+          const SizedBox(height: 10),
+        ],
+        if (labours.isNotEmpty) ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Labour Added',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
             ),
-            child: Column(
-              children: [
-                _buildContractorDetailsCard(),
-                SizedBox(height: sectionSpacing),
-                _buildMaterialSection(),
-                SizedBox(height: sectionSpacing),
-                _buildLabourSection(),
-                SizedBox(height: sectionSpacing),
-                _buildAdditionalCostsSection(),
-                SizedBox(height: sectionSpacing),
-                _buildSummarySection(),
-                const SizedBox(height: 32),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.getDarkAccent(_primaryColor),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.getDarkAccent(_primaryColor)
-                            .withValues(alpha: 0.25),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: isSaving ? null : _saveToFirestore,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        foregroundColor: const Color(0xFF0A183D),
-                        disabledBackgroundColor:
-                            Colors.white.withValues(alpha: 0.15),
-                        disabledForegroundColor:
-                            Colors.white.withValues(alpha: 0.45),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 6,
-                        shadowColor: _primaryColor.withValues(alpha: 0.4),
-                      ),
-                      child: isSaving
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF0A183D),
-                                ),
-                              ),
-                            )
-                          : const Text(
-                              'SAVE ENTRY',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
+          ),
+          const SizedBox(height: 6),
+          ...labours.asMap().entries.map((e) {
+            final idx = e.key;
+            final item = e.value;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${item['type']} (x${item['count']})',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
                     ),
                   ),
-                ),
-                SizedBox(height: sectionSpacing * 2),
-              ],
-            ),
-          ),
-        ),
-      ),
+                  Text(
+                    '₹${item['totalSalary']}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline_rounded, size: 18, color: Colors.redAccent),
+                    onPressed: () => _removeLabour(idx),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ],
     );
   }
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:demo_cst/screens/customer/customer_dashboard.dart';
 import 'package:demo_cst/services/firestore_service.dart';
@@ -8,7 +7,6 @@ import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_text_field.dart';
 import 'package:demo_cst/widgets/glass_button.dart';
-import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/utils/firestore_error_handler.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
@@ -113,7 +111,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         // Sync branding details
         await AppTheme.syncWithFirestore(orgId);
 
-        final projectsCollection = await FirestoreService.projects;
+        final projectsCollection = FirestoreService.projects;
         final querySnapshot = await projectsCollection
             .where('ownerName', isEqualTo: _usernameController.text.trim())
             .where(
@@ -123,11 +121,12 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
-          final data = querySnapshot.docs.first.data() as Map<String, dynamic>;
+          final data = querySnapshot.docs.first.data();
           final siteId = data['siteId'] ?? '';
 
           await AuthService().login(UserRole.customer, {
             'ownerName': _usernameController.text.trim(),
+            'ownerPhoneNumber': _passwordController.text.trim(),
             'siteId': siteId,
             'orgId': orgId,
             'cust_org_doc_path': resolvedPath,

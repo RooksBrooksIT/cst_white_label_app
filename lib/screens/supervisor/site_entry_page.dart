@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
 import 'package:demo_cst/services/expense_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
@@ -1079,7 +1078,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
               horizontal: 16.0,
               vertical: 16.0,
             ),
-            child: Center(
+            child: Align(
+              alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: 800,
@@ -1210,7 +1210,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           _buildModernSiteRow(
                             Icons.location_on,
                             'Location',
-                            siteLocation ?? 'Unknown',
+                            siteLocation.isNotEmpty ? siteLocation : 'Unknown',
                           ),
                           _buildModernSiteRow(
                             Icons.stairs_outlined,

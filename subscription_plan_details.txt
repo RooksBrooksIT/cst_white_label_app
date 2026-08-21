@@ -1,0 +1,140 @@
+================================================================================
+CST WHITE LABEL APPLICATION - SUBSCRIPTION PLAN DETAILS & PRICING SPECIFICATION
+================================================================================
+
+OVERVIEW:
+This document details all subscription plans, billing cycles, feature quotas, 
+pricing formulas, payment integrations, and refund policies implemented in 
+the CST White Label Application.
+
+--------------------------------------------------------------------------------
+1. SUBSCRIPTION PLANS COMPARISON TABLE
+--------------------------------------------------------------------------------
+
++-------------------+-----------------+-----------------+------------------+-------------------+
+| Plan Name         | Monthly Price   | 6 Months Price  | Yearly Price     | Project Quota     |
+|                   | (Billed/mo)     | (Save 20%)      | (Save 33%)       |                   |
++-------------------+-----------------+-----------------+------------------+-------------------+
+| 1. Free Trial     | ₹0 (Free)       | N/A             | N/A              | 1 Project/Site    |
+| 2. Silver Plan    | ₹199 / mo       | ₹1,194 / 6 mo   | ₹2,388 / year    | Up to 3 Projects  |
+| 3. Gold Plan      | ₹999 / mo       | ₹5,994 / 6 mo   | ₹11,988 / year   | Up to 10 Projects |
+| 4. Platinum Plan  | Dynamic Rate    | Dynamic Rate    | Dynamic Rate     | Customizable      |
+|                   | ₹99.9 / project | ₹599.4 / proj   | ₹1,198.8 / proj  | (5 to 50 Projects)|
++-------------------+-----------------+-----------------+------------------+-------------------+
+
+--------------------------------------------------------------------------------
+2. DETAILED PLAN SPECIFICATIONS
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+PLAN 1: FREE TRIAL PLAN
+--------------------------------------------------------------------------------
+• Description: Experience full app features for new organizations.
+• Duration: 14 Days
+• Pricing:
+  - Monthly: ₹0
+  - 6 Months: N/A
+  - Yearly: N/A
+• Quotas & Technical Limits:
+  - Max Projects/Sites (`maxProjects`): 1
+  - Max Active Users (`maxUsers`): 2
+• Included Features:
+  [✓] Basic Project Management
+  [✓] Task Tracking & Daily Updates
+  [✓] Limited Team Members (up to 2)
+  [✓] Basic Reports & Analytics
+
+--------------------------------------------------------------------------------
+PLAN 2: SILVER PLAN
+--------------------------------------------------------------------------------
+• Description: Ideal for small construction teams starting out.
+• Pricing Structure:
+  - Monthly Plan: ₹199 / month (Original ₹299)
+  - 6 Months Plan: ₹1,194 / 6 months (Save 20%, Original ₹1,794)
+  - Yearly Plan: ₹2,388 / year (Save 33%, Original ₹3,588)
+• Quotas & Technical Limits:
+  - Max Projects/Sites (`maxProjects`): 3
+  - Max Active Users (`maxUsers`): 5
+• Included Features:
+  [✓] Basic Project Management
+  [✓] Task Tracking & Updates
+  [✓] Limited Team Members (3-5)
+  [✓] Basic Reports & Data View
+
+--------------------------------------------------------------------------------
+PLAN 3: GOLD PLAN
+--------------------------------------------------------------------------------
+• Description: Comprehensive management with a fixed project quota.
+• Pricing Structure:
+  - Monthly Plan: ₹999 / month (Original ₹1,499)
+  - 6 Months Plan: ₹5,994 / 6 months (Save 20%, Original ₹8,994)
+  - Yearly Plan: ₹11,988 / year (Save 33%, Original ₹17,988)
+• Quotas & Technical Limits:
+  - Max Projects/Sites (`maxProjects`): 10
+  - Max Active Users (`maxUsers`): 15
+• Included Features:
+  [✓] Up to 10 Projects & Active Sites
+  [✓] Up to 5 Managers
+  [✓] Up to 10 Supervisors
+  [✓] Advanced Collaboration & Site Monitoring
+  [✓] Expense Tracking & Monthly Report Views
+
+--------------------------------------------------------------------------------
+PLAN 4: PLATINUM PLAN (CUSTOMIZABLE PROJECT LIMITS)
+--------------------------------------------------------------------------------
+• Description: Enterprise-scale solution with custom project scaling.
+• Rate Formula:
+  - Per-Project Monthly Rate: ₹99.9 / project (Original ₹149.9)
+  - Per-Project 6-Months Rate: ₹599.4 / project (Original ₹899.4)
+  - Per-Project Yearly Rate: ₹1,198.8 / project (Original ₹1,798.8)
+• Project Range & Presets:
+  - Selectable Limit: 5 to 50 Projects / Active Sites
+  - Interactive Stepper Controls (- / +)
+  - Quick Select Preset Chips: 5, 10, 15, 20, 25, 30, 40, 50 Sites
+• Quotas & Technical Limits:
+  - Max Projects/Sites (`maxProjects`): `Selected Project Count`
+  - Max Active Users (`maxUsers`): `(Selected Project Count * 1.5).round()`
+• Platinum Price Matrix Table:
+  +------------------+-----------------+-------------------+--------------------+
+  | Projects Selected| Monthly Amount  | 6 Months Amount   | Yearly Amount      |
+  +------------------+-----------------+-------------------+--------------------+
+  |  5 Sites         | ₹499.5          | ₹2,997.0          | ₹5,994.0           |
+  | 10 Sites         | ₹999.0          | ₹5,994.0          | ₹11,988.0          |
+  | 15 Sites         | ₹1,498.5        | ₹8,991.0          | ₹17,982.0          |
+  | 20 Sites         | ₹1,998.0        | ₹11,988.0         | ₹23,976.0          |
+  | 25 Sites         | ₹2,497.5        | ₹14,985.0         | ₹29,970.0          |
+  | 30 Sites         | ₹2,997.0        | ₹17,982.0         | ₹35,964.0          |
+  | 40 Sites         | ₹3,996.0        | ₹23,976.0         | ₹47,952.0          |
+  | 50 Sites         | ₹4,995.0        | ₹29,970.0         | ₹59,940.0          |
+  +------------------+-----------------+-------------------+--------------------+
+• Included Features:
+  [✓] Up to [Selected Count] Projects & Active Sites
+  [✓] Up to [(Selected Count / 2).round()] Managers
+  [✓] Up to [Selected Count] Supervisors
+  [✓] Advanced Collaboration & Workflows
+  [✓] Real-time Site Monitoring & Live Logs
+  [✓] Comprehensive Expense Tracking & Audits
+
+--------------------------------------------------------------------------------
+3. PAYMENT GATEWAY & UPGRADE LOGIC
+--------------------------------------------------------------------------------
+• Payment Gateway: PayU Checkout Integration (`PayUCheckoutScreen`)
+• Transaction Handling:
+  - Generates secure transaction ID (`txnid`) via `PayUService`
+  - Back-end verification via Firebase Cloud Functions
+• Plan Upgrade Options:
+  1. Immediate Upgrade: Activates new plan instantly and updates Firestore.
+  2. Queued Upgrade: Schedules plan change to auto-activate when current 
+     subscription period ends (`queuedPlan`, `queuedStartDate`, `queuedEndDate`).
+
+--------------------------------------------------------------------------------
+4. REFUND & CANCELLATION POLICY
+--------------------------------------------------------------------------------
+• Recurring Billing: Monthly, 6 Months, or Yearly recurring cycles.
+• Support Contact: support@rookstechnologies.com
+• Refund Request Window: Eligible within 7 days of initial purchase or renewal.
+• Refund Processing Time: 5 to 7 business days to original payment method.
+• Partial Usage: No refunds provided for partial subscription periods or 
+  unused plan quotas.
+
+================================================================================

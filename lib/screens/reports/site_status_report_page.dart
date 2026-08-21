@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '/utils/pdf_templates.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class SiteStatusReportPage extends StatelessWidget {
   final String status;
@@ -38,28 +39,48 @@ class SiteStatusReportPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
-
+    final primaryColor = Theme.of(context).primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final statusColor = getStatusColor(context, status);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
-          '$status Sites',
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+          '$status Sites Report',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
         ),
-        backgroundColor: statusColor,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
             icon: const Icon(
-              Icons.picture_as_pdf_outlined,
+              Icons.picture_as_pdf_rounded,
               color: Colors.white,
+              size: 20,
             ),
             onPressed: () => _generatePdf(context),
+            tooltip: 'Export PDF Report',
           ),
         ],
       ),

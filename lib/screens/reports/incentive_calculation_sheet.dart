@@ -354,16 +354,40 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
       );
     }
 
+    final darkAccent = AppTheme.getDarkAccent(_primaryColor);
+
     if (_loading) {
-      return GlassScaffold(
-        title: 'Incentive Sheet',
-        onBack: () => Navigator.pop(context),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-            child: Center(child: CircularProgressIndicator(color: _primaryColor)),
+      return Scaffold(
+        backgroundColor: const Color(0xFFF1F5F9),
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text(
+            'Incentive Sheet',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  darkAccent,
+                  Color.alphaBlend(
+                    _primaryColor.withValues(alpha: 0.35),
+                    darkAccent,
+                  ),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+            onPressed: () => Navigator.pop(context),
           ),
         ),
+        body: Center(child: CircularProgressIndicator(color: _primaryColor)),
       );
     }
 
@@ -376,22 +400,48 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
           Navigator.pop(context);
         }
       },
-      child: GlassScaffold(
-        title: 'Incentive Sheet',
-        onBack: () async {
-          final shouldLeave = await _showUnsavedChangesDialog();
-          if (shouldLeave && context.mounted) {
-            Navigator.pop(context);
-          }
-        },
-        actions: [
-          IconButton(
-            icon: Icon(Icons.picture_as_pdf_outlined, color: _textColor),
-            tooltip: 'Export PDF Report',
-            onPressed: _generatePdf,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF1F5F9),
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text(
+            'Incentive Calculation Sheet',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
-        ],
-        body: Center(
+          centerTitle: true,
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  darkAccent,
+                  Color.alphaBlend(
+                    _primaryColor.withValues(alpha: 0.35),
+                    darkAccent,
+                  ),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+            onPressed: () async {
+              final shouldLeave = await _showUnsavedChangesDialog();
+              if (shouldLeave && context.mounted) {
+                Navigator.pop(context);
+              }
+            },
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+              tooltip: 'Export PDF Report',
+              onPressed: _generatePdf,
+            ),
+          ],
+        ),  body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
             child: SingleChildScrollView(

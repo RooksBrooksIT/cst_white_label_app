@@ -127,22 +127,52 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
       builder: (context, primaryColor, _) {
         final cardAccent = AppTheme.getCardAccent(primaryColor);
 
-        return GlassScaffold(
-          title: 'Material Report',
-          appBarForegroundColor: Colors.white,
-          onBack: () => Navigator.pop(context),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-              onPressed: reportRows.isNotEmpty ? _generatePdf : null,
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF1F5F9),
+          appBar: AppBar(
+            iconTheme: const IconThemeData(color: Colors.white),
+            title: const Text(
+              'Materials Inventory Report',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: selectedMaterial != null
-                  ? () => _fetchMaterialReport(selectedMaterial!)
-                  : null,
+            centerTitle: true,
+            elevation: 0,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    darkAccent,
+                    Color.alphaBlend(
+                      primaryColor.withValues(alpha: 0.35),
+                      darkAccent,
+                    ),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
             ),
-          ],
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+                onPressed: reportRows.isNotEmpty ? _generatePdf : null,
+                tooltip: 'Export PDF Report',
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                onPressed: selectedMaterial != null
+                    ? () => _fetchMaterialReport(selectedMaterial!)
+                    : null,
+                tooltip: 'Refresh',
+              ),
+            ],
+          ),
           body: Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(

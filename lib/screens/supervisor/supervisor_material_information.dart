@@ -303,15 +303,18 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     setState(() {
       _selectedMaterialName = materialName;
       if (materialName != null) {
-        final source = _transferMode == 0
-            ? siteMaterialsList
-            : siteMaterialsList;
-        final selectedMaterial = source.firstWhere(
-          (material) => material['materialName'] == materialName,
+        Map<String, dynamic> selectedMaterial = siteMaterialsList.firstWhere(
+          (material) => (material['materialName'] ?? material['displayName']) == materialName,
           orElse: () => {},
         );
+        if (selectedMaterial.isEmpty) {
+          selectedMaterial = materialsList.firstWhere(
+            (material) => (material['materialName'] ?? material['displayName']) == materialName,
+            orElse: () => {},
+          );
+        }
         if (selectedMaterial.isNotEmpty) {
-          availableCount = selectedMaterial['count'] ?? 0;
+          availableCount = _parseCount(selectedMaterial['count'] ?? selectedMaterial['availableCount']);
         } else {
           availableCount = 0;
         }
@@ -1908,10 +1911,10 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                         fontSize: Responsive.fontSize(context, 14),
                       ),
                     ),
-                    items: siteMaterialsList.map((material) {
+                    items: (siteMaterialsList.isNotEmpty ? siteMaterialsList : materialsList).map((material) {
                       final materialName = material['materialName'];
                       final displayName = material['displayName'];
-                      final count = material['count'] ?? 0;
+                      final count = _parseCount(material['count'] ?? material['availableCount']);
 
                       return DropdownMenuItem<String>(
                         value: materialName,

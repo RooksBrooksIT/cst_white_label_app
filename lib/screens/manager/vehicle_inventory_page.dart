@@ -4,23 +4,8 @@ import 'package:demo_cst/screens/reports/vehicle_inventory_pdf.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:demo_cst/utils/responsive.dart';
 
-/// Vehicle Inventory Report
-/// - Filter modes: by Date (string equality on 'date'), by Month (createdAt range), by Site (toLocation equality)
-/// - Sites loaded from 'projects' collection via 'siteName'
-/// - Results displayed in a DataTable with all listed fields
-/// - Submit -> displays "Generate PDF", generating a PDF of currently displayed rows
-///
-/// Index strategy:
-/// - Date mode: no orderBy used -> avoids composite (date + createdAt)
-/// - Site mode: no orderBy used -> avoids composite (toLocation + createdAt)
-/// - Month mode: createdAt range + orderBy(createdAt) -> uses single-field index on createdAt (automatic)
-///
-/// If you prefer chronological order for date/site, create composite indexes:
-/// - vehicleMovements: date Asc, createdAt Asc
-/// - vehicleMovements: toLocation Asc, createdAt Asc
-/// Then add .orderBy('createdAt') back in respective modes.
 enum ReportFilterMode { date, month, site }
 
 class VehicleInventoryReportPage extends StatefulWidget {
@@ -44,7 +29,6 @@ class _VehicleInventoryReportPageState
   bool _isSubmitting = false;
   bool _submitted = false;
   bool _isLoadingSites = false;
-  bool _isLoadingData = false;
 
   List<String> _sites = [];
   List<Map<String, dynamic>> _rows = [];
@@ -58,9 +42,7 @@ class _VehicleInventoryReportPageState
   Future<void> _loadSites() async {
     setState(() => _isLoadingSites = true);
     try {
-      final snap = await FirestoreService
-          .getCollection('projects')
-          .get();
+      final snap = await FirestoreService.getCollection('projects').get();
       final names = <String>{};
       for (final d in snap.docs) {
         final data = d.data();
@@ -79,7 +61,7 @@ class _VehicleInventoryReportPageState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to load sites: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.redAccent,
         ),
       );
     } finally {
@@ -92,7 +74,7 @@ class _VehicleInventoryReportPageState
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate ?? now,
-      firstDate: DateTime(2000),
+      firstDate: DateTime(2020),
       lastDate: DateTime(now.year + 2),
     );
     if (picked != null) {
@@ -102,23 +84,67 @@ class _VehicleInventoryReportPageState
 
   Future<void> _pickMonth() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final initial = _selectedMonth ?? now;
+    final pickedYear = await showDialog<int>(
       context: context,
-      initialDate: _selectedMonth ?? DateTime(now.year, now.month, 1),
-      firstDate: DateTime(2000, 1, 1),
-      lastDate: DateTime(now.year + 2, 12, 31),
-      helpText: 'Select month (any day in month)',
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Select Year'),
+          content: SizedBox(
+            width: 250,
+            height: 250,
+            child: YearPicker(
+              firstDate: DateTime(2020),
+              lastDate: DateTime(now.year + 2),
+              selectedDate: initial,
+              onChanged: (DateTime dt) => Navigator.pop(ctx, dt.year),
+            ),
+          ),
+        );
+      },
     );
-    if (picked != null) {
-      setState(() => _selectedMonth = DateTime(picked.year, picked.month, 1));
-    }
+
+    if (pickedYear == null) return;
+
+    if (!mounted) return;
+    final pickedMonthInt = await showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        final months = List.generate(12, (i) => i + 1);
+        return AlertDialog(
+          title: Text('Select Month ($pickedYear)'),
+          content: SizedBox(
+            width: 280,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: months.map((m) {
+                final date = DateTime(pickedYear, m, 1);
+                final label = DateFormat('MMM').format(date);
+                return SizedBox(
+                  width: 75,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, m),
+                    child: Text(label),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (pickedMonthInt == null) return;
+    setState(() {
+      _selectedMonth = DateTime(pickedYear, pickedMonthInt, 1);
+    });
   }
 
-  String _formatDate(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+  String _formatDate(DateTime dt) => DateFormat('yyyy-MM-dd').format(dt);
 
-  Future<void> _submit() async {
+  Future<void> _fetchReport() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() {
       _isSubmitting = true;
       _submitted = false;
@@ -126,126 +152,74 @@ class _VehicleInventoryReportPageState
     });
 
     try {
-      await _fetchData();
+      final col = FirestoreService.getCollection('vehicleMovements');
+      QuerySnapshot<Map<String, dynamic>> snap;
+
+      switch (_mode) {
+        case ReportFilterMode.date:
+          final dateStr = _formatDate(_selectedDate!);
+          snap = await col.where('date', isEqualTo: dateStr).get();
+          break;
+        case ReportFilterMode.month:
+          final start = DateTime(_selectedMonth!.year, _selectedMonth!.month, 1);
+          final end = DateTime(_selectedMonth!.year, _selectedMonth!.month + 1, 1);
+          snap = await col
+              .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+              .where('createdAt', isLessThan: Timestamp.fromDate(end))
+              .orderBy('createdAt', descending: true)
+              .get();
+          break;
+        case ReportFilterMode.site:
+          snap = await col.where('toLocation', isEqualTo: _selectedSite).get();
+          break;
+      }
+
+      final items = snap.docs.map((d) => d.data()).toList();
+
+      if (_mode != ReportFilterMode.month) {
+        items.sort((a, b) {
+          final ta = (a['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+          final tb = (b['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+          return tb.compareTo(ta);
+        });
+      }
+
       setState(() {
+        _rows = items;
         _submitted = true;
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error fetching report: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Failed to load report: $e'),
+          backgroundColor: Colors.redAccent,
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _fetchData() async {
-    setState(() => _isLoadingData = true);
-    try {
-      final col = FirestoreService.getCollection('vehicleMovements');
-
-      Query<Map<String, dynamic>> q = col;
-
-      switch (_mode) {
-        case ReportFilterMode.date:
-          final dateStr = _formatDate(_selectedDate!);
-          // Avoid composite index by not ordering by createdAt.
-          q = q.where('date', isEqualTo: dateStr);
-          break;
-
-        case ReportFilterMode.month:
-          // Range on createdAt plus orderBy(createdAt) -> single-field index on createdAt.
-          final start = DateTime(
-            _selectedMonth!.year,
-            _selectedMonth!.month,
-            1,
-          );
-          final end = DateTime(
-            _selectedMonth!.year,
-            _selectedMonth!.month + 1,
-            1,
-          ).subtract(const Duration(milliseconds: 1));
-          q = q
-              .where(
-                'createdAt',
-                isGreaterThanOrEqualTo: Timestamp.fromDate(start),
-              )
-              .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(end))
-              .orderBy('createdAt', descending: false);
-          break;
-
-        case ReportFilterMode.site:
-          // Avoid composite by not ordering by createdAt.
-          q = q.where('toLocation', isEqualTo: _selectedSite);
-          break;
-      }
-
-      final snap = await q.get();
-
-      List<Map<String, dynamic>> items = snap.docs.map((d) {
-        final data = d.data();
-        return {
-          'createdAt': data['createdAt'],
-          'date': data['date'],
-          'distanceKm': data['distanceKm'],
-          'docId': data['docId'],
-          'driverName': data['driverName'],
-          'endTime': data['endTime'],
-          'fromLocation': data['fromLocation'],
-          'materialType': data['materialType'],
-          'materialUnit': data['materialUnit'],
-          'movementId': data['movementId'],
-          'movementType': data['movementType'],
-          'quantity': data['quantity'],
-          'remarks': data['remarks'],
-          'startTime': data['startTime'],
-          'toLocation': data['toLocation'],
-          'vehicleId': data['vehicleId'],
-          'siteId': _selectedSite,
-        };
-      }).toList();
-
-      // Month mode fallback: ensure "date" starts with yyyy-MM if needed.
-      if (_mode == ReportFilterMode.month) {
-        final monthPrefix = DateFormat('yyyy-MM').format(_selectedMonth!);
-        items = items.where((r) {
-          final ds = r['date'];
-          if (ds is String && ds.length >= 7) {
-            return ds.startsWith(monthPrefix);
-          }
-          return true;
-        }).toList();
-      }
-
-      setState(() {
-        _rows = items;
-      });
-    } finally {
-      if (mounted) setState(() => _isLoadingData = false);
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   Future<void> _generatePdf() async {
+    if (_rows.isEmpty) return;
     try {
-      final title = switch (_mode) {
-        ReportFilterMode.date =>
-          'Vehicle Inventory Report - ${_formatDate(_selectedDate!)}',
-        ReportFilterMode.month =>
-          'Vehicle Inventory Report - ${DateFormat('MMMM yyyy').format(_selectedMonth!)}',
-        ReportFilterMode.site =>
-          'Vehicle Inventory Report - Site: ${_selectedSite!}',
-      };
+      final String filterTitle;
+      switch (_mode) {
+        case ReportFilterMode.date:
+          filterTitle = 'Date: ${_formatDate(_selectedDate!)}';
+          break;
+        case ReportFilterMode.month:
+          filterTitle = 'Month: ${DateFormat('MMMM yyyy').format(_selectedMonth!)}';
+          break;
+        case ReportFilterMode.site:
+          filterTitle = 'Site: $_selectedSite';
+          break;
+      }
+
       await InventoryReportPdf.generateAndShare(
         context: context,
-        title: title,
+        title: filterTitle,
         rows: _rows,
       );
     } catch (e) {
@@ -253,586 +227,527 @@ class _VehicleInventoryReportPageState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to generate PDF: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.redAccent,
         ),
       );
     }
   }
 
-  Widget _buildModeSelector() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
+  @override
+  Widget build(BuildContext context) {
+    final bool isMobile = Responsive.isMobile(context);
+    final primaryColor = Theme.of(context).primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Vehicle Inventory',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      padding: const EdgeInsets.all(4),
-      child: Row(
-        children: ReportFilterMode.values.map((mode) {
-          final isSelected = _mode == mode;
-          String label = 'By Date';
-          IconData icon = Icons.today_rounded;
-
-          if (mode == ReportFilterMode.month) {
-            label = 'By Month';
-            icon = Icons.calendar_month_rounded;
-          } else if (mode == ReportFilterMode.site) {
-            label = 'By Site';
-            icon = Icons.place_rounded;
-          }
-
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _mode = mode;
-                  _selectedDate = null;
-                  _selectedMonth = null;
-                  _selectedSite = null;
-                  _rows = [];
-                  _submitted = false;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF0A183D) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      icon,
-                      size: 17,
-                      color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
-                      ),
-                    ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 650),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 80),
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFilterCard(primaryColor),
+                  const SizedBox(height: 20),
+                  if (_submitted) ...[
+                    _buildReportSummary(primaryColor),
+                    const SizedBox(height: 16),
+                    _buildMovementList(primaryColor),
                   ],
-                ),
+                ],
               ),
             ),
-          );
-        }).toList(),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildFilters(Color primaryColor) {
+  Widget _buildFilterCard(Color primaryColor) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.inventory_2_rounded, size: 18, color: primaryColor),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Inventory Filter Mode',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0A183D),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _buildModeSegmentedControl(primaryColor),
+            const SizedBox(height: 16),
+            _buildFilterInput(primaryColor),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _isSubmitting ? null : _fetchReport,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.analytics_rounded, size: 18),
+                label: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'FETCH INVENTORY REPORT',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModeSegmentedControl(Color primaryColor) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Row(
+        children: [
+          _buildSegmentButton('By Date', ReportFilterMode.date, Icons.calendar_today_rounded, primaryColor),
+          _buildSegmentButton('By Month', ReportFilterMode.month, Icons.calendar_month_rounded, primaryColor),
+          _buildSegmentButton('By Site', ReportFilterMode.site, Icons.location_on_rounded, primaryColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentButton(String label, ReportFilterMode mode, IconData icon, Color primaryColor) {
+    final bool isSelected = _mode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _mode = mode;
+            _submitted = false;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: isSelected ? primaryColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 15, color: isSelected ? Colors.white : const Color(0xFF64748B)),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? Colors.white : const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterInput(Color primaryColor) {
     switch (_mode) {
       case ReportFilterMode.date:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Date *',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
+        return _buildCustomTextField(
+          label: 'Select Date *',
+          child: TextFormField(
+            readOnly: true,
+            onTap: _pickDate,
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
+            controller: TextEditingController(
+              text: _selectedDate == null ? '' : _formatDate(_selectedDate!),
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: TextFormField(
-                      readOnly: true,
-                      style: const TextStyle(
-                        color: Color(0xFF0A183D),
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Select Date',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.calendar_today_rounded,
-                          color: Color(0xFF0A183D),
-                        ),
-                      ),
-                      controller: TextEditingController(
-                        text: _selectedDate == null
-                            ? ''
-                            : _formatDate(_selectedDate!),
-                      ),
-                      validator: (_) =>
-                          _selectedDate == null ? 'Select a date' : null,
-                      onTap: _pickDate,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _pickDate,
-                    icon: const Icon(Icons.event_rounded, size: 18),
-                    label: const Text(
-                      'Pick',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: const Color(0xFF0A183D),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 4,
-                    ),
-                  ),
-                ),
-              ],
+            decoration: InputDecoration(
+              hintText: 'Choose date for report',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              prefixIcon: Icon(Icons.calendar_today_rounded, color: primaryColor, size: 20),
             ),
-          ],
+            validator: (_) => _selectedDate == null ? 'Please select a date' : null,
+          ),
         );
+
       case ReportFilterMode.month:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Month *',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
+        return _buildCustomTextField(
+          label: 'Select Month *',
+          child: TextFormField(
+            readOnly: true,
+            onTap: _pickMonth,
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
+            controller: TextEditingController(
+              text: _selectedMonth == null ? '' : DateFormat('MMMM yyyy').format(_selectedMonth!),
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: TextFormField(
-                      readOnly: true,
-                      style: const TextStyle(
-                        color: Color(0xFF0A183D),
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Select Month',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.calendar_month_rounded,
-                          color: Color(0xFF0A183D),
-                        ),
-                      ),
-                      controller: TextEditingController(
-                        text: _selectedMonth == null
-                            ? ''
-                            : DateFormat('MMMM yyyy').format(_selectedMonth!),
-                      ),
-                      validator: (_) =>
-                          _selectedMonth == null ? 'Select a month' : null,
-                      onTap: _pickMonth,
-                    ),
-                  ),
+            decoration: InputDecoration(
+              hintText: 'Choose month for report',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              prefixIcon: Icon(Icons.calendar_month_rounded, color: primaryColor, size: 20),
+            ),
+            validator: (_) => _selectedMonth == null ? 'Please select a month' : null,
+          ),
+        );
+
+      case ReportFilterMode.site:
+        return _buildCustomTextField(
+          label: 'Select Site *',
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: _selectedSite,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              prefixIcon: Icon(Icons.location_on_rounded, color: primaryColor, size: 20),
+              hintText: _isLoadingSites ? 'Loading sites...' : 'Choose destination site',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+            ),
+            items: _sites.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+            onChanged: (v) => setState(() => _selectedSite = v),
+            validator: (v) => v == null || v.isEmpty ? 'Please select a site' : null,
+          ),
+        );
+    }
+  }
+
+  Widget _buildCustomTextField({required String label, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: child,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReportSummary(Color primaryColor) {
+    final double totalDistance = _rows.fold(
+      0.0,
+      (accum, item) => accum + ((item['distanceValue'] as num?)?.toDouble() ?? 0.0),
+    );
+    final double totalQty = _rows.fold(
+      0.0,
+      (accum, item) => accum + ((item['quantityValue'] as num?)?.toDouble() ?? 0.0),
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildSummaryTile('Movements', '${_rows.length}', Icons.local_shipping_rounded, primaryColor),
+              Container(height: 36, width: 1, color: const Color(0xFFE2E8F0)),
+              _buildSummaryTile('Distance', '${totalDistance.toStringAsFixed(1)} km', Icons.route_rounded, primaryColor),
+              Container(height: 36, width: 1, color: const Color(0xFFE2E8F0)),
+              _buildSummaryTile('Material Qty', totalQty.toStringAsFixed(0), Icons.inventory_2_rounded, primaryColor),
+            ],
+          ),
+          if (_rows.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                onPressed: _generatePdf,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _pickMonth,
-                    icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                    label: const Text(
-                      'Pick',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: const Color(0xFF0A183D),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 4,
-                    ),
-                  ),
-                ),
-              ],
+                icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                label: const Text('Download PDF Inventory Report', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
             ),
           ],
-        );
-      case ReportFilterMode.site:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryTile(String label, String value, IconData icon, Color primaryColor) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Select Site *',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+            Icon(icon, size: 14, color: primaryColor),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0A183D))),
+      ],
+    );
+  }
+
+  Widget _buildMovementList(Color primaryColor) {
+    if (_rows.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+        ),
+        child: const Center(
+          child: Text(
+            'No vehicle movement logs found for this query.',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 20,
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 6),
-            Container(
+            const SizedBox(width: 8),
+            Text(
+              'Movements Found (${_rows.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0A183D),
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _rows.length,
+          itemBuilder: (context, index) {
+            final row = _rows[index];
+            final vehicleModel = row['vehicleModel'] ?? 'Vehicle';
+            final plate = row['vehicleNumberPlate'] ?? '';
+            final driver = row['driverName'] ?? 'Unknown Driver';
+            final fromLoc = row['fromLocation'] ?? '';
+            final toLoc = row['toLocation'] ?? '';
+            final material = row['materialType'] ?? '';
+            final qty = row['quantity'] ?? '0';
+            final unit = row['materialUnit'] ?? '';
+            final distance = row['distanceKm'] ?? '0';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: DropdownButtonFormField<String>(
-                dropdownColor: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                decoration: InputDecoration(
-                  hintText: 'Select Site',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.place_rounded,
-                    color: Color(0xFF0A183D),
-                  ),
-                ),
-                style: const TextStyle(
-                  color: Color(0xFF0A183D),
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
-                ),
-                isExpanded: true,
-                items: _sites
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-                value: _selectedSite,
-                onChanged: (v) => setState(() => _selectedSite = v),
-                validator: (v) => v == null || v.isEmpty ? 'Select a site' : null,
-              ),
-            ),
-          ],
-        );
-    }
-  }
-
-  Widget _buildTable() {
-    final dateFmt = DateFormat('yyyy-MM-dd HH:mm');
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A183D),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: DataTable(
-        headingRowColor: WidgetStateProperty.all(const Color(0xFF05112E)),
-        headingTextStyle: const TextStyle(
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
-          fontSize: 13.5,
-        ),
-        dataTextStyle: const TextStyle(
-          color: Color(0xFFE2E8F0),
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-        columns: const [
-          DataColumn(label: Text('Date')),
-          DataColumn(label: Text('Created At')),
-          DataColumn(label: Text('Movement ID')),
-          DataColumn(label: Text('Doc ID')),
-          DataColumn(label: Text('Vehicle ID')),
-          DataColumn(label: Text('Driver')),
-          DataColumn(label: Text('From')),
-          DataColumn(label: Text('To')),
-          DataColumn(label: Text('Type')),
-          DataColumn(label: Text('Start')),
-          DataColumn(label: Text('End')),
-          DataColumn(label: Text('Distance Km')),
-          DataColumn(label: Text('Material')),
-          DataColumn(label: Text('Unit')),
-          DataColumn(label: Text('Qty')),
-          DataColumn(label: Text('Remarks')),
-        ],
-        rows: _rows.map((r) {
-          final ts = r['createdAt'];
-          String created = '';
-          if (ts is Timestamp) {
-            created = dateFmt.format(ts.toDate());
-          } else if (ts is DateTime) {
-            created = dateFmt.format(ts);
-          }
-          return DataRow(
-            cells: [
-              DataCell(Text('${r['date'] ?? ''}')),
-              DataCell(Text(created)),
-              DataCell(Text('${r['movementId'] ?? ''}')),
-              DataCell(Text('${r['docId'] ?? ''}')),
-              DataCell(Text('${r['vehicleId'] ?? ''}')),
-              DataCell(Text('${r['driverName'] ?? ''}')),
-              DataCell(Text('${r['fromLocation'] ?? ''}')),
-              DataCell(Text('${r['toLocation'] ?? ''}')),
-              DataCell(Text('${r['movementType'] ?? ''}')),
-              DataCell(Text('${r['startTime'] ?? ''}')),
-              DataCell(Text('${r['endTime'] ?? ''}')),
-              DataCell(Text('${r['distanceKm'] ?? ''}')),
-              DataCell(Text('${r['materialType'] ?? ''}')),
-              DataCell(Text('${r['materialUnit'] ?? ''}')),
-              DataCell(Text('${r['quantity'] ?? ''}')),
-              DataCell(Text('${r['remarks'] ?? ''}')),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final darkCardBg = AppTheme.getDarkAccent(primaryColor);
-
-    return GlassScaffold(
-      title: 'Vehicle Inventory Report',
-      onBack: () => Navigator.pop(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                // Filter Card Container
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: darkCardBg,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: darkCardBg.withValues(alpha: 0.25),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.local_shipping_rounded, color: primaryColor, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              vehicleModel,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF0A183D)),
+                            ),
+                            Text(
+                              '$plate • $driver',
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${distance}km',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: primaryColor),
+                        ),
                       ),
                     ],
                   ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildModeSelector(),
-                        const SizedBox(height: 16),
-                        if (_isLoadingSites && _mode == ReportFilterMode.site)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 12.0),
-                            child: LinearProgressIndicator(),
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.route_rounded, size: 14, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$fromLoc → $toLoc',
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
                           ),
-                        _buildFilters(primaryColor),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 50,
-                                child: ElevatedButton(
-                                  onPressed: _isSubmitting ? null : _submit,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryColor,
-                                    foregroundColor: const Color(0xFF0A183D),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    elevation: 4,
-                                  ),
-                                  child: _isSubmitting
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                              Color(0xFF0A183D),
-                                            ),
-                                          ),
-                                        )
-                                      : const Text(
-                                          'Submit Report',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            ),
-                            if (_submitted && _rows.isNotEmpty) ...[
-                              const SizedBox(width: 12),
-                              SizedBox(
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  onPressed: _generatePdf,
-                                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
-                                  label: const Text(
-                                    'Generate PDF',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF22C55E),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    elevation: 4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
+                        ],
+                      ),
+                      if (material.toString().isNotEmpty)
+                        Text(
+                          '$material ($qty $unit)',
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-                ),
-                // Results Table Container
-                Expanded(
-                  child: _isLoadingData
-                      ? const Center(child: CircularProgressIndicator())
-                      : _rows.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0A183D).withValues(alpha: 0.08),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 48,
-                                  color: Color(0xFF0A183D),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'No vehicle movement records found',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0A183D),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Select filter parameters and tap submit to view report.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Container(
-                          decoration: BoxDecoration(
-                            color: darkCardBg,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: darkCardBg.withValues(alpha: 0.25),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minWidth: MediaQuery.of(context).size.width,
-                                ),
-                                child: SingleChildScrollView(child: _buildTable()),
-                              ),
-                            ),
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          },
         ),
-      ),
+      ],
     );
   }
 }

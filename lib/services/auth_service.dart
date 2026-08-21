@@ -88,20 +88,52 @@ class AuthService {
 
   /// Mark a user as logged in with a role and data
   Future<void> login(UserRole role, Map<String, dynamic> data) async {
+    final sanitizedData = _sanitizeForJson(data);
     await _prefs.setBool(_isLoggedInKey, true);
     await _prefs.setString(_userRoleKey, role.toString());
-    await _prefs.setString(_userDataKey, jsonEncode(data));
+    await _prefs.setString(
+      _userDataKey,
+      jsonEncode(sanitizedData, toEncodable: (item) {
+        if (item is Timestamp) return item.toDate().toIso8601String();
+        if (item is DateTime) return item.toIso8601String();
+        return item.toString();
+      }),
+    );
 
     // For backward compatibility and specialized logic in existing services,
     // we also set the specific keys they expect.
-    await _syncLegacyKeys(role, data);
+    await _syncLegacyKeys(role, sanitizedData);
 
     // Automatically refresh branding if orgId is available
-    final orgId = data['dynamicPath'] ?? data['orgId'];
+    final orgId = sanitizedData['dynamicPath'] ?? sanitizedData['orgId'];
     if (orgId != null && orgId.toString().isNotEmpty) {
       FirestoreService.setOrgPath(orgId.toString());
       await refreshBranding(orgId.toString());
     }
+  }
+
+  /// Helper to convert non-JSON-encodable objects like Timestamp to standard strings
+  Map<String, dynamic> _sanitizeForJson(Map<String, dynamic> map) {
+    final clean = <String, dynamic>{};
+    map.forEach((key, value) {
+      if (value is Timestamp) {
+        clean[key] = value.toDate().toIso8601String();
+      } else if (value is DateTime) {
+        clean[key] = value.toIso8601String();
+      } else if (value is Map<String, dynamic>) {
+        clean[key] = _sanitizeForJson(value);
+      } else if (value is List) {
+        clean[key] = value.map((item) {
+          if (item is Timestamp) return item.toDate().toIso8601String();
+          if (item is DateTime) return item.toIso8601String();
+          if (item is Map<String, dynamic>) return _sanitizeForJson(item);
+          return item;
+        }).toList();
+      } else {
+        clean[key] = value;
+      }
+    });
+    return clean;
   }
 
   /// Fetch and apply organization branding from Firestore
@@ -277,6 +309,8 @@ class AuthService {
         await _prefs.setBool('cust_isLoggedIn', true);
         if (data.containsKey('ownerName'))
           await _prefs.setString('cust_ownerName', data['ownerName']);
+        if (data.containsKey('ownerPhoneNumber'))
+          await _prefs.setString('cust_ownerPhoneNumber', data['ownerPhoneNumber']);
         if (data.containsKey('siteId'))
           await _prefs.setString('cust_siteId', data['siteId']);
         if (data.containsKey('orgId'))

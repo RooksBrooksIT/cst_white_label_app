@@ -8,7 +8,6 @@ import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_text_field.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:demo_cst/screens/manager/config_account_dashboard.dart';
 
@@ -82,14 +81,19 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
     String username,
     String password,
     String orgId,
-    String resolvedPath,
-  ) async {
-    await AuthService().login(UserRole.manager, {
+    String resolvedPath, {
+    Map<String, dynamic>? extraData,
+  }) async {
+    final Map<String, dynamic> data = {
       'username': username,
       'password': password,
       'orgId': orgId,
       'config_org_doc_path': resolvedPath,
-    });
+    };
+    if (extraData != null) {
+      data.addAll(extraData);
+    }
+    await AuthService().login(UserRole.manager, data);
   }
 
   @override
@@ -106,24 +110,6 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
       builder: (context) {
         return AlertDialog(
           title: const Text('Login Failed'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Success'),
           content: Text(message),
           actions: [
             TextButton(
@@ -171,18 +157,28 @@ class _ConfigLoginPageState extends State<ConfigLoginPage>
 
         // 3. Authenticate within organization
         final configCollection = FirestoreService.configUsers;
-        final querySnapshot = await configCollection
+        var querySnapshot = await configCollection
             .where('UserName', isEqualTo: _usernameController.text.trim())
             .where('Password', isEqualTo: _passwordController.text.trim())
             .get();
 
+        if (querySnapshot.docs.isEmpty) {
+          // Check 'manager' collection as well
+          querySnapshot = await FirestoreService.getCollection('manager')
+              .where('UserName', isEqualTo: _usernameController.text.trim())
+              .where('Password', isEqualTo: _passwordController.text.trim())
+              .get();
+        }
+
         if (querySnapshot.docs.isNotEmpty) {
+          final docData = querySnapshot.docs.first.data();
           final String resolvedPath = 'organisation/$orgId/data/admin';
           await _saveLoginCredentials(
             _usernameController.text.trim(),
             _passwordController.text.trim(),
             orgId,
             resolvedPath,
+            extraData: docData,
           );
 
           // Save FCM token for push notifications

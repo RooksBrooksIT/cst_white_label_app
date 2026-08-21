@@ -7,6 +7,7 @@ import '/widgets/glass_card.dart';
 import '/utils/responsive.dart';
 import '/utils/project_stage_pdf_helper.dart';
 import 'package:demo_cst/screens/reports/pdf_preview_page.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class ProjectstageSiteSummaryReport extends StatefulWidget {
   final String siteId;
@@ -248,16 +249,46 @@ class _ProjectstageSiteSummaryReportState
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
-    return GlassScaffold(
-      title: 'Site Summary Report',
-      onBack: () => Navigator.pop(context),
-      appBarForegroundColor: Colors.white,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-          onPressed: _generatePdf,
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Site Summary Report',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-      ],
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+            onPressed: _generatePdf,
+            tooltip: 'Export PDF Report',
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(

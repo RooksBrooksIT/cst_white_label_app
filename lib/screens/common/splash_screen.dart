@@ -8,6 +8,7 @@ import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
 import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
 import 'package:demo_cst/screens/organization/org_subscription_page.dart';
+import 'package:demo_cst/screens/customer/customer_dashboard.dart';
 import 'package:demo_cst/utils/terms_helper.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 
@@ -169,6 +170,18 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             );
           }
+          break;
+        case UserRole.customer:
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CustomerDashboardPage(
+                ownerName: data['ownerName'] ?? '',
+                ownerPhoneNumber: data['ownerPhoneNumber'] ?? '',
+                siteId: data['siteId'] ?? '',
+              ),
+            ),
+          );
           break;
         default:
           Navigator.pushReplacementNamed(context, '/landing');

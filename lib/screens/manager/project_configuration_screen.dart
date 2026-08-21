@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 enum ProjectConfigType {
   category,
@@ -156,11 +156,41 @@ class _ProjectConfigurationScreenState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return GlassScaffold(
-      title: 'Project Configuration',
-      onBack: () => Navigator.pop(context),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Project Configuration',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

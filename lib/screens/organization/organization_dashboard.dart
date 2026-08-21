@@ -8,8 +8,6 @@ import 'package:demo_cst/screens/manager/config_account_dashboard.dart';
 import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
 import 'package:demo_cst/screens/reports/incentive_calculation.dart';
 import 'package:demo_cst/screens/reports/insights_dashboard.dart';
-import 'package:demo_cst/screens/manager/manager_expenses.dart';
-import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
 import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
 import 'package:demo_cst/screens/reports/material_report.dart';
 import 'package:demo_cst/screens/organization/org_site_supervisor_daily_week_report.dart';
@@ -19,7 +17,6 @@ import 'package:demo_cst/screens/reports/site_weekly_financial_report.dart';
 import 'package:demo_cst/screens/reports/tools_inventory_report.dart';
 import 'package:demo_cst/screens/manager/manager_approval_screen.dart';
 import 'package:demo_cst/screens/organization/org_notification_page.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/screens/organization/org_menu_screen.dart';
@@ -35,12 +32,16 @@ class OrganizationDashboard extends StatefulWidget {
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
   final ScrollController _scrollController = ScrollController();
-  final PageController _statCardsPageController = PageController(viewportFraction: 0.88);
+  final PageController _statCardsPageController = PageController(
+    viewportFraction: 0.88,
+  );
+  final TextEditingController _searchController = TextEditingController();
   int _currentStatCardIndex = 0;
   StreamSubscription<DocumentSnapshot>? _subscriptionListener;
   String _userName = '';
   String _userRole = 'Organization Administrator';
-  String _selectedCategoryFilter = 'All';
+  String _searchQuery = '';
+  DateTime? _lastBackPressTime;
 
   @override
   void initState() {
@@ -97,22 +98,95 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     }
   }
 
+  /// Real-time Pending Material Requests Count Stream
+  Stream<int> _getPendingMaterialRequestsCount() {
+    return FirestoreService.getCollection(
+      'siteMaterialsRequest',
+    ).snapshots().map((snap) {
+      return snap.docs.where((doc) {
+        final status = (doc.data()['status'] ?? 'Processing').toString();
+        return status.toLowerCase().contains('processing') ||
+            status.toLowerCase().contains('pending');
+      }).length;
+    });
+  }
+
+  /// Real-time Pending Work Schedule / Worker Requests Count Stream
+  Stream<int> _getPendingScheduleRequestsCount() {
+    return FirestoreService.siteSupervisorProjectStageSchedule.snapshots().map((
+      snap,
+    ) {
+      return snap.docs.where((doc) {
+        final status =
+            (doc.data()['approvalStatus'] ?? doc.data()['status'] ?? 'Pending')
+                .toString();
+        return status.toLowerCase().contains('pending') ||
+            status.toLowerCase().contains('processing');
+      }).length;
+    });
+  }
+
   @override
   void dispose() {
     _subscriptionListener?.cancel();
     _scrollController.dispose();
     _statCardsPageController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<Color>(
-      valueListenable: AppTheme.primaryColor,
-      builder: (context, primaryColor, _) {
-        return Theme(
-          data: AppTheme.getTheme(primaryColor),
-          child: Builder(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Press back again to exit',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: const Color(0xFF0A183D),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              ),
+            );
+          }
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: ValueListenableBuilder<Color>(
+        valueListenable: AppTheme.primaryColor,
+        builder: (context, primaryColor, _) {
+          return Theme(
+            data: AppTheme.getTheme(primaryColor),
+            child: Builder(
             builder: (context) {
               final theme = Theme.of(context);
               return ValueListenableBuilder<String>(
@@ -122,76 +196,81 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       ? "$appName Overview"
                       : 'Organization Dashboard';
 
-                  return GlassScaffold(
-                    title: titleText,
-                    actions: [
-                      // Refresh / Sync Action Button
-                      IconButton(
-                        icon: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            shape: BoxShape.circle,
+                  final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+                  return Scaffold(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    appBar: AppBar(
+                      iconTheme: const IconThemeData(color: Colors.white),
+                      title: Text(
+                        titleText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      centerTitle: true,
+                      elevation: 0,
+                      flexibleSpace: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              darkAccent,
+                              Color.alphaBlend(
+                                primaryColor.withValues(alpha: 0.35),
+                                darkAccent,
+                              ),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          child: const Icon(
+                        ),
+                      ),
+                      actions: [
+                        // Refresh / Sync Action Button
+                        IconButton(
+                          icon: const Icon(
                             Icons.refresh_rounded,
-                            color: Color(0xFF0A183D),
-                            size: 18,
+                            color: Colors.white,
+                            size: 20,
                           ),
+                          tooltip: 'Sync Dashboard',
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            setState(() {});
+                          },
                         ),
-                        tooltip: 'Sync Dashboard',
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          setState(() {});
-                        },
-                      ),
-                      // Notifications Action Button
-                      IconButton(
-                        icon: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
+                        // Notifications Action Button
+                        IconButton(
+                          icon: const Icon(
                             Icons.notifications_outlined,
-                            color: Color(0xFF0A183D),
-                            size: 18,
+                            color: Colors.white,
+                            size: 20,
                           ),
+                          tooltip: 'Notifications',
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const OrgNotificationPage(),
+                              ),
+                            );
+                          },
                         ),
-                        tooltip: 'Notifications',
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const OrgNotificationPage(),
-                            ),
-                          );
-                        },
-                      ),
-                      // Org Menu Action Button
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: IconButton(
-                          icon: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0A183D),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.grid_view_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
+                        // Org Menu Action Button
+                        IconButton(
+                          icon: const Icon(
+                            Icons.grid_view_rounded,
+                            color: Colors.white,
+                            size: 20,
                           ),
                           tooltip: 'Main Menu',
                           onPressed: () => _navigateToOrgMenu(context),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                     body: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(
@@ -218,15 +297,24 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                                   ),
                                 ),
 
-                                // 3. Quick Category Filter Bar
+                                // 2.5. Real-time Supervisor Requests Announcements Section
                                 SliverToBoxAdapter(
-                                  child: _buildCategoryFilterBar(
+                                  child:
+                                      _buildSupervisorRequestsAnnouncementSection(
+                                        context,
+                                        theme,
+                                      ),
+                                ),
+
+                                // 2.7. Quick Access Search & User Discovery Bar
+                                SliverToBoxAdapter(
+                                  child: _buildQuickAccessSearchBar(
                                     context,
                                     theme,
                                   ),
                                 ),
 
-                                // 4. Categorized Feature Cards
+                                // 3. Categorized Feature Cards
                                 ..._buildListSections(
                                   context,
                                   theme,
@@ -249,13 +337,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           ),
         );
       },
-    );
+    ),
+  );
   }
 
   /// Header Banner showcasing User Welcome & Organization Status Pill
   Widget _buildWelcomeHeader(BuildContext context, ThemeData theme) {
     final hPad = Responsive.horizontalPadding(context);
-    final darkAccent = AppTheme.getDarkAccent(theme.primaryColor);
+    final primary = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primary);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 16),
@@ -267,17 +357,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             end: Alignment.bottomRight,
             colors: [
               darkAccent,
-              Color.alphaBlend(
-                theme.primaryColor.withValues(alpha: 0.4),
-                darkAccent,
-              ),
+              Color.alphaBlend(primary.withValues(alpha: 0.55), darkAccent),
             ],
           ),
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: darkAccent.withValues(alpha: 0.3),
-              blurRadius: 16,
+              color: primary.withValues(alpha: 0.28),
+              blurRadius: 14,
               offset: const Offset(0, 6),
             ),
           ],
@@ -354,37 +441,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ],
               ),
             ),
-            // Live Status Tag
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    Icons.sensors_rounded,
-                    color: Color(0xFF34D399),
-                    size: 14,
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    'LIVE',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -403,7 +459,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         }
 
         final docs = snapshot.hasData ? snapshot.data!.docs : [];
-        
+
         int totalProjects = docs.length;
         int ongoingCount = 0;
         int completedCount = 0;
@@ -494,7 +550,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0A183D).withValues(alpha: 0.08),
+                            color: const Color(
+                              0xFF0A183D,
+                            ).withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -510,7 +568,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         // Scroll Arrows
                         Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0A183D).withValues(alpha: 0.05),
+                            color: const Color(
+                              0xFF0A183D,
+                            ).withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
@@ -520,7 +580,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                                 onTap: _currentStatCardIndex > 0
                                     ? () {
                                         _statCardsPageController.previousPage(
-                                          duration: const Duration(milliseconds: 300),
+                                          duration: const Duration(
+                                            milliseconds: 300,
+                                          ),
                                           curve: Curves.easeInOut,
                                         );
                                       }
@@ -549,7 +611,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                                 onTap: _currentStatCardIndex < 3
                                     ? () {
                                         _statCardsPageController.nextPage(
-                                          duration: const Duration(milliseconds: 300),
+                                          duration: const Duration(
+                                            milliseconds: 300,
+                                          ),
                                           curve: Curves.easeInOut,
                                         );
                                       }
@@ -636,7 +700,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                           itemBuilder: (context, index) {
                             final stat = statCards[index];
                             return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               child: _buildStatCard(
                                 title: stat['title'] as String,
                                 value: stat['value'] as String,
@@ -656,7 +723,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(statCards.length, (index) {
                           final isSelected = _currentStatCardIndex == index;
-                          final cardAccent = statCards[index]['accentColor'] as Color;
+                          final cardAccent =
+                              statCards[index]['accentColor'] as Color;
                           return AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
                             margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -689,6 +757,343 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  /// Real-time Supervisor Requests Announcement Section (Material & Work Schedule Requests)
+  Widget _buildSupervisorRequestsAnnouncementSection(
+    BuildContext context,
+    ThemeData theme,
+  ) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreService.getCollection('materialRequests').snapshots(),
+      builder: (context, matSnap) {
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirestoreService.siteSupervisorProjectStageSchedule
+              .snapshots(),
+          builder: (context, wsSnap) {
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirestoreService.getCollection(
+                'supervisor_requests',
+              ).snapshots(),
+              builder: (context, genSnap) {
+                final List<Map<String, dynamic>> incomingAnnouncements = [];
+
+                // 1. Process Material Requests (Processing / Pending)
+                if (matSnap.hasData) {
+                  for (var doc in matSnap.data!.docs) {
+                    final data = doc.data();
+                    final status = (data['status'] ?? 'Processing').toString();
+                    if (status.toLowerCase().contains('processing') ||
+                        status.toLowerCase().contains('pending')) {
+                      incomingAnnouncements.add({
+                        'docId': doc.id,
+                        'requestType': 'Material Request',
+                        'typeKey': 'material_request',
+                        'icon': Icons.inventory_2_rounded,
+                        'accentColor': const Color(0xFFEA580C),
+                        'supervisorName':
+                            data['supervisorName']?.toString() ?? 'Supervisor',
+                        'requestId': data['matReqId']?.toString() ?? doc.id,
+                        'siteName':
+                            data['siteId']?.toString() ??
+                            data['projectName']?.toString() ??
+                            'Site',
+                        'date': data['date']?.toString() ?? 'Recent',
+                      });
+                    }
+                  }
+                }
+
+                // 2. Process Work Schedule Requests (Pending)
+                if (wsSnap.hasData) {
+                  for (var doc in wsSnap.data!.docs) {
+                    final data = doc.data();
+                    final status =
+                        (data['approvalStatus'] ?? data['status'] ?? 'Pending')
+                            .toString();
+                    if (status.toLowerCase().contains('pending') ||
+                        status.toLowerCase().contains('processing')) {
+                      incomingAnnouncements.add({
+                        'docId': doc.id,
+                        'requestType': 'Work Schedule Request',
+                        'typeKey': 'work_schedule',
+                        'icon': Icons.event_available_rounded,
+                        'accentColor': const Color(0xFF10B981),
+                        'supervisorName':
+                            data['supervisorName']?.toString() ?? 'Supervisor',
+                        'requestId': data['wsReqId']?.toString() ?? doc.id,
+                        'siteName':
+                            data['siteId']?.toString() ??
+                            data['projectName']?.toString() ??
+                            'Site',
+                        'date': 'Pending Approval',
+                      });
+                    }
+                  }
+                }
+
+                // 3. Process General Supervisor Requests (Pending)
+                if (genSnap.hasData) {
+                  for (var doc in genSnap.data!.docs) {
+                    final data = doc.data();
+                    final status = (data['status'] ?? 'Pending').toString();
+                    if (status.toLowerCase() == 'pending') {
+                      incomingAnnouncements.add({
+                        'docId': doc.id,
+                        'requestType':
+                            data['category']?.toString() ??
+                            'Supervisor Request',
+                        'typeKey': 'general',
+                        'icon': Icons.rate_review_rounded,
+                        'accentColor': const Color(0xFF3B82F6),
+                        'supervisorName':
+                            data['supervisorName']?.toString() ?? 'Supervisor',
+                        'requestId': data['title']?.toString() ?? doc.id,
+                        'siteName': data['site']?.toString() ?? 'Site',
+                        'date': 'Pending Approval',
+                      });
+                    }
+                  }
+                }
+
+                if (incomingAnnouncements.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return Padding(
+                  padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 20),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0A183D), Color(0xFF1E293B)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF0A183D,
+                          ).withValues(alpha: 0.25),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.campaign_rounded,
+                                color: Colors.orangeAccent,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'Supervisor Requests Announcements',
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${incomingAnnouncements.length} Pending',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amberAccent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 145,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: incomingAnnouncements.length,
+                            itemBuilder: (context, index) {
+                              final item = incomingAnnouncements[index];
+                              final String reqType = item['requestType'];
+                              final String supName = item['supervisorName'];
+                              final String reqId = item['requestId'];
+                              final String siteName = item['siteName'];
+                              final Color accent = item['accentColor'];
+                              final IconData icon = item['icon'];
+                              final String typeKey = item['typeKey'];
+
+                              return Container(
+                                width: 280,
+                                margin: const EdgeInsets.only(right: 12),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: accent.withValues(alpha: 0.4),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: BoxDecoration(
+                                            color: accent.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            icon,
+                                            color: accent,
+                                            size: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            reqType,
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: accent,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Supervisor: $supName',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0A183D),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'ID: $reqId',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            '• Site: $siteName',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Spacer(),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          HapticFeedback.lightImpact();
+                                          if (typeKey == 'material_request') {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const ManagerMaterialApprovalScreen(),
+                                              ),
+                                            );
+                                          } else {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const ManagerApprovalScreen(),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF0A183D,
+                                          ),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 6,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                        child: const Text(
+                                          'View Request',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
         );
       },
     );
@@ -734,11 +1139,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   color: accentColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  icon,
-                  color: accentColor,
-                  size: 18,
-                ),
+                child: Icon(icon, color: accentColor, size: 18),
               ),
               Text(
                 value,
@@ -865,10 +1266,26 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildLegendItem('Ongoing', '${(ongoingPct * 100).toStringAsFixed(0)}%', const Color(0xFF10B981)),
-              _buildLegendItem('Completed', '${(completedPct * 100).toStringAsFixed(0)}%', const Color(0xFF3B82F6)),
-              _buildLegendItem('Planning', '${(planningPct * 100).toStringAsFixed(0)}%', const Color(0xFFF59E0B)),
-              _buildLegendItem('On Hold', '${(onHoldPct * 100).toStringAsFixed(0)}%', const Color(0xFFEF4444)),
+              _buildLegendItem(
+                'Ongoing',
+                '${(ongoingPct * 100).toStringAsFixed(0)}%',
+                const Color(0xFF10B981),
+              ),
+              _buildLegendItem(
+                'Completed',
+                '${(completedPct * 100).toStringAsFixed(0)}%',
+                const Color(0xFF3B82F6),
+              ),
+              _buildLegendItem(
+                'Planning',
+                '${(planningPct * 100).toStringAsFixed(0)}%',
+                const Color(0xFFF59E0B),
+              ),
+              _buildLegendItem(
+                'On Hold',
+                '${(onHoldPct * 100).toStringAsFixed(0)}%',
+                const Color(0xFFEF4444),
+              ),
             ],
           ),
         ],
@@ -897,70 +1314,348 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  /// Quick Filter Bar for categories (All, Admin, Finance, Expenses, Approvals, Reports)
-  Widget _buildCategoryFilterBar(BuildContext context, ThemeData theme) {
+  /// Quick Access Search Bar & Instant Discovery
+  Widget _buildQuickAccessSearchBar(BuildContext context, ThemeData theme) {
     final hPad = Responsive.horizontalPadding(context);
-    final filters = [
-      'All',
-      'Administrative & Config',
-      'Finance & Balance Sheets',
-      'Expense Management',
-      'Review & Approvals',
-      'Reports & Insights',
-    ];
+    final primary = theme.primaryColor;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Row(
-          children: filters.map((filter) {
-            final isSelected = _selectedCategoryFilter == filter;
-            final filterLabel = filter == 'All'
-                ? 'All Categories'
-                : filter.split(' ')[0]; // Shortened label for chips
+      padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _searchQuery.isNotEmpty
+                ? primary.withValues(alpha: 0.6)
+                : const Color(0xFFE2E8F0),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _searchController,
+          onChanged: (val) {
+            setState(() {
+              _searchQuery = val;
+            });
+          },
+          textInputAction: TextInputAction.search,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
+          decoration: InputDecoration(
+            hintText: 'Search manager, financial, supervisor, tools...',
+            hintStyle: const TextStyle(
+              fontSize: 12.5,
+              color: Color(0xFF94A3B8),
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: Color(0xFF64748B),
+              size: 20,
+            ),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(
+                      Icons.cancel_rounded,
+                      color: Color(0xFF94A3B8),
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-            return Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: ChoiceChip(
-                label: Text(
-                  filterLabel,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected
-                        ? Colors.white
-                        : const Color(0xFF0A183D),
-                  ),
+  /// Category Grid Tile for Organization Dashboard Quick Access
+  Widget _buildCategoryGridTile({
+    required BuildContext context,
+    required OrgCategoryData category,
+    required VoidCallback onTap,
+  }) {
+    final color = category.color;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Top Row: Category Icon & Option Count Pill
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(11),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(category.icon, color: Colors.white, size: 19),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${category.items.length} ${category.items.length == 1 ? "Option" : "Options"}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: color,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 14,
+                            color: color,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                selected: isSelected,
-                selectedColor: const Color(0xFF0A183D),
-                backgroundColor: Colors.white.withValues(alpha: 0.7),
-                elevation: isSelected ? 3 : 0,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                const SizedBox(height: 8),
+                // Bottom: Title & Subtitle
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      category.title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0A183D),
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      category.subtitle,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                        height: 1.15,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isSelected
-                        ? const Color(0xFF0A183D)
-                        : Colors.black.withValues(alpha: 0.08),
-                  ),
-                ),
-                onSelected: (selected) {
-                  if (selected) {
-                    HapticFeedback.lightImpact();
-                    setState(() {
-                      _selectedCategoryFilter = filter;
-                    });
-                  }
-                },
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Category Heading Banner (Shown during active search / filtering)
+  Widget _buildCategoryHeading({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required int itemCount,
+    required bool isExpanded,
+    required VoidCallback onTap,
+  }) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 6, hPad, 6),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isExpanded
+                    ? color.withValues(alpha: 0.35)
+                    : const Color(0xFFE2E8F0),
+                width: isExpanded ? 1.4 : 1.0,
               ),
-            );
-          }).toList(),
+              boxShadow: isExpanded
+                  ? [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(child: Icon(icon, color: Colors.white, size: 18)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: isExpanded ? 0.12 : 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$itemCount ${itemCount == 1 ? "Option" : "Options"}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        duration: const Duration(milliseconds: 200),
+                        turns: isExpanded ? 0.5 : 0.0,
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -973,120 +1668,294 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   ) {
     final hPad = Responsive.horizontalPadding(context);
     final allCategories = _getCategories(theme);
-    final filteredCategories = _selectedCategoryFilter == 'All'
-        ? allCategories
-        : allCategories
-            .where((c) => c.title == _selectedCategoryFilter)
-            .toList();
+    final rawQuery = _searchQuery.trim().toLowerCase();
 
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+    final crossAxisCount = availableWidth >= 900
+        ? 5
+        : (availableWidth >= 600 ? 4 : 3);
+    final childAspectRatio = availableWidth >= 600 ? 1.05 : 0.88;
+
     List<Widget> slivers = [];
 
-    for (var category in filteredCategories) {
-      if (category.items.isEmpty) continue;
-
-      // Section Header
-      slivers.add(
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              hPad,
-              Responsive.spacing(context, 16),
-              hPad,
-              Responsive.spacing(context, 10),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: darkCardBg,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+    // Header Title: "Quick Access" on Left, "View All" on Right
+    slivers.add(
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            hPad,
+            Responsive.spacing(context, 8),
+            hPad,
+            Responsive.spacing(context, 4),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                rawQuery.isNotEmpty ? 'Search Results' : 'Quick Access',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0A183D),
+                  letterSpacing: -0.4,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        category.title,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0A183D),
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      Text(
-                        category.subtitle,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF5A759E),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: darkCardBg,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(
-                    '${category.items.length}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+              ),
+              if (rawQuery.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                  child: const Text(
+                    'Clear Search',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6366F1),
                     ),
                   ),
                 ),
-              ],
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // When NO search query is active, display categories in the smooth 2-Column Grid!
+    if (rawQuery.isEmpty) {
+      final categoryCrossAxisCount = availableWidth >= 900
+          ? 4
+          : (availableWidth >= 600 ? 3 : 2);
+      final categoryAspectRatio = availableWidth >= 600 ? 1.55 : 1.35;
+
+      slivers.add(
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(hPad, 6, hPad, 20),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: categoryCrossAxisCount,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: categoryAspectRatio,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final cat = allCategories[index];
+                return _buildCategoryGridTile(
+                  context: context,
+                  category: cat,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OrgCategoryDetailsPage(
+                          category: cat,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              childCount: allCategories.length,
             ),
           ),
         ),
       );
+      return slivers;
+    }
 
-      // Items List for this section
+    // Determine matching categories and their items for active search
+    final List<Map<String, dynamic>> categoriesToDisplay = [];
+
+    for (var cat in allCategories) {
+      List<SubMenuItem> matchingItems = cat.items.where((item) {
+        final titleMatch = item.title.toLowerCase().contains(rawQuery);
+        final subtitleMatch = item.subtitle.toLowerCase().contains(rawQuery);
+        final tagMatch =
+            item.tags?.any((tag) => tag.toLowerCase().contains(rawQuery)) ??
+            false;
+        final catMatch = cat.title.toLowerCase().contains(rawQuery);
+        return titleMatch || subtitleMatch || tagMatch || catMatch;
+      }).toList();
+
+      if (matchingItems.isNotEmpty) {
+        categoriesToDisplay.add({'category': cat, 'items': matchingItems});
+      }
+    }
+
+    // If search returned 0 items
+    if (categoriesToDisplay.isEmpty) {
       slivers.add(
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: hPad),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final item = category.items[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: _buildListItem(context, item),
-              );
-            }, childCount: category.items.length),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 24),
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_search_rounded,
+                      color: Color(0xFF6366F1),
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'No matching tools or options found',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'No results match "$rawQuery". Try searching for managers, financial, supervisors, workers, or expenses.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text(
+                      'Clear & Show All',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A183D),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
+      return slivers;
+    }
+
+    // When search is active, render matching Category Option Grids
+    for (var entry in categoriesToDisplay) {
+      final OrgCategoryData cat = entry['category'];
+      final List<SubMenuItem> items = entry['items'];
+      const bool isExpanded = true;
+
+      // 1. Category Heading (Interactive Expand / Collapse)
+      slivers.add(
+        SliverToBoxAdapter(
+          child: _buildCategoryHeading(
+            context: context,
+            title: cat.title,
+            subtitle: cat.subtitle,
+            icon: cat.icon,
+            color: cat.color,
+            itemCount: items.length,
+            isExpanded: isExpanded,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => OrgCategoryDetailsPage(category: cat),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      // 2. Category Grid (Rendered only when isExpanded == true)
+      if (isExpanded) {
+        slivers.add(
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(hPad, 6, hPad, 10),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: childAspectRatio,
+              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final item = items[index];
+                return _buildQuickAccessCard(context, item);
+              }, childCount: items.length),
+            ),
+          ),
+        );
+      }
     }
 
     return slivers;
   }
 
-  Widget _buildListItem(BuildContext context, SubMenuItem item) {
-    final theme = Theme.of(context);
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
+  /// Individual Quick Access Card matching the reference design:
+  /// - Soft pastel tinted background container with rounded corners
+  /// - Vibrant circular icon badge with white icon
+  /// - Optional badge (e.g. "NEW" or pending requests count)
+  /// - Bold title
+  /// - Small subtitle description
+  /// - Subtle trailing chevron arrow
+  Widget _buildQuickAccessCard(BuildContext context, SubMenuItem item) {
+    final cardBg = item.cardBgColor ?? item.color.withValues(alpha: 0.12);
+    final iconBg = item.color;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(20),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: iconBg.withValues(alpha: 0.08), width: 1),
         boxShadow: [
           BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: iconBg.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -1097,76 +1966,116 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             HapticFeedback.lightImpact();
             item.onTap();
           },
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Icon Badge
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: item.color,
-                    boxShadow: [
-                      BoxShadow(
-                        color: item.color.withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
+                // Top Row: Circular Icon & Optional Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: iconBg.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Icon(
-                    item.icon,
-                    color: Colors.white,
-                    size: 22,
-                  ),
+                      child: Center(
+                        child: Icon(item.icon, color: Colors.white, size: 18),
+                      ),
+                    ),
+                    if (item.countStream != null)
+                      StreamBuilder<int>(
+                        stream: item.countStream,
+                        builder: (context, snapshot) {
+                          final count = snapshot.data ?? 0;
+                          if (count <= 0) return const SizedBox.shrink();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1),
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF6366F1,
+                                  ).withValues(alpha: 0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '$count NEW',
+                              style: const TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 14),
-                // Title and Subtitle
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -0.2,
-                        ),
+                const SizedBox(height: 6),
+                // Middle & Bottom: Title, Subtitle, Chevron
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                        letterSpacing: -0.2,
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.subtitle,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFFCBD5E1),
-                          height: 1.25,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.subtitle,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                              height: 1.1,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Trailing Arrow
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 14,
+                          color: iconBg.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1176,119 +2085,235 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  List<_CategoryData> _getCategories(ThemeData theme) {
-    final primary = theme.primaryColor;
-    final secondary = theme.colorScheme.secondary;
-
+  List<OrgCategoryData> _getCategories(ThemeData theme) {
     return [
-      _CategoryData(
-        title: "Administrative & Config",
-        subtitle: "Manage accounts and system settings",
-        icon: Icons.admin_panel_settings_rounded,
-        color: primary,
-        gradientColors: [primary, primary.withValues(alpha: 0.7)],
+      OrgCategoryData(
+        title: "Manager Configuration",
+        subtitle: "Manager profiles, expenditures & console setup",
+        icon: Icons.manage_accounts_rounded,
+        color: const Color(0xFF7C3AED),
+        gradientColors: [const Color(0xFF7C3AED), const Color(0xFF8B5CF6)],
         items: [
           SubMenuItem(
-            title: "Manager Account",
-            subtitle: "Configure profiles and access permissions",
-            icon: Icons.admin_panel_settings_rounded,
-            color: primary,
-            onTap: () => _navigateToConfiguration(context),
+            title: "Manager Config",
+            subtitle: "Manager profiles & credentials",
+            icon: Icons.manage_accounts_rounded,
+            color: const Color(0xFF7C3AED),
+            cardBgColor: const Color(0xFFF3F0FF),
+            tags: [
+              'user',
+              'users',
+              'manager',
+              'managers',
+              'profile',
+              'profiles',
+              'admin',
+              'staff',
+              'role',
+              'account',
+              'login',
+            ],
+            onTap: () => _navigateToManagerConfig(context),
           ),
           SubMenuItem(
-            title: "Manager Config",
-            subtitle: "Create and manage manager profiles",
-            icon: Icons.manage_accounts_rounded,
-            color: primary,
-            onTap: () => _navigateToManagerConfig(context),
+            title: "Management Console",
+            subtitle: "Master data & system settings",
+            icon: Icons.tune_rounded,
+            color: const Color(0xFF4F46E5),
+            cardBgColor: const Color(0xFFEEF2FF),
+            tags: [
+              'admin',
+              'config',
+              'settings',
+              'console',
+              'master',
+              'system',
+              'users',
+            ],
+            onTap: () => _navigateToConfiguration(context),
           ),
         ],
       ),
-      _CategoryData(
-        title: "Finance & Balance Sheets",
-        subtitle: "Site payments, entries, and financial reports",
+      OrgCategoryData(
+        title: "Financial Management",
+        subtitle: "Site payments, reports & financial balance sheets",
         icon: Icons.account_balance_wallet_rounded,
-        color: primary.withBlue(150),
-        gradientColors: [
-          primary.withBlue(150),
-          primary.withBlue(150).withValues(alpha: 0.7),
-        ],
+        color: const Color(0xFF0EA5E9),
+        gradientColors: [const Color(0xFF0EA5E9), const Color(0xFF38BDF8)],
         items: [
           SubMenuItem(
             title: "Site Payment Entry",
-            subtitle: "Record daily site transactions",
+            subtitle: "Daily site transactions",
             icon: Icons.payments_rounded,
-            color: primary.withBlue(150),
+            color: const Color(0xFF0D9488),
+            cardBgColor: const Color(0xFFE6F8F5),
+            tags: [
+              'finance',
+              'financial',
+              'payment',
+              'money',
+              'transaction',
+              'site',
+              'entry',
+              'daily',
+            ],
             onTap: () => _navigateToSitePaymentEntry(context),
           ),
           SubMenuItem(
             title: "Site Payment Report",
-            subtitle: "Daily site-level financial reports",
+            subtitle: "Daily financial transaction logs",
             icon: Icons.receipt_long_rounded,
-            color: primary.withBlue(180),
+            color: const Color(0xFF0284C7),
+            cardBgColor: const Color(0xFFE7F7FD),
+            tags: [
+              'finance',
+              'financial',
+              'report',
+              'payment',
+              'daily',
+              'statement',
+            ],
             onTap: () => _navigateToDailyReport(context),
           ),
           SubMenuItem(
             title: "Weekly Finance Report",
             subtitle: "Weekly financial health overview",
             icon: Icons.account_balance_rounded,
-            color: primary.withBlue(210),
+            color: const Color(0xFF2563EB),
+            cardBgColor: const Color(0xFFEDF4FE),
+            tags: [
+              'finance',
+              'financial',
+              'weekly',
+              'health',
+              'overview',
+              'report',
+            ],
             onTap: () => _navigateToSiteWeeklyFinancialReport(context),
+          ),
+          SubMenuItem(
+            title: "Financial Analytics",
+            subtitle: "Financial metrics & insights",
+            icon: Icons.query_stats_rounded,
+            color: const Color(0xFF4F46E5),
+            cardBgColor: const Color(0xFFEEF1FF),
+            tags: [
+              'finance',
+              'financial',
+              'analytics',
+              'insights',
+              'charts',
+              'report',
+            ],
+            onTap: () => _navigateToInsights(context),
+          ),
+          SubMenuItem(
+            title: "Incentive Calculation",
+            subtitle: "Performance-based rewards",
+            icon: Icons.calculate_rounded,
+            color: const Color(0xFFE11D48),
+            cardBgColor: const Color(0xFFFFEFF4),
+            tags: [
+              'finance',
+              'financial',
+              'incentive',
+              'reward',
+              'calculation',
+              'bonus',
+              'worker',
+            ],
+            onTap: () => _navigateToIncentiveCaliculation(context),
           ),
         ],
       ),
-      _CategoryData(
+      OrgCategoryData(
+        title: "Supervisor Operations",
+        subtitle: "Supervisor work schedule approvals",
+        icon: Icons.supervisor_account_rounded,
+        color: const Color(0xFF0D9488),
+        gradientColors: [const Color(0xFF0D9488), const Color(0xFF14B8A6)],
+        items: [
+          SubMenuItem(
+            title: "Schedule Approval",
+            subtitle: "Supervisor work schedule approvals",
+            icon: Icons.event_available_rounded,
+            color: const Color(0xFF059669),
+            cardBgColor: const Color(0xFFE7F8F0),
+            tags: [
+              'approval',
+              'schedule',
+              'workers',
+              'supervisor',
+              'review',
+              'pending',
+              'user',
+            ],
+            countStream: _getPendingScheduleRequestsCount(),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ManagerApprovalScreen(),
+              ),
+            ),
+          ),
+        ],
+      ),
+      OrgCategoryData(
         title: "Expense Management",
-        subtitle: "Track organization and field expenses",
-        icon: Icons.money_rounded,
-        color: secondary,
-        gradientColors: [secondary, secondary.withValues(alpha: 0.7)],
+        subtitle: "Track organization and field expenditures",
+        icon: Icons.monetization_on_rounded,
+        color: const Color(0xFFF97316),
+        gradientColors: [const Color(0xFFF97316), const Color(0xFFFB923C)],
         items: [
           SubMenuItem(
             title: "Organization Expenses",
-            subtitle: "Central operational cost monitoring",
+            subtitle: "Central operational costs",
             icon: Icons.corporate_fare_rounded,
-            color: secondary,
+            color: const Color(0xFFFF7828),
+            cardBgColor: const Color(0xFFFFF0EA),
+            tags: [
+              'expense',
+              'cost',
+              'spend',
+              'operational',
+              'organization',
+              'central',
+            ],
             onTap: () => _navigateToOrganizationExpenses(context),
           ),
           SubMenuItem(
-            title: "Manager Expenses",
-            subtitle: "Project management expenditures",
-            icon: Icons.person_search_rounded,
-            color: secondary.withValues(alpha: 0.9),
-            onTap: () => _navigateToManagerExpenses(context),
-          ),
-          SubMenuItem(
             title: "Organisation Daily Entry",
-            subtitle: "Log daily project progress and expenses",
+            subtitle: "Daily project progress & expenses",
             icon: Icons.edit_note_rounded,
-            color: secondary.withValues(alpha: 0.8),
+            color: const Color(0xFFD97706),
+            cardBgColor: const Color(0xFFFEF9E7),
+            tags: ['entry', 'daily', 'progress', 'site', 'expense'],
             onTap: () => _navigateToManagerDailyEntry(context),
-          ),
-          SubMenuItem(
-            title: "Supervisor Daily Entry",
-            subtitle: "Daily field-level operational expenses",
-            icon: Icons.engineering_rounded,
-            color: secondary.withValues(alpha: 0.7),
-            onTap: () => _navigateToSiteExpenses(context),
           ),
         ],
       ),
-      _CategoryData(
+      OrgCategoryData(
         title: "Review & Approvals",
         subtitle: "Approve schedules, materials, and incentives",
         icon: Icons.fact_check_rounded,
-        color: primary.withGreen(150),
-        gradientColors: [
-          primary.withGreen(150),
-          primary.withGreen(150).withValues(alpha: 0.7),
-        ],
+        color: const Color(0xFF10B981),
+        gradientColors: [const Color(0xFF10B981), const Color(0xFF34D399)],
         items: [
           SubMenuItem(
-            title: "Schedule Request Approval",
-            subtitle: "Approve project work schedules",
+            title: "Schedule Approval",
+            subtitle: "Work schedules & workers",
             icon: Icons.event_available_rounded,
-            color: primary.withGreen(150),
+            color: const Color(0xFF059669),
+            cardBgColor: const Color(0xFFE7F8F0),
+            tags: [
+              'approval',
+              'schedule',
+              'workers',
+              'review',
+              'pending',
+              'user',
+            ],
+            countStream: _getPendingScheduleRequestsCount(),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -1297,10 +2322,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             ),
           ),
           SubMenuItem(
-            title: "Material Request Approval",
-            subtitle: "Authorize material procurement",
+            title: "Material Approval",
+            subtitle: "Material procurement authorization",
             icon: Icons.inventory_2_rounded,
-            color: primary.withGreen(180),
+            color: const Color(0xFF6366F1),
+            cardBgColor: const Color(0xFFEEF1FF),
+            tags: ['approval', 'material', 'procurement', 'review', 'pending'],
+            countStream: _getPendingMaterialRequestsCount(),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -1310,39 +2338,54 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           ),
           SubMenuItem(
             title: "Incentive Calculation",
-            subtitle: "Process performance-based rewards",
+            subtitle: "Performance-based rewards",
             icon: Icons.calculate_rounded,
-            color: primary.withGreen(210),
+            color: const Color(0xFFE11D48),
+            cardBgColor: const Color(0xFFFFEFF4),
+            tags: [
+              'incentive',
+              'reward',
+              'calculation',
+              'bonus',
+              'worker',
+              'user',
+            ],
             onTap: () => _navigateToIncentiveCaliculation(context),
           ),
         ],
       ),
-      _CategoryData(
-        title: "Reports & Insights",
-        subtitle: "Stock monitoring and tool analytics",
+      OrgCategoryData(
+        title: "Reports & Analytics",
+        subtitle: "Stock monitoring, equipment & performance analytics",
         icon: Icons.bar_chart_rounded,
-        color: primary.withValues(alpha: 0.8),
-        gradientColors: [primary.withValues(alpha: 0.8), primary.withValues(alpha: 0.5)],
+        color: const Color(0xFF8B5CF6),
+        gradientColors: [const Color(0xFF8B5CF6), const Color(0xFFA78BFA)],
         items: [
           SubMenuItem(
-            title: "Advanced Financial Analytics",
-            subtitle: "Detailed performance insights",
+            title: "Financial Analytics",
+            subtitle: "Performance insights & charts",
             icon: Icons.query_stats_rounded,
-            color: primary.withValues(alpha: 0.8),
+            color: const Color(0xFF4F46E5),
+            cardBgColor: const Color(0xFFEEF1FF),
+            tags: ['analytics', 'insights', 'charts', 'report', 'financial'],
             onTap: () => _navigateToInsights(context),
           ),
           SubMenuItem(
             title: "Materials Inventory",
             subtitle: "Real-time stock monitoring",
             icon: Icons.inventory_rounded,
-            color: primary.withValues(alpha: 0.7),
+            color: const Color(0xFF10B981),
+            cardBgColor: const Color(0xFFEAF9ED),
+            tags: ['material', 'inventory', 'stock', 'report'],
             onTap: () => _navigateToMaterialReport(context),
           ),
           SubMenuItem(
             title: "Tools Inventory",
-            subtitle: "Track field equipment usage",
+            subtitle: "Field equipment usage",
             icon: Icons.construction_rounded,
-            color: primary.withValues(alpha: 0.6),
+            color: const Color(0xFF0891B2),
+            cardBgColor: const Color(0xFFECFEFF),
+            tags: ['tools', 'equipment', 'inventory', 'report'],
             onTap: () => _navigateToToolsInventory(context),
           ),
         ],
@@ -1394,11 +2437,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     MaterialPageRoute(builder: (context) => OrganizationExpenses()),
   );
 
-  void _navigateToManagerExpenses(BuildContext context) => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => ManagerExpenses()),
-  );
-
   void _navigateToMaterialReport(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => const MaterialReportPage()),
@@ -1421,13 +2459,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  void _navigateToSiteExpenses(BuildContext context) => Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const SiteEntryPage(userName: '', userDetails: {}),
-    ),
-  );
-
   void _navigateToOrgMenu(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(
@@ -1436,7 +2467,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   );
 }
 
-class _CategoryData {
+class OrgCategoryData {
   final String title;
   final String subtitle;
   final IconData icon;
@@ -1444,7 +2475,7 @@ class _CategoryData {
   final List<Color> gradientColors;
   final List<SubMenuItem> items;
 
-  _CategoryData({
+  OrgCategoryData({
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -1459,14 +2490,485 @@ class SubMenuItem {
   final String subtitle;
   final IconData icon;
   final Color color;
+  final Color? cardBgColor;
   final VoidCallback onTap;
+  final Stream<int>? countStream;
+  final List<String>? tags;
 
   SubMenuItem({
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.color,
+    this.cardBgColor,
     required this.onTap,
+    this.countStream,
+    this.tags,
   });
 }
 
+/// Dedicated Details Screen for displaying options of an individual category
+class OrgCategoryDetailsPage extends StatefulWidget {
+  final OrgCategoryData category;
+
+  const OrgCategoryDetailsPage({
+    super.key,
+    required this.category,
+  });
+
+  @override
+  State<OrgCategoryDetailsPage> createState() => _OrgCategoryDetailsPageState();
+}
+
+class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hPad = Responsive.horizontalPadding(context);
+    final cat = widget.category;
+
+    final rawQuery = _searchQuery.trim().toLowerCase();
+    final items = rawQuery.isEmpty
+        ? cat.items
+        : cat.items.where((item) {
+            final titleMatch = item.title.toLowerCase().contains(rawQuery);
+            final subtitleMatch =
+                item.subtitle.toLowerCase().contains(rawQuery);
+            final tagMatch =
+                item.tags?.any((tag) => tag.toLowerCase().contains(rawQuery)) ??
+                false;
+            return titleMatch || subtitleMatch || tagMatch;
+          }).toList();
+
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, appPrimary, _) {
+        final darkAccent = AppTheme.getDarkAccent(cat.color);
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            iconTheme: const IconThemeData(color: Colors.white),
+            title: Text(
+              cat.title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                letterSpacing: -0.3,
+              ),
+            ),
+            centerTitle: true,
+            elevation: 0,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    darkAccent,
+                    Color.alphaBlend(
+                      cat.color.withValues(alpha: 0.4),
+                      darkAccent,
+                    ),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+            leading: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final availableWidth = constraints.maxWidth;
+              final crossAxisCount = availableWidth >= 900
+                  ? 5
+                  : (availableWidth >= 600 ? 4 : 3);
+              final childAspectRatio = availableWidth >= 600 ? 1.05 : 0.88;
+
+              return CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                slivers: [
+                  // Category Info Banner
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 12),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: cat.color.withValues(alpha: 0.2),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: cat.color.withValues(alpha: 0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: cat.color,
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: cat.color.withValues(alpha: 0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  cat.icon,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    cat.title,
+                                    style: const TextStyle(
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0A183D),
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    cat.subtitle,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: cat.color.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${cat.items.length} ${cat.items.length == 1 ? "Option" : "Options"}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: cat.color,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Search Bar inside Category (if more than 2 items)
+                  if (cat.items.length > 2)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: _searchQuery.isNotEmpty
+                                  ? cat.color.withValues(alpha: 0.6)
+                                  : const Color(0xFFE2E8F0),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (val) {
+                              setState(() {
+                                _searchQuery = val;
+                              });
+                            },
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Search in ${cat.title}...',
+                              hintStyle: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF94A3B8),
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search_rounded,
+                                color: cat.color,
+                                size: 18,
+                              ),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(
+                                        Icons.cancel_rounded,
+                                        color: Color(0xFF94A3B8),
+                                        size: 16,
+                                      ),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() {
+                                          _searchQuery = '';
+                                        });
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Empty Search State
+                  if (items.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.all(hPad),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 30),
+                              Icon(
+                                Icons.search_off_rounded,
+                                size: 48,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'No matching options in ${cat.title}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    // Grid of Category Options
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 24),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: childAspectRatio,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final item = items[index];
+                            return _buildOptionCard(context, item);
+                          },
+                          childCount: items.length,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOptionCard(BuildContext context, SubMenuItem item) {
+    final cardBg = item.cardBgColor ?? item.color.withValues(alpha: 0.12);
+    final iconBg = item.color;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: iconBg.withValues(alpha: 0.08),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: iconBg.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            item.onTap();
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Top Row: Circular Icon & Optional Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: iconBg.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(
+                          item.icon,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    if (item.countStream != null)
+                      StreamBuilder<int>(
+                        stream: item.countStream,
+                        builder: (context, snapshot) {
+                          final count = snapshot.data ?? 0;
+                          if (count <= 0) return const SizedBox.shrink();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$count NEW',
+                              style: const TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Middle & Bottom: Title, Subtitle, Chevron
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.subtitle,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                              height: 1.1,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 14,
+                          color: iconBg.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
