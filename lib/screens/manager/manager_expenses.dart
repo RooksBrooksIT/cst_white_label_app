@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/expense_service.dart';
+import 'package:demo_cst/services/app_storage_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class ManagerExpenses extends StatefulWidget {
@@ -218,18 +218,13 @@ class _ManagerExpensesState extends State<ManagerExpenses> {
 
   Future<String?> _uploadBillImage(File image, String billNo) async {
     try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('organisation')
-          .child(FirestoreService.currentOrgId)
-          .child('expenses')
-          .child(
-            '${selectedSiteId}_${DateFormat('ddMMyyyy').format(selectedDate)}',
-          )
-          .child('bill_$billNo.jpg');
-
-      final uploadTask = await storageRef.putFile(image);
-      return await uploadTask.ref.getDownloadURL();
+      if (selectedSiteId == null) return null;
+      return await AppStorageService.uploadExpenseBill(
+        siteId: selectedSiteId!,
+        billNo: billNo,
+        dateFormatted: DateFormat('ddMMyyyy').format(selectedDate),
+        file: image,
+      );
     } catch (e) {
       debugPrint('Error uploading image: $e');
       return null;

@@ -2070,7 +2070,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          ...items.map((item) => _buildInfoItem(item)).toList(),
+          ...items.map((item) => _buildInfoItem(item)),
         ],
       ),
     );
@@ -2078,18 +2078,19 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
   Widget _buildInfoItem(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('• ', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          const Text('• ', style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), fontWeight: FontWeight.bold)),
           Expanded(
             child: Text(
               text,
               style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFFCBD5E1),
-                height: 1.3,
+                fontSize: 12.5,
+                color: Color(0xFF334155),
+                fontWeight: FontWeight.w500,
+                height: 1.35,
               ),
             ),
           ),

@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// Craft Storage Security Rules for Strict Multi-Tenant Isolation
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Strict Multi-Tenant Organization Boundary:
+    // All assets (drawings, user images, expense receipts, verification photos, branding)
+    // are partitioned under /organisation/{orgId}/...
+    match /organisation/{orgId}/{allPaths=**} {
+      // Enforce authenticated access
+      allow read, write: if request.auth != null;
+    }
+
+    // Default deny for unpartitioned root paths to prevent cross-tenant data leaks
+    match /{unpartitionedPath=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -9,7 +9,6 @@ class AboutUsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
 
     return GlassScaffold(
       padding: EdgeInsets.zero,
@@ -26,11 +25,11 @@ class AboutUsScreen extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      color: const Color(0xFF0B1942),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          color: const Color(0xFF0B1942).withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -46,12 +45,12 @@ class AboutUsScreen extends StatelessWidget {
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
-                  Text(
+                  const Text(
                     'About Us',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      color: Color(0xFF0A183D),
                       letterSpacing: -0.4,
                     ),
                   ),
@@ -66,23 +65,26 @@ class AboutUsScreen extends StatelessWidget {
                   constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Hero Section
+                        // Hero Logo & App Name Section
                         Center(
                           child: Column(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(20),
+                                width: 96,
+                                height: 96,
+                                padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: darkCardBg.withValues(alpha: 0.25),
-                                      blurRadius: 20,
+                                      color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+                                      blurRadius: 18,
                                       offset: const Offset(0, 4),
                                     ),
                                   ],
@@ -90,71 +92,49 @@ class AboutUsScreen extends StatelessWidget {
                                 child: ClipOval(
                                   child: Image.asset(
                                     'assets/images/logo_main.png',
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) => Icon(
+                                      Icons.business_center_rounded,
+                                      size: 40,
+                                      color: theme.primaryColor,
+                                    ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'eBricks App',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0A183D),
-                                  letterSpacing: -0.4,
-                                ),
+                              const SizedBox(height: 14),
+                              ValueListenableBuilder<String>(
+                                valueListenable: AppTheme.appName,
+                                builder: (context, name, _) {
+                                  return Text(
+                                    name.trim().isNotEmpty ? name : 'eBricks App',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0A183D),
+                                      letterSpacing: -0.3,
+                                    ),
+                                  );
+                                },
                               ),
                               const SizedBox(height: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: darkCardBg,
+                                  color: theme.primaryColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: theme.primaryColor.withValues(alpha: 0.25),
+                                    width: 1.0,
+                                  ),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Version 1.0.0',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
+                                    color: theme.primaryColor,
+                                    letterSpacing: 0.3,
                                   ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // 1. About the App Card
-                        Container(
-                          padding: const EdgeInsets.all(22),
-                          decoration: BoxDecoration(
-                            color: darkCardBg,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: darkCardBg.withValues(alpha: 0.25),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildCardHeader(title: 'ABOUT THE APP', icon: Icons.info_outline_rounded),
-                              const SizedBox(height: 14),
-                              const Text(
-                                'eBricks is a smart and efficient construction and operations management application developed by Rooks and Brooks Technologies Pvt Ltd. The platform is designed to simplify and streamline the management of organizational activities, including tracking operations, monitoring progress, and managing financial records such as expenses and income.\n\nAt its core, eBicks is built to serve organizations that require structured control over their workflows. The app follows a role-based system, enabling seamless collaboration between Organization Owners, Managers, Supervisors, and Customers, ensuring transparency and accountability at every level.\n\nUnlike public applications, eBicks operates on a controlled access model where accounts are created and managed by authorized administrators. This ensures data security, operational integrity, and a customized experience for each organization.\n\nOur mission is to empower businesses with reliable, scalable, and user-friendly digital solutions that enhance productivity and decision-making.',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  height: 1.55,
-                                  color: Color(0xFFCBD5E1),
-                                  fontWeight: FontWeight.w400,
                                 ),
                               ),
                             ],
@@ -163,60 +143,104 @@ class AboutUsScreen extends StatelessWidget {
 
                         const SizedBox(height: 20),
 
-                        // 2. About the Company Card
+                        // 1. About the App Card
                         Container(
-                          padding: const EdgeInsets.all(22),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: darkCardBg,
-                            borderRadius: BorderRadius.circular(24),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                             boxShadow: [
                               BoxShadow(
-                                color: darkCardBg.withValues(alpha: 0.25),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                blurRadius: 14,
+                                offset: const Offset(0, 3),
                               ),
                             ],
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildCardHeader(title: 'ABOUT THE COMPANY', icon: Icons.business_rounded),
-                              const SizedBox(height: 14),
+                              _buildCardHeader(
+                                theme: theme,
+                                title: 'ABOUT THE APP',
+                                icon: Icons.info_outline_rounded,
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Divider(color: Color(0xFFF1F5F9), height: 1),
+                              ),
+                              const Text(
+                                'eBricks is a smart and efficient construction and operations management application developed by Rooks and Brooks Technologies Pvt Ltd. The platform is designed to simplify and streamline the management of organizational activities, including tracking operations, monitoring progress, and managing financial records such as expenses and income.\n\nAt its core, eBicks is built to serve organizations that require structured control over their workflows. The app follows a role-based system, enabling seamless collaboration between Organization Owners, Managers, Supervisors, and Customers, ensuring transparency and accountability at every level.\n\nUnlike public applications, eBicks operates on a controlled access model where accounts are created and managed by authorized administrators. This ensures data security, operational integrity, and a customized experience for each organization.\n\nOur mission is to empower businesses with reliable, scalable, and user-friendly digital solutions that enhance productivity and decision-making.',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  height: 1.6,
+                                  color: Color(0xFF334155),
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // 2. About the Company Card
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                blurRadius: 14,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildCardHeader(
+                                theme: theme,
+                                title: 'ABOUT THE COMPANY',
+                                icon: Icons.business_rounded,
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Divider(color: Color(0xFFF1F5F9), height: 1),
+                              ),
                               const Text(
                                 'Rooks and Brooks Technologies Pvt Ltd is a technology-driven company committed to delivering high-quality software solutions tailored to modern business needs. We specialize in developing scalable applications that combine performance, security, and user-centric design.\n\nOur goal is to transform traditional processes into smart digital systems that drive efficiency and growth for our clients.',
                                 style: TextStyle(
                                   fontSize: 13.5,
-                                  height: 1.55,
-                                  color: Color(0xFFCBD5E1),
+                                  height: 1.6,
+                                  color: Color(0xFF334155),
                                   fontWeight: FontWeight.w400,
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 16),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.08),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                                 ),
                                 child: Row(
                                   children: [
                                     Container(
                                       width: 36,
                                       height: 36,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF1E88E5),
-                                        shape: BoxShape.circle,
+                                      decoration: BoxDecoration(
+                                        color: theme.primaryColor.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.email_rounded,
-                                        color: Colors.white,
+                                        color: theme.primaryColor,
                                         size: 18,
                                       ),
                                     ),
@@ -239,7 +263,7 @@ class AboutUsScreen extends StatelessWidget {
                                             'support@rookstechnologies.com',
                                             style: TextStyle(
                                               fontSize: 13.5,
-                                              fontWeight: FontWeight.w800,
+                                              fontWeight: FontWeight.w700,
                                               color: Color(0xFF0A183D),
                                             ),
                                           ),
@@ -254,7 +278,7 @@ class AboutUsScreen extends StatelessWidget {
                         ),
 
                         // Bottom Spacer so content is never cut off
-                        const SizedBox(height: 100),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
@@ -267,20 +291,24 @@ class AboutUsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCardHeader({required String title, required IconData icon}) {
+  Widget _buildCardHeader({
+    required ThemeData theme,
+    required String title,
+    required IconData icon,
+  }) {
     return Row(
       children: [
         Container(
-          width: 34,
-          height: 34,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
+            color: theme.primaryColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
             icon,
-            color: Colors.white,
-            size: 18,
+            color: theme.primaryColor,
+            size: 20,
           ),
         ),
         const SizedBox(width: 10),
@@ -289,8 +317,8 @@ class AboutUsScreen extends StatelessWidget {
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: 1.0,
+            color: Color(0xFF0A183D),
+            letterSpacing: 0.5,
           ),
         ),
       ],

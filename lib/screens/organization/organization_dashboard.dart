@@ -37,6 +37,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   );
   final TextEditingController _searchController = TextEditingController();
   int _currentStatCardIndex = 0;
+  Timer? _statCardsAutoScrollTimer;
   StreamSubscription<DocumentSnapshot>? _subscriptionListener;
   String _userName = '';
   String _userRole = 'Organization Administrator';
@@ -49,6 +50,27 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     _loadUserData();
     _checkSubscription();
     _startSubscriptionListener();
+    _startStatCardsAutoScroll();
+  }
+
+  void _startStatCardsAutoScroll() {
+    _statCardsAutoScrollTimer?.cancel();
+    _statCardsAutoScrollTimer = Timer.periodic(
+      const Duration(seconds: 3, milliseconds: 500),
+      (timer) {
+        if (!mounted || !_statCardsPageController.hasClients) return;
+        final nextPage = (_currentStatCardIndex + 1) % 4;
+        _statCardsPageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 550),
+          curve: Curves.easeInOutCubic,
+        );
+      },
+    );
+  }
+
+  void _resetAutoScrollTimer() {
+    _startStatCardsAutoScroll();
   }
 
   Future<void> _loadUserData() async {
@@ -128,6 +150,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   @override
   void dispose() {
+    _statCardsAutoScrollTimer?.cancel();
     _subscriptionListener?.cancel();
     _scrollController.dispose();
     _statCardsPageController.dispose();
@@ -579,6 +602,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                               InkWell(
                                 onTap: _currentStatCardIndex > 0
                                     ? () {
+                                        _resetAutoScrollTimer();
                                         _statCardsPageController.previousPage(
                                           duration: const Duration(
                                             milliseconds: 300,
@@ -610,6 +634,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                               InkWell(
                                 onTap: _currentStatCardIndex < 3
                                     ? () {
+                                        _resetAutoScrollTimer();
                                         _statCardsPageController.nextPage(
                                           duration: const Duration(
                                             milliseconds: 300,
@@ -696,6 +721,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                             setState(() {
                               _currentStatCardIndex = index;
                             });
+                            _resetAutoScrollTimer();
                           },
                           itemBuilder: (context, index) {
                             final stat = statCards[index];
@@ -1397,7 +1423,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required OrgCategoryData category,
     required VoidCallback onTap,
   }) {
-    final color = category.color;
+    final color = Theme.of(context).primaryColor;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -1410,7 +1436,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.05),
+            color: color.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1510,7 +1536,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         fontSize: 9.5,
                         fontWeight: FontWeight.w500,
                         color: Color(0xFF64748B),
-                        height: 1.15,
+                        height: 1.1,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -1537,6 +1563,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required VoidCallback onTap,
   }) {
     final hPad = Responsive.horizontalPadding(context);
+    final brandingColor = Theme.of(context).primaryColor;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, 6, hPad, 6),
@@ -1552,14 +1579,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isExpanded
-                    ? color.withValues(alpha: 0.35)
+                    ? brandingColor.withValues(alpha: 0.35)
                     : const Color(0xFFE2E8F0),
                 width: isExpanded ? 1.4 : 1.0,
               ),
               boxShadow: isExpanded
                   ? [
                       BoxShadow(
-                        color: color.withValues(alpha: 0.08),
+                        color: brandingColor.withValues(alpha: 0.08),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -1579,11 +1606,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: color,
+                    color: brandingColor,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: color.withValues(alpha: 0.3),
+                        color: brandingColor.withValues(alpha: 0.3),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -1626,7 +1653,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: isExpanded ? 0.12 : 0.08),
+                    color: brandingColor.withValues(alpha: isExpanded ? 0.12 : 0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -1637,7 +1664,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
-                          color: color,
+                          color: brandingColor,
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1647,7 +1674,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         child: Icon(
                           Icons.keyboard_arrow_down_rounded,
                           size: 16,
-                          color: color,
+                          color: brandingColor,
                         ),
                       ),
                     ],
@@ -1772,102 +1799,54 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     final List<Map<String, dynamic>> categoriesToDisplay = [];
 
     for (var cat in allCategories) {
-      List<SubMenuItem> matchingItems = cat.items.where((item) {
+      final matchingItems = cat.items.where((item) {
         final titleMatch = item.title.toLowerCase().contains(rawQuery);
         final subtitleMatch = item.subtitle.toLowerCase().contains(rawQuery);
         final tagMatch =
             item.tags?.any((tag) => tag.toLowerCase().contains(rawQuery)) ??
             false;
-        final catMatch = cat.title.toLowerCase().contains(rawQuery);
-        return titleMatch || subtitleMatch || tagMatch || catMatch;
+        return titleMatch || subtitleMatch || tagMatch;
       }).toList();
 
-      if (matchingItems.isNotEmpty) {
-        categoriesToDisplay.add({'category': cat, 'items': matchingItems});
+      if (cat.title.toLowerCase().contains(rawQuery) ||
+          cat.subtitle.toLowerCase().contains(rawQuery) ||
+          matchingItems.isNotEmpty) {
+        categoriesToDisplay.add({
+          'category': cat,
+          'items': matchingItems.isNotEmpty ? matchingItems : cat.items,
+        });
       }
     }
 
-    // If search returned 0 items
     if (categoriesToDisplay.isEmpty) {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 24),
-            child: Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+            padding: EdgeInsets.all(hPad),
+            child: Center(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_search_rounded,
-                      color: Color(0xFF6366F1),
-                      size: 28,
-                    ),
+                  const SizedBox(height: 40),
+                  Icon(
+                    Icons.search_off_rounded,
+                    size: 48,
+                    color: Colors.grey.shade400,
                   ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'No matching tools or options found',
-                    style: TextStyle(
+                  const SizedBox(height: 12),
+                  Text(
+                    'No features found for "$_searchQuery"',
+                    style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF1E293B),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'No results match "$rawQuery". Try searching for managers, financial, supervisors, workers, or expenses.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Try searching for approvals, report, sites, etc.',
+                    style: TextStyle(
+                      fontSize: 12.5,
                       color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      _searchController.clear();
-                      setState(() {
-                        _searchQuery = '';
-                      });
-                    },
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: const Text(
-                      'Clear & Show All',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0A183D),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                     ),
                   ),
                 ],
@@ -1879,13 +1858,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       return slivers;
     }
 
-    // When search is active, render matching Category Option Grids
-    for (var entry in categoriesToDisplay) {
-      final OrgCategoryData cat = entry['category'];
-      final List<SubMenuItem> items = entry['items'];
-      const bool isExpanded = true;
+    for (var catMap in categoriesToDisplay) {
+      final OrgCategoryData cat = catMap['category'];
+      final List<SubMenuItem> items = catMap['items'];
 
-      // 1. Category Heading (Interactive Expand / Collapse)
       slivers.add(
         SliverToBoxAdapter(
           child: _buildCategoryHeading(
@@ -1895,13 +1871,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             icon: cat.icon,
             color: cat.color,
             itemCount: items.length,
-            isExpanded: isExpanded,
+            isExpanded: true,
             onTap: () {
               HapticFeedback.lightImpact();
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => OrgCategoryDetailsPage(category: cat),
+                  builder: (context) => OrgCategoryDetailsPage(
+                    category: cat,
+                  ),
                 ),
               );
             },
@@ -1909,51 +1887,48 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         ),
       );
 
-      // 2. Category Grid (Rendered only when isExpanded == true)
-      if (isExpanded) {
-        slivers.add(
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(hPad, 6, hPad, 10),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: childAspectRatio,
-              ),
-              delegate: SliverChildBuilderDelegate((context, index) {
+      slivers.add(
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(hPad, 6, hPad, 16),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: childAspectRatio,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
                 final item = items[index];
                 return _buildQuickAccessCard(context, item);
-              }, childCount: items.length),
+              },
+              childCount: items.length,
             ),
           ),
-        );
-      }
+        ),
+      );
     }
 
     return slivers;
   }
 
-  /// Individual Quick Access Card matching the reference design:
-  /// - Soft pastel tinted background container with rounded corners
-  /// - Vibrant circular icon badge with white icon
-  /// - Optional badge (e.g. "NEW" or pending requests count)
-  /// - Bold title
-  /// - Small subtitle description
-  /// - Subtle trailing chevron arrow
   Widget _buildQuickAccessCard(BuildContext context, SubMenuItem item) {
-    final cardBg = item.cardBgColor ?? item.color.withValues(alpha: 0.12);
-    final iconBg = item.color;
+    final primaryColor = Theme.of(context).primaryColor;
+    final cardBg = primaryColor.withValues(alpha: 0.08);
+    final iconBg = primaryColor;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: iconBg.withValues(alpha: 0.08), width: 1),
+        border: Border.all(
+          color: primaryColor.withValues(alpha: 0.12),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: iconBg.withValues(alpha: 0.04),
+            color: primaryColor.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -1973,7 +1948,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top Row: Circular Icon & Optional Badge
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1993,7 +1967,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         ],
                       ),
                       child: Center(
-                        child: Icon(item.icon, color: Colors.white, size: 18),
+                        child: Icon(
+                          item.icon,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                       ),
                     ),
                     if (item.countStream != null)
@@ -2010,15 +1988,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF6366F1),
                               borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF6366F1,
-                                  ).withValues(alpha: 0.3),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
                             ),
                             child: Text(
                               '$count NEW',
@@ -2026,7 +1995,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                                 fontSize: 8.5,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
-                                letterSpacing: -0.2,
                               ),
                             ),
                           );
@@ -2035,7 +2003,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                // Middle & Bottom: Title, Subtitle, Chevron
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -2067,11 +2034,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: 4),
                         Icon(
-                          Icons.chevron_right_rounded,
-                          size: 14,
-                          color: iconBg.withValues(alpha: 0.7),
+                          Icons.arrow_forward_ios_rounded,
+                          size: 10,
+                          color: primaryColor,
                         ),
                       ],
                     ),
@@ -2086,91 +2053,130 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   }
 
   List<OrgCategoryData> _getCategories(ThemeData theme) {
+    final primary = theme.primaryColor;
+
     return [
       OrgCategoryData(
-        title: "Manager Configuration",
-        subtitle: "Manager profiles, expenditures & console setup",
-        icon: Icons.manage_accounts_rounded,
-        color: const Color(0xFF7C3AED),
-        gradientColors: [const Color(0xFF7C3AED), const Color(0xFF8B5CF6)],
+        title: "Configuration",
+        subtitle: "System setup, workers, sites, stages & users",
+        icon: Icons.tune_rounded,
+        color: primary,
+        gradientColors: [primary, primary.withValues(alpha: 0.85)],
         items: [
           SubMenuItem(
-            title: "Manager Config",
-            subtitle: "Manager profiles & credentials",
-            icon: Icons.manage_accounts_rounded,
-            color: const Color(0xFF7C3AED),
-            cardBgColor: const Color(0xFFF3F0FF),
+            title: "Master Console",
+            subtitle: "Full organization controls",
+            icon: Icons.admin_panel_settings_rounded,
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
-              'user',
-              'users',
-              'manager',
-              'managers',
-              'profile',
-              'profiles',
-              'admin',
-              'staff',
-              'role',
-              'account',
-              'login',
-            ],
-            onTap: () => _navigateToManagerConfig(context),
-          ),
-          SubMenuItem(
-            title: "Management Console",
-            subtitle: "Master data & system settings",
-            icon: Icons.tune_rounded,
-            color: const Color(0xFF4F46E5),
-            cardBgColor: const Color(0xFFEEF2FF),
-            tags: [
-              'admin',
               'config',
-              'settings',
+              'setup',
               'console',
+              'admin',
               'master',
+              'dashboard',
               'system',
-              'users',
             ],
             onTap: () => _navigateToConfiguration(context),
+          ),
+          SubMenuItem(
+            title: "Manager Settings",
+            subtitle: "Site workers & materials config",
+            icon: Icons.manage_accounts_rounded,
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
+            tags: [
+              'config',
+              'manager',
+              'settings',
+              'workers',
+              'materials',
+              'sites',
+              'setup',
+            ],
+            onTap: () => _navigateToManagerConfig(context),
           ),
         ],
       ),
       OrgCategoryData(
-        title: "Financial Management",
-        subtitle: "Site payments, reports & financial balance sheets",
-        icon: Icons.account_balance_wallet_rounded,
-        color: const Color(0xFF0EA5E9),
-        gradientColors: [const Color(0xFF0EA5E9), const Color(0xFF38BDF8)],
+        title: "Daily Operations",
+        subtitle: "Payment records, site progress & daily logs",
+        icon: Icons.calendar_today_rounded,
+        color: primary,
+        gradientColors: [primary, primary.withValues(alpha: 0.85)],
         items: [
           SubMenuItem(
-            title: "Site Payment Entry",
-            subtitle: "Daily site transactions",
+            title: "Daily Payment Entry",
+            subtitle: "Record daily site payments",
             icon: Icons.payments_rounded,
-            color: const Color(0xFF0D9488),
-            cardBgColor: const Color(0xFFE6F8F5),
-            tags: [
-              'finance',
-              'financial',
-              'payment',
-              'money',
-              'transaction',
-              'site',
-              'entry',
-              'daily',
-            ],
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
+            tags: ['daily', 'payment', 'entry', 'finance', 'site', 'expense'],
             onTap: () => _navigateToSitePaymentEntry(context),
           ),
           SubMenuItem(
-            title: "Site Payment Report",
-            subtitle: "Daily financial transaction logs",
+            title: "Daily Site Payment Report",
+            subtitle: "Daily site ledger breakdown",
             icon: Icons.receipt_long_rounded,
-            color: const Color(0xFF0284C7),
-            cardBgColor: const Color(0xFFE7F7FD),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
+            tags: [
+              'daily',
+              'payment',
+              'report',
+              'finance',
+              'site',
+              'statement',
+            ],
+            onTap: () => _navigateToDailyReport(context),
+          ),
+          SubMenuItem(
+            title: "Organisation Daily Entry",
+            subtitle: "Daily project progress & expenses",
+            icon: Icons.edit_note_rounded,
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
+            tags: ['entry', 'daily', 'progress', 'site', 'expense'],
+            onTap: () => _navigateToManagerDailyEntry(context),
+          ),
+        ],
+      ),
+      OrgCategoryData(
+        title: "Financial Ledger",
+        subtitle: "Expense logs, weekly reports & incentive calculations",
+        icon: Icons.account_balance_wallet_rounded,
+        color: primary,
+        gradientColors: [primary, primary.withValues(alpha: 0.85)],
+        items: [
+          SubMenuItem(
+            title: "Organization Expenses",
+            subtitle: "Central operational costs",
+            icon: Icons.corporate_fare_rounded,
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
+            tags: [
+              'expense',
+              'cost',
+              'spend',
+              'operational',
+              'organization',
+              'central',
+            ],
+            onTap: () => _navigateToOrganizationExpenses(context),
+          ),
+          SubMenuItem(
+            title: "Daily Site Payment Report",
+            subtitle: "Daily site transaction logs",
+            icon: Icons.receipt_long_rounded,
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
               'finance',
-              'financial',
-              'report',
-              'payment',
               'daily',
+              'payment',
+              'report',
+              'transaction',
               'statement',
             ],
             onTap: () => _navigateToDailyReport(context),
@@ -2179,8 +2185,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Weekly Finance Report",
             subtitle: "Weekly financial health overview",
             icon: Icons.account_balance_rounded,
-            color: const Color(0xFF2563EB),
-            cardBgColor: const Color(0xFFEDF4FE),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
               'finance',
               'financial',
@@ -2195,8 +2201,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Financial Analytics",
             subtitle: "Financial metrics & insights",
             icon: Icons.query_stats_rounded,
-            color: const Color(0xFF4F46E5),
-            cardBgColor: const Color(0xFFEEF1FF),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
               'finance',
               'financial',
@@ -2211,8 +2217,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Incentive Calculation",
             subtitle: "Performance-based rewards",
             icon: Icons.calculate_rounded,
-            color: const Color(0xFFE11D48),
-            cardBgColor: const Color(0xFFFFEFF4),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
               'finance',
               'financial',
@@ -2230,15 +2236,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Supervisor Operations",
         subtitle: "Supervisor work schedule approvals",
         icon: Icons.supervisor_account_rounded,
-        color: const Color(0xFF0D9488),
-        gradientColors: [const Color(0xFF0D9488), const Color(0xFF14B8A6)],
+        color: primary,
+        gradientColors: [primary, primary.withValues(alpha: 0.85)],
         items: [
           SubMenuItem(
             title: "Schedule Approval",
             subtitle: "Supervisor work schedule approvals",
             icon: Icons.event_available_rounded,
-            color: const Color(0xFF059669),
-            cardBgColor: const Color(0xFFE7F8F0),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
               'approval',
               'schedule',
@@ -2262,15 +2268,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Expense Management",
         subtitle: "Track organization and field expenditures",
         icon: Icons.monetization_on_rounded,
-        color: const Color(0xFFF97316),
-        gradientColors: [const Color(0xFFF97316), const Color(0xFFFB923C)],
+        color: primary,
+        gradientColors: [primary, primary.withValues(alpha: 0.85)],
         items: [
           SubMenuItem(
             title: "Organization Expenses",
             subtitle: "Central operational costs",
             icon: Icons.corporate_fare_rounded,
-            color: const Color(0xFFFF7828),
-            cardBgColor: const Color(0xFFFFF0EA),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
               'expense',
               'cost',
@@ -2285,8 +2291,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Organisation Daily Entry",
             subtitle: "Daily project progress & expenses",
             icon: Icons.edit_note_rounded,
-            color: const Color(0xFFD97706),
-            cardBgColor: const Color(0xFFFEF9E7),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: ['entry', 'daily', 'progress', 'site', 'expense'],
             onTap: () => _navigateToManagerDailyEntry(context),
           ),
@@ -2296,15 +2302,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Review & Approvals",
         subtitle: "Approve schedules, materials, and incentives",
         icon: Icons.fact_check_rounded,
-        color: const Color(0xFF10B981),
-        gradientColors: [const Color(0xFF10B981), const Color(0xFF34D399)],
+        color: primary,
+        gradientColors: [primary, primary.withValues(alpha: 0.85)],
         items: [
           SubMenuItem(
             title: "Schedule Approval",
             subtitle: "Work schedules & workers",
             icon: Icons.event_available_rounded,
-            color: const Color(0xFF059669),
-            cardBgColor: const Color(0xFFE7F8F0),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
               'approval',
               'schedule',
@@ -2325,8 +2331,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Material Approval",
             subtitle: "Material procurement authorization",
             icon: Icons.inventory_2_rounded,
-            color: const Color(0xFF6366F1),
-            cardBgColor: const Color(0xFFEEF1FF),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: ['approval', 'material', 'procurement', 'review', 'pending'],
             countStream: _getPendingMaterialRequestsCount(),
             onTap: () => Navigator.push(
@@ -2340,8 +2346,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Incentive Calculation",
             subtitle: "Performance-based rewards",
             icon: Icons.calculate_rounded,
-            color: const Color(0xFFE11D48),
-            cardBgColor: const Color(0xFFFFEFF4),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: [
               'incentive',
               'reward',
@@ -2358,15 +2364,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         title: "Reports & Analytics",
         subtitle: "Stock monitoring, equipment & performance analytics",
         icon: Icons.bar_chart_rounded,
-        color: const Color(0xFF8B5CF6),
-        gradientColors: [const Color(0xFF8B5CF6), const Color(0xFFA78BFA)],
+        color: primary,
+        gradientColors: [primary, primary.withValues(alpha: 0.85)],
         items: [
           SubMenuItem(
             title: "Financial Analytics",
             subtitle: "Performance insights & charts",
             icon: Icons.query_stats_rounded,
-            color: const Color(0xFF4F46E5),
-            cardBgColor: const Color(0xFFEEF1FF),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: ['analytics', 'insights', 'charts', 'report', 'financial'],
             onTap: () => _navigateToInsights(context),
           ),
@@ -2374,8 +2380,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Materials Inventory",
             subtitle: "Real-time stock monitoring",
             icon: Icons.inventory_rounded,
-            color: const Color(0xFF10B981),
-            cardBgColor: const Color(0xFFEAF9ED),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: ['material', 'inventory', 'stock', 'report'],
             onTap: () => _navigateToMaterialReport(context),
           ),
@@ -2383,8 +2389,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             title: "Tools Inventory",
             subtitle: "Field equipment usage",
             icon: Icons.construction_rounded,
-            color: const Color(0xFF0891B2),
-            cardBgColor: const Color(0xFFECFEFF),
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
             tags: ['tools', 'equipment', 'inventory', 'report'],
             onTap: () => _navigateToToolsInventory(context),
           ),
@@ -2551,7 +2557,8 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
       builder: (context, appPrimary, _) {
-        final darkAccent = AppTheme.getDarkAccent(cat.color);
+        final primaryColor = appPrimary;
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -2574,7 +2581,7 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                   colors: [
                     darkAccent,
                     Color.alphaBlend(
-                      cat.color.withValues(alpha: 0.4),
+                      primaryColor.withValues(alpha: 0.45),
                       darkAccent,
                     ),
                   ],
@@ -2615,12 +2622,12 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: cat.color.withValues(alpha: 0.2),
+                            color: primaryColor.withValues(alpha: 0.2),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: cat.color.withValues(alpha: 0.06),
+                              color: primaryColor.withValues(alpha: 0.06),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -2632,11 +2639,11 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                               width: 46,
                               height: 46,
                               decoration: BoxDecoration(
-                                color: cat.color,
+                                color: primaryColor,
                                 borderRadius: BorderRadius.circular(14),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: cat.color.withValues(alpha: 0.35),
+                                    color: primaryColor.withValues(alpha: 0.35),
                                     blurRadius: 8,
                                     offset: const Offset(0, 3),
                                   ),
@@ -2683,7 +2690,7 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                                 vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: cat.color.withValues(alpha: 0.1),
+                                color: primaryColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -2691,7 +2698,7 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w800,
-                                  color: cat.color,
+                                  color: primaryColor,
                                 ),
                               ),
                             ),
@@ -2712,7 +2719,7 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: _searchQuery.isNotEmpty
-                                  ? cat.color.withValues(alpha: 0.6)
+                                  ? primaryColor.withValues(alpha: 0.6)
                                   : const Color(0xFFE2E8F0),
                               width: 1.2,
                             ),
@@ -2744,7 +2751,7 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                               ),
                               prefixIcon: Icon(
                                 Icons.search_rounded,
-                                color: cat.color,
+                                color: primaryColor,
                                 size: 18,
                               ),
                               suffixIcon: _searchQuery.isNotEmpty
@@ -2816,7 +2823,7 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             final item = items[index];
-                            return _buildOptionCard(context, item);
+                            return _buildOptionCard(context, item, primaryColor);
                           },
                           childCount: items.length,
                         ),
@@ -2831,9 +2838,13 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
     );
   }
 
-  Widget _buildOptionCard(BuildContext context, SubMenuItem item) {
-    final cardBg = item.cardBgColor ?? item.color.withValues(alpha: 0.12);
-    final iconBg = item.color;
+  Widget _buildOptionCard(
+    BuildContext context,
+    SubMenuItem item,
+    Color primaryColor,
+  ) {
+    final cardBg = primaryColor.withValues(alpha: 0.08);
+    final iconBg = primaryColor;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -2841,12 +2852,12 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: iconBg.withValues(alpha: 0.08),
+          color: primaryColor.withValues(alpha: 0.12),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: iconBg.withValues(alpha: 0.04),
+            color: primaryColor.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -2954,11 +2965,11 @@ class _OrgCategoryDetailsPageState extends State<OrgCategoryDetailsPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: 4),
                         Icon(
-                          Icons.chevron_right_rounded,
-                          size: 14,
-                          color: iconBg.withValues(alpha: 0.7),
+                          Icons.arrow_forward_ios_rounded,
+                          size: 10,
+                          color: primaryColor,
                         ),
                       ],
                     ),

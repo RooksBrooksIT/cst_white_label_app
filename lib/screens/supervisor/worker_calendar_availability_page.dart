@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 
 class WorkerCalendarAvailabilityPage extends StatefulWidget {
@@ -54,10 +54,9 @@ class _WorkerCalendarAvailabilityPageState
         final data = doc.data();
         final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
 
-        if (workersMap.containsKey(widget.workerName) ||
-            workersMap.containsKey(widget.workerId)) {
-          final workerInfo =
-              workersMap[widget.workerName] ?? workersMap[widget.workerId];
+        // Find this worker's attendance in this record
+        if (workersMap.containsKey(widget.workerId)) {
+          final workerInfo = workersMap[widget.workerId] as Map<String, dynamic>;
 
           String? formattedDate;
 
@@ -75,8 +74,8 @@ class _WorkerCalendarAvailabilityPageState
 
           // Priority 2: Use legacy 'Day' field (dd/MM/yyyy)
           if (formattedDate == null) {
-            final legacyDay = data['Day']?.toString();
-            if (legacyDay != null) {
+            final legacyDay = data['Day']?.toString() ?? data['day']?.toString();
+            if (legacyDay != null && legacyDay.contains('/')) {
               final parts = legacyDay.split('/');
               if (parts.length == 3) {
                 formattedDate = '${parts[2]}-${parts[1]}-${parts[0]}';
@@ -123,37 +122,76 @@ class _WorkerCalendarAvailabilityPageState
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     final colorScheme = Theme.of(context).colorScheme;
     final selectedDateStr = DateFormat('yyyy-MM-dd').format(_selectedDay!);
     final dayDetails =
         _attendanceData[selectedDateStr] as Map<String, dynamic>?;
 
-    return GlassScaffold(
-      title: 'Worker Schedule',
-      onBack: () => Navigator.pop(context),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Worker Schedule',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
           child: Column(
-        children: [
-          _buildWorkerHeader(colorScheme),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  _buildCalendar(colorScheme),
-                  const SizedBox(height: 20),
-                  _buildDayDetails(dayDetails, colorScheme),
-                  const SizedBox(height: 30),
-                ],
+            children: [
+              _buildWorkerHeader(colorScheme),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      _buildCalendar(colorScheme),
+                      const SizedBox(height: 20),
+                      _buildDayDetails(dayDetails, colorScheme),
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
         ),
       ),
     );

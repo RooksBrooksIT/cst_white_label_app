@@ -8,6 +8,7 @@ import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/services/subscription_limit_service.dart';
 
 class SiteScreen extends StatefulWidget {
   const SiteScreen({super.key});
@@ -356,6 +357,21 @@ class _SiteScreenState extends State<SiteScreen>
     String? createdSiteDocId;
 
     try {
+      // Validate active subscription site limit
+      final subValidation = await SubscriptionLimitService.canCreateSite();
+      if (!subValidation.isAllowed) {
+        if (mounted) Navigator.pop(context); // Close progress dialog
+        if (mounted) {
+          await SubscriptionLimitService.showLimitReachedDialog(
+            context,
+            title: 'Site Limit Reached',
+            message: subValidation.errorMessage ??
+                'You have reached your subscription plan limit for active sites.',
+          );
+        }
+        return;
+      }
+
       // 1. Check for Duplicate Site
       final dupQuery = await FirestoreService.getCollection('Site')
           .where('siteName', isEqualTo: siteName)
@@ -1107,7 +1123,6 @@ class _SiteScreenState extends State<SiteScreen>
   Widget _buildAllSiteTab() {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
-    final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirestoreService.getCollection('Site').snapshots(),
@@ -1255,8 +1270,15 @@ class _SiteScreenState extends State<SiteScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      color: darkAccent,
+                      color: primaryColor,
                       borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Text(
                       '${filteredSites.length} Sites',
@@ -1301,7 +1323,7 @@ class _SiteScreenState extends State<SiteScreen>
                 totalPages: totalPages,
                 totalItems: totalItems,
                 itemsPerPage: _allSitesItemsPerPage,
-                darkCardBg: darkAccent,
+                darkCardBg: primaryColor,
                 primaryColor: primaryColor,
                 onPageChanged: (newPage) {
                   setState(() => _allSitesCurrentPage = newPage);
@@ -1360,7 +1382,7 @@ class _SiteScreenState extends State<SiteScreen>
             icon: Icon(
               Icons.first_page_rounded,
               size: 20,
-              color: currentPage > 1 ? darkCardBg : Colors.grey.shade300,
+              color: currentPage > 1 ? primaryColor : Colors.grey.shade300,
             ),
             onPressed: currentPage > 1 ? () => onPageChanged(1) : null,
             tooltip: 'First Page',
@@ -1371,7 +1393,7 @@ class _SiteScreenState extends State<SiteScreen>
             icon: Icon(
               Icons.chevron_left_rounded,
               size: 20,
-              color: currentPage > 1 ? darkCardBg : Colors.grey.shade300,
+              color: currentPage > 1 ? primaryColor : Colors.grey.shade300,
             ),
             onPressed: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
             tooltip: 'Previous Page',
@@ -1380,8 +1402,15 @@ class _SiteScreenState extends State<SiteScreen>
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             margin: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
-              color: darkCardBg,
+              color: primaryColor,
               borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.25),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
             child: Text(
               '$currentPage / $totalPages',
@@ -1398,7 +1427,7 @@ class _SiteScreenState extends State<SiteScreen>
             icon: Icon(
               Icons.chevron_right_rounded,
               size: 20,
-              color: currentPage < totalPages ? darkCardBg : Colors.grey.shade300,
+              color: currentPage < totalPages ? primaryColor : Colors.grey.shade300,
             ),
             onPressed: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
             tooltip: 'Next Page',
@@ -1409,7 +1438,7 @@ class _SiteScreenState extends State<SiteScreen>
             icon: Icon(
               Icons.last_page_rounded,
               size: 20,
-              color: currentPage < totalPages ? darkCardBg : Colors.grey.shade300,
+              color: currentPage < totalPages ? primaryColor : Colors.grey.shade300,
             ),
             onPressed: currentPage < totalPages ? () => onPageChanged(totalPages) : null,
             tooltip: 'Last Page',
@@ -1422,7 +1451,6 @@ class _SiteScreenState extends State<SiteScreen>
   Widget _buildSiteCard(BuildContext context, String docId, Map<String, dynamic> data) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
-    final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
     final siteId = (data['siteId'] as String?) ?? docId;
     final siteName = (data['siteName'] as String?) ?? 'Unnamed Site';
@@ -1457,8 +1485,15 @@ class _SiteScreenState extends State<SiteScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: darkAccent,
+                    color: primaryColor,
                     borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.25),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                   child: Text(
                     siteId,

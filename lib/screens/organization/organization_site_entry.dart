@@ -621,6 +621,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
               maxWidth: isMobile ? double.infinity : 750.0,
             ),
             child: SingleChildScrollView(
+              primary: true,
               padding: const EdgeInsets.all(16.0),
               physics: const BouncingScrollPhysics(),
               child: Column(
@@ -776,7 +777,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                               color: primaryColor,
                               size: 20.0,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             const Text(
                               'Date:',
                               style: TextStyle(
@@ -785,20 +786,27 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Text(
-                              selectedDate != null
-                                  ? DateFormat('dd MMM yyyy').format(selectedDate!)
-                                  : 'No date chosen',
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0A183D),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                selectedDate != null
+                                    ? DateFormat('dd MMM yyyy').format(selectedDate!)
+                                    : 'No date chosen',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0A183D),
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const Spacer(),
                             TextButton.icon(
                               onPressed: _pickDate,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
                               icon: Icon(Icons.edit_calendar_rounded, size: 16, color: primaryColor),
                               label: Text(
                                 'Change',
@@ -918,10 +926,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                             height: 48,
                             child: ElevatedButton.icon(
                               onPressed: _addMaterial,
-                              icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 20),
-                              label: const Text(
-                                'Add Material',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                              icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 18),
+                              label: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Add Material',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
@@ -939,10 +950,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 () => _showCustomMaterialFields =
                                     !_showCustomMaterialFields,
                               ),
-                              icon: const Icon(Icons.more_horiz_rounded, size: 20, color: Color(0xFF0A183D)),
-                              label: Text(
-                                _showCustomMaterialFields ? 'Hide Custom' : 'Custom Material',
-                                style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold, fontSize: 13.5),
+                              icon: const Icon(Icons.more_horiz_rounded, size: 18, color: Color(0xFF0A183D)),
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _showCustomMaterialFields ? 'Hide Custom' : 'Custom Material',
+                                  style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold, fontSize: 13.5),
+                                ),
                               ),
                               style: OutlinedButton.styleFrom(
                                 backgroundColor: Colors.white,
@@ -1126,10 +1140,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                             height: 48,
                             child: ElevatedButton.icon(
                               onPressed: _addLabour,
-                              icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 20),
-                              label: const Text(
-                                'Add Labour',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                              icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 18),
+                              label: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Add Labour',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
@@ -1147,10 +1164,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                 () => _showCustomLabourFields =
                                     !_showCustomLabourFields,
                               ),
-                              icon: const Icon(Icons.more_horiz_rounded, size: 20, color: Color(0xFF0A183D)),
-                              label: Text(
-                                _showCustomLabourFields ? 'Hide Custom' : 'Custom Labour',
-                                style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold, fontSize: 13.5),
+                              icon: const Icon(Icons.more_horiz_rounded, size: 18, color: Color(0xFF0A183D)),
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _showCustomLabourFields ? 'Hide Custom' : 'Custom Labour',
+                                  style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold, fontSize: 13.5),
+                                ),
                               ),
                               style: OutlinedButton.styleFrom(
                                 backgroundColor: Colors.white,
@@ -1279,13 +1299,16 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                       ),
                                     ),
                                   )
-                                : const Text(
-                                    'Save Daily Entry',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15.0,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.3,
+                                : const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'Save Daily Entry',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15.0,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.3,
+                                      ),
                                     ),
                                   ),
                           ),
@@ -1307,12 +1330,15 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                             ),
                             onPressed: isSaving ? null : _resetForm,
                             icon: const Icon(Icons.restart_alt_rounded, size: 18, color: Color(0xFF64748B)),
-                            label: const Text(
-                              'Reset',
-                              style: TextStyle(
-                                color: Color(0xFF0A183D),
-                                fontSize: 15.0,
-                                fontWeight: FontWeight.bold,
+                            label: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Reset',
+                                style: TextStyle(
+                                  color: Color(0xFF0A183D),
+                                  fontSize: 15.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -1481,6 +1507,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         border: Border.all(color: const Color(0xFFCBD5E1)),
       ),
       child: SingleChildScrollView(
+        primary: false,
         scrollDirection: Axis.horizontal,
         child: ConstrainedBox(
           constraints: BoxConstraints(

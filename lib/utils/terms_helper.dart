@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 
 class TermsHelper {
@@ -47,6 +46,7 @@ class _TermsDialog extends StatefulWidget {
 
 class _TermsDialogState extends State<_TermsDialog> {
   bool _isAccepted = false;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -57,10 +57,16 @@ class _TermsDialogState extends State<_TermsDialog> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
-    final maxHeight = size.height * 0.75; // Use slightly less to be safe
+    final maxHeight = size.height * 0.75;
     final maxWidth = size.width > 600 ? 500.0 : size.width * 0.9;
 
     return Dialog(
@@ -75,10 +81,10 @@ class _TermsDialogState extends State<_TermsDialog> {
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+            border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
             boxShadow: [
               BoxShadow(
-                color: theme.shadowColor.withOpacity(0.08),
+                color: theme.shadowColor.withValues(alpha: 0.08),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -86,7 +92,7 @@ class _TermsDialogState extends State<_TermsDialog> {
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
-            mainAxisSize: MainAxisSize.min, // This allows the dialog to shrink
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header
@@ -96,10 +102,10 @@ class _TermsDialogState extends State<_TermsDialog> {
                   vertical: 18,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.primaryColor.withOpacity(0.08),
+                  color: theme.primaryColor.withValues(alpha: 0.08),
                   border: Border(
                     bottom: BorderSide(
-                      color: theme.dividerColor.withOpacity(0.1),
+                      color: theme.dividerColor.withValues(alpha: 0.1),
                     ),
                   ),
                 ),
@@ -128,8 +134,10 @@ class _TermsDialogState extends State<_TermsDialog> {
               // Content - This is the flexible part that scrolls
               Flexible(
                 child: Scrollbar(
+                  controller: _scrollController,
                   thumbVisibility: true,
                   child: SingleChildScrollView(
+                    controller: _scrollController,
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,7 +207,7 @@ class _TermsDialogState extends State<_TermsDialog> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   border: Border(
-                    top: BorderSide(color: theme.dividerColor.withOpacity(0.1)),
+                    top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Column(
@@ -236,9 +244,10 @@ class _TermsDialogState extends State<_TermsDialog> {
                           ? () => Navigator.pop(context)
                           : (_isAccepted
                               ? () async {
+                                  final nav = Navigator.of(context);
                                   await TermsHelper.acceptTerms();
                                   if (mounted) {
-                                    Navigator.pop(context);
+                                    nav.pop();
                                     widget.onAccepted();
                                   }
                                 }

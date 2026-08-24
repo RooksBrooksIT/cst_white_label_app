@@ -430,13 +430,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         'Get support and help',
         Colors.teal,
       ),
-      DashboardItem(
-        'Privacy Policy',
-        Icons.privacy_tip_rounded,
-        Colors.blueGrey,
-        'View privacy policy',
-        Colors.blueGrey,
-      ),
     ],
   };
 
@@ -1202,9 +1195,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       final meta = _categoryMetadata[sectionTitle] ?? {
         "subtitle": "Management options and settings",
         "icon": items.first.icon,
-        "color": items.first.color,
       };
-      final Color categoryColor = meta["color"] as Color;
       final IconData categoryIcon = meta["icon"] as IconData;
 
       // Category Header in search results
@@ -1218,7 +1209,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: categoryColor,
+                    color: Theme.of(context).primaryColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
@@ -1316,15 +1307,15 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     required List<DashboardItem> items,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
     final meta = _categoryMetadata[sectionTitle] ?? {
       "subtitle": "Management options and settings",
       "icon": items.first.icon,
-      "color": items.first.color,
     };
 
     final String subtitle = meta["subtitle"] as String;
     final IconData categoryIcon = meta["icon"] as IconData;
-    final Color categoryColor = meta["color"] as Color;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -1337,7 +1328,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         ),
         boxShadow: [
           BoxShadow(
-            color: categoryColor.withValues(alpha: 0.05),
+            color: primaryColor.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1368,11 +1359,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: categoryColor,
+                        color: primaryColor,
                         borderRadius: BorderRadius.circular(11),
                         boxShadow: [
                           BoxShadow(
-                            color: categoryColor.withValues(alpha: 0.3),
+                            color: primaryColor.withValues(alpha: 0.3),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -1388,7 +1379,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                         vertical: 3.5,
                       ),
                       decoration: BoxDecoration(
-                        color: categoryColor.withValues(alpha: 0.09),
+                        color: primaryColor.withValues(alpha: 0.09),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -1399,14 +1390,14 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              color: categoryColor,
+                              color: primaryColor,
                             ),
                           ),
                           const SizedBox(width: 2),
                           Icon(
                             Icons.chevron_right_rounded,
                             size: 14,
-                            color: categoryColor,
+                            color: primaryColor,
                           ),
                         ],
                       ),
@@ -1454,8 +1445,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   /// Individual Quick Access Card for Management Console
   Widget _buildQuickAccessCard(BuildContext context, DashboardItem item) {
-    final cardBg = item.color.withValues(alpha: 0.10);
-    final iconBg = item.color;
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final cardBg = primaryColor.withValues(alpha: 0.08);
+    final iconBg = primaryColor;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -1463,7 +1456,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: iconBg.withValues(alpha: 0.08),
+          color: iconBg.withValues(alpha: 0.12),
           width: 1,
         ),
         boxShadow: [
@@ -1894,12 +1887,10 @@ class _ConsoleCategoryDetailsPageState
     final meta = widget.metadata ?? {
       "subtitle": "Management options and settings",
       "icon": widget.items.first.icon,
-      "color": widget.items.first.color,
     };
 
     final String subtitle = meta["subtitle"] as String;
     final IconData categoryIcon = meta["icon"] as IconData;
-    final Color categoryColor = meta["color"] as Color;
 
     final rawQuery = _searchQuery.trim().toLowerCase();
     final filteredItems = rawQuery.isEmpty
@@ -1912,7 +1903,7 @@ class _ConsoleCategoryDetailsPageState
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
-        final darkAccent = AppTheme.getDarkAccent(categoryColor);
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -1935,7 +1926,7 @@ class _ConsoleCategoryDetailsPageState
                   colors: [
                     darkAccent,
                     Color.alphaBlend(
-                      categoryColor.withValues(alpha: 0.4),
+                      primaryColor.withValues(alpha: 0.35),
                       darkAccent,
                     ),
                   ],
@@ -1976,12 +1967,12 @@ class _ConsoleCategoryDetailsPageState
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: categoryColor.withValues(alpha: 0.2),
+                            color: primaryColor.withValues(alpha: 0.18),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: categoryColor.withValues(alpha: 0.06),
+                              color: primaryColor.withValues(alpha: 0.06),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -1993,11 +1984,11 @@ class _ConsoleCategoryDetailsPageState
                               width: 46,
                               height: 46,
                               decoration: BoxDecoration(
-                                color: categoryColor,
+                                color: primaryColor,
                                 borderRadius: BorderRadius.circular(14),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: categoryColor.withValues(alpha: 0.35),
+                                    color: primaryColor.withValues(alpha: 0.35),
                                     blurRadius: 8,
                                     offset: const Offset(0, 3),
                                   ),
@@ -2044,7 +2035,7 @@ class _ConsoleCategoryDetailsPageState
                                 vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: categoryColor.withValues(alpha: 0.1),
+                                color: primaryColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -2052,7 +2043,7 @@ class _ConsoleCategoryDetailsPageState
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w800,
-                                  color: categoryColor,
+                                  color: primaryColor,
                                 ),
                               ),
                             ),
@@ -2073,7 +2064,7 @@ class _ConsoleCategoryDetailsPageState
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: _searchQuery.isNotEmpty
-                                  ? categoryColor.withValues(alpha: 0.6)
+                                  ? primaryColor.withValues(alpha: 0.6)
                                   : const Color(0xFFE2E8F0),
                               width: 1.2,
                             ),
@@ -2105,7 +2096,7 @@ class _ConsoleCategoryDetailsPageState
                               ),
                               prefixIcon: Icon(
                                 Icons.search_rounded,
-                                color: categoryColor,
+                                color: primaryColor,
                                 size: 18,
                               ),
                               suffixIcon: _searchQuery.isNotEmpty
@@ -2177,7 +2168,7 @@ class _ConsoleCategoryDetailsPageState
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             final item = filteredItems[index];
-                            return _buildOptionCard(context, item);
+                            return _buildOptionCard(context, item, primaryColor);
                           },
                           childCount: filteredItems.length,
                         ),
@@ -2192,9 +2183,13 @@ class _ConsoleCategoryDetailsPageState
     );
   }
 
-  Widget _buildOptionCard(BuildContext context, DashboardItem item) {
-    final cardBg = item.color.withValues(alpha: 0.10);
-    final iconBg = item.color;
+  Widget _buildOptionCard(
+    BuildContext context,
+    DashboardItem item,
+    Color primaryColor,
+  ) {
+    final cardBg = primaryColor.withValues(alpha: 0.08);
+    final iconBg = primaryColor;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -2202,7 +2197,7 @@ class _ConsoleCategoryDetailsPageState
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: iconBg.withValues(alpha: 0.08),
+          color: iconBg.withValues(alpha: 0.12),
           width: 1,
         ),
         boxShadow: [

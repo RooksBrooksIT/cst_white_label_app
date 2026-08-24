@@ -8,135 +8,135 @@ class LandingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const Color darkNavy = Color(0xFF0B1942);
-    const Color vibrantOceanBlue = Color(0xFF1E88E5);
-
     return GlassScaffold(
       padding: EdgeInsets.zero,
       body: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-            child: Column(
-              children: [
-                // Hero Logo Circle
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(
-                      color: vibrantOceanBlue.withValues(alpha: 0.3),
-                      width: 3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: darkNavy.withValues(alpha: 0.15),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                        offset: const Offset(0, 6),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 550),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+              child: Column(
+                children: [
+                  // Hero Logo Circle
+                  Container(
+                    width: 110,
+                    height: 110,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        width: 3,
                       ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Image.asset(
-                        'assets/images/logo_main.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => const Icon(
-                          Icons.construction_rounded,
-                          size: 50,
-                          color: vibrantOceanBlue,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0A183D).withValues(alpha: 0.08),
+                          blurRadius: 18,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Image.asset(
+                          'assets/images/logo_main.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.construction_rounded,
+                            size: 46,
+                            color: Color(0xFF1E88E5),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
-                // App Name
-                ValueListenableBuilder<String>(
-                  valueListenable: AppTheme.appName,
-                  builder: (context, name, _) {
-                    return Text(
-                      name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0A183D),
-                        letterSpacing: 0.8,
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-
-                // Main Headline
-                const Text(
-                  'Manage Your Projects\nLike a Pro',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0A183D),
-                    height: 1.2,
-                    letterSpacing: -0.5,
+                  // App Name
+                  ValueListenableBuilder<String>(
+                    valueListenable: AppTheme.appName,
+                    builder: (context, name, _) {
+                      return Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0A183D),
+                          letterSpacing: 0.6,
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const SizedBox(height: 10),
+                  const SizedBox(height: 6),
 
-                // Subtitle Description
-                const Text(
-                  'Plan, track, and manage your construction work\nseamlessly with professional tools.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF5A759E),
-                    fontWeight: FontWeight.w500,
-                    height: 1.4,
+                  // Main Headline
+                  const Text(
+                    'Manage Your Projects\nLike a Pro',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0A183D),
+                      height: 1.2,
+                      letterSpacing: -0.4,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 28),
+                  const SizedBox(height: 8),
 
-                // Dark Navy Action Cards
-                _buildDarkActionTile(
-                  context: context,
-                  label: 'Create Account',
-                  subtitle: 'Register your organization',
-                  icon: Icons.add_business_rounded,
-                  accentColor: const Color(0xFF1E88E5),
-                  onTap: () => Navigator.pushNamed(
-                    context,
-                    '/orgRegistrationForm',
+                  // Subtitle Description
+                  const Text(
+                    'Plan, track, and manage your construction work\nseamlessly with professional tools.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: Color(0xFF5A759E),
+                      fontWeight: FontWeight.w500,
+                      height: 1.35,
+                    ),
                   ),
-                ),
-                _buildDarkActionTile(
-                  context: context,
-                  label: 'Login',
-                  subtitle: 'Access your dashboard',
-                  icon: Icons.login_rounded,
-                  accentColor: const Color(0xFF42A5F5),
-                  onTap: () async {
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.remove('temp_org_path');
-                    if (context.mounted) {
-                      Navigator.pushNamed(context, '/authSelection');
-                    }
-                  },
-                ),
-                _buildDarkActionTile(
-                  context: context,
-                  label: 'Join with Code',
-                  subtitle: 'Join an existing organization',
-                  icon: Icons.qr_code_scanner_rounded,
-                  accentColor: const Color(0xFF0EA5E9),
-                  onTap: () => Navigator.pushNamed(context, '/joinByReferral'),
-                ),
-              ],
+                  const SizedBox(height: 24),
+
+                  // Clean White Action Cards Matching Reference Theme
+                  _buildWhiteActionTile(
+                    context: context,
+                    label: 'Create Account',
+                    subtitle: 'Register your organization',
+                    icon: Icons.add_business_rounded,
+                    accentColor: const Color(0xFF2563EB),
+                    onTap: () => Navigator.pushNamed(
+                      context,
+                      '/orgRegistrationForm',
+                    ),
+                  ),
+                  _buildWhiteActionTile(
+                    context: context,
+                    label: 'Login',
+                    subtitle: 'Access your dashboard',
+                    icon: Icons.login_rounded,
+                    accentColor: const Color(0xFF8B5CF6),
+                    onTap: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove('temp_org_path');
+                      if (context.mounted) {
+                        Navigator.pushNamed(context, '/authSelection');
+                      }
+                    },
+                  ),
+                  _buildWhiteActionTile(
+                    context: context,
+                    label: 'Join with Code',
+                    subtitle: 'Join an existing organization',
+                    icon: Icons.qr_code_scanner_rounded,
+                    accentColor: const Color(0xFF06B6D4),
+                    onTap: () => Navigator.pushNamed(context, '/joinByReferral'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -144,7 +144,7 @@ class LandingPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDarkActionTile({
+  Widget _buildWhiteActionTile({
     required BuildContext context,
     required String label,
     required String subtitle,
@@ -152,21 +152,29 @@ class LandingPage extends StatelessWidget {
     required Color accentColor,
     required VoidCallback onTap,
   }) {
-    const Color darkNavy = Color(0xFF0B1942);
-
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+      padding: const EdgeInsets.only(bottom: 14.0),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: darkNavy,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.9),
+            width: 1.2,
+          ),
           boxShadow: [
             BoxShadow(
-              color: darkNavy.withValues(alpha: 0.25),
-              blurRadius: 16,
-              spreadRadius: 1,
-              offset: const Offset(0, 6),
+              color: const Color(0xFF0A183D).withValues(alpha: 0.05),
+              blurRadius: 14,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: accentColor.withValues(alpha: 0.06),
+              blurRadius: 10,
+              spreadRadius: 0,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -176,23 +184,30 @@ class LandingPage extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(20),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Row(
                 children: [
                   Container(
-                    width: 54,
-                    height: 54,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
+                      color: accentColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withValues(alpha: 0.20),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Icon(
                       icon,
                       color: accentColor,
-                      size: 28,
+                      size: 24,
                     ),
                   ),
-                  const SizedBox(width: 18),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,27 +215,37 @@ class LandingPage extends StatelessWidget {
                         Text(
                           label,
                           style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0A183D),
+                            letterSpacing: -0.2,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           subtitle,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            height: 1.3,
-                            color: Colors.white.withValues(alpha: 0.65),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF64748B),
+                            height: 1.2,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: accentColor,
-                    size: 18,
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: accentColor,
+                      size: 18,
+                    ),
                   ),
                 ],
               ),

@@ -558,7 +558,7 @@ class __ProjectConfigSectionCardState
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A183D),
+                  backgroundColor: theme.primaryColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -568,6 +568,7 @@ class __ProjectConfigSectionCardState
                     borderRadius: BorderRadius.circular(12),
                   ),
                   elevation: 2,
+                  shadowColor: theme.primaryColor.withValues(alpha: 0.35),
                 ),
               ),
             ],

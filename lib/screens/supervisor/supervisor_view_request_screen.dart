@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import '/widgets/glass_scaffold.dart';
-import '/widgets/glass_card.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class ViewApprovalScreen extends StatefulWidget {
   final String supervisorId;
@@ -15,7 +14,7 @@ class ViewApprovalScreen extends StatefulWidget {
   });
 
   @override
-  _ViewApprovalScreenState createState() => _ViewApprovalScreenState();
+  State<ViewApprovalScreen> createState() => _ViewApprovalScreenState();
 }
 
 class _ViewApprovalScreenState extends State<ViewApprovalScreen>
@@ -36,58 +35,153 @@ class _ViewApprovalScreenState extends State<ViewApprovalScreen>
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    final cs = Theme.of(context).colorScheme;
-    return GlassScaffold(
-      title: 'Work Schedule Approvals',
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Work Schedule Approvals',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
           child: Column(
-        children: [
-          // Tab bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: cs.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicator: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: cs.primary,
+            children: [
+              const SizedBox(height: 12),
+              // Segmented Tab bar
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: LinearGradient(
+                      colors: [
+                        darkAccent,
+                        Color.alphaBlend(
+                          primaryColor.withValues(alpha: 0.35),
+                          darkAccent,
+                        ),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: darkAccent.withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  labelColor: Colors.white,
+                  unselectedLabelColor: const Color(0xFF64748B),
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  tabs: const [
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.pending_actions_rounded, size: 16),
+                          SizedBox(width: 8),
+                          Text('Pending'),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded, size: 16),
+                          SizedBox(width: 8),
+                          Text('Approved'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              labelColor: cs.onPrimary,
-              unselectedLabelColor: cs.onSurface.withOpacity(0.7),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              tabs: const [
-                Tab(text: 'Pending'),
-                Tab(text: 'Approved'),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                ApprovalList(
-                  status: 'Pending',
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
+              const SizedBox(height: 6),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    ApprovalList(
+                      status: 'Pending',
+                      supervisorId: widget.supervisorId,
+                      supervisorName: widget.supervisorName,
+                      primaryColor: primaryColor,
+                      darkAccent: darkAccent,
+                    ),
+                    ApprovalList(
+                      status: 'Approved',
+                      supervisorId: widget.supervisorId,
+                      supervisorName: widget.supervisorName,
+                      primaryColor: primaryColor,
+                      darkAccent: darkAccent,
+                    ),
+                  ],
                 ),
-                ApprovalList(
-                  status: 'Approved',
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
         ),
       ),
     );
@@ -98,16 +192,20 @@ class ApprovalList extends StatefulWidget {
   final String status;
   final String supervisorId;
   final String supervisorName;
+  final Color primaryColor;
+  final Color darkAccent;
 
   const ApprovalList({
     super.key,
     required this.status,
     required this.supervisorId,
     required this.supervisorName,
+    required this.primaryColor,
+    required this.darkAccent,
   });
 
   @override
-  _ApprovalListState createState() => _ApprovalListState();
+  State<ApprovalList> createState() => _ApprovalListState();
 }
 
 class _ApprovalListState extends State<ApprovalList> {
@@ -124,52 +222,59 @@ class _ApprovalListState extends State<ApprovalList> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    debugPrint(
-      'ApprovalList: Querying for supervisorName="${widget.supervisorName}" with status="${widget.status}"',
-    );
-    debugPrint(
-      'ApprovalList: OrgID from FirestoreService is "${FirestoreService.currentOrgId}"',
-    );
-
     return Column(
       children: [
         if (!FirestoreService.isReady)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            color: cs.errorContainer,
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: cs.errorContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Text(
               'Firestore is not initialized. Please re-login.',
               style: TextStyle(color: cs.onErrorContainer),
               textAlign: TextAlign.center,
             ),
           ),
+        // Search Bar
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: TextField(
             controller: _searchController,
-            style: TextStyle(color: cs.onSurface),
+            style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
             decoration: InputDecoration(
-              hintText: 'Search by Request ID',
-              hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.5)),
-              prefixIcon: Icon(Icons.search, color: cs.primary),
+              hintText: 'Search by Request ID, Project...',
+              hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+              prefixIcon: Icon(Icons.search_rounded,
+                  color: widget.primaryColor, size: 18),
+              suffixIcon: _searchText.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchText = '');
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: Colors.white,
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: cs.primary),
-              ),
-              filled: true,
-              fillColor: cs.surface.withOpacity(0.3),
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 0,
-                horizontal: 16,
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: widget.primaryColor, width: 1.8),
               ),
             ),
             onChanged: (value) {
@@ -196,15 +301,13 @@ class _ApprovalListState extends State<ApprovalList> {
 
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
-                  child: CircularProgressIndicator(color: cs.primary),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(widget.primaryColor),
+                  ),
                 );
               }
 
-              // Filter by supervisorName or supervisorId in memory for robustness
               final allDocs = snapshot.data!.docs;
-              debugPrint(
-                'ApprovalList: Found ${allDocs.length} total documents for status "${widget.status}" in this OrgID',
-              );
 
               final docs = allDocs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
@@ -220,62 +323,74 @@ class _ApprovalListState extends State<ApprovalList> {
                 final searchName = widget.supervisorName.trim().toLowerCase();
                 final searchId = widget.supervisorId.trim().toLowerCase();
 
-                final isMatch = dbSupName == searchName || dbSupId == searchId;
-                if (!isMatch && allDocs.length < 5) {
-                  debugPrint(
-                    'ApprovalList: No match for doc ${doc.id}. DB(Name: "$dbSupName", ID: "$dbSupId") vs Search(Name: "$searchName", ID: "$searchId")',
-                  );
-                }
-                return isMatch;
+                return dbSupName == searchName || dbSupId == searchId;
               }).toList();
 
-              if (docs.isEmpty) {
+              final filteredDocs = docs.where((doc) {
+                if (_searchText.isEmpty) return true;
+                final data = doc.data() as Map<String, dynamic>;
+                final wsReqId = (data['wsReqId'] ?? '').toString().toLowerCase();
+                final projectName = (data['projectName'] ?? '').toString().toLowerCase();
+                final siteId = (data['siteId'] ?? '').toString().toLowerCase();
+                final query = _searchText.toLowerCase();
+                return wsReqId.contains(query) || projectName.contains(query) || siteId.contains(query);
+              }).toList();
+
+              if (filteredDocs.isEmpty) {
                 return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.inbox_outlined,
-                        size: 64,
-                        color: cs.onSurface.withOpacity(0.3),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No ${widget.status} requests found',
-                        style: TextStyle(
-                          color: cs.onSurface.withOpacity(0.6),
-                          fontSize: 16,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: widget.primaryColor.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            widget.status == 'Pending'
+                                ? Icons.pending_actions_rounded
+                                : Icons.verified_rounded,
+                            size: 48,
+                            color: widget.primaryColor,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(
+                          'No ${widget.status} Requests Found',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'For supervisor: ${widget.supervisorName}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }
 
-              if (_searchText.isNotEmpty) {
-                final idx = docs.indexWhere((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return (data['wsReqId'] ?? '')
-                      .toString()
-                      .toLowerCase()
-                      .contains(_searchText.toLowerCase());
-                });
-                if (idx != -1) {
-                  final match = docs.removeAt(idx);
-                  docs.insert(0, match);
-                }
-              }
-
               return ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: docs.length,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                itemCount: filteredDocs.length,
                 itemBuilder: (context, index) {
-                  var doc = docs[index];
-                  var data = doc.data() as Map<String, dynamic>;
+                  final doc = filteredDocs[index];
+                  final data = doc.data() as Map<String, dynamic>;
                   return ApprovalCard(
                     docId: doc.id,
                     data: data,
                     status: widget.status,
+                    primaryColor: widget.primaryColor,
+                    darkAccent: widget.darkAccent,
                   );
                 },
               );
@@ -291,16 +406,20 @@ class ApprovalCard extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> data;
   final String status;
+  final Color primaryColor;
+  final Color darkAccent;
 
   const ApprovalCard({
     super.key,
     required this.docId,
     required this.data,
     required this.status,
+    required this.primaryColor,
+    required this.darkAccent,
   });
 
   @override
-  _ApprovalCardState createState() => _ApprovalCardState();
+  State<ApprovalCard> createState() => _ApprovalCardState();
 }
 
 class _ApprovalCardState extends State<ApprovalCard>
@@ -309,203 +428,293 @@ class _ApprovalCardState extends State<ApprovalCard>
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final data = widget.data;
-    return GlassCard(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+    final isApproved = widget.status == 'Approved';
+
+    final statusBgColor = isApproved
+        ? const Color(0xFFECFDF5)
+        : const Color(0xFFFFFBEB);
+    final statusTextColor = isApproved
+        ? const Color(0xFF059669)
+        : const Color(0xFFD97706);
+    final statusBorderColor = isApproved
+        ? const Color(0xFF6EE7B7)
+        : const Color(0xFFFDE68A);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         child: Column(
           children: [
             // Header Row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Request ID: ${data['wsReqId']}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: cs.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          data['projectName'] ?? '',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: cs.onSurface.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: _expanded ? 0.5 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.keyboard_arrow_down,
-                        size: 32,
-                        color: cs.primary,
+            InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: widget.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _expanded = !_expanded;
-                        });
-                      },
+                      child: Icon(
+                        Icons.calendar_month_rounded,
+                        color: widget.primaryColor,
+                        size: 22,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                data['wsReqId'] ?? 'Request',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14.5,
+                                  color: widget.darkAccent,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusBgColor,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: statusBorderColor),
+                                ),
+                                child: Text(
+                                  data['approvalStatus'] ?? widget.status,
+                                  style: TextStyle(
+                                    color: statusTextColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            data['projectName'] ?? 'Project',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0.0,
+                      duration: const Duration(milliseconds: 300),
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 24,
+                        color: widget.darkAccent,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            // Animated details
-            if (_expanded)
+            // Expanded details
+            if (_expanded) ...[
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildInfoRow('Site ID', data['siteId'] ?? '-'),
+                    _buildInfoRow('Supervisor', data['supervisorName'] ?? '-'),
+                    _buildInfoRow('Project Stage', data['projectStage'] ?? '-'),
+                    const SizedBox(height: 12),
+
+                    // Metrics Grid (Days & Payment)
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
+                        Expanded(
+                          child: _buildMetricCard(
+                            'Requested Days',
+                            '${data['reqDays'] ?? 0} Days',
+                            Icons.timelapse_rounded,
+                            widget.primaryColor,
                           ),
-                          decoration: BoxDecoration(
-                            color: widget.status == 'Pending'
-                                ? Colors.orange.withOpacity(0.2)
-                                : Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            data['approvalStatus'],
-                            style: TextStyle(
-                              color: widget.status == 'Pending'
-                                  ? Colors.orange
-                                  : Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildMetricCard(
+                            'Approved Days',
+                            data['appDays'] != null
+                                ? '${data['appDays']} Days'
+                                : 'Pending',
+                            Icons.check_circle_outline_rounded,
+                            isApproved
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF59E0B),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Divider(color: cs.outlineVariant),
-                    const SizedBox(height: 8),
-                    _buildInfoRow('Site', data['siteId'], cs),
-                    _buildInfoRow('Supervisor', data['supervisorName'], cs),
-                    _buildInfoRow('Project', data['projectName'], cs),
-                    _buildInfoRow('Stage', data['projectStage'], cs),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildDaysBox(
-                          'Requested Days',
-                          data['reqDays'].toString(),
-                          cs,
+                        Expanded(
+                          child: _buildMetricCard(
+                            'Estimated Cost',
+                            '₹${data['estimatedPayment'] ?? 0}',
+                            Icons.payments_outlined,
+                            const Color(0xFF6366F1),
+                          ),
                         ),
-                        _buildDaysBox(
-                          'Approved Days',
-                          data['appDays']?.toString() ?? '-',
-                          cs,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildPaymentBox(
-                          'Estimated',
-                          data['estimatedPayment'].toString(),
-                          cs,
-                        ),
-                        _buildPaymentBox(
-                          'Approved',
-                          data['approvedPayment']?.toString() ?? '-',
-                          cs,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildMetricCard(
+                            'Approved Cost',
+                            data['approvedPayment'] != null
+                                ? '₹${data['approvedPayment']}'
+                                : 'Pending',
+                            Icons.account_balance_wallet_outlined,
+                            isApproved
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF59E0B),
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      'Labour Details:',
+
+                    // Labour Details Tables
+                    const Text(
+                      'Labour Allocation:',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: cs.primary,
+                        fontSize: 13,
+                        color: Color(0xFF0F172A),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _buildLabourTable(data['reqLabours'], 'Requested', cs),
-                    if (data['appLabours'] != null)
-                      Column(
-                        children: [
-                          const SizedBox(height: 12),
-                          _buildLabourTable(data['appLabours'], 'Approved', cs),
-                        ],
+                    if (data['reqLabours'] is List &&
+                        (data['reqLabours'] as List).isNotEmpty)
+                      _buildLabourTable(
+                        data['reqLabours'] as List<dynamic>,
+                        'Requested Roles',
                       ),
+                    if (data['appLabours'] is List &&
+                        (data['appLabours'] as List).isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildLabourTable(
+                        data['appLabours'] as List<dynamic>,
+                        'Approved Roles',
+                      ),
+                    ],
                   ],
                 ),
               ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value, ColorScheme cs) {
+  Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: cs.primary.withOpacity(0.8),
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-          Text(value, style: TextStyle(color: cs.onSurface)),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDaysBox(String label, String value, ColorScheme cs) {
+  Widget _buildMetricCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.primary.withOpacity(0.3)),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, color: cs.primary.withOpacity(0.8)),
+          Row(
+            children: [
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: cs.primary,
+              color: color,
             ),
           ),
         ],
@@ -513,101 +722,74 @@ class _ApprovalCardState extends State<ApprovalCard>
     );
   }
 
-  Widget _buildPaymentBox(String label, String value, ColorScheme cs) {
+  Widget _buildLabourTable(List<dynamic> labours, String title) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: cs.secondary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.secondary.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.secondary.withOpacity(0.8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            color: const Color(0xFFF1F5F9),
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 11.5,
+                color: Color(0xFF475569),
+              ),
             ),
           ),
-          Text(
-            '₹$value',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: cs.secondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLabourTable(
-    List<dynamic> labours,
-    String title,
-    ColorScheme cs,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: cs.primary.withOpacity(0.7),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Table(
-          columnWidths: const {
-            0: FlexColumnWidth(3),
-            1: FlexColumnWidth(2),
-            2: FlexColumnWidth(2),
-          },
-          border: TableBorder.all(
-            color: cs.outlineVariant,
-            width: 1,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          children: [
-            TableRow(
-              decoration: BoxDecoration(color: cs.primary.withOpacity(0.1)),
-              children: [
-                _buildTableHeaderCell('Designation', cs),
-                _buildTableHeaderCell('Count', cs),
-                // _buildTableHeaderCell('Salary', cs),
-              ],
-            ),
-            ...labours.map((labour) {
+          Table(
+            columnWidths: const {
+              0: FlexColumnWidth(3),
+              1: FlexColumnWidth(1.5),
+            },
+            children: labours.map((labour) {
               return TableRow(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
+                  ),
+                ),
                 children: [
-                  _buildTableCell(labour['labourDesignation'], cs),
-                  _buildTableCell(labour['labourCount'].toString(), cs),
-                  // _buildTableCell('₹${labour['salary']}', cs),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      labour['labourDesignation'] ?? '',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      '${labour['labourCount'] ?? 0} Persons',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
                 ],
               );
-            }),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTableHeaderCell(String text, ColorScheme cs) {
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: Text(
-        text,
-        style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
+            }).toList(),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildTableCell(String text, ColorScheme cs) {
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: Text(text, style: TextStyle(color: cs.onSurface)),
     );
   }
 }

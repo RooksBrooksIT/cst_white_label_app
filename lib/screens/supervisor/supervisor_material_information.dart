@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import '/utils/responsive.dart';
 import '/services/firestore_service.dart';
-import '/widgets/glass_scaffold.dart';
-import '/widgets/glass_card.dart';
-import '/widgets/glass_text_field.dart';
-import '/widgets/glass_button.dart';
+import '/utils/app_theme.dart';
 
 class SupervisorMaterialInfoScreen extends StatefulWidget {
   const SupervisorMaterialInfoScreen({super.key});
@@ -802,39 +798,81 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      title: 'Material Information',
-      onBack: () => Navigator.of(context).pop(),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.help_outline, size: Responsive.scaleH(context, 22)),
-          onPressed: () => _showHelpDialog(context),
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Material Information',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
         ),
-        SizedBox(width: Responsive.scaleH(context, 8)),
-      ],
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline_rounded,
+                color: Colors.white, size: 22),
+            onPressed: () => _showHelpDialog(context, primaryColor),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 800),
           child: _isLoadingSites || _isLoadingMaterials
               ? Center(
                   child: CircularProgressIndicator(
-                    color: Theme.of(context).colorScheme.primary,
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
                   ),
                 )
               : Column(
                   children: [
-                    _buildModeToggle(),
+                    const SizedBox(height: 12),
+                    _buildModeToggle(primaryColor, darkAccent),
                     Expanded(
                       child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
-                        padding: EdgeInsets.all(Responsive.scaleH(context, 16)),
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             if (_transferMode == 0)
-                              ..._buildSiteToSiteUI()
+                              ..._buildSiteToSiteUI(primaryColor, darkAccent)
                             else
-                              ..._buildSiteToCompanyUI(),
+                              ..._buildSiteToCompanyUI(primaryColor, darkAccent),
                           ],
                         ),
                       ),
@@ -846,39 +884,113 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     );
   }
 
-  Widget _buildModeToggle() {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: Responsive.scaleH(context, 16),
-        vertical: Responsive.scaleV(context, 8),
+  Widget _buildModeToggle(Color primaryColor, Color darkAccent) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: GlassCard(
-        padding: EdgeInsets.all(Responsive.scaleH(context, 4)),
-        child: Row(
-          children: [
-            Expanded(
-              child: _buildToggleButton(
-                title: 'Site to Site',
-                isSelected: _transferMode == 0,
-                onTap: () => setState(() {
-                  _transferMode = 0;
-                  _selectedMaterialName = null;
-                  availableCount = 0;
-                  _neededCountController.clear();
-                }),
-              ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildToggleButton(
+              title: 'Site to Site',
+              icon: Icons.swap_horiz_rounded,
+              isSelected: _transferMode == 0,
+              primaryColor: primaryColor,
+              darkAccent: darkAccent,
+              onTap: () => setState(() {
+                _transferMode = 0;
+                _selectedMaterialName = null;
+                availableCount = 0;
+                _neededCountController.clear();
+              }),
             ),
-            SizedBox(width: Responsive.scaleH(context, 8)),
-            Expanded(
-              child: _buildToggleButton(
-                title: 'Return to Company',
-                isSelected: _transferMode == 1,
-                onTap: () => setState(() {
-                  _transferMode = 1;
-                  _selectedMaterialName = null;
-                  availableCount = 0;
-                  _neededCountController.clear();
-                }),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _buildToggleButton(
+              title: 'Return to Company',
+              icon: Icons.assignment_return_rounded,
+              isSelected: _transferMode == 1,
+              primaryColor: primaryColor,
+              darkAccent: darkAccent,
+              onTap: () => setState(() {
+                _transferMode = 1;
+                _selectedMaterialName = null;
+                availableCount = 0;
+                _neededCountController.clear();
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleButton({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required Color primaryColor,
+    required Color darkAccent,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    darkAccent,
+                    Color.alphaBlend(
+                      primaryColor.withValues(alpha: 0.35),
+                      darkAccent,
+                    ),
+                  ],
+                )
+              : null,
+          color: isSelected ? null : Colors.transparent,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: darkAccent.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF64748B),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                fontSize: 13,
               ),
             ),
           ],
@@ -887,503 +999,702 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     );
   }
 
-  Widget _buildToggleButton({
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    final primaryColor = Theme.of(context).primaryColor;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(vertical: Responsive.scaleV(context, 10)),
+  List<Widget> _buildSiteToSiteUI(Color primaryColor, Color darkAccent) {
+    return [
+      _buildSectionHeader('From Site (Source)', Icons.outbox_rounded, primaryColor),
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-          border: isSelected
-              ? null
-              : Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1), width: 1.5),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
-        child: Center(
-          child: Text(
-            title,
-            style: TextStyle(
-              color: isSelected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              fontWeight: FontWeight.bold,
-              fontSize: Responsive.fontSize(context, 13),
+        child: Column(
+          children: [
+            _buildTextField(
+              controller: _fromManagerController,
+              label: 'Manager Name *',
+              hint: 'Enter manager name',
+              icon: Icons.person_rounded,
+              primaryColor: primaryColor,
             ),
-          ),
+            const SizedBox(height: 12),
+            _buildSiteDropdownGeneric(
+              'Source Site ID *',
+              _fromSiteId,
+              sitesList,
+              primaryColor,
+              (v) async {
+                final site = sitesList.firstWhere(
+                  (s) => s['siteId'] == v,
+                  orElse: () => {},
+                );
+                setState(() {
+                  _fromSiteId = v;
+                  _fromSiteNameController.text =
+                      site['siteName']?.toString() ?? '';
+                  _fromProjectNameController.text =
+                      site['projectName']?.toString() ?? '';
+                  _fromSupervisorController.text =
+                      site['supervisorName']?.toString() ?? '';
+                  _selectedMaterialName = null;
+                  availableCount = 0;
+                  _neededCountController.clear();
+                  _isLoadingMaterials = true;
+                });
+                await _loadSiteMaterialData(v);
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _fromSiteNameController,
+              label: 'Site Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.location_on_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _fromProjectNameController,
+              label: 'Project Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.business_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _fromSupervisorController,
+              label: 'Supervisor Name',
+              hint: '',
+              enabled: false,
+              icon: Icons.supervisor_account_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _fromDateController,
+              label: 'Transfer Date *',
+              hint: 'Select date',
+              onTap: () => _selectDate(context, _fromDateController),
+              icon: Icons.calendar_month_rounded,
+              primaryColor: primaryColor,
+            ),
+          ],
         ),
       ),
-    );
-  }
 
-  List<Widget> _buildSiteToSiteUI() {
-    return [
-      _buildSectionHeader('From Site'),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _fromManagerController,
-        label: 'Manager Name *',
-        hint: 'Enter manager name',
-        icon: Icons.person,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildSiteDropdownGeneric('Site ID *', _fromSiteId, sitesList, (v) async {
-        final site = sitesList.firstWhere(
-          (s) => s['siteId'] == v,
-          orElse: () => {},
-        );
-        setState(() {
-          _fromSiteId = v;
-          _fromSiteNameController.text = site['siteName']?.toString() ?? '';
-          _fromProjectNameController.text = site['projectName']?.toString() ?? '';
-          _fromSupervisorController.text =
-              site['supervisorName']?.toString() ?? '';
-          _selectedMaterialName = null;
-          availableCount = 0;
-          _neededCountController.clear();
-          _isLoadingMaterials = true;
-        });
-        await _loadSiteMaterialData(v);
-      }),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _fromSiteNameController,
-        label: 'Site Name',
-        hint: 'Auto-filled from selection',
-        enabled: false,
-        icon: Icons.location_on,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _fromProjectNameController,
-        label: 'Project Name',
-        hint: 'Auto-filled from selection',
-        enabled: false,
-        icon: Icons.business,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _fromSupervisorController,
-        label: 'Supervisor Name',
-        hint: '',
-        enabled: false,
-        icon: Icons.supervisor_account,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _fromDateController,
-        label: 'Date *',
-        hint: 'Select date',
-        onTap: () => _selectDate(context, _fromDateController),
-        icon: Icons.calendar_today,
-      ),
-
-      SizedBox(height: Responsive.scaleV(context, 24)),
-      _buildSectionHeader('To Site'),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _toManagerController,
-        label: 'Manager Name *',
-        hint: 'Enter manager name',
-        icon: Icons.person,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildSiteDropdownGeneric('Site ID *', _toSiteId, sitesList, (v) {
-        final site = sitesList.firstWhere(
-          (s) => s['siteId'] == v,
-          orElse: () => {},
-        );
-        setState(() {
-          _toSiteId = v;
-          _toSiteNameController.text = site['siteName']?.toString() ?? '';
-          _toProjectNameController.text = site['projectName']?.toString() ?? '';
-          _toSupervisorController.text =
-              site['supervisorName']?.toString() ?? '';
-        });
-      }),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _toSiteNameController,
-        label: 'Site Name',
-        hint: 'Auto-filled from selection',
-        enabled: false,
-        icon: Icons.location_on,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _toProjectNameController,
-        label: 'Project Name',
-        hint: 'Auto-filled from selection',
-        enabled: false,
-        icon: Icons.business,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _toSupervisorController,
-        label: 'Supervisor Name',
-        hint: 'Auto-filled from selection',
-        enabled: false,
-        icon: Icons.supervisor_account,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildTextField(
-        controller: _toDateController,
-        label: 'Date *',
-        hint: 'Select date',
-        onTap: () => _selectDate(context, _toDateController),
-        icon: Icons.calendar_today,
-      ),
-
-      SizedBox(height: Responsive.scaleV(context, 24)),
-      _buildSectionHeader('Materials'),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      _buildMaterialDropdown(),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-      Row(
-        children: [
-          Expanded(
-            child: _buildCountBox(
-              'Available Count',
-              availableCount.toString(),
-              availableCount > 0 ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error,
-              Icons.inventory,
+      const SizedBox(height: 18),
+      _buildSectionHeader('To Site (Destination)', Icons.move_to_inbox_rounded, primaryColor),
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            _buildTextField(
+              controller: _toManagerController,
+              label: 'Manager Name *',
+              hint: 'Enter manager name',
+              icon: Icons.person_rounded,
+              primaryColor: primaryColor,
             ),
-          ),
-          SizedBox(width: Responsive.scaleH(context, 16)),
-          Expanded(
-            child: _buildTextField(
-              controller: _neededCountController,
-              label: 'Needed Count *',
-              hint: 'Enter count',
-              keyboardType: TextInputType.number,
-              icon: Icons.edit,
+            const SizedBox(height: 12),
+            _buildSiteDropdownGeneric(
+              'Destination Site ID *',
+              _toSiteId,
+              sitesList,
+              primaryColor,
+              (v) {
+                final site = sitesList.firstWhere(
+                  (s) => s['siteId'] == v,
+                  orElse: () => {},
+                );
+                setState(() {
+                  _toSiteId = v;
+                  _toSiteNameController.text =
+                      site['siteName']?.toString() ?? '';
+                  _toProjectNameController.text =
+                      site['projectName']?.toString() ?? '';
+                  _toSupervisorController.text =
+                      site['supervisorName']?.toString() ?? '';
+                });
+              },
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _toSiteNameController,
+              label: 'Site Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.location_on_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _toProjectNameController,
+              label: 'Project Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.business_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _toSupervisorController,
+              label: 'Supervisor Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.supervisor_account_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _toDateController,
+              label: 'Receipt Date *',
+              hint: 'Select date',
+              onTap: () => _selectDate(context, _toDateController),
+              icon: Icons.calendar_month_rounded,
+              primaryColor: primaryColor,
+            ),
+          ],
+        ),
       ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
 
-      Row(
-        children: [
-          Expanded(
-            child: GlassButton(onPressed: _addMaterial, label: 'Add Material'),
-          ),
-          SizedBox(width: Responsive.scaleH(context, 16)),
-          Expanded(
-            child: GlassButton(
-              onPressed: _clearMaterial,
-              label: 'Clear',
-              isSecondary: true,
+      const SizedBox(height: 18),
+      _buildSectionHeader('Materials Selection', Icons.inventory_2_rounded, primaryColor),
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            _buildMaterialDropdown(primaryColor),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCountBox(
+                    'Available Stock',
+                    availableCount.toString(),
+                    availableCount > 0
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFEF4444),
+                    Icons.inventory_rounded,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTextField(
+                    controller: _neededCountController,
+                    label: 'Needed Quantity *',
+                    hint: 'Enter quantity',
+                    keyboardType: TextInputType.number,
+                    icon: Icons.pin_rounded,
+                    primaryColor: primaryColor,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: _clearMaterial,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Clear',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: _addMaterial,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_rounded, size: 18),
+                          SizedBox(width: 6),
+                          Text('Add Material',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
 
       if (materialsToTransfer.isNotEmpty) ...[
-        _buildMaterialsList(),
-        SizedBox(height: Responsive.scaleV(context, 16)),
+        const SizedBox(height: 16),
+        _buildMaterialsList(primaryColor),
       ],
 
-      SizedBox(height: Responsive.scaleV(context, 24)),
-      _buildSectionHeader('Final Actions'),
-      SizedBox(height: Responsive.scaleV(context, 16)),
+      const SizedBox(height: 20),
+      _buildTransferInfoBox(
+        'Materials will be transferred directly between the selected sites. Inventory levels will be updated atomically for both sites.',
+      ),
 
+      const SizedBox(height: 20),
       Row(
         children: [
           Expanded(
-            child: GlassButton(
-              onPressed: () => Navigator.of(context).pop(),
-              label: 'Cancel',
-              isSecondary: true,
+            child: SizedBox(
+              height: 48,
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF64748B),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('CANCEL',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ),
-          SizedBox(width: Responsive.scaleH(context, 16)),
+          const SizedBox(width: 14),
           Expanded(
-            child: GlassButton(
-              onPressed: () {
-                if (_validateSiteToSiteForm()) {
-                  _saveSiteToSiteTransfer();
-                }
-              },
-              label: 'Transfer',
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (_validateSiteToSiteForm()) {
+                    _saveSiteToSiteTransfer();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 3,
+                  shadowColor: primaryColor.withValues(alpha: 0.35),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('TRANSFER MATERIALS',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ),
         ],
-      ),
-      SizedBox(height: Responsive.scaleV(context, 20)),
-      _buildTransferInfoBox(
-        'Materials will be transferred directly between the selected sites. Inventory levels will be updated for both sites.',
       ),
     ];
   }
 
-  List<Widget> _buildSiteToCompanyUI() {
+  List<Widget> _buildSiteToCompanyUI(Color primaryColor, Color darkAccent) {
     return [
-      _buildSectionHeader('Site Information'),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
-      _buildTextField(
-        controller: _siteToCompanyManagerController,
-        label: 'Manager Name *',
-        hint: 'Enter manager name',
-        icon: Icons.person,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
-      _buildSiteDropdownGeneric('Site ID *', _selectedSiteId, sitesList, (
-        v,
-      ) async {
-        final site = sitesList.firstWhere(
-          (s) => s['siteId'] == v,
-          orElse: () => {},
-        );
-        setState(() {
-          _selectedSiteId = v;
-          _siteToCompanySiteNameController.text =
-              site['siteName']?.toString() ?? '';
-          _siteToCompanySupervisorController.text =
-              site['supervisorName']?.toString() ?? '';
-          _projectNameController.text = site['projectName']?.toString() ?? '';
-          _selectedMaterialName = null;
-          availableCount = 0;
-          _neededCountController.clear();
-          _isLoadingMaterials = true;
-        });
-        await _loadSiteMaterialData(v);
-      }),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
-      _buildTextField(
-        controller: _siteToCompanySiteNameController,
-        label: 'Site Name',
-        hint: 'Auto-filled from selection',
-        enabled: false,
-        icon: Icons.location_on,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
-      _buildTextField(
-        controller: _projectNameController,
-        label: 'Project Name',
-        hint: 'Auto-filled from selection',
-        enabled: false,
-        icon: Icons.business,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
-      _buildTextField(
-        controller: _siteToCompanySupervisorController,
-        label: 'Supervisor Name',
-        hint: 'Auto-filled from selection',
-        enabled: false,
-        icon: Icons.supervisor_account,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
-      _buildTextField(
-        controller: _siteToCompanyDateController,
-        label: 'Date *',
-        hint: 'Select date',
-        onTap: () => _selectDate(context, _siteToCompanyDateController),
-        icon: Icons.calendar_today,
-      ),
-      SizedBox(height: Responsive.scaleV(context, 24)),
-
-      _buildSectionHeader('Materials to Return'),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
-      _buildMaterialDropdown(),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
-      Row(
-        children: [
-          Expanded(
-            child: _buildCountBox(
-              'Available Count',
-              availableCount.toString(),
-              availableCount > 0 ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error,
-              Icons.inventory,
+      _buildSectionHeader('Site Information', Icons.apartment_rounded, primaryColor),
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            _buildTextField(
+              controller: _siteToCompanyManagerController,
+              label: 'Manager Name *',
+              hint: 'Enter manager name',
+              icon: Icons.person_rounded,
+              primaryColor: primaryColor,
             ),
-          ),
-          SizedBox(width: Responsive.scaleH(context, 16)),
-          Expanded(
-            child: _buildTextField(
-              controller: _neededCountController,
-              label: 'Return Count *',
-              hint: 'Enter count to return',
-              keyboardType: TextInputType.number,
-              icon: Icons.edit,
+            const SizedBox(height: 12),
+            _buildSiteDropdownGeneric(
+              'Site ID *',
+              _selectedSiteId,
+              sitesList,
+              primaryColor,
+              (v) async {
+                final site = sitesList.firstWhere(
+                  (s) => s['siteId'] == v,
+                  orElse: () => {},
+                );
+                setState(() {
+                  _selectedSiteId = v;
+                  _siteToCompanySiteNameController.text =
+                      site['siteName']?.toString() ?? '';
+                  _siteToCompanySupervisorController.text =
+                      site['supervisorName']?.toString() ?? '';
+                  _projectNameController.text =
+                      site['projectName']?.toString() ?? '';
+                  _selectedMaterialName = null;
+                  availableCount = 0;
+                  _neededCountController.clear();
+                  _isLoadingMaterials = true;
+                });
+                await _loadSiteMaterialData(v);
+              },
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _siteToCompanySiteNameController,
+              label: 'Site Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.location_on_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _projectNameController,
+              label: 'Project Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.business_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _siteToCompanySupervisorController,
+              label: 'Supervisor Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.supervisor_account_rounded,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _siteToCompanyDateController,
+              label: 'Return Date *',
+              hint: 'Select date',
+              onTap: () => _selectDate(context, _siteToCompanyDateController),
+              icon: Icons.calendar_month_rounded,
+              primaryColor: primaryColor,
+            ),
+          ],
+        ),
       ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
 
-      Row(
-        children: [
-          Expanded(
-            child: GlassButton(onPressed: _addMaterial, label: 'Add Material'),
-          ),
-          SizedBox(width: Responsive.scaleH(context, 16)),
-          Expanded(
-            child: GlassButton(
-              onPressed: _clearMaterial,
-              label: 'Clear',
-              isSecondary: true,
+      const SizedBox(height: 18),
+      _buildSectionHeader('Materials to Return', Icons.inventory_2_rounded, primaryColor),
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            _buildMaterialDropdown(primaryColor),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCountBox(
+                    'Available Stock',
+                    availableCount.toString(),
+                    availableCount > 0
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFEF4444),
+                    Icons.inventory_rounded,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTextField(
+                    controller: _neededCountController,
+                    label: 'Return Count *',
+                    hint: 'Enter return count',
+                    keyboardType: TextInputType.number,
+                    icon: Icons.pin_rounded,
+                    primaryColor: primaryColor,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: _clearMaterial,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Clear',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: _addMaterial,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_rounded, size: 18),
+                          SizedBox(width: 6),
+                          Text('Add Material',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      SizedBox(height: Responsive.scaleV(context, 16)),
 
       if (materialsToTransfer.isNotEmpty) ...[
-        _buildMaterialsList(),
-        SizedBox(height: Responsive.scaleV(context, 16)),
+        const SizedBox(height: 16),
+        _buildMaterialsList(primaryColor),
       ],
 
-      SizedBox(height: Responsive.scaleV(context, 24)),
+      const SizedBox(height: 20),
+      _buildTransferInfoBox(
+        'Materials are returned from site to central company inventory. Stock counts will be updated automatically.',
+      ),
 
-      _buildSectionHeader('Final Actions'),
-      SizedBox(height: Responsive.scaleV(context, 16)),
-
+      const SizedBox(height: 20),
       Row(
         children: [
           Expanded(
-            child: GlassButton(
-              onPressed: () => Navigator.of(context).pop(),
-              label: 'Cancel',
-              isSecondary: true,
+            child: SizedBox(
+              height: 48,
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF64748B),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('CANCEL',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ),
-          SizedBox(width: Responsive.scaleH(context, 16)),
+          const SizedBox(width: 14),
           Expanded(
-            child: GlassButton(
-              onPressed: () {
-                if (_validateSiteToCompanyForm()) {
-                  _saveSiteToCompanyTransfer();
-                }
-              },
-              label: 'Return',
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (_validateSiteToCompanyForm()) {
+                    _saveSiteToCompanyTransfer();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 3,
+                  shadowColor: primaryColor.withValues(alpha: 0.35),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('RETURN TO COMPANY',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ),
         ],
-      ),
-      SizedBox(height: Responsive.scaleV(context, 20)),
-      _buildTransferInfoBox(
-        'Materials are returned from site to company. Inventory levels will be updated automatically.',
       ),
     ];
   }
 
-  void _showSuccessDialogSiteToSite() {
+  void _showSuccessDialogSiteToSite([Color? primaryColor]) {
+    final effectivePrimary =
+        primaryColor ?? Theme.of(context).colorScheme.primary;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Colors.transparent,
-          contentPadding: EdgeInsets.zero,
-          content: GlassCard(
-            padding: EdgeInsets.all(Responsive.scaleH(context, 24)),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  color: Colors.green,
-                  size: Responsive.scaleH(context, 64),
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.all(24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFECFDF5),
+                  shape: BoxShape.circle,
                 ),
-                SizedBox(height: Responsive.scaleV(context, 16)),
-                Text(
-                  'Transfer Successful!',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: Responsive.fontSize(context, 20),
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF10B981),
+                  size: 48,
                 ),
-                SizedBox(height: Responsive.scaleV(context, 12)),
-                Text(
-                  'Materials have been transferred successfully between sites.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: Responsive.fontSize(context, 14),
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                  ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Transfer Successful!',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Color(0xFF0F172A),
                 ),
-                SizedBox(height: Responsive.scaleV(context, 24)),
-                _buildInfoItem('From: ${_fromSiteNameController.text}'),
-                _buildInfoItem('To: ${_toSiteNameController.text}'),
-                _buildInfoItem('Date: ${_fromDateController.text}'),
-                SizedBox(height: Responsive.scaleV(context, 24)),
-                GlassButton(
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Materials have been transferred successfully between sites.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildInfoItem('From: ${_fromSiteNameController.text}'),
+              _buildInfoItem('To: ${_toSiteNameController.text}'),
+              _buildInfoItem('Date: ${_fromDateController.text}'),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                     _clearSiteToSiteFields();
                   },
-                  label: 'OK',
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: effectivePrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('OK',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  void _showSuccessDialogSiteToCompany() {
+  void _showSuccessDialogSiteToCompany([Color? primaryColor]) {
+    final effectivePrimary =
+        primaryColor ?? Theme.of(context).colorScheme.primary;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Colors.transparent,
-          contentPadding: EdgeInsets.zero,
-          content: GlassCard(
-            padding: EdgeInsets.all(Responsive.scaleH(context, 24)),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  color: Colors.green,
-                  size: Responsive.scaleH(context, 64),
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.all(24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFECFDF5),
+                  shape: BoxShape.circle,
                 ),
-                SizedBox(height: Responsive.scaleV(context, 16)),
-                Text(
-                  'Return Successful!',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: Responsive.fontSize(context, 20),
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF10B981),
+                  size: 48,
                 ),
-                SizedBox(height: Responsive.scaleV(context, 12)),
-                Text(
-                  'Materials have been returned to company successfully.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: Responsive.fontSize(context, 14),
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                  ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Return Successful!',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Color(0xFF0F172A),
                 ),
-                SizedBox(height: Responsive.scaleV(context, 24)),
-                _buildInfoItem(
-                  'Site: ${_siteToCompanySiteNameController.text}',
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Materials have been returned to company successfully.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
                 ),
-                _buildInfoItem('Date: ${_siteToCompanyDateController.text}'),
-                SizedBox(height: Responsive.scaleV(context, 24)),
-                GlassButton(
+              ),
+              const SizedBox(height: 16),
+              _buildInfoItem('Site: ${_siteToCompanySiteNameController.text}'),
+              _buildInfoItem('Date: ${_siteToCompanyDateController.text}'),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                     _clearSiteToCompanyFields();
                   },
-                  label: 'OK',
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: effectivePrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('OK',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -1395,103 +1706,126 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       SnackBar(
         content: Text(
           message,
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 14),
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: const TextStyle(fontSize: 13.5, color: Colors.white),
         ),
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
+        backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Responsive.scaleH(context, 8)),
+          borderRadius: BorderRadius.circular(10),
         ),
-        margin: EdgeInsets.all(Responsive.scaleH(context, 16)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
 
-  void _showHelpDialog(BuildContext context) {
+  void _showHelpDialog(BuildContext context, [Color? primaryColor]) {
+    final effectivePrimary =
+        primaryColor ?? Theme.of(context).colorScheme.primary;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.transparent,
-        contentPadding: EdgeInsets.zero,
-        content: GlassCard(
-          padding: EdgeInsets.all(Responsive.scaleH(context, 24)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'About Material Transfer',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 18),
-                  color: Theme.of(context).colorScheme.onSurface,
+        backgroundColor: Colors.white,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: effectivePrimary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.help_outline_rounded,
+                      color: effectivePrimary, size: 20),
                 ),
-              ),
-              SizedBox(height: Responsive.scaleV(context, 16)),
-              _buildHelpItem(
-                Icons.sync_alt,
-                'Site to Site',
-                'Transfer materials between two different project sites.',
-              ),
-              SizedBox(height: Responsive.scaleV(context, 12)),
-              _buildHelpItem(
-                Icons.business,
-                'Return to Company',
-                'Send materials from a site back to the central company inventory.',
-              ),
-              SizedBox(height: Responsive.scaleV(context, 12)),
-              _buildHelpItem(
-                Icons.inventory,
-                'Real-time Tracking',
-                'Inventory levels for all sites are updated automatically upon transfer confirmation.',
-              ),
-              SizedBox(height: Responsive.scaleV(context, 24)),
-              Align(
-                alignment: Alignment.centerRight,
-                child: GlassButton(
-                  onPressed: () => Navigator.pop(context),
-                  label: 'Got it',
+                const SizedBox(width: 10),
+                const Text(
+                  'About Material Transfer',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildHelpItem(
+              Icons.swap_horiz_rounded,
+              'Site to Site',
+              'Transfer materials directly between two project sites.',
+              effectivePrimary,
+            ),
+            const SizedBox(height: 12),
+            _buildHelpItem(
+              Icons.assignment_return_rounded,
+              'Return to Company',
+              'Send unused materials from site back to central inventory.',
+              effectivePrimary,
+            ),
+            const SizedBox(height: 12),
+            _buildHelpItem(
+              Icons.inventory_2_rounded,
+              'Real-time Tracking',
+              'Site & company inventory levels update automatically upon transfer.',
+              effectivePrimary,
+            ),
+            const SizedBox(height: 20),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: effectivePrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('Got it'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHelpItem(IconData icon, String title, String description) {
+  Widget _buildHelpItem(
+    IconData icon,
+    String title,
+    String description,
+    Color primaryColor,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          color: Theme.of(context).colorScheme.primary,
-          size: Responsive.scaleH(context, 20),
-        ),
-        SizedBox(width: Responsive.scaleH(context, 12)),
+        Icon(icon, color: primaryColor, size: 18),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: Responsive.fontSize(context, 14),
-                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 13.5,
+                  color: Color(0xFF0F172A),
                 ),
               ),
-              SizedBox(height: Responsive.scaleV(context, 2)),
+              const SizedBox(height: 2),
               Text(
                 description,
-                style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 12),
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
@@ -1500,8 +1834,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       ],
     );
   }
-
-  // --- Consolidated UI Helper Methods ---
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -1511,61 +1843,66 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     IconData? icon,
     TextInputType keyboardType = TextInputType.text,
     VoidCallback? onTap,
+    required Color primaryColor,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (onTap != null)
-          InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
-            child: IgnorePointer(
-              child: GlassTextField(
-                controller: controller,
-                label: label,
-                icon: icon ?? Icons.text_fields,
-                keyboardType: keyboardType,
-                readOnly: true,
-              ),
-            ),
-          )
-        else
-          GlassTextField(
-            controller: controller,
-            label: label,
-            icon: icon ?? Icons.text_fields,
-            keyboardType: keyboardType,
-            readOnly: !enabled,
-          ),
-      ],
+    return TextField(
+      controller: controller,
+      readOnly: onTap != null || !enabled,
+      onTap: onTap,
+      keyboardType: keyboardType,
+      style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+        hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
+        prefixIcon: icon != null
+            ? Icon(icon, color: primaryColor, size: 18)
+            : null,
+        isDense: true,
+        filled: true,
+        fillColor: enabled ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 1.8),
+        ),
+      ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: Responsive.scaleH(context, 12),
-        vertical: Responsive.scaleV(context, 8),
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(Responsive.scaleH(context, 12)),
-        border: Border(
-          left: BorderSide(
-            color: Theme.of(context).colorScheme.primary,
-            width: Responsive.scaleH(context, 4),
+  Widget _buildSectionHeader(String title, IconData icon, Color primaryColor) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: primaryColor, size: 16),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
           ),
         ),
-      ),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: Responsive.fontSize(context, 16),
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary,
-          letterSpacing: 0.5,
-        ),
-      ),
+      ],
     );
   }
 
@@ -1575,76 +1912,68 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     Color color,
     IconData icon,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(
-            left: Responsive.scaleH(context, 4),
-            bottom: Responsive.scaleV(context, 8),
-          ),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: Responsive.fontSize(context, 14),
-              color: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.color?.withOpacity(0.8),
-            ),
-          ),
-        ),
-        GlassCard(
-          padding: EdgeInsets.all(Responsive.scaleH(context, 14)),
-          child: Row(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Container(
-                padding: EdgeInsets.all(Responsive.scaleH(context, 8)),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: Responsive.scaleH(context, 20),
-                ),
-              ),
-              SizedBox(width: Responsive.scaleH(context, 12)),
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
               Text(
-                value,
+                title,
                 style: TextStyle(
-                  fontSize: Responsive.fontSize(context, 18),
-                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                   color: color,
                 ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTransferInfoBox(String text) {
-    return GlassCard(
-      padding: EdgeInsets.all(Responsive.scaleH(context, 12)),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.info_outline,
-            color: Theme.of(context).colorScheme.primary,
-            size: Responsive.scaleH(context, 20),
+          const Icon(
+            Icons.info_outline_rounded,
+            color: Color(0xFF3B82F6),
+            size: 18,
           ),
-          SizedBox(width: Responsive.scaleH(context, 12)),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                fontSize: Responsive.fontSize(context, 12),
-                color: Theme.of(context).textTheme.bodySmall?.color,
-                height: 1.5,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF1E40AF),
+                height: 1.4,
               ),
             ),
           ),
@@ -1653,115 +1982,131 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     );
   }
 
-  Widget _buildMaterialsList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(
-            left: Responsive.scaleH(context, 4),
-            bottom: Responsive.scaleV(context, 12),
-          ),
-          child: Text(
-            'Materials to Transfer:',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: Responsive.fontSize(context, 16),
-              color: Theme.of(context).textTheme.titleLarge?.color,
-            ),
-          ),
-        ),
-        GlassCard(
-          child: Column(
+  Widget _buildMaterialsList(Color primaryColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              ...materialsToTransfer.asMap().entries.map((entry) {
-                final index = entry.key;
-                final material = entry.value;
-                return Container(
-                  decoration: BoxDecoration(
-                    border: index < materialsToTransfer.length - 1
-                        ? Border(
-                            bottom: BorderSide(
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
-                            ),
-                          )
-                        : null,
+              const Text(
+                'Materials to Transfer',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${materialsToTransfer.length} items',
+                  style: TextStyle(
+                    color: primaryColor,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
                   ),
-                  child: ListTile(
-                    leading: Container(
-                      padding: EdgeInsets.all(Responsive.scaleH(context, 8)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: materialsToTransfer.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final material = materialsToTransfer[index];
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                        shape: BoxShape.circle,
+                        color: primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(
-                        Icons.inventory,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: Responsive.scaleH(context, 20),
+                      child: Icon(Icons.inventory_2_rounded,
+                          color: primaryColor, size: 16),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            material['displayName'] ?? '',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          Text(
+                            'Quantity: ${material['neededCount']} units',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: primaryColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    title: Text(
-                      material['displayName'],
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: Responsive.fontSize(context, 14),
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Quantity: ${material['neededCount']} units',
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(context, 12),
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                      ),
-                    ),
-                    trailing: IconButton(
-                      icon: Icon(
-                        Icons.delete_outline,
-                        color: Theme.of(context).colorScheme.error,
-                        size: Responsive.scaleH(context, 20),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Color(0xFFEF4444),
+                        size: 20,
                       ),
                       onPressed: () => _removeMaterial(index),
                     ),
-                  ),
-                );
-              }).toList(),
-            ],
+                  ],
+                ),
+              );
+            },
           ),
-        ),
-        SizedBox(height: Responsive.scaleV(context, 8)),
-        Text(
-          'Total Materials: ${materialsToTransfer.length}',
-          style: TextStyle(
-            fontSize: Responsive.fontSize(context, 12),
-            color: Theme.of(
-              context,
-            ).textTheme.bodySmall?.color?.withOpacity(0.7),
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildInfoItem(String text) {
     return Padding(
-      padding: EdgeInsets.only(bottom: Responsive.scaleV(context, 4)),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '• ',
-            style: TextStyle(
-              fontSize: Responsive.fontSize(context, 14),
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
+          const Text('• ',
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF10B981))),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                fontSize: Responsive.fontSize(context, 14),
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF334155),
               ),
             ),
           ),
@@ -1774,175 +2119,139 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     String label,
     String? selectedId,
     List<Map<String, dynamic>> sitesList,
+    Color primaryColor,
     ValueChanged<String?> onChanged,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.only(
-            left: Responsive.scaleH(context, 4),
-            bottom: Responsive.scaleV(context, 8),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: Responsive.fontSize(context, 14),
-              color: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.color?.withOpacity(0.8),
+        DropdownButtonFormField<String>(
+          value: selectedId,
+          style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle:
+                const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+            prefixIcon:
+                Icon(Icons.apartment_rounded, color: primaryColor, size: 18),
+            isDense: true,
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
             ),
           ),
-        ),
-        GlassCard(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.scaleH(context, 12),
-            vertical: Responsive.scaleV(context, 4),
-          ),
-          child: _isLoadingSites
-              ? Row(
-                  children: [
-                    SizedBox(
-                      width: Responsive.scaleH(context, 16),
-                      height: Responsive.scaleH(context, 16),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    SizedBox(width: Responsive.scaleH(context, 12)),
-                    Text(
-                      'Loading sites...',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: Responsive.fontSize(context, 14),
-                      ),
-                    ),
-                  ],
-                )
-              : DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: selectedId,
-                    isExpanded: true,
-                    dropdownColor: Theme.of(context).colorScheme.surface,
-                    hint: Text(
-                      'Select Site',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.outline,
-                        fontSize: Responsive.fontSize(context, 14),
-                      ),
-                    ),
-                    items: sitesList.map((site) {
-                      return DropdownMenuItem<String>(
-                        value: site['siteId'],
-                        child: Text(
-                          site['siteName'] ?? site['siteId'],
-                          style: TextStyle(
-                            fontSize: Responsive.fontSize(context, 14),
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: onChanged,
-                  ),
-                ),
+          items: sitesList.map((site) {
+            return DropdownMenuItem<String>(
+              value: site['siteId'],
+              child: Text(
+                site['siteName'] ?? site['siteId'],
+                style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
         ),
       ],
     );
   }
 
-  Widget _buildMaterialDropdown() {
+  Widget _buildMaterialDropdown(Color primaryColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.only(
-            left: Responsive.scaleH(context, 4),
-            bottom: Responsive.scaleV(context, 8),
-          ),
-          child: Text(
-            'Material Name *',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: Responsive.fontSize(context, 14),
-              color: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.color?.withOpacity(0.8),
+        DropdownButtonFormField<String>(
+          value: _selectedMaterialName,
+          style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
+          decoration: InputDecoration(
+            labelText: 'Select Material *',
+            labelStyle:
+                const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+            prefixIcon:
+                Icon(Icons.inventory_2_rounded, color: primaryColor, size: 18),
+            isDense: true,
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
             ),
           ),
-        ),
-        GlassCard(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.scaleH(context, 12),
-            vertical: Responsive.scaleV(context, 4),
-          ),
-          child: _isLoadingMaterials
-              ? Row(
-                  children: [
-                    SizedBox(
-                      width: Responsive.scaleH(context, 16),
-                      height: Responsive.scaleH(context, 16),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    SizedBox(width: Responsive.scaleH(context, 12)),
-                    Text(
-                      'Loading materials...',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: Responsive.fontSize(context, 14),
-                      ),
-                    ),
-                  ],
-                )
-              : DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedMaterialName,
-                    isExpanded: true,
-                    dropdownColor: Theme.of(context).colorScheme.surface,
-                    hint: Text(
-                      'Select Material',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.outline,
-                        fontSize: Responsive.fontSize(context, 14),
-                      ),
-                    ),
-                    items: (siteMaterialsList.isNotEmpty ? siteMaterialsList : materialsList).map((material) {
-                      final materialName = material['materialName'];
-                      final displayName = material['displayName'];
-                      final count = _parseCount(material['count'] ?? material['availableCount']);
+          items: (siteMaterialsList.isNotEmpty
+                  ? siteMaterialsList
+                  : materialsList)
+              .map((material) {
+            final materialName = material['materialName'];
+            final displayName = material['displayName'];
+            final count =
+                _parseCount(material['count'] ?? material['availableCount']);
 
-                      return DropdownMenuItem<String>(
-                        value: materialName,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              displayName ?? materialName,
-                              style: TextStyle(
-                                fontSize: Responsive.fontSize(context, 14),
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                            Text(
-                              'Available: $count',
-                              style: TextStyle(
-                                fontSize: Responsive.fontSize(context, 12),
-                                color: count > 0 ? Colors.green : Theme.of(context).colorScheme.error,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: _onMaterialChanged,
+            return DropdownMenuItem<String>(
+              value: materialName,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    displayName ?? materialName,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
-                ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: count > 0
+                          ? const Color(0xFFECFDF5)
+                          : const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Stock: $count',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: count > 0
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFDC2626),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          onChanged: _onMaterialChanged,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
         ),
       ],
     );

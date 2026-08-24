@@ -1,20 +1,22 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ConstructionDocuments extends StatefulWidget {
   const ConstructionDocuments({super.key});
 
   @override
-  _ConstructionDocumentsState createState() => _ConstructionDocumentsState();
+  State<ConstructionDocuments> createState() => _ConstructionDocumentsState();
 }
 
 class _ConstructionDocumentsState extends State<ConstructionDocuments> {
   String? selectedSiteId;
   Map<String, dynamic>? selectedSiteData;
 
-  final Color primaryColor = Color(0xFF772323);
-  final Color backgroundColor = Color(0xFFF5F5F5);
+  final Color primaryColor = const Color(0xFF772323);
+  final Color backgroundColor = const Color(0xFFF5F5F5);
 
   // Set your base URL here to prepend to relative doc URLs
   final String baseDocUrl = 'https://your-base-url.com/';
@@ -37,7 +39,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
         });
       }
     } catch (e) {
-      print('Error fetching site data: $e');
+      debugPrint('Error fetching site data: $e');
       setState(() {
         selectedSiteData = null;
       });
@@ -50,7 +52,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
       return docUrl;
     } else {
       final fullUrl = baseDocUrl + docUrl;
-      print('Prepared URL: $fullUrl');
+      debugPrint('Prepared URL: $fullUrl');
       return fullUrl;
     }
   }
@@ -330,12 +332,22 @@ class WebViewScreen extends StatefulWidget {
   const WebViewScreen({super.key, required this.title, required this.url});
 
   @override
-  _WebViewScreenState createState() => _WebViewScreenState();
+  State<WebViewScreen> createState() => _WebViewScreenState();
 }
 
 class _WebViewScreenState extends State<WebViewScreen> {
   late final WebViewController _controller;
   bool isLoading = true;
+  int loadingProgress = 0;
+
+  String get effectiveUrl {
+    final lower = widget.url.toLowerCase();
+    // Use Google Docs Viewer for raw PDFs on mobile to ensure proper rendering inside WebView
+    if (!kIsWeb && (lower.endsWith('.pdf') || lower.contains('.pdf?')) && !lower.contains('docs.google.com')) {
+      return 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(widget.url)}';
+    }
+    return widget.url;
+  }
 
   @override
   void initState() {
@@ -343,19 +355,56 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..loadRequest(Uri.parse(widget.url))
+      ..loadRequest(Uri.parse(effectiveUrl))
       ..setNavigationDelegate(
         NavigationDelegate(
+          onProgress: (progress) {
+            if (mounted) {
+              setState(() {
+                loadingProgress = progress;
+                if (progress == 100) isLoading = false;
+              });
+            }
+          },
           onPageFinished: (_) {
-            setState(() {
-              isLoading = false;
-            });
+            if (mounted) {
+              setState(() {
+                isLoading = false;
+              });
+            }
           },
           onWebResourceError: (error) {
-            print('Web resource error: $error');
+            debugPrint('Web resource error: $error');
+            if (mounted) {
+              setState(() {
+                isLoading = false;
+              });
+            }
           },
         ),
       );
+  }
+
+  Future<void> _downloadOrOpenExternal() async {
+    final uri = Uri.parse(widget.url);
+    try {
+      final canLaunch = await canLaunchUrl(uri);
+      if (canLaunch) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not open external link: ${widget.url}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to download / open: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -363,18 +412,56 @@ class _WebViewScreenState extends State<WebViewScreen> {
     bool isMobile = MediaQuery.of(context).size.width < 600;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Color(0xFF772323),
+        title: Text(
+          widget.title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF772323),
+        iconTheme: const IconThemeData(color: Colors.white),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Reload',
+            onPressed: () {
+              setState(() => isLoading = true);
+              _controller.reload();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.download_rounded, color: Colors.white),
+            tooltip: 'Download / Open in Browser',
+            onPressed: _downloadOrOpenExternal,
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 800),
           child: Stack(
-        children: [
-          WebViewWidget(controller: _controller),
-          if (isLoading) const Center(child: CircularProgressIndicator()),
-        ],
-      ),
+            children: [
+              WebViewWidget(controller: _controller),
+              if (isLoading)
+                Container(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF772323)),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          loadingProgress > 0 ? 'Loading document ($loadingProgress%)...' : 'Loading document...',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

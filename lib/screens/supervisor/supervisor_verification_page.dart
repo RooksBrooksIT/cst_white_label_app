@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/app_storage_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class SupervisorVerificationPage extends StatefulWidget {
@@ -250,11 +250,15 @@ class _SupervisorVerificationPageState
     if (_selectedImage == null || _currentPosition == null) return null;
 
     try {
-      final fileName =
-          'supervisor_photos/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref = FirebaseStorage.instance.ref().child(fileName);
-      await ref.putFile(_selectedImage!);
-      final url = await ref.getDownloadURL();
+      final url = await AppStorageService.uploadSupervisorVerificationPhoto(
+        supervisorId: widget.supervisorId,
+        imageFile: _selectedImage!,
+        siteId: _selectedSite?['siteId'],
+      );
+
+      if (url == null || url.isEmpty) {
+        throw Exception('Storage upload returned empty URL');
+      }
 
       await FirestoreService.getCollection('supervisorPhotoLogs').add({
         'photoUrl': url,

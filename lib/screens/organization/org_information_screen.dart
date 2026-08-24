@@ -88,7 +88,6 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
 
     return GlassScaffold(
       padding: EdgeInsets.zero,
@@ -105,11 +104,11 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      color: const Color(0xFF0B1942),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          color: const Color(0xFF0B1942).withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -125,12 +124,12 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
-                  Text(
+                  const Text(
                     'Organisation Info',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      color: Color(0xFF0A183D),
                       letterSpacing: -0.4,
                     ),
                   ),
@@ -144,58 +143,88 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
                   child: _isFetching
-                      ? const Center(
+                      ? Center(
                           child: CircularProgressIndicator(
-                            color: Color(0xFF0A183D),
+                            color: theme.primaryColor,
                           ),
                         )
                       : SingleChildScrollView(
                           physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           child: Form(
                             key: _formKey,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // Main Card Container
+                                // Main Card Container (Clean White Reference Theme)
                                 Container(
-                                  padding: const EdgeInsets.all(24),
+                                  padding: const EdgeInsets.all(20),
                                   decoration: BoxDecoration(
-                                    color: darkCardBg,
-                                    borderRadius: BorderRadius.circular(24),
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(22),
+                                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: darkCardBg.withValues(alpha: 0.25),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 4),
+                                        color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                        blurRadius: 14,
+                                        offset: const Offset(0, 3),
                                       ),
                                     ],
                                   ),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
-                                        'Update Information',
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                          letterSpacing: -0.3,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              color: theme.primaryColor.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(
+                                              Icons.business_rounded,
+                                              color: theme.primaryColor,
+                                              size: 22,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          const Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Update Information',
+                                                  style: TextStyle(
+                                                    fontSize: 17,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(0xFF0A183D),
+                                                    letterSpacing: -0.3,
+                                                  ),
+                                                ),
+                                                SizedBox(height: 2),
+                                                Text(
+                                                  'Update your organisation address and contact number.',
+                                                  style: TextStyle(
+                                                    fontSize: 12.5,
+                                                    color: Color(0xFF64748B),
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 6),
-                                      const Text(
-                                        'Update your organisation address and contact number.',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFFCBD5E1),
-                                          height: 1.35,
-                                        ),
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 14),
+                                        child: Divider(color: Color(0xFFF1F5F9), height: 1),
                                       ),
-                                      const SizedBox(height: 24),
 
                                       // Address Field
                                       _buildInputField(
+                                        theme: theme,
                                         controller: _addressController,
                                         label: 'Organisation Address',
                                         hint: 'Enter Organisation Address',
@@ -209,10 +238,11 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
                                         },
                                       ),
 
-                                      const SizedBox(height: 20),
+                                      const SizedBox(height: 16),
 
                                       // Phone Field
                                       _buildInputField(
+                                        theme: theme,
                                         controller: _orgPhoneController,
                                         label: 'Organisation Phone Number',
                                         hint: 'Enter 10-digit Phone Number',
@@ -236,37 +266,37 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
                                   ),
                                 ),
 
-                                const SizedBox(height: 32),
+                                const SizedBox(height: 24),
 
                                 // Save CTA Button
                                 SizedBox(
-                                  height: 54,
+                                  height: 48,
                                   child: ElevatedButton(
                                     onPressed: _isLoading ? null : _saveInformation,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: darkCardBg,
+                                      backgroundColor: theme.primaryColor,
                                       foregroundColor: Colors.white,
-                                      elevation: 4,
-                                      shadowColor: darkCardBg.withValues(alpha: 0.35),
+                                      elevation: 2,
+                                      shadowColor: theme.primaryColor.withValues(alpha: 0.35),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
                                     child: _isLoading
                                         ? const SizedBox(
-                                            width: 24,
-                                            height: 24,
+                                            width: 20,
+                                            height: 20,
                                             child: CircularProgressIndicator(
-                                              strokeWidth: 2.5,
+                                              strokeWidth: 2,
                                               color: Colors.white,
                                             ),
                                           )
                                         : const Text(
                                             'SAVE CHANGES',
                                             style: TextStyle(
-                                              fontSize: 16,
+                                              fontSize: 14,
                                               fontWeight: FontWeight.w800,
-                                              letterSpacing: 0.8,
+                                              letterSpacing: 0.5,
                                             ),
                                           ),
                                   ),
@@ -286,6 +316,7 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
   }
 
   Widget _buildInputField({
+    required ThemeData theme,
     required TextEditingController controller,
     required String label,
     required String hint,
@@ -298,63 +329,62 @@ class _OrgInformationScreenState extends State<OrgInformationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+        Row(
+          children: [
+            Icon(icon, size: 14, color: theme.primaryColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF334155),
               ),
-            ],
-          ),
-          child: TextFormField(
-            controller: controller,
-            maxLines: maxLines,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            validator: validator,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
             ),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+          ],
+        ),
+        const SizedBox(height: 6),
+        Theme(
+          data: Theme.of(context).copyWith(
+            inputDecorationTheme: const InputDecorationTheme(
+              filled: false,
+              fillColor: Colors.transparent,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: maxLines > 1 ? 10 : 11),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+            ),
+            child: TextFormField(
+              controller: controller,
+              maxLines: maxLines,
+              keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
+              validator: validator,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
               ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFF1E88E5),
-                  size: 22,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
+                border: InputBorder.none,
+                isDense: true,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Color(0xFF1E88E5), width: 1.8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
           ),
         ),

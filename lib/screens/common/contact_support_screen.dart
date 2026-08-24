@@ -237,7 +237,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            color: primaryColor.withValues(alpha: 0.05),
             blurRadius: 14,
             offset: const Offset(0, 3),
           ),
@@ -280,9 +280,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        color: primaryColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
@@ -291,18 +291,19 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                           Container(
                             width: 6,
                             height: 6,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
+                            decoration: BoxDecoration(
+                              color: primaryColor,
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Text(
+                          Text(
                             'ONLINE • FAST RESPONSE',
                             style: TextStyle(
                               fontSize: 9.5,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF047857),
+                              color: primaryColor,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ],
@@ -310,7 +311,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   'How can we help you?',
                   style: TextStyle(
@@ -320,7 +321,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 const Text(
                   'Our dedicated support team is available to assist with your construction management operations.',
                   style: TextStyle(
@@ -346,7 +347,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            color: primaryColor.withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 3),
           ),
@@ -355,13 +356,27 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Instant Support Channels',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: darkAccent,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.contact_phone_rounded, color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Instant Support Channels',
+                style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w800,
+                  color: darkAccent,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -371,8 +386,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           // 1. Email Support
           _buildChannelItem(
             icon: Icons.alternate_email_rounded,
-            iconColor: const Color(0xFF0284C7),
-            iconBg: const Color(0xFFE0F2FE),
             title: 'Official Support Email',
             value: _email,
             actionLabel: 'Send Email',
@@ -384,8 +397,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           // 2. Phone Support
           _buildChannelItem(
             icon: Icons.phone_iphone_rounded,
-            iconColor: const Color(0xFF10B981),
-            iconBg: const Color(0xFFECFDF5),
             title: 'Customer Helpline',
             value: _phoneDisplay,
             actionLabel: 'Call Now',
@@ -397,8 +408,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           // 3. WhatsApp Support
           _buildChannelItem(
             icon: Icons.chat_rounded,
-            iconColor: const Color(0xFF25D366),
-            iconBg: const Color(0xFFDCFCE7),
             title: 'WhatsApp Business Chat',
             value: _phoneDisplay,
             actionLabel: 'Chat on WhatsApp',
@@ -412,8 +421,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
   Widget _buildChannelItem({
     required IconData icon,
-    required Color iconColor,
-    required Color iconBg,
     required String title,
     required String value,
     required String actionLabel,
@@ -432,10 +439,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: iconBg,
+              color: primaryColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: iconColor, size: 20),
+            child: Icon(icon, color: primaryColor, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -465,7 +472,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           ),
           IconButton(
             tooltip: 'Copy',
-            icon: const Icon(Icons.copy_rounded, size: 16, color: Color(0xFF64748B)),
+            icon: Icon(Icons.copy_rounded, size: 16, color: primaryColor),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             onPressed: onCopy,
@@ -474,10 +481,11 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           ElevatedButton(
             onPressed: onTap,
             style: ElevatedButton.styleFrom(
-              backgroundColor: iconColor,
+              backgroundColor: primaryColor,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              elevation: 2,
+              shadowColor: primaryColor.withValues(alpha: 0.35),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(
@@ -499,152 +507,171 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            color: primaryColor.withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: const InputDecorationTheme(
+            filled: false,
+            fillColor: Colors.transparent,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.confirmation_number_rounded, color: primaryColor, size: 20),
                   ),
-                  child: Icon(Icons.confirmation_number_rounded, color: primaryColor, size: 20),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Submit a Help Request',
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w800,
-                    color: darkAccent,
+                  const SizedBox(width: 10),
+                  Text(
+                    'Submit a Help Request',
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      color: darkAccent,
+                    ),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Divider(color: Color(0xFFF1F5F9), height: 1),
+              ),
+
+              // Name
+              _buildFormLabel('Your Name *', Icons.person_rounded),
+              const SizedBox(height: 6),
+              _buildInputContainer(
+                child: TextFormField(
+                  controller: _nameController,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your name' : null,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(
+                    hintText: 'Enter your full name',
+                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                    border: InputBorder.none,
+                    isDense: true,
                   ),
                 ),
-              ],
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Divider(color: Color(0xFFF1F5F9), height: 1),
-            ),
+              ),
+              const SizedBox(height: 14),
 
-            // Name
-            _buildFormLabel('Your Name *', Icons.person_rounded),
-            const SizedBox(height: 6),
-            _buildInputContainer(
-              child: TextFormField(
-                controller: _nameController,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your name' : null,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                decoration: const InputDecoration(
-                  hintText: 'Enter your full name',
-                  hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                  border: InputBorder.none,
+              // Contact
+              _buildFormLabel('Email or Phone Number *', Icons.contact_mail_rounded),
+              const SizedBox(height: 6),
+              _buildInputContainer(
+                child: TextFormField(
+                  controller: _contactController,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your contact details' : null,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(
+                    hintText: 'e.g. name@company.com or +91...',
+                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-            // Contact
-            _buildFormLabel('Email or Phone Number *', Icons.contact_mail_rounded),
-            const SizedBox(height: 6),
-            _buildInputContainer(
-              child: TextFormField(
-                controller: _contactController,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your contact details' : null,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                decoration: const InputDecoration(
-                  hintText: 'e.g. name@company.com or +91...',
-                  hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                  border: InputBorder.none,
+              // Issue Category
+              _buildFormLabel('Issue Category', Icons.category_rounded),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedCategory,
+                    isExpanded: true,
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+                    items: _categories.map((c) {
+                      return DropdownMenuItem<String>(
+                        value: c,
+                        child: Text(
+                          c,
+                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedCategory = val);
+                    },
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-            // Issue Category
-            _buildFormLabel('Issue Category', Icons.category_rounded),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedCategory,
-                  isExpanded: true,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                  items: _categories.map((c) {
-                    return DropdownMenuItem<String>(
-                      value: c,
-                      child: Text(
-                        c,
-                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedCategory = val);
-                  },
+              // Message
+              _buildFormLabel('Describe your query or issue *', Icons.edit_note_rounded),
+              const SizedBox(height: 6),
+              _buildInputContainer(
+                verticalPadding: 10,
+                child: TextFormField(
+                  controller: _messageController,
+                  maxLines: 4,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please provide details about your issue' : null,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A), height: 1.4),
+                  decoration: const InputDecoration(
+                    hintText: 'Type your message or issue description here...',
+                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 20),
 
-            // Message
-            _buildFormLabel('Describe your query or issue *', Icons.edit_note_rounded),
-            const SizedBox(height: 6),
-            _buildInputContainer(
-              child: TextFormField(
-                controller: _messageController,
-                maxLines: 3,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Please provide details about your issue' : null,
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                decoration: const InputDecoration(
-                  hintText: 'Type your message or issue description here...',
-                  hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                  border: InputBorder.none,
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isSubmitting ? null : _submitTicket,
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: _isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text(
+                          'SUBMIT TICKET',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                        ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 2,
+                    shadowColor: primaryColor.withValues(alpha: 0.35),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 18),
-
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : _submitTicket,
-                icon: const Icon(Icons.send_rounded, size: 18),
-                label: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text(
-                        'SUBMIT TICKET',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                      ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  elevation: 3,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -659,7 +686,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            color: primaryColor.withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 3),
           ),
@@ -672,10 +699,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: primaryColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.schedule_rounded, color: Color(0xFF475569), size: 20),
+                child: Icon(Icons.schedule_rounded, color: primaryColor, size: 20),
               ),
               const SizedBox(width: 12),
               Column(
@@ -690,7 +717,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     ),
                   ),
                   const Text(
-                    'Monday – Saturday &bull; 9:00 AM – 6:00 PM IST',
+                    'Monday – Saturday • 9:00 AM – 6:00 PM IST',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -709,7 +736,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   Widget _buildFormLabel(String label, IconData icon) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: const Color(0xFF64748B)),
+        Icon(icon, size: 14, color: primaryColor),
         const SizedBox(width: 5),
         Text(
           label,
@@ -723,13 +750,13 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     );
   }
 
-  Widget _buildInputContainer({required Widget child}) {
+  Widget _buildInputContainer({required Widget child, double verticalPadding = 11}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: verticalPadding),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
       ),
       child: child,
     );

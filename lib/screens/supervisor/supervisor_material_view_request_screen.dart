@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '/widgets/glass_scaffold.dart';
-import '/widgets/glass_card.dart';
 
 class SupervisorMaterialViewRequestScreen extends StatefulWidget {
   final String supervisorId;
@@ -70,16 +70,56 @@ class _SupervisorMaterialViewRequestScreenState
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     final cs = Theme.of(context).colorScheme;
-    return GlassScaffold(
-      title: 'Material Requests',
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Material Requests',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
           child: Column(
-        children: [
+            children: [
           if (!FirestoreService.isReady)
             Container(
               width: double.infinity,

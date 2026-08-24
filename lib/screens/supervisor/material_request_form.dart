@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/notification_service.dart';
-import '/widgets/glass_scaffold.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class MaterialRequestForm extends StatefulWidget {
   final String supervisorId;
@@ -41,12 +41,9 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   bool isLoadingSupervisorData = true;
   bool isSubmitting = false;
 
-  // Color palette
-  static const darkNavy = Color(0xFF0A183D);
-  static const primaryEmerald = Color(0xFF10B981);
-  static const accentOrange = Color(0xFFEA580C);
-
+  // Dynamic branding color palette
   Color get primaryColor => Theme.of(context).colorScheme.primary;
+  Color get darkAccent => AppTheme.getDarkAccent(primaryColor);
   Color get errorColor => Theme.of(context).colorScheme.error;
 
   // Material dropdown data
@@ -242,7 +239,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: darkNavy,
+              primary: primaryColor,
               onPrimary: Colors.white,
               surface: Theme.of(context).colorScheme.surface,
               onSurface: Theme.of(context).colorScheme.onSurface,
@@ -401,11 +398,11 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         context: context,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: primaryEmerald, size: 28),
-              SizedBox(width: 10),
-              Text('Request Submitted', style: TextStyle(fontWeight: FontWeight.bold)),
+              Icon(Icons.check_circle_rounded, color: primaryColor, size: 28),
+              const SizedBox(width: 10),
+              const Text('Request Submitted', style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           content: Text(
@@ -419,7 +416,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                 Navigator.of(context).pop();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: darkNavy,
+                backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -443,12 +440,49 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return GlassScaffold(
-      title: 'Material Request Form',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Material Request Form',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
@@ -456,13 +490,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      CircularProgressIndicator(color: darkNavy),
-                      SizedBox(height: 16),
+                    children: [
+                      CircularProgressIndicator(color: primaryColor),
+                      const SizedBox(height: 16),
                       Text(
                         'Loading assigned site details...',
                         style: TextStyle(
-                          color: darkNavy,
+                          color: darkAccent,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -475,23 +509,23 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Header Card Banner
-                      _buildHeaderBanner(),
+                      _buildHeaderBanner(darkAccent),
                       const SizedBox(height: 16),
 
                       // Section 1: Site & Project Details Card
-                      _buildSiteDetailsCard(),
+                      _buildSiteDetailsCard(darkAccent),
                       const SizedBox(height: 16),
 
                       // Section 2: Material Entry Card
-                      _buildMaterialEntryCard(),
+                      _buildMaterialEntryCard(darkAccent),
                       const SizedBox(height: 16),
 
                       // Section 3: Added Materials List Card
-                      _buildAddedMaterialsListCard(),
+                      _buildAddedMaterialsListCard(darkAccent),
                       const SizedBox(height: 24),
 
                       // Final Submit & Cancel Buttons
-                      _buildActionButtons(),
+                      _buildActionButtons(darkAccent),
                     ],
                   ),
                 ),
@@ -501,20 +535,23 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   }
 
   /// Modern Header Banner Card
-  Widget _buildHeaderBanner() {
+  Widget _buildHeaderBanner(Color darkAccent) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [darkNavy, Color(0xFF1E293B)],
+          colors: [
+            darkAccent,
+            Color.alphaBlend(primaryColor.withValues(alpha: 0.45), darkAccent),
+          ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: darkNavy.withValues(alpha: 0.3),
+            color: darkAccent.withValues(alpha: 0.25),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -525,12 +562,12 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: accentOrange.withValues(alpha: 0.2),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
               Icons.inventory_2_rounded,
-              color: accentOrange,
+              color: Colors.white,
               size: 28,
             ),
           ),
@@ -553,7 +590,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                   'Request raw materials & equipment for your site',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.75),
+                    color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),
               ],
@@ -565,13 +602,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   }
 
   /// Card 1: Site & Project Details
-  Widget _buildSiteDetailsCard() {
+  Widget _buildSiteDetailsCard(Color darkAccent) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -585,7 +622,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         children: [
           _buildCardTitle(
             icon: Icons.domain_rounded,
-            iconColor: darkNavy,
+            iconColor: primaryColor,
             title: 'Site & Project Information',
           ),
           const SizedBox(height: 14),
@@ -676,13 +713,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   }
 
   /// Card 2: Material Entry Form
-  Widget _buildMaterialEntryCard() {
+  Widget _buildMaterialEntryCard(Color darkAccent) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -696,7 +733,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         children: [
           _buildCardTitle(
             icon: Icons.add_shopping_cart_rounded,
-            iconColor: primaryEmerald,
+            iconColor: primaryColor,
             title: 'Add Required Material',
           ),
           const SizedBox(height: 14),
@@ -747,7 +784,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           ),
           const SizedBox(height: 16),
 
-          // Add Material Button
+          // Add Material Button (Branded)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -758,13 +795,14 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryEmerald,
+                backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                elevation: 0,
+                elevation: 2,
+                shadowColor: primaryColor.withValues(alpha: 0.35),
               ),
             ),
           ),
@@ -774,13 +812,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   }
 
   /// Card 3: Added Materials List Card
-  Widget _buildAddedMaterialsListCard() {
+  Widget _buildAddedMaterialsListCard(Color darkAccent) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -796,22 +834,22 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             children: [
               _buildCardTitle(
                 icon: Icons.checklist_rounded,
-                iconColor: accentOrange,
+                iconColor: primaryColor,
                 title: 'Requested Items',
               ),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: darkNavy.withValues(alpha: 0.08),
+                  color: primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${addedMaterials.length} Items',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: darkNavy,
+                    color: primaryColor,
                   ),
                 ),
               ),
@@ -826,7 +864,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 children: [
@@ -841,7 +879,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: darkNavy,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -877,7 +915,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                     border: Border.all(
                       color: isImmediate
                           ? errorColor.withValues(alpha: 0.2)
-                          : Colors.grey.shade200,
+                          : const Color(0xFFE2E8F0),
                     ),
                   ),
                   child: Row(
@@ -887,13 +925,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                         decoration: BoxDecoration(
                           color: isImmediate
                               ? errorColor.withValues(alpha: 0.1)
-                              : primaryEmerald.withValues(alpha: 0.1),
+                              : primaryColor.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.inventory_2_rounded,
                           size: 18,
-                          color: isImmediate ? errorColor : primaryEmerald,
+                          color: isImmediate ? errorColor : primaryColor,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -906,7 +944,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: darkNavy,
+                                color: Color(0xFF0F172A),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -963,7 +1001,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   }
 
   /// Action Buttons (Cancel & Submit)
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(Color darkAccent) {
     return Row(
       children: [
         Expanded(
@@ -974,7 +1012,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             },
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              side: const BorderSide(color: darkNavy),
+              side: BorderSide(color: const Color(0xFFCBD5E1)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -982,7 +1020,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             child: const Text(
               "Cancel",
               style: TextStyle(
-                color: darkNavy,
+                color: Color(0xFF475569),
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               ),
@@ -994,14 +1032,14 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           child: ElevatedButton(
             onPressed: isSubmitting ? null : _sendForApproval,
             style: ElevatedButton.styleFrom(
-              backgroundColor: darkNavy,
+              backgroundColor: primaryColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
               elevation: 4,
-              shadowColor: darkNavy.withValues(alpha: 0.4),
+              shadowColor: primaryColor.withValues(alpha: 0.4),
             ),
             child: isSubmitting
                 ? const SizedBox(
@@ -1054,7 +1092,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
-            color: darkNavy,
+            color: Color(0xFF0F172A),
           ),
         ),
       ],
@@ -1077,32 +1115,32 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       inputFormatters: inputFormatters,
       style: TextStyle(
         fontSize: 13.5,
-        color: enabled ? darkNavy : Colors.grey.shade700,
+        color: enabled ? const Color(0xFF0F172A) : Colors.grey.shade700,
         fontWeight: enabled ? FontWeight.normal : FontWeight.w600,
       ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-        prefixIcon: Icon(icon, size: 18, color: enabled ? darkNavy : Colors.grey.shade500),
+        prefixIcon: Icon(icon, size: 18, color: enabled ? primaryColor : Colors.grey.shade500),
         filled: true,
         fillColor: enabled ? Colors.grey.shade50 : Colors.grey.shade100,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: darkNavy, width: 1.8),
+          borderSide: BorderSide(color: primaryColor, width: 1.8),
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: const BorderSide(color: Color(0xFFF1F5F9)),
         ),
       ),
     );
@@ -1119,36 +1157,36 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     return DropdownButtonFormField<T>(
       isExpanded: true,
       value: value,
-      style: const TextStyle(fontSize: 13.5, color: darkNavy),
+      style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-        prefixIcon: Icon(icon, size: 18, color: darkNavy),
+        prefixIcon: Icon(icon, size: 18, color: primaryColor),
         filled: true,
         fillColor: Colors.grey.shade50,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: darkNavy, width: 1.8),
+          borderSide: BorderSide(color: primaryColor, width: 1.8),
         ),
       ),
       dropdownColor: Colors.white,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: darkNavy),
+      icon: Icon(Icons.keyboard_arrow_down_rounded, color: primaryColor),
       items: items.map((T item) {
         return DropdownMenuItem<T>(
           value: item,
           child: Text(
             item.toString(),
-            style: const TextStyle(fontSize: 13, color: darkNavy),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
             overflow: TextOverflow.ellipsis,
           ),
         );
@@ -1169,26 +1207,26 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                 ? DateFormat('MMM dd, yyyy').format(selectedDate!)
                 : '',
           ),
-          style: const TextStyle(fontSize: 13.5, color: darkNavy),
+          style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
           decoration: InputDecoration(
             labelText: "Target Request Date",
             labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-            prefixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: darkNavy),
+            prefixIcon: Icon(Icons.calendar_month_rounded, size: 18, color: primaryColor),
             filled: true,
             fillColor: Colors.grey.shade50,
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: darkNavy, width: 1.8),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
             ),
           ),
         ),

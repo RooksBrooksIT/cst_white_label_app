@@ -281,6 +281,8 @@ class FirestoreService {
   get siteSupervisorIncentives => getCollection('siteSupervisorIncentives');
   static CollectionReference<Map<String, dynamic>> get siteDrawings =>
       getCollection('siteDrawings');
+  static CollectionReference<Map<String, dynamic>> get constructionDrawings =>
+      getCollection('siteDrawings');
   static CollectionReference<Map<String, dynamic>> get siteMaterialsRequest =>
       getCollection('siteMaterialsRequest');
   static CollectionReference<Map<String, dynamic>> get projectStages =>

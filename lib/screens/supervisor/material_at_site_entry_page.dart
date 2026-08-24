@@ -1,10 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
-import '/widgets/glass_scaffold.dart';
-import '/widgets/glass_card.dart';
-import '/services/firestore_service.dart';
-import '/services/notification_service.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class MaterialAtSiteEntryPage extends StatefulWidget {
   final String supervisorId;
@@ -533,73 +532,109 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? errorColor : successColor,
+        backgroundColor: isError ? errorColor : const Color(0xFF10B981),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
       ),
     );
   }
 
   Widget _buildInfoCard() {
-    final cs = Theme.of(context).colorScheme;
-    return GlassCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'SITE INFORMATION',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface.withOpacity(0.6),
-                letterSpacing: 1.2,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.apartment_rounded,
+                    color: primaryColor, size: 18),
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildSiteIdDropdown(),
-            const SizedBox(height: 16),
-            _buildReadOnlyField('Project Name', projectNameController),
-            const SizedBox(height: 16),
-            _buildReadOnlyField('Project Stage', projectStageController),
-            const SizedBox(height: 16),
-            _buildReadOnlyField('Start Date', startDateController),
-            const SizedBox(height: 16),
-            _buildReadOnlyField('End Date', endDateController),
-            const SizedBox(height: 16),
-            _buildReadOnlyField('Joined On', joinedOnController),
-            const SizedBox(height: 16),
-            _buildReadOnlyField('Location', siteLocationController),
-            const SizedBox(height: 16),
-            _buildReadOnlyField(
-              'Supervisor ID',
-              supervisorIdController_Internal,
-            ),
-            const SizedBox(height: 16),
-            _buildReadOnlyField('Supervisor Name', supervisorNameController),
-            const SizedBox(height: 16),
-            _buildReadOnlyField('Site Comments', siteCommentsController),
-            const SizedBox(height: 24),
-            _buildDateField(),
-          ],
-        ),
+              const SizedBox(width: 10),
+              const Text(
+                'Site Information',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSiteIdDropdown(),
+          const SizedBox(height: 14),
+          _buildReadOnlyField('Project Name', projectNameController),
+          const SizedBox(height: 14),
+          _buildReadOnlyField('Project Stage', projectStageController),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _buildReadOnlyField('Start Date', startDateController)),
+              const SizedBox(width: 10),
+              Expanded(child: _buildReadOnlyField('End Date', endDateController)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildReadOnlyField('Joined On', joinedOnController),
+          const SizedBox(height: 14),
+          _buildReadOnlyField('Location', siteLocationController),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _buildReadOnlyField(
+                  'Supervisor ID',
+                  supervisorIdController_Internal,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildReadOnlyField(
+                  'Supervisor Name',
+                  supervisorNameController,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildReadOnlyField('Site Comments', siteCommentsController),
+          const SizedBox(height: 16),
+          _buildDateField(),
+        ],
       ),
     );
   }
 
   Widget _buildSiteIdDropdown() {
-    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Site ID',
+        const Text(
+          'Select Assigned Site *',
           style: TextStyle(
-            fontSize: 14,
-            color: cs.onSurface.withOpacity(0.6),
-            fontWeight: FontWeight.w500,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
           ),
         ),
         const SizedBox(height: 6),
@@ -612,7 +647,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   child: Text(
                     siteId,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 15, color: cs.onSurface),
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                   ),
                 ),
               )
@@ -663,91 +698,105 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             }
           },
           decoration: InputDecoration(
+            isDense: true,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: cs.outlineVariant),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: cs.outlineVariant),
+              horizontal: 14,
+              vertical: 12,
             ),
             filled: true,
-            fillColor: cs.surface.withOpacity(0.1),
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
+            ),
           ),
           isExpanded: true,
-          icon: Icon(
-            Icons.arrow_drop_down,
-            color: cs.onSurface.withOpacity(0.6),
+          icon: const Icon(
+            Icons.arrow_drop_down_rounded,
+            color: Color(0xFF64748B),
           ),
-          style: TextStyle(fontSize: 15, color: cs.onSurface),
-          dropdownColor: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
         ),
       ],
     );
   }
 
   Widget _buildReadOnlyField(String label, TextEditingController controller) {
-    final cs = Theme.of(context).colorScheme;
     return TextField(
       controller: controller,
+      readOnly: true,
+      style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+        isDense: true,
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: cs.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: cs.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
-        filled: true,
-        fillColor: cs.surface.withOpacity(0.1),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-        labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
       ),
-      readOnly: true,
-      style: TextStyle(fontSize: 15, color: cs.onSurface),
     );
   }
 
   Widget _buildDateField() {
-    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Date',
+        const Text(
+          'Entry Date',
           style: TextStyle(
-            fontSize: 14,
-            color: cs.onSurface.withOpacity(0.6),
-            fontWeight: FontWeight.w500,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
           ),
         ),
         const SizedBox(height: 6),
-        GestureDetector(
+        InkWell(
           onTap: _pickDate,
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: cs.outlineVariant),
-              color: cs.surface.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              color: const Color(0xFFF8FAFC),
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today, size: 20, color: cs.primary),
-                const SizedBox(width: 12),
+                Icon(Icons.calendar_month_rounded, size: 18, color: primaryColor),
+                const SizedBox(width: 10),
                 Text(
                   DateFormat('MMMM d, yyyy').format(selectedDate),
-                  style: TextStyle(fontSize: 15, color: cs.onSurface),
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const Spacer(),
+                const Icon(
+                  Icons.edit_calendar_rounded,
+                  size: 16,
+                  color: Color(0xFF64748B),
                 ),
               ],
             ),
@@ -758,100 +807,156 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   }
 
   Widget _buildMaterialInputCard() {
-    final cs = Theme.of(context).colorScheme;
-    return GlassCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'ADD MATERIALS',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface.withOpacity(0.6),
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (dropdownsLoading)
-              Center(child: CircularProgressIndicator(color: cs.primary))
-            else if (materialOptions.isEmpty || unitOptions.isEmpty)
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  'No materials or units available. Please add them in Firestore.',
-                  style: TextStyle(color: Theme.of(context).colorScheme.primary),
-                ),
-              )
-            else
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(flex: 3, child: _buildMaterialDropdown()),
-                      const SizedBox(width: 12),
-                      Expanded(flex: 2, child: _buildUnitDropdown()),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: quantityController,
-                          decoration: InputDecoration(
-                            labelText: 'Quantity',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: cs.outlineVariant),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: cs.outlineVariant),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            labelStyle: TextStyle(
-                              color: cs.onSurface.withOpacity(0.6),
-                            ),
-                          ),
-                          keyboardType: TextInputType.number,
-                          style: TextStyle(fontSize: 15, color: cs.onSurface),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: _addMaterialEntry,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: cs.secondary,
-                          foregroundColor: cs.onSecondary,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                        ),
-                        child: const Text('ADD'),
-                      ),
-                    ],
-                  ),
-                ],
+                child: Icon(Icons.add_shopping_cart_rounded,
+                    color: primaryColor, size: 18),
               ),
-          ],
-        ),
+              const SizedBox(width: 10),
+              const Text(
+                'Add Material Entry',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (dropdownsLoading)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                ),
+              ),
+            )
+          else if (materialOptions.isEmpty || unitOptions.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: primaryColor.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Text(
+                'No materials or units available. Please check Firestore.',
+                style: TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            )
+          else
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(flex: 3, child: _buildMaterialDropdown()),
+                    const SizedBox(width: 10),
+                    Expanded(flex: 2, child: _buildUnitDropdown()),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: quantityController,
+                        style: const TextStyle(
+                            fontSize: 13.5, color: Color(0xFF0F172A)),
+                        decoration: InputDecoration(
+                          labelText: 'Quantity',
+                          labelStyle: const TextStyle(
+                              fontSize: 12.5, color: Color(0xFF64748B)),
+                          isDense: true,
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: primaryColor, width: 1.8),
+                          ),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          onPressed: _addMaterialEntry,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_rounded, size: 16),
+                              SizedBox(width: 4),
+                              Text('ADD',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -860,12 +965,12 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Material',
           style: TextStyle(
-            fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w500,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
           ),
         ),
         const SizedBox(height: 6),
@@ -878,9 +983,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   child: Text(
                     mat,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurface,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
                 ),
@@ -888,33 +993,29 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               .toList(),
           onChanged: (val) => setState(() => selectedMaterial = val),
           decoration: InputDecoration(
+            isDense: true,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+              horizontal: 14,
+              vertical: 12,
             ),
             filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
+            ),
           ),
           isExpanded: true,
-          icon: Icon(
-            Icons.arrow_drop_down,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          style: TextStyle(
-            fontSize: 15,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          dropdownColor: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(8),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
         ),
       ],
     );
@@ -924,12 +1025,12 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Unit',
           style: TextStyle(
-            fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w500,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
           ),
         ),
         const SizedBox(height: 6),
@@ -942,9 +1043,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   child: Text(
                     unit,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurface,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
                 ),
@@ -952,33 +1053,29 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               .toList(),
           onChanged: (val) => setState(() => selectedUnit = val),
           decoration: InputDecoration(
+            isDense: true,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+              horizontal: 14,
+              vertical: 12,
             ),
             filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
+            ),
           ),
           isExpanded: true,
-          icon: Icon(
-            Icons.arrow_drop_down,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          style: TextStyle(
-            fontSize: 15,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          dropdownColor: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(8),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
         ),
       ],
     );
@@ -987,61 +1084,87 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   Widget _buildMaterialList() {
     if (materialEntries.isEmpty) {
       return Container(
-        padding: const EdgeInsets.symmetric(vertical: 32),
+        padding: const EdgeInsets.symmetric(vertical: 28),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 48,
-              color: Theme.of(context).colorScheme.outline,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.inventory_2_outlined,
+                size: 36,
+                color: Color(0xFF94A3B8),
+              ),
             ),
             const SizedBox(height: 12),
-            Text(
+            const Text(
               'No materials added yet',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14.5,
+                color: Color(0xFF0F172A),
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Add materials using the form above',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 13),
+            const SizedBox(height: 4),
+            const Text(
+              'Use the form above to add material items',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12.5,
+              ),
             ),
           ],
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'ADDED MATERIALS',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            letterSpacing: 1.2,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Added Materials (${materialEntries.length})',
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: materialEntries.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            final entry = materialEntries[index];
-            return Material(
-              elevation: 0,
-              borderRadius: BorderRadius.circular(8),
-
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
+          const SizedBox(height: 12),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: materialEntries.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final entry = materialEntries[index];
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
                 child: Row(
                   children: [
                     Expanded(
@@ -1051,71 +1174,79 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                           Text(
                             entry['material'],
                             style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Color(0xFF0F172A),
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 3),
                           Text(
                             '${entry['quantity']} ${entry['unit']}',
                             style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
+                              color: primaryColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5,
                             ),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: Icon(
-                        Icons.delete_outline,
-                        color: Theme.of(context).colorScheme.error,
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Color(0xFFEF4444),
+                        size: 20,
                       ),
                       onPressed: () => _deleteMaterialEntry(index),
-                      splashRadius: 20,
                     ),
                   ],
                 ),
-              ),
-            );
-          },
-        ),
-      ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildActionButtons() {
-    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: cs.onSurface.withOpacity(0.7),
-              side: BorderSide(color: cs.outlineVariant),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF64748B),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: const Text('CANCEL',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-            child: const Text('CANCEL'),
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 14),
         Expanded(
-          child: ElevatedButton(
-            onPressed: _onSave,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: cs.primary,
-              foregroundColor: cs.onPrimary,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _onSave,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 3,
+                shadowColor: primaryColor.withValues(alpha: 0.35),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: const Text('SAVE MATERIALS',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-            child: const Text('SAVE MATERIALS'),
           ),
         ),
       ],
@@ -1129,165 +1260,226 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildInfoCard(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildUpdateDateSelector(),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: fetchMaterialsForUpdate,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              elevation: 0,
-              minimumSize: const Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: fetchMaterialsForUpdate,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.download_rounded, size: 18),
+                  SizedBox(width: 8),
+                  Text('LOAD MATERIALS FOR DATE',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ],
               ),
             ),
-            child: const Text('LOAD MATERIALS FOR SELECTED DATE'),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           if (isUpdateLoading)
-            const Center(child: CircularProgressIndicator())
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                ),
+              ),
+            )
           else if (updateErrorMsg != null)
             Container(
-              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: errorColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: errorColor.withOpacity(0.3)),
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
               ),
-              child: Text(updateErrorMsg!, style: TextStyle(color: errorColor)),
+              child: Text(
+                updateErrorMsg!,
+                style: const TextStyle(
+                  color: Color(0xFFDC2626),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
             )
           else if (updateMaterials.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'UPDATE QUANTITIES',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    letterSpacing: 1.2,
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Update Quantities',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: updateMaterials.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final mat = updateMaterials[index];
-                    return Material(
-                      elevation: 0,
-                      borderRadius: BorderRadius.circular(8),
-
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
+                  const SizedBox(height: 14),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: updateMaterials.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final mat = updateMaterials[index];
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               mat['materialName'] ?? '',
                               style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Color(0xFF0F172A),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             Row(
                               children: [
                                 Expanded(
                                   child: TextField(
                                     controller:
                                         updateQuantityControllers[index],
+                                    style: const TextStyle(
+                                        fontSize: 13.5,
+                                        color: Color(0xFF0F172A)),
                                     decoration: InputDecoration(
                                       labelText: 'Quantity',
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                          color: Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                          color: Colors.grey.shade300,
-                                        ),
-                                      ),
+                                      labelStyle: const TextStyle(
+                                          fontSize: 12.5,
+                                          color: Color(0xFF64748B)),
+                                      isDense: true,
+                                      filled: true,
+                                      fillColor: Colors.white,
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 14,
-                                          ),
-                                      labelStyle: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFFE2E8F0)),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFFE2E8F0)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        borderSide: BorderSide(
+                                            color: primaryColor, width: 1.8),
                                       ),
                                     ),
                                     keyboardType: TextInputType.number,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: Colors.grey.shade800,
-                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                ElevatedButton(
-                                  onPressed: () =>
-                                      updateMaterialQuantity(index),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryColor,
-                                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                const SizedBox(width: 10),
+                                SizedBox(
+                                  height: 40,
+                                  child: ElevatedButton(
+                                    onPressed: () =>
+                                        updateMaterialQuantity(index),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryColor,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
                                     ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 16,
-                                    ),
+                                    child: const Text('UPDATE',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12)),
                                   ),
-                                  child: const Text('UPDATE'),
                                 ),
                               ],
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             )
           else
             Container(
               padding: const EdgeInsets.symmetric(vertical: 32),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200, width: 1),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.find_in_page_outlined,
-                    size: 48,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No materials loaded',
-                    style: TextStyle(color: Colors.grey.shade500),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Load materials for the selected date',
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                  ),
-                ],
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.find_in_page_outlined,
+                        size: 36,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No materials loaded',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.5,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Select a date and click "Load Materials"',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -1301,11 +1493,11 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       child: Column(
         children: [
           _buildInfoCard(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildMaterialInputCard(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildMaterialList(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _buildActionButtons(),
         ],
       ),
@@ -1314,86 +1506,189 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    final cs = Theme.of(context).colorScheme;
     return DefaultTabController(
       length: 2,
-      child: GlassScaffold(
-        title: 'Material at Site Entry',
-        body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Column(
-          children: [
-            // Tab bar
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: cs.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TabBar(
-                indicator: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: cs.primary,
-                ),
-                labelColor: cs.onPrimary,
-                unselectedLabelColor: cs.onSurface.withOpacity(0.7),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-                tabs: const [
-                  Tab(text: 'New Entry'),
-                  Tab(text: 'Update Entry'),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text(
+            'Material at Site Entry',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              letterSpacing: -0.3,
+            ),
+          ),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  darkAccent,
+                  Color.alphaBlend(
+                    primaryColor.withValues(alpha: 0.35),
+                    darkAccent,
+                  ),
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
-            Expanded(
-              child: isLoading
-                  ? Center(child: CircularProgressIndicator(color: cs.primary))
-                  : errorMsg != null
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
+          ),
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints:
+                BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                // Segmented Tab Bar
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TabBar(
+                    indicator: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      gradient: LinearGradient(
+                        colors: [
+                          darkAccent,
+                          Color.alphaBlend(
+                            primaryColor.withValues(alpha: 0.35),
+                            darkAccent,
+                          ),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: darkAccent.withValues(alpha: 0.25),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    labelColor: Colors.white,
+                    unselectedLabelColor: const Color(0xFF64748B),
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                    ),
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    dividerColor: Colors.transparent,
+                    tabs: const [
+                      Tab(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 48,
-                              color: cs.error,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              errorMsg!,
-                              style: TextStyle(color: cs.error, fontSize: 16),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                              onPressed: fetchSiteDetails,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: cs.primary,
-                                foregroundColor: cs.onPrimary,
-                              ),
-                              child: const Text('Retry'),
-                            ),
+                            Icon(Icons.add_circle_outline_rounded, size: 16),
+                            SizedBox(width: 8),
+                            Text('New Entry'),
                           ],
                         ),
                       ),
-                    )
-                  : TabBarView(
-                      children: [
-                        _buildNewEntryTabContent(),
-                        _buildUpdateTabContent(),
-                      ],
-                    ),
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.update_rounded, size: 16),
+                            SizedBox(width: 8),
+                            Text('Update Entry'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: isLoading
+                      ? Center(
+                          child: CircularProgressIndicator(
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(primaryColor),
+                          ),
+                        )
+                      : errorMsg != null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  size: 48,
+                                  color: Color(0xFFEF4444),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  errorMsg!,
+                                  style: const TextStyle(
+                                    color: Color(0xFFEF4444),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 20),
+                                ElevatedButton(
+                                  onPressed: fetchSiteDetails,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primaryColor,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : TabBarView(
+                          children: [
+                            _buildNewEntryTabContent(),
+                            _buildUpdateTabContent(),
+                          ],
+                        ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-        ),
-      ),
       ),
     );
   }
@@ -1402,6 +1697,13 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   void dispose() {
     siteIdController.dispose();
     siteLocationController.dispose();
+    projectNameController.dispose();
+    projectStageController.dispose();
+    startDateController.dispose();
+    endDateController.dispose();
+    joinedOnController.dispose();
+    siteCommentsController.dispose();
+    supervisorIdController_Internal.dispose();
     supervisorNameController.dispose();
     quantityController.dispose();
     for (var controller in updateQuantityControllers) {

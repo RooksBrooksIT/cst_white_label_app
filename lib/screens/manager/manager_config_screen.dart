@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/services/subscription_limit_service.dart';
 
 class ManagerConfigScreen extends StatefulWidget {
   const ManagerConfigScreen({super.key});
@@ -133,6 +134,21 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     setState(() => _isSubmitting = true);
 
     try {
+      // Validate active subscription manager limit
+      final subValidation = await SubscriptionLimitService.canCreateManager();
+      if (!subValidation.isAllowed) {
+        setState(() => _isSubmitting = false);
+        if (mounted) {
+          await SubscriptionLimitService.showLimitReachedDialog(
+            context,
+            title: 'Manager Limit Reached',
+            message: subValidation.errorMessage ??
+                'You have reached your subscription plan limit for managers.',
+          );
+        }
+        return;
+      }
+
       final username = _userNameController.text.trim();
       final contactNo = _contactNoController.text.trim();
 

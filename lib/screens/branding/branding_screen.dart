@@ -1,7 +1,6 @@
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:demo_cst/screens/organization/pricing_screen.dart';
@@ -178,7 +177,6 @@ class _BrandingScreenState extends State<BrandingScreen> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final Color darkCardBg = AppTheme.getDarkAccent(_selectedColor);
 
     return Theme(
       data: AppTheme.getTheme(_selectedColor),
@@ -197,11 +195,11 @@ class _BrandingScreenState extends State<BrandingScreen> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                        color: const Color(0xFF0B1942),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                            color: const Color(0xFF0B1942).withValues(alpha: 0.25),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -217,12 +215,12 @@ class _BrandingScreenState extends State<BrandingScreen> {
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    Text(
-                      'Branding',
+                    const Text(
+                      'Brand Color',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                        color: Color(0xFF0A183D),
                         letterSpacing: -0.4,
                       ),
                     ),
@@ -237,7 +235,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                     constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -245,13 +243,14 @@ class _BrandingScreenState extends State<BrandingScreen> {
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: darkCardBg,
-                              borderRadius: BorderRadius.circular(24),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: darkCardBg.withValues(alpha: 0.25),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
+                                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
@@ -261,89 +260,103 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                 Row(
                                   children: [
                                     Container(
-                                      width: 36,
-                                      height: 36,
+                                      width: 40,
+                                      height: 40,
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.15),
-                                        shape: BoxShape.circle,
+                                        color: _selectedColor.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.edit_note_rounded,
-                                        color: Colors.white,
-                                        size: 20,
+                                        color: _selectedColor,
+                                        size: 22,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    const Text(
-                                      'App Information',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                        letterSpacing: -0.3,
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'App Information',
+                                            style: TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0A183D),
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Customize your workspace display name.',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              color: Color(0xFF64748B),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                  child: Divider(color: Color(0xFFF1F5F9), height: 1),
+                                ),
                                 const Text(
                                   'App Name',
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 12.5,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFFCBD5E1),
+                                    color: Color(0xFF334155),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.08),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: TextField(
-                                    controller: _appNameController,
-                                    style: const TextStyle(
-                                      color: Color(0xFF0A183D),
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
+                                const SizedBox(height: 6),
+                                Theme(
+                                  data: Theme.of(context).copyWith(
+                                    inputDecorationTheme: const InputDecorationTheme(
+                                      filled: false,
+                                      fillColor: Colors.transparent,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      contentPadding: EdgeInsets.zero,
                                     ),
-                                    onChanged: (v) => setState(() {}),
-                                    decoration: InputDecoration(
-                                      hintText: widget.orgName,
-                                      hintStyle: const TextStyle(
-                                        color: Color(0xFF94A3B8),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                                    ),
+                                    child: TextField(
+                                      controller: _appNameController,
+                                      style: const TextStyle(
+                                        color: Color(0xFF0F172A),
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                      prefixIcon: const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                                        child: Icon(
-                                          Icons.apps_rounded,
-                                          color: Color(0xFF1E88E5),
-                                          size: 20,
+                                      onChanged: (v) => setState(() {}),
+                                      decoration: InputDecoration(
+                                        hintText: widget.orgName,
+                                        hintStyle: const TextStyle(
+                                          color: Color(0xFF94A3B8),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
                                         ),
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        borderSide: const BorderSide(
-                                          color: Color(0xFF1E88E5),
-                                          width: 1.8,
+                                        prefixIcon: Padding(
+                                          padding: const EdgeInsets.only(right: 10.0),
+                                          child: Icon(
+                                            Icons.apps_rounded,
+                                            color: _selectedColor,
+                                            size: 20,
+                                          ),
                                         ),
-                                      ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 14,
+                                        prefixIconConstraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                                        border: InputBorder.none,
+                                        isDense: true,
                                       ),
                                     ),
                                   ),
@@ -358,13 +371,14 @@ class _BrandingScreenState extends State<BrandingScreen> {
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: darkCardBg,
-                              borderRadius: BorderRadius.circular(24),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: darkCardBg.withValues(alpha: 0.25),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
+                                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
@@ -374,76 +388,86 @@ class _BrandingScreenState extends State<BrandingScreen> {
                                 Row(
                                   children: [
                                     Container(
-                                      width: 36,
-                                      height: 36,
+                                      width: 40,
+                                      height: 40,
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.15),
-                                        shape: BoxShape.circle,
+                                        color: _selectedColor.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.palette_rounded,
-                                        color: Colors.white,
-                                        size: 20,
+                                        color: _selectedColor,
+                                        size: 22,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    const Text(
-                                      'Brand Color Theme',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                        letterSpacing: -0.3,
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Brand Color Theme',
+                                            style: TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0A183D),
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Choose from 14+ vibrant brand colors or pick a custom theme color.',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              color: Color(0xFF64748B),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Choose from 14+ vibrant brand colors or pick a custom theme color.',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    color: Color(0xFFCBD5E1),
-                                    height: 1.3,
-                                  ),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                  child: Divider(color: Color(0xFFF1F5F9), height: 1),
                                 ),
-                                const SizedBox(height: 18),
                                 _buildColorPalette(),
                               ],
                             ),
                           ),
 
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 24),
 
                           // 3. Save / Continue CTA Button
                           SizedBox(
-                            height: 54,
+                            height: 48,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _goToNextStep,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0B1942),
+                                backgroundColor: _selectedColor,
                                 foregroundColor: Colors.white,
-                                elevation: 4,
-                                shadowColor: const Color(0xFF0B1942).withValues(alpha: 0.35),
+                                elevation: 2,
+                                shadowColor: _selectedColor.withValues(alpha: 0.35),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                               child: _isLoading
                                   ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
+                                      width: 20,
+                                      height: 20,
                                       child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
+                                        strokeWidth: 2,
                                         color: Colors.white,
                                       ),
                                     )
                                   : const Text(
                                       'SAVE CHANGES',
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.8,
+                                        letterSpacing: 0.5,
                                       ),
                                     ),
                             ),
@@ -464,8 +488,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
   Widget _buildColorPalette() {
     return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+      spacing: 8,
+      runSpacing: 8,
       children: _colorOptions.map((opt) {
         final isCustom = opt['isCustom'] == true;
         final Color swatchColor = isCustom ? _customColor : opt['color'] as Color;
@@ -475,7 +499,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
             ? (!_colorOptions.any(
                 (o) => o['isCustom'] != true && o['color'] == _selectedColor,
               ))
-            : _selectedColor.value == swatchColor.value;
+            : _selectedColor == swatchColor;
 
         return GestureDetector(
           onTap: isCustom
@@ -488,20 +512,20 @@ class _BrandingScreenState extends State<BrandingScreen> {
                 },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
+              color: isSelected ? Colors.white : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.3),
-                width: isSelected ? 2.0 : 1.0,
+                color: isSelected ? _selectedColor : const Color(0xFFE2E8F0),
+                width: isSelected ? 1.8 : 1.2,
               ),
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                        color: swatchColor.withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
+                        color: _selectedColor.withValues(alpha: 0.25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ]
                   : null,
@@ -509,16 +533,15 @@ class _BrandingScreenState extends State<BrandingScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Color Circle / Custom Rainbow
                 Container(
-                  width: 20,
-                  height: 20,
+                  width: 18,
+                  height: 18,
                   decoration: BoxDecoration(
                     color: isCustom && !isSelected ? null : swatchColor,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF0A183D) : Colors.white,
-                      width: 1.5,
+                      color: isSelected ? _selectedColor : const Color(0xFFCBD5E1),
+                      width: 1.2,
                     ),
                     gradient: isCustom && !isSelected
                         ? const SweepGradient(
@@ -538,17 +561,17 @@ class _BrandingScreenState extends State<BrandingScreen> {
                       ? const Icon(
                           Icons.check,
                           color: Colors.white,
-                          size: 13,
+                          size: 11,
                         )
                       : null,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 7),
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 12.5,
                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? const Color(0xFF0A183D) : Colors.white,
+                    color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF475569),
                   ),
                 ),
               ],

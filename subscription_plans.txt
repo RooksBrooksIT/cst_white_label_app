@@ -1,0 +1,108 @@
+================================================================================
+                       SUBSCRIPTION PLANS & PRICING DETAILS
+================================================================================
+
+1. FREE TRIAL PLAN
+--------------------------------------------------------------------------------
+• Target Audience : New users testing platform capabilities at zero cost.
+• Pricing         : FREE (₹0)
+• Billing Cadence : 14-Day Free Access (No credit card required)
+• Quotas & Limitations:
+  - Projects / Active Sites : Maximum 1 Project
+  - Team Members / Users    : Maximum 2 Users
+• Included Features:
+  - Basic Project Management
+  - Task Tracking & Updates
+  - Limited Team Members (up to 2)
+  - Basic Reports & Analytics
+  - Standard Cloud Storage
+
+
+2. SILVER PLAN (Starter)
+--------------------------------------------------------------------------------
+• Target Audience : Small teams and independent contractors starting out.
+• Pricing Details :
+  - Monthly Plan  : ₹99 / month  (Original Price: ₹149 / month)
+  - 6 Months Plan : ₹594 total   (Original Price: ₹894 - ₹99/mo rate)
+  - Annual (Yearly): ₹1,188 / year (Original Price: ₹1,788 - Save 33% at ₹99/mo)
+• Quotas & Limitations:
+  - Projects / Active Sites : Maximum 3 Projects
+  - Team Members / Users    : Maximum 5 Users
+• Included Features:
+  - Basic Project Management
+  - Task Tracking & Updates
+  - Limited Team Members (3-5)
+  - Basic Reports & Data View
+  - Standard Cloud Backup & Sync
+
+
+3. GOLD PLAN (Expert Choice)
+--------------------------------------------------------------------------------
+• Target Audience : Growing organizations requiring structured multi-site control.
+• Pricing Details :
+  - Monthly Plan  : ₹199 / month   (Original Price: ₹299 / month)
+  - 6 Months Plan : ₹1,194 total   (Original Price: ₹1,794 - ₹199/mo rate)
+  - Annual (Yearly): ₹2,388 / year (Original Price: ₹3,588 - Save 33% at ₹199/mo)
+• Quotas & Limitations:
+  - Projects / Active Sites : Maximum 10 Projects & Active Sites
+  - Team Members / Users    : Up to 15 Users (5 Managers + 10 Supervisors)
+• Included Features:
+  - Up to 10 Projects & Active Sites
+  - Up to 5 Managers & 10 Supervisors
+  - Advanced collaboration & Site monitoring
+  - Expense tracking & Monthly report views
+  - Role-based Access & Live Timeline
+  - Real-time Material Movement Logs
+
+
+4. PLATINUM PLAN (Custom Scale)
+--------------------------------------------------------------------------------
+• Target Audience : Mid to large organizations needing customizable project limits.
+• Pricing Model   : Scalable at ₹39.90 / site / month (Original: ₹59.90 / site / mo)
+• Pricing by Site Tier:
+  -  5 Sites : ₹199.50 / mo  |  6 Months: ₹1,197   |  1 Year: ₹2,394
+  - 10 Sites : ₹399.00 / mo  |  6 Months: ₹2,394   |  1 Year: ₹4,788
+  - 15 Sites : ₹598.50 / mo  |  6 Months: ₹3,591   |  1 Year: ₹7,182
+  - 20 Sites : ₹798.00 / mo  |  6 Months: ₹4,788   |  1 Year: ₹9,576
+  - 25 Sites : ₹997.50 / mo  |  6 Months: ₹5,985   |  1 Year: ₹11,970
+  - 30 Sites : ₹1,197.00 / mo |  6 Months: ₹7,182   |  1 Year: ₹14,364
+  - 40 Sites : ₹1,596.00 / mo |  6 Months: ₹9,576   |  1 Year: ₹19,152
+  - 50 Sites : ₹1,995.00 / mo |  6 Months: ₹11,970  |  1 Year: ₹23,940
+• Quotas & Limitations:
+  - Projects / Active Sites : Customizable from 5 to 50 Sites
+  - Managers               : Up to (Site Count / 2), clamped between 2 and 25
+  - Supervisors            : Up to Site Count (e.g. 10 sites = 10 supervisors)
+  - Total Users            : Site Count * 1.5
+• Included Features:
+  - Customizable Projects & Active Sites Quota (5-50)
+  - Scaled Managers & Supervisors allocation
+  - Advanced collaboration & Workflows
+  - Real-time site monitoring & Live logs
+  - Comprehensive expense tracking & Audits
+  - Priority cloud sync & audit logging
+
+
+5. ENTERPRISE PLAN (Team / Custom)
+--------------------------------------------------------------------------------
+• Target Audience : Large enterprises needing dedicated infra & bespoke SLA.
+• Pricing Details : Custom Pricing / Annual Contract via Enterprise Sales
+• Quotas & Limitations:
+  - Projects / Active Sites : UNLIMITED
+  - Team Members / Users    : UNLIMITED Managers & Supervisors
+• Included Features:
+  - Unlimited Projects & Active Sites
+  - Unlimited Managers & Supervisors
+  - Custom Cloud Infrastructure & Dedicated Database
+  - 24/7 Priority SLA & Dedicated Account Manager
+  - Custom API Integrations & Webhooks
+  - Enterprise Security & Data Residency
+
+================================================================================
+                          UPGRADE & BILLING RULES
+================================================================================
+• Immediate Upgrade vs Queued Upgrade:
+  - Existing active subscribers can choose to queue their upgrade, which activates
+    automatically upon expiration of their current active billing cycle.
+• Payment Gateways Supported:
+  - PayU Payment Gateway (Credit Card, Debit Card, Net Banking, UPI)
+================================================================================

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 
@@ -17,6 +18,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   late TabController _tabController;
 
   Color get primaryColor => Theme.of(context).primaryColor;
+
+  // ── Logged In User State ──────────────────────────────────────────────────
+  String _loggedInManagerName = '';
 
   // ── Company to Site State ──────────────────────────────────────────────────
   final TextEditingController _projectNameController = TextEditingController();
@@ -91,6 +95,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     setState(() => _isLoadingData = true);
     try {
       await Future.wait([
+        _fetchCurrentManagerName(),
         _fetchSitesData(),
         _fetchTools(),
         _fetchMovementLogs(),
@@ -103,6 +108,56 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       if (mounted) {
         setState(() => _isLoadingData = false);
       }
+    }
+  }
+
+  Future<void> _fetchCurrentManagerName() async {
+    try {
+      final auth = AuthService();
+      String resolvedName = '';
+
+      if (auth.userRole == UserRole.organization) {
+        resolvedName = (auth.userData['org_name'] ??
+                auth.userData['username'] ??
+                'Organization Administrator')
+            .toString();
+      } else if (auth.userRole == UserRole.manager) {
+        final data = auth.userData;
+        resolvedName = (data['FullName'] ??
+                data['fullName'] ??
+                data['UserName'] ??
+                data['username'] ??
+                '')
+            .toString();
+
+        if (resolvedName.isEmpty || resolvedName == 'Manager') {
+          final username = (data['username'] ?? data['UserName'] ?? '').toString().trim();
+          if (username.isNotEmpty) {
+            final q = await FirestoreService.getCollection('manager')
+                .where('UserName', isEqualTo: username)
+                .limit(1)
+                .get();
+            if (q.docs.isNotEmpty) {
+              final docData = q.docs.first.data();
+              resolvedName = (docData['FullName'] ?? docData['fullName'] ?? docData['name'] ?? '').toString();
+            }
+          }
+        }
+      }
+
+      if (resolvedName.isNotEmpty && mounted) {
+        setState(() {
+          _loggedInManagerName = resolvedName;
+          if (_managerNameController.text.trim().isEmpty) {
+            _managerNameController.text = resolvedName;
+          }
+          if (_returnManagerNameController.text.trim().isEmpty) {
+            _returnManagerNameController.text = resolvedName;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching logged in manager name: $e');
     }
   }
 
@@ -402,7 +457,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     setState(() {
       if (isReturn) {
         _returnProjectNameController.clear();
-        _returnManagerNameController.clear();
+        _returnManagerNameController.text = _loggedInManagerName;
         _returnSupervisorNameController.clear();
         _returnSelectedDate = DateTime.now();
         _returnSelectedSiteId = null;
@@ -413,7 +468,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         _returnSelectedToolAvailableCount = null;
       } else {
         _projectNameController.clear();
-        _managerNameController.clear();
+        _managerNameController.text = _loggedInManagerName;
         _supervisorNameController.clear();
         _selectedDate = DateTime.now();
         _selectedSiteId = null;
@@ -738,17 +793,17 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       body: SafeArea(
         child: Column(
           children: [
-            // ── Pill Tab Switcher ───────────────────────────────────────────
+            // ── Executive Segmented Tab Switcher ────────────────────────────
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              padding: const EdgeInsets.all(4),
+              margin: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                    color: primaryColor.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -759,9 +814,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                 builder: (context, _) {
                   return Row(
                     children: [
-                      _buildTabItem(0, 'COMPANY → SITE', Icons.local_shipping_rounded),
-                      _buildTabItem(1, 'SITE → COMPANY', Icons.assignment_return_rounded),
-                      _buildTabItem(2, 'MOVEMENT LOGS', Icons.receipt_long_rounded),
+                      _buildTabItem(0, 'DISPATCH', 'To Site', Icons.local_shipping_rounded),
+                      _buildTabItem(1, 'RETURN', 'To Org', Icons.assignment_return_rounded),
+                      _buildTabItem(2, 'LOGS', 'History', Icons.receipt_long_rounded),
                     ],
                   );
                 },
@@ -771,7 +826,11 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
             // ── Tab Views ───────────────────────────────────────────────────
             Expanded(
               child: _isLoadingData
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                      ),
+                    )
                   : TabBarView(
                       controller: _tabController,
                       children: [
@@ -787,50 +846,71 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     );
   }
 
-  Widget _buildTabItem(int index, String label, IconData icon) {
+  Widget _buildTabItem(int index, String title, String subtitle, IconData icon) {
     final isSelected = _tabController.index == index;
     return Expanded(
       child: GestureDetector(
         onTap: () => _tabController.animateTo(index),
+        behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? primaryColor : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.28),
+                      color: primaryColor.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
                   ]
                 : null,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: isSelected ? Colors.white : const Color(0xFF64748B),
-              ),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
-                    color: isSelected ? Colors.white : const Color(0xFF475569),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 15,
+                        color: isSelected ? Colors.white : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                          color: isSelected ? Colors.white : const Color(0xFF334155),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -855,7 +935,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 680),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 30),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -864,12 +944,12 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                      blurRadius: 14,
+                      color: primaryColor.withValues(alpha: 0.04),
+                      blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
                   ],
@@ -880,15 +960,15 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(9),
                           decoration: BoxDecoration(
-                            color: (isReturn ? Colors.amber : primaryColor).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
+                            color: primaryColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
                             isReturn ? Icons.assignment_return_rounded : Icons.local_shipping_rounded,
-                            color: isReturn ? Colors.amber.shade800 : primaryColor,
-                            size: 22,
+                            color: primaryColor,
+                            size: 21,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -898,6 +978,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: darkAccent,
+                            letterSpacing: -0.3,
                           ),
                         ),
                       ],
@@ -912,13 +993,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                       isReturn ? 'Select Source Site ID *' : 'Select Target Site ID *',
                       Icons.location_on_rounded,
                     ),
-                    const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -928,7 +1009,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             isReturn ? 'Choose site to return from...' : 'Choose site to send tools...',
                             style: const TextStyle(
                               color: Color(0xFF94A3B8),
-                              fontSize: 13.5,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
@@ -962,12 +1044,12 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildFieldLabel('Project Name', Icons.business_rounded),
-                              const SizedBox(height: 6),
                               _buildReadOnlyBox(
                                 isReturn
                                     ? _returnProjectNameController.text
                                     : _projectNameController.text,
                                 'Auto-populated',
+                                prefixIcon: Icons.apartment_rounded,
                               ),
                             ],
                           ),
@@ -978,12 +1060,12 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildFieldLabel('Supervisor Name', Icons.badge_rounded),
-                              const SizedBox(height: 6),
                               _buildReadOnlyBox(
                                 isReturn
                                     ? _returnSupervisorNameController.text
                                     : _supervisorNameController.text,
                                 'Auto-populated',
+                                prefixIcon: Icons.person_rounded,
                               ),
                             ],
                           ),
@@ -999,27 +1081,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildFieldLabel('Manager Name', Icons.person_rounded),
-                              const SizedBox(height: 6),
-                              _buildInputContainer(
-                                child: TextField(
-                                  controller: isReturn
-                                      ? _returnManagerNameController
-                                      : _managerNameController,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                  decoration: const InputDecoration(
-                                    hintText: 'Enter Manager',
-                                    hintStyle: TextStyle(
-                                      color: Color(0xFF94A3B8),
-                                      fontSize: 13,
-                                    ),
-                                    border: InputBorder.none,
-                                  ),
-                                ),
+                              _buildFieldLabel('Manager Name', Icons.manage_accounts_rounded),
+                              _buildCustomTextField(
+                                controller: isReturn
+                                    ? _returnManagerNameController
+                                    : _managerNameController,
+                                hint: 'Enter Manager',
+                                prefixIcon: Icons.edit_note_rounded,
                               ),
                             ],
                           ),
@@ -1030,7 +1098,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildFieldLabel('Movement Date', Icons.calendar_today_rounded),
-                              const SizedBox(height: 6),
                               GestureDetector(
                                 onTap: () async {
                                   final picked = await showDatePicker(
@@ -1050,24 +1117,27 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                   }
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(Icons.event_rounded, size: 16, color: primaryColor),
+                                      Icon(Icons.calendar_month_rounded, size: 18, color: primaryColor),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        DateFormat('dd MMM yyyy').format(
-                                          isReturn ? _returnSelectedDate : _selectedDate,
-                                        ),
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF0F172A),
+                                      Expanded(
+                                        child: Text(
+                                          DateFormat('dd MMM yyyy').format(
+                                            isReturn ? _returnSelectedDate : _selectedDate,
+                                          ),
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF0F172A),
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -1089,12 +1159,12 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                      blurRadius: 14,
+                      color: primaryColor.withValues(alpha: 0.04),
+                      blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
                   ],
@@ -1108,15 +1178,15 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(9),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0EA5E9).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(10),
+                                color: primaryColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.handyman_rounded,
-                                color: Color(0xFF0284C7),
-                                size: 20,
+                                color: primaryColor,
+                                size: 21,
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -1126,6 +1196,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
                                 color: darkAccent,
+                                letterSpacing: -0.3,
                               ),
                             ),
                           ],
@@ -1141,13 +1212,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
 
                     // Tool Dropdown
                     _buildFieldLabel('Choose Tool *', Icons.inventory_2_rounded),
-                    const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -1157,7 +1228,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             'Select tool from inventory...',
                             style: TextStyle(
                               color: Color(0xFF94A3B8),
-                              fontSize: 13.5,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
@@ -1197,78 +1269,136 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     ),
                     const SizedBox(height: 14),
 
-                    // Quantity Stepper + Add Button
+                    // Unified Stepper & Add Button
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Expanded(
+                          flex: 5,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildFieldLabel('Quantity Units *', Icons.numbers_rounded),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildInputContainer(
-                                      child: TextField(
-                                        controller: currentCountController,
-                                        keyboardType: TextInputType.number,
-                                        style: const TextStyle(
-                                          fontSize: 14.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFF0F172A),
-                                        ),
-                                        onChanged: (val) {
-                                          final parsed = int.tryParse(val) ?? 1;
-                                          setState(() {
-                                            if (isReturn) {
-                                              _returnToolCount = parsed;
-                                            } else {
-                                              _toolCount = parsed;
-                                            }
-                                          });
+                              _buildFieldLabel('Quantity Units *', Icons.pin_rounded),
+                              Container(
+                                height: 48,
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(8),
+                                        onTap: () {
+                                          final cur = int.tryParse(currentCountController.text.trim()) ?? 1;
+                                          if (cur > 1) {
+                                            currentCountController.text = (cur - 1).toString();
+                                            setState(() {
+                                              if (isReturn) {
+                                                _returnToolCount = cur - 1;
+                                              } else {
+                                                _toolCount = cur - 1;
+                                              }
+                                            });
+                                          }
                                         },
-                                        decoration: const InputDecoration(
-                                          hintText: 'Count',
-                                          border: InputBorder.none,
+                                        child: Container(
+                                          width: 34,
+                                          height: 34,
+                                          decoration: BoxDecoration(
+                                            color: primaryColor.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Icon(Icons.remove_rounded, size: 18, color: primaryColor),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  _buildSmallStepper(Icons.remove, () {
-                                    final cur = int.tryParse(currentCountController.text.trim()) ?? 1;
-                                    if (cur > 1) {
-                                      currentCountController.text = (cur - 1).toString();
-                                      setState(() {
-                                        if (isReturn) {
-                                          _returnToolCount = cur - 1;
-                                        } else {
-                                          _toolCount = cur - 1;
-                                        }
-                                      });
-                                    }
-                                  }),
-                                  const SizedBox(width: 4),
-                                  _buildSmallStepper(Icons.add, () {
-                                    final cur = int.tryParse(currentCountController.text.trim()) ?? 0;
-                                    currentCountController.text = (cur + 1).toString();
-                                    setState(() {
-                                      if (isReturn) {
-                                        _returnToolCount = cur + 1;
-                                      } else {
-                                        _toolCount = cur + 1;
-                                      }
-                                    });
-                                  }),
-                                ],
+                                    Expanded(
+                                      child: Center(
+                                        child: Theme(
+                                          data: Theme.of(context).copyWith(
+                                            inputDecorationTheme: const InputDecorationTheme(
+                                              filled: false,
+                                              fillColor: Colors.transparent,
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
+                                          child: TextField(
+                                            controller: currentCountController,
+                                            keyboardType: TextInputType.number,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFF0F172A),
+                                            ),
+                                            onChanged: (val) {
+                                              final parsed = int.tryParse(val) ?? 1;
+                                              setState(() {
+                                                if (isReturn) {
+                                                  _returnToolCount = parsed;
+                                                } else {
+                                                  _toolCount = parsed;
+                                                }
+                                              });
+                                            },
+                                            decoration: const InputDecoration(
+                                              filled: false,
+                                              fillColor: Colors.transparent,
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              errorBorder: InputBorder.none,
+                                              disabledBorder: InputBorder.none,
+                                              isDense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(8),
+                                        onTap: () {
+                                          final cur = int.tryParse(currentCountController.text.trim()) ?? 0;
+                                          currentCountController.text = (cur + 1).toString();
+                                          setState(() {
+                                            if (isReturn) {
+                                              _returnToolCount = cur + 1;
+                                            } else {
+                                              _toolCount = cur + 1;
+                                            }
+                                          });
+                                        },
+                                        child: Container(
+                                          width: 34,
+                                          height: 34,
+                                          decoration: BoxDecoration(
+                                            color: primaryColor.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Icon(Icons.add_rounded, size: 18, color: primaryColor),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 24),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 4,
                           child: SizedBox(
                             height: 48,
                             child: ElevatedButton.icon(
@@ -1281,9 +1411,10 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                elevation: 2,
+                                shadowColor: primaryColor.withValues(alpha: 0.35),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                             ),
@@ -1302,12 +1433,12 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                        blurRadius: 14,
+                        color: primaryColor.withValues(alpha: 0.04),
+                        blurRadius: 12,
                         offset: const Offset(0, 3),
                       ),
                     ],
@@ -1327,10 +1458,10 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: primaryColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
                               'TOTAL: ${currentAddedTools.fold<int>(0, (accumulator, item) => accumulator + ((item['count'] as int?) ?? 0))} UNITS',
@@ -1361,9 +1492,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             child: Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(6),
+                                  padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
-                                    color: primaryColor.withValues(alpha: 0.1),
+                                    color: primaryColor.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(Icons.build_rounded, size: 16, color: primaryColor),
@@ -1396,16 +1527,16 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF1F5F9),
+                                    color: primaryColor.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                    border: Border.all(color: primaryColor.withValues(alpha: 0.15)),
                                   ),
                                   child: Text(
                                     '${item['count']} Units',
                                     style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: 12.5,
                                       fontWeight: FontWeight.w900,
-                                      color: darkAccent,
+                                      color: primaryColor,
                                     ),
                                   ),
                                 ),
@@ -1444,12 +1575,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             ? null
                             : () => isReturn ? _saveSiteToCompanyReturn() : _saveCompanyToSiteMovement(),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isReturn ? Colors.amber.shade800 : primaryColor,
+                          backgroundColor: primaryColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          elevation: 4,
+                          elevation: 3,
+                          shadowColor: primaryColor.withValues(alpha: 0.35),
                         ),
                         child: isSubmitting
                             ? const SizedBox(
@@ -1487,16 +1619,42 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     child: OutlinedButton(
                       onPressed: () => _resetForm(isReturn),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF64748B),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        foregroundColor: primaryColor,
+                        side: BorderSide(color: primaryColor.withValues(alpha: 0.35), width: 1.2),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('RESET', style: TextStyle(fontWeight: FontWeight.w700)),
+                      child: const Text(
+                        'RESET',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 20),
+
+              // ── 5. How It Works Guide Box ─────────────────────────────────
+              _buildHowItWorksBox(
+                isReturn: isReturn,
+                primaryColor: primaryColor,
+                items: isReturn
+                    ? const [
+                        'Tools are returned from Site back to Company Inventory.',
+                        'Site tools inventory count decreases automatically.',
+                        'Company available stock count increases automatically.',
+                        'Return transaction is recorded in Movement Logs with tracking TR-ID.',
+                      ]
+                    : const [
+                        'Tools are dispatched from Company Inventory to the selected Site.',
+                        'Company available stock decreases automatically upon dispatch.',
+                        'Site tools inventory count increases automatically.',
+                        'Dispatch transaction is recorded in Movement Logs with tracking TM-ID.',
+                      ],
               ),
             ],
           ),
@@ -1505,18 +1663,68 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     );
   }
 
-  Widget _buildSmallStepper(IconData icon, VoidCallback onPressed) {
+  Widget _buildHowItWorksBox({
+    required bool isReturn,
+    required Color primaryColor,
+    required List<String> items,
+  }) {
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: primaryColor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.22)),
       ),
-      child: IconButton(
-        icon: Icon(icon, size: 16, color: const Color(0xFF334155)),
-        onPressed: onPressed,
-        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-        padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: primaryColor, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'How it works:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                  color: primaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...items.map((item) => _buildInfoItem(item)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '• ',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF475569),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF334155),
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1893,50 +2101,124 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   // ---------------------------------------------------------------------------
 
   Widget _buildFieldLabel(String label, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 15, color: const Color(0xFF64748B)),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF334155),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 14.5, color: primaryColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF334155),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildInputContainer({required Widget child}) {
+  Widget _buildCustomTextField({
+    required TextEditingController controller,
+    required String hint,
+    IconData? prefixIcon,
+    TextInputType keyboardType = TextInputType.text,
+    Function(String)? onChanged,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      height: 48,
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
       ),
-      child: child,
+      child: Row(
+        children: [
+          if (prefixIcon != null) ...[
+            const SizedBox(width: 12),
+            Icon(prefixIcon, size: 17, color: const Color(0xFF64748B)),
+            const SizedBox(width: 6),
+          ] else
+            const SizedBox(width: 12),
+          Expanded(
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                inputDecorationTheme: const InputDecorationTheme(
+                  filled: false,
+                  fillColor: Colors.transparent,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+              child: TextField(
+                controller: controller,
+                keyboardType: keyboardType,
+                onChanged: onChanged,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  filled: false,
+                  fillColor: Colors.transparent,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
     );
   }
 
-  Widget _buildReadOnlyBox(String text, String placeholder) {
+  Widget _buildReadOnlyBox(String text, String placeholder, {IconData? prefixIcon}) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
       ),
-      child: Text(
-        text.isNotEmpty ? text : placeholder,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: text.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
-        ),
+      child: Row(
+        children: [
+          if (prefixIcon != null) ...[
+            Icon(prefixIcon, size: 17, color: const Color(0xFF94A3B8)),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              text.isNotEmpty ? text : placeholder,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: text.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

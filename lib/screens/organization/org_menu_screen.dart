@@ -12,7 +12,6 @@ import 'package:demo_cst/screens/common/contact_support_screen.dart';
 import 'package:demo_cst/screens/organization/org_subscription_page.dart';
 import 'package:demo_cst/screens/organization/org_information_screen.dart';
 import 'package:demo_cst/screens/common/about_us_screen.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 
 class OrgMenuScreen extends StatefulWidget {
   final bool standalone;
@@ -23,7 +22,6 @@ class OrgMenuScreen extends StatefulWidget {
 }
 
 class _OrgMenuScreenState extends State<OrgMenuScreen> {
-  String _orgName = '';
   String _orgCode = 'Loading...';
   String _subscriptionPlan = 'Loading...';
   String _subscriptionExpiry = '';
@@ -187,19 +185,18 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
   }
 
   Widget _buildReferralSection(ThemeData theme) {
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -212,12 +209,12 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+                  color: theme.primaryColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.share_rounded,
-                  color: Colors.white,
+                  color: theme.primaryColor,
                   size: 20,
                 ),
               ),
@@ -225,24 +222,25 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
               const Text(
                 'Referral Program',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
+                  color: Color(0xFF0A183D),
+                  fontSize: 17,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.3,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           const Text(
             'Share these codes with your team members to register them under your organization.',
             style: TextStyle(
-              color: Color(0xFFCBD5E1),
+              color: Color(0xFF64748B),
               fontSize: 13,
               height: 1.35,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           _buildCodeRow('REFERRAL', _orgCode, theme),
         ],
       ),
@@ -258,23 +256,17 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           style: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF94A3B8),
-            letterSpacing: 1.0,
+            color: Color(0xFF64748B),
+            letterSpacing: 0.8,
           ),
         ),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -283,23 +275,29 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 code,
                 style: TextStyle(
                   color: theme.primaryColor,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2.0,
                 ),
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.copy_rounded,
-                  color: Color(0xFF0A183D),
-                  size: 20,
-                ),
-                onPressed: () {
+              InkWell(
+                onTap: () {
                   Clipboard.setData(ClipboardData(text: code));
                   AppTheme.showSuccessToast(context, '$label code copied!');
                 },
-                constraints: const BoxConstraints(),
-                padding: EdgeInsets.zero,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.copy_rounded,
+                    color: theme.primaryColor,
+                    size: 18,
+                  ),
+                ),
               ),
             ],
           ),
@@ -317,7 +315,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           child: Text(
             'Settings & Customization',
             style: TextStyle(
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: Color(0xFF0A183D),
               letterSpacing: -0.3,
@@ -416,7 +414,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           child: Text(
             'Billing & Membership',
             style: TextStyle(
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: Color(0xFF0A183D),
               letterSpacing: -0.3,
@@ -449,24 +447,24 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () => _showLogoutConfirmation(context),
-        icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
+        icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 18),
         label: const Text(
           'LOGOUT',
           style: TextStyle(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w800,
-            letterSpacing: 1.0,
+            letterSpacing: 0.8,
             color: Colors.white,
           ),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFDC2626),
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          elevation: 4,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          elevation: 2,
           shadowColor: const Color(0xFFDC2626).withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
       ),
@@ -595,18 +593,17 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: darkCardBg,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: darkCardBg.withValues(alpha: 0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -614,27 +611,20 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
             child: Row(
               children: [
                 // Icon Badge
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: iconColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: iconColor.withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    color: iconColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 22),
+                  child: Icon(icon, color: iconColor, size: 20),
                 ),
                 const SizedBox(width: 14),
                 // Title and Subtitle
@@ -645,20 +635,20 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                       Text(
                         title,
                         style: const TextStyle(
-                          fontSize: 15.5,
+                          fontSize: 14.5,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: Color(0xFF0F172A),
                           letterSpacing: -0.2,
                         ),
                       ),
                       if (subtitle != null) ...[
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 2),
                         Text(
                           subtitle,
                           style: const TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFFCBD5E1),
+                            color: Color(0xFF64748B),
                             height: 1.25,
                           ),
                           maxLines: 2,
@@ -670,19 +660,20 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                 ),
                 const SizedBox(width: 10),
                 trailing ??
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
+                    child: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Color(0xFF64748B),
+                      size: 18,
+                    ),
+                  ),
               ],
             ),
           ),

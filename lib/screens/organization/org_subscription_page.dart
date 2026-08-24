@@ -7,6 +7,8 @@ import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/organization/pricing_screen.dart';
 import 'package:demo_cst/screens/common/contact_support_screen.dart';
 
+import 'package:demo_cst/services/subscription_limit_service.dart';
+
 class OrganizationSubscriptionPage extends StatefulWidget {
   const OrganizationSubscriptionPage({super.key});
 
@@ -27,94 +29,91 @@ class _OrganizationSubscriptionPageState
   String _queuedPlanName = '';
   String _queuedStartDate = '';
 
-  int _siteCount = 0;
-  int _supervisorCount = 0;
+  SubscriptionPlanLimits _limits =
+      SubscriptionLimitService.getLimitsForPlan('Free Trial');
+  SubscriptionUsage _usage = const SubscriptionUsage(
+    siteCount: 0,
+    managerCount: 0,
+    supervisorCount: 0,
+    totalUserCount: 0,
+  );
 
   Color get primaryColor => Theme.of(context).primaryColor;
 
   @override
   void initState() {
     super.initState();
-    _fetchSubscriptionData();
-    _fetchUsageData();
+    _loadSubscriptionAndUsage();
   }
 
-  Future<void> _fetchSubscriptionData() async {
+  Future<void> _loadSubscriptionAndUsage() async {
     try {
-      var doc = await FirestoreService.subscriptionDoc.get();
+      final limits = await SubscriptionLimitService.getActivePlanLimits();
+      final usage = await SubscriptionLimitService.getCurrentUsage();
 
+      var doc = await FirestoreService.subscriptionDoc.get();
       if (!doc.exists) {
-        debugPrint('OrganizationSubscriptionPage: Subscription doc not found in admin, falling back to root.');
         doc = await FirestoreService.rootOrgDoc.get();
       }
 
-      if (doc.exists && mounted) {
-        final data = doc.data()!;
-        setState(() {
-          _planName = _formatPlanName(data['subscriptionPlan'] ?? 'Free Trial');
-          
+      if (mounted) {
+        String expiryDate = 'Lifetime Active';
+        int daysRemaining = 365;
+        bool isActive = true;
+        bool isUpgradeQueued = false;
+        String queuedPlanName = '';
+        String queuedStartDate = '';
+
+        if (doc.exists) {
+          final data = doc.data()!;
           final isActiveField = data['isSubscriptionActive'] as bool? ?? true;
           final expiry = data['subscriptionEndDate'] as Timestamp?;
-          
-          bool isExpired = false;
+
           if (expiry != null) {
             final expDate = expiry.toDate();
             final now = DateTime.now();
-            isExpired = now.isAfter(expDate);
-            _daysRemaining = expDate.difference(now).inDays;
-            if (_daysRemaining < 0) _daysRemaining = 0;
-            _expiryDate = DateFormat('dd MMM yyyy').format(expDate);
-          } else {
-            _expiryDate = 'Lifetime Active';
-            _daysRemaining = 365;
+            final isExpired = now.isAfter(expDate);
+            daysRemaining = expDate.difference(now).inDays;
+            if (daysRemaining < 0) daysRemaining = 0;
+            expiryDate = DateFormat('dd MMM yyyy').format(expDate);
+            isActive = isActiveField && !isExpired;
           }
 
           final isQueued = data['isUpgradeQueued'] as bool? ?? false;
           final queuedPlanRaw = data['queuedPlan'] as String?;
           final queuedStartTs = data['queuedStartDate'] as Timestamp?;
           if (isQueued && queuedPlanRaw != null && queuedPlanRaw.isNotEmpty) {
-            _isUpgradeQueued = true;
-            _queuedPlanName = _formatPlanName(queuedPlanRaw);
+            isUpgradeQueued = true;
+            queuedPlanName = _formatPlanName(queuedPlanRaw);
             if (queuedStartTs != null) {
-              _queuedStartDate = DateFormat('dd MMM yyyy').format(queuedStartTs.toDate());
+              queuedStartDate =
+                  DateFormat('dd MMM yyyy').format(queuedStartTs.toDate());
             } else {
-              _queuedStartDate = _expiryDate;
+              queuedStartDate = expiryDate;
             }
-          } else {
-            _isUpgradeQueued = false;
           }
+        }
 
-          _isActive = isActiveField && !isExpired;
-          _status = _isActive ? 'Active' : 'Inactive';
+        setState(() {
+          _limits = limits;
+          _usage = usage;
+          _planName = limits.planName;
+          _isActive = isActive;
+          _status = isActive ? 'Active' : 'Inactive';
+          _expiryDate = expiryDate;
+          _daysRemaining = daysRemaining;
+          _isUpgradeQueued = isUpgradeQueued;
+          _queuedPlanName = queuedPlanName;
+          _queuedStartDate = queuedStartDate;
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetching subscription data: $e');
+      debugPrint('Error loading subscription: $e');
       if (mounted) {
-        setState(() {
-          _planName = 'Standard Plan';
-          _status = 'Active';
-          _expiryDate = '31 Dec 2026';
-          _daysRemaining = 130;
-          _isActive = true;
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
-  }
-
-  Future<void> _fetchUsageData() async {
-    try {
-      final sitesSnap = await FirestoreService.getCollection('Site').get();
-      final supSnap = await FirestoreService.getCollection('Supervisors').get();
-      if (mounted) {
-        setState(() {
-          _siteCount = sitesSnap.docs.length;
-          _supervisorCount = supSnap.docs.length;
-        });
-      }
-    } catch (_) {}
   }
 
   String _formatPlanName(String raw) {
@@ -182,6 +181,7 @@ class _OrganizationSubscriptionPageState
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : SingleChildScrollView(
+                      primary: true,
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                       child: Column(
@@ -436,6 +436,133 @@ class _OrganizationSubscriptionPageState
   }
 
   Widget _buildUsageMetricsCard(Color darkAccent) {
+    final isSilver = _limits.planName == 'Silver';
+    final isFreeTrial = _limits.planName == 'Free Trial';
+    final isEnterprise = _limits.planName == 'Enterprise';
+
+    final List<Widget> statItems;
+
+    if (isEnterprise) {
+      statItems = [
+        Expanded(
+          child: _buildUsageStatItem(
+            'Active Sites',
+            '${_usage.siteCount}',
+            'Unlimited',
+            Icons.location_city_rounded,
+            const Color(0xFF10B981),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildUsageStatItem(
+            'Managers',
+            '${_usage.managerCount}',
+            'Unlimited',
+            Icons.admin_panel_settings_rounded,
+            const Color(0xFF8B5CF6),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildUsageStatItem(
+            'Supervisors',
+            '${_usage.supervisorCount}',
+            'Unlimited',
+            Icons.supervisor_account_rounded,
+            const Color(0xFF0284C7),
+          ),
+        ),
+      ];
+    } else if (isSilver || isFreeTrial) {
+      final maxSites = _limits.maxProjects;
+      final maxUsers = _limits.maxTotalUsers;
+      final sitesDisplay = '${_usage.siteCount.clamp(0, maxSites)} / $maxSites';
+      final usersDisplay = '${_usage.totalUserCount.clamp(0, maxUsers)} / $maxUsers';
+      final sitesStatus = _usage.siteCount >= maxSites
+          ? 'Limit Reached'
+          : '${maxSites - _usage.siteCount} Available';
+      final usersStatus = _usage.totalUserCount >= maxUsers
+          ? 'Limit Reached'
+          : '${maxUsers - _usage.totalUserCount} Available';
+
+      statItems = [
+        Expanded(
+          child: _buildUsageStatItem(
+            'Active Sites',
+            sitesDisplay,
+            sitesStatus,
+            Icons.location_city_rounded,
+            const Color(0xFF10B981),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildUsageStatItem(
+            'Team Users',
+            usersDisplay,
+            usersStatus,
+            Icons.group_rounded,
+            const Color(0xFF0284C7),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildUsageStatItem(
+            'Cloud Storage',
+            isSilver ? 'Daily Sync' : 'Standard',
+            'Cloud Backup',
+            Icons.cloud_done_rounded,
+            const Color(0xFF8B5CF6),
+          ),
+        ),
+      ];
+    } else {
+      // Gold & Platinum
+      final maxSites = _limits.maxProjects;
+      final maxManagers = _limits.maxManagers ?? 5;
+      final maxSupervisors = _limits.maxSupervisors ?? 10;
+      final sitesDisplay = '${_usage.siteCount.clamp(0, maxSites)} / $maxSites';
+      final managersDisplay = '${_usage.managerCount.clamp(0, maxManagers)} / $maxManagers';
+      final supsDisplay = '${_usage.supervisorCount.clamp(0, maxSupervisors)} / $maxSupervisors';
+
+      final sitesStatus = _usage.siteCount >= maxSites ? 'Limit Reached' : 'Max $maxSites';
+      final managersStatus = _usage.managerCount >= maxManagers ? 'Limit Reached' : 'Max $maxManagers';
+      final supsStatus = _usage.supervisorCount >= maxSupervisors ? 'Limit Reached' : 'Max $maxSupervisors';
+
+      statItems = [
+        Expanded(
+          child: _buildUsageStatItem(
+            'Active Sites',
+            sitesDisplay,
+            sitesStatus,
+            Icons.location_city_rounded,
+            const Color(0xFF10B981),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildUsageStatItem(
+            'Managers',
+            managersDisplay,
+            managersStatus,
+            Icons.admin_panel_settings_rounded,
+            const Color(0xFF8B5CF6),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildUsageStatItem(
+            'Supervisors',
+            supsDisplay,
+            supsStatus,
+            Icons.supervisor_account_rounded,
+            const Color(0xFF0284C7),
+          ),
+        ),
+      ];
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -472,41 +599,15 @@ class _OrganizationSubscriptionPageState
             child: Divider(color: Color(0xFFF1F5F9), height: 1),
           ),
           Row(
-            children: [
-              Expanded(
-                child: _buildUsageStatItem(
-                  'Active Sites',
-                  '$_siteCount',
-                  'Unlimited',
-                  Icons.location_city_rounded,
-                  const Color(0xFF10B981),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildUsageStatItem(
-                  'Supervisors',
-                  '$_supervisorCount',
-                  'Unlimited',
-                  Icons.supervisor_account_rounded,
-                  const Color(0xFF0284C7),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildUsageStatItem(
-                  'Cloud Backups',
-                  'Auto',
-                  'Daily',
-                  Icons.cloud_done_rounded,
-                  const Color(0xFF8B5CF6),
-                ),
-              ),
-            ],
+            children: statItems,
           ),
         ],
       ),
     );
+  }
+
+  List<String> _getFeaturesForCurrentPlan() {
+    return _limits.features;
   }
 
   Widget _buildUsageStatItem(
@@ -535,20 +636,42 @@ class _OrganizationSubscriptionPageState
             child: Icon(icon, color: color, size: 16),
           ),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF0F172A),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0F172A),
+              ),
             ),
           ),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF64748B),
+          const SizedBox(height: 1),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              limit,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
             ),
           ),
         ],
@@ -557,6 +680,8 @@ class _OrganizationSubscriptionPageState
   }
 
   Widget _buildPlanDetailsSection(Color darkAccent) {
+    final features = _getFeaturesForCurrentPlan();
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -599,17 +724,10 @@ class _OrganizationSubscriptionPageState
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Divider(color: Color(0xFFF1F5F9), height: 1),
           ),
-          _buildFeatureItem('Unlimited Construction Projects & Sites'),
-          const SizedBox(height: 10),
-          _buildFeatureItem('Real-time Financial & Expense Verifications'),
-          const SizedBox(height: 10),
-          _buildFeatureItem('Dynamic PDF & Excel Analytics Reports'),
-          const SizedBox(height: 10),
-          _buildFeatureItem('Material Requisitions & Approval Workflows'),
-          const SizedBox(height: 10),
-          _buildFeatureItem('Tools Inventory Tracking & Site Transfers'),
-          const SizedBox(height: 10),
-          _buildFeatureItem('White-label Branding & Custom Theme'),
+          ...features.map((feature) => Padding(
+                padding: const EdgeInsets.only(bottom: 10.0),
+                child: _buildFeatureItem(feature),
+              )),
         ],
       ),
     );
@@ -694,7 +812,7 @@ class _OrganizationSubscriptionPageState
                             isManagingExisting: true,
                           ),
                         ),
-                      ).then((_) => _fetchSubscriptionData());
+                      ).then((_) => _loadSubscriptionAndUsage());
                     },
                     icon: const Icon(Icons.upgrade_rounded, size: 20),
                     label: const Text(

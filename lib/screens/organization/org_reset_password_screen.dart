@@ -98,7 +98,6 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final Color darkCardBg = AppTheme.getDarkAccent(theme.primaryColor);
 
     return GlassScaffold(
       padding: EdgeInsets.zero,
@@ -115,11 +114,11 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      color: const Color(0xFF0B1942),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.getDarkAccent(AppTheme.primaryColor.value).withValues(alpha: 0.25),
+                          color: const Color(0xFF0B1942).withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -135,12 +134,12 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
-                  Text(
+                  const Text(
                     'Reset Password',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.getDarkAccent(AppTheme.primaryColor.value),
+                      color: Color(0xFF0A183D),
                       letterSpacing: -0.4,
                     ),
                   ),
@@ -155,68 +154,81 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                   constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Form(
                       key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Main Section Container Card
+                          // Main Section Container Card (Clean White Reference Theme)
                           Container(
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: darkCardBg,
-                              borderRadius: BorderRadius.circular(24),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: darkCardBg.withValues(alpha: 0.25),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
+                                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Icon Circle Badge
-                                Container(
-                                  width: 58,
-                                  height: 58,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.lock_reset_rounded,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: theme.primaryColor.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        Icons.lock_reset_rounded,
+                                        color: theme.primaryColor,
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Change Your Password',
+                                            style: TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0A183D),
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Enter your old and new password.',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              color: Color(0xFF64748B),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'Change Your Password',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    letterSpacing: -0.3,
-                                  ),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                  child: Divider(color: Color(0xFFF1F5F9), height: 1),
                                 ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Enter your old password and a new one to update your credentials.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFFCBD5E1),
-                                    height: 1.35,
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
 
                                 // Old Password
                                 _buildPasswordField(
+                                  theme: theme,
                                   controller: _oldPasswordController,
                                   label: 'Old Password',
                                   hint: 'Enter your Old Password',
@@ -226,10 +238,11 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                                   validator: (v) => v == null || v.isEmpty ? 'Old password required' : null,
                                 ),
 
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 16),
 
                                 // New Password
                                 _buildPasswordField(
+                                  theme: theme,
                                   controller: _newPasswordController,
                                   label: 'New Password',
                                   hint: 'Enter your New Password',
@@ -241,10 +254,11 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                                       : (v.length < 6 ? 'Minimum 6 characters' : null),
                                 ),
 
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 16),
 
                                 // Confirm Password
                                 _buildPasswordField(
+                                  theme: theme,
                                   controller: _confirmPasswordController,
                                   label: 'Confirm New Password',
                                   hint: 'Confirm your New Password',
@@ -257,37 +271,37 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 24),
 
                           // Save CTA Button
                           SizedBox(
-                            height: 54,
+                            height: 48,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _resetPassword,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: darkCardBg,
+                                backgroundColor: theme.primaryColor,
                                 foregroundColor: Colors.white,
-                                elevation: 4,
-                                shadowColor: darkCardBg.withValues(alpha: 0.35),
+                                elevation: 2,
+                                shadowColor: theme.primaryColor.withValues(alpha: 0.35),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                               child: _isLoading
                                   ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
+                                      width: 20,
+                                      height: 20,
                                       child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
+                                        strokeWidth: 2,
                                         color: Colors.white,
                                       ),
                                     )
                                   : const Text(
                                       'UPDATE PASSWORD',
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.8,
+                                        letterSpacing: 0.5,
                                       ),
                                     ),
                             ),
@@ -307,6 +321,7 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
   }
 
   Widget _buildPasswordField({
+    required ThemeData theme,
     required TextEditingController controller,
     required String label,
     required String hint,
@@ -318,69 +333,78 @@ class _OrgResetPasswordScreenState extends State<OrgResetPasswordScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+        Row(
+          children: [
+            Icon(icon, size: 14, color: theme.primaryColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF334155),
               ),
-            ],
-          ),
-          child: TextFormField(
-            controller: controller,
-            obscureText: !isVisible,
-            validator: validator,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
             ),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+          ],
+        ),
+        const SizedBox(height: 6),
+        Theme(
+          data: Theme.of(context).copyWith(
+            inputDecorationTheme: const InputDecorationTheme(
+              filled: false,
+              fillColor: Colors.transparent,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+            ),
+            child: TextFormField(
+              controller: controller,
+              obscureText: !isVisible,
+              validator: validator,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
               ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFF1E88E5),
-                  size: 22,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  isVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                  color: const Color(0xFF64748B),
-                  size: 20,
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(right: 10.0),
+                  child: Icon(
+                    icon,
+                    color: theme.primaryColor,
+                    size: 18,
+                  ),
                 ),
-                onPressed: onToggleVisibility,
+                prefixIconConstraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                suffixIcon: InkWell(
+                  onTap: onToggleVisibility,
+                  child: Icon(
+                    isVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                    color: const Color(0xFF64748B),
+                    size: 18,
+                  ),
+                ),
+                suffixIconConstraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                border: InputBorder.none,
+                isDense: true,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Color(0xFF1E88E5), width: 1.8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
           ),
         ),

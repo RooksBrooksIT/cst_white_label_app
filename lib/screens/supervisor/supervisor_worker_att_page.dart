@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import '/widgets/glass_scaffold.dart';
-import '/widgets/glass_card.dart';
-import '/utils/list_extensions.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class AttendanceManagementPage extends StatefulWidget {
   final String supervisorId;
@@ -18,7 +15,7 @@ class AttendanceManagementPage extends StatefulWidget {
   });
 
   @override
-  _AttendanceManagementPageState createState() =>
+  State<AttendanceManagementPage> createState() =>
       _AttendanceManagementPageState();
 }
 
@@ -454,15 +451,15 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'present':
-        return Colors.green; // Semantic success
+        return const Color(0xFF10B981);
       case 'absent':
-        return Theme.of(context).colorScheme.error;
+        return const Color(0xFFEF4444);
       case 'overtime':
-        return Colors.orange; // Semantic warning
+        return const Color(0xFF8B5CF6);
       case 'half day':
-        return Theme.of(context).colorScheme.secondary;
+        return const Color(0xFFF59E0B);
       default:
-        return Colors.grey;
+        return const Color(0xFF94A3B8);
     }
   }
 
@@ -483,334 +480,483 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile = MediaQuery.of(context).size.width < 600;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return GlassScaffold(
-      title: 'Attendance Management',
-      onBack: () => Navigator.pop(context),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Attendance Management',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                darkAccent,
+                Color.alphaBlend(
+                  primaryColor.withValues(alpha: 0.35),
+                  darkAccent,
+                ),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints:
+              BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
           child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Site Selection
-            _buildSectionHeader('Select Site'),
-            _buildSiteSelectionSection(),
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Site Selection Card
+                _buildSiteSelectionSection(primaryColor),
 
-            const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
-            // Workers Attendance Table
-            if (_selectedSiteId != null) _buildAttendanceSection(),
-
-            if (_workers.isNotEmpty) const SizedBox(height: 24),
-
-            // Submit Button
-            if (_workers.isNotEmpty) _buildSubmitButton(),
-          ],
-        ),
-      ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: cs.primary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSiteSelectionSection() {
-    final cs = Theme.of(context).colorScheme;
-    return GlassCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            DropdownButtonFormField<String>(
-              value: _selectedSiteId,
-              dropdownColor: cs.surfaceContainerHighest,
-              style: TextStyle(color: cs.onSurface),
-              decoration: InputDecoration(
-                labelText: 'Site *',
-                labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.7)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.outlineVariant),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.outlineVariant),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary),
-                ),
-                prefixIcon: Icon(Icons.construction, color: cs.primary),
-                filled: true,
-                fillColor: cs.surface.withOpacity(0.1),
-              ),
-              items: _isLoadingSites
-                  ? [
-                      DropdownMenuItem(
-                        value: null,
-                        child: Text(
-                          'Loading sites...',
-                          style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.5),
+                // Workers Attendance Table / Section
+                if (_selectedSiteId != null)
+                  Expanded(child: _buildAttendanceSection(primaryColor, darkAccent))
+                else
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.apartment_rounded,
+                              size: 48,
+                              color: primaryColor,
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Select a Site to Begin',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Assigned to supervisor: ${widget.supervisorName}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ),
-                    ]
-                  : _sites.map<DropdownMenuItem<String>>((site) {
-                      return DropdownMenuItem<String>(
-                        value: site['id'] as String?,
-                        child: Text(
-                          site['site'] ?? 'Unnamed Site',
-                          style: TextStyle(color: cs.onSurface),
-                        ),
-                      );
-                    }).toList(),
-              onChanged: _onSiteSelected,
-            ),
-
-            if (_selectedSiteId != null) const SizedBox(height: 12),
-
-            if (_selectedSiteId != null)
-              Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 16, color: cs.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Date: $_currentDate',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: cs.onSurface,
                     ),
                   ),
-                ],
-              ),
-          ],
+
+                if (_workers.isNotEmpty) const SizedBox(height: 14),
+
+                // Submit Button
+                if (_workers.isNotEmpty) _buildSubmitButton(primaryColor),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildAttendanceSection() {
-    final cs = Theme.of(context).colorScheme;
-    return Expanded(
-      child: GlassCard(
-        mainAxisSize: MainAxisSize.max,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSiteSelectionSection(Color primaryColor) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<String>(
+            value: _selectedSiteId,
+            dropdownColor: Colors.white,
+            style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
+            decoration: InputDecoration(
+              labelText: 'Select Assigned Site *',
+              labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              prefixIcon: Icon(Icons.construction_rounded,
+                  color: primaryColor, size: 18),
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: primaryColor, width: 1.8),
+              ),
+            ),
+            items: _isLoadingSites
+                ? [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text(
+                        'Loading sites...',
+                        style: TextStyle(color: Color(0xFF64748B)),
+                      ),
+                    ),
+                  ]
+                : _sites.map<DropdownMenuItem<String>>((site) {
+                    return DropdownMenuItem<String>(
+                      value: site['id'] as String?,
+                      child: Text(
+                        site['site'] ?? 'Unnamed Site',
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF0F172A)),
+                      ),
+                    );
+                  }).toList(),
+            onChanged: _onSiteSelected,
+          ),
+          if (_selectedSiteId != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                        Border.all(color: primaryColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_month_rounded,
+                          size: 15, color: primaryColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Date: $_currentDate',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Supervisor: ${widget.supervisorName}',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF475569),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceSection(Color primaryColor, Color darkAccent) {
+    final markedCount = _attendanceStatus.values
+        .where((status) => status.isNotEmpty)
+        .length;
+
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.people_alt_rounded,
+                        color: primaryColor, size: 18),
+                  ),
+                  const SizedBox(width: 10),
                   Text(
-                    'Workers Attendance (${_workers.length})',
-                    style: TextStyle(
-                      fontSize: 16,
+                    'Workers (${_workers.length})',
+                    style: const TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: cs.primary,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
-                  if (_workers.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cs.primary.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '${_attendanceStatus.values.where((status) => status.isNotEmpty).length}/${_workers.length} marked',
-                        style: TextStyle(
-                          color: cs.primary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
                 ],
               ),
-              const SizedBox(height: 16),
-
-              if (_isLoadingWorkers)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40.0),
-                    child: CircularProgressIndicator(),
+              if (_workers.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
                   ),
-                )
-              else if (_workers.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 40.0),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.person_off,
-                          size: 48,
-                          color: cs.onSurface.withOpacity(0.3),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No workers found for this site',
-                          style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.5),
-                          ),
-                        ),
-                      ],
+                  decoration: BoxDecoration(
+                    color: markedCount == _workers.length
+                        ? const Color(0xFFECFDF5)
+                        : primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: markedCount == _workers.length
+                          ? const Color(0xFF6EE7B7)
+                          : primaryColor.withValues(alpha: 0.2),
                     ),
                   ),
-                )
-              else
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _workers.length,
-                    padding: const EdgeInsets.only(top: 8),
-                    itemBuilder: (context, index) {
-                      final worker = _workers[index];
-                      final workerName = worker['workerName']?.toString() ?? '';
-                      final designation =
-                          worker['workerDesignation']?.toString() ?? '';
-                      final currentStatus = _attendanceStatus[workerName] ?? '';
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: cs.surface.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: cs.outlineVariant.withOpacity(0.2),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: cs.primary.withOpacity(0.1),
-                                child: Text(
-                                  (index + 1).toString(),
-                                  style: TextStyle(
-                                    color: cs.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                workerName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              subtitle: Text(
-                                designation,
-                                style: TextStyle(
-                                  color: cs.onSurface.withOpacity(0.6),
-                                  fontSize: 13,
-                                ),
-                              ),
-                              trailing: currentStatus.isNotEmpty
-                                  ? Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _getStatusColor(
-                                          currentStatus,
-                                        ).withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: _getStatusColor(
-                                            currentStatus,
-                                          ).withOpacity(0.5),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        _getStatusText(currentStatus),
-                                        style: TextStyle(
-                                          color: _getStatusColor(currentStatus),
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            const Divider(height: 1),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceAround,
-                                children: [
-                                  Expanded(
-                                    child: _buildAttendanceButton(
-                                      'Present',
-                                      workerName,
-                                      currentStatus,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: _buildAttendanceButton(
-                                      'Absent',
-                                      workerName,
-                                      currentStatus,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: _buildAttendanceButton(
-                                      'Overtime',
-                                      workerName,
-                                      currentStatus,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: _buildAttendanceButton(
-                                      'Half Day',
-                                      workerName,
-                                      currentStatus,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                  child: Text(
+                    '$markedCount/${_workers.length} marked',
+                    style: TextStyle(
+                      color: markedCount == _workers.length
+                          ? const Color(0xFF059669)
+                          : primaryColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
             ],
           ),
-        ),
+          const SizedBox(height: 12),
+          const Divider(color: Color(0xFFE2E8F0), height: 1),
+          const SizedBox(height: 8),
+
+          if (_isLoadingWorkers)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40.0),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                ),
+              ),
+            )
+          else if (_workers.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.person_off_rounded,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No workers found for this site',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: _workers.length,
+                padding: const EdgeInsets.only(top: 4),
+                itemBuilder: (context, index) {
+                  final worker = _workers[index];
+                  final workerName = worker['workerName']?.toString() ?? '';
+                  final designation =
+                      worker['workerDesignation']?.toString() ?? '';
+                  final currentStatus = _attendanceStatus[workerName] ?? '';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 2),
+                          leading: CircleAvatar(
+                            backgroundColor:
+                                primaryColor.withValues(alpha: 0.12),
+                            child: Text(
+                              (index + 1).toString(),
+                              style: TextStyle(
+                                color: primaryColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            workerName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14.5,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          subtitle: Text(
+                            designation,
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: currentStatus.isNotEmpty
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _getStatusColor(currentStatus)
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _getStatusColor(currentStatus)
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _getStatusText(currentStatus),
+                                    style: TextStyle(
+                                      color: _getStatusColor(currentStatus),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                )
+                              : null,
+                        ),
+                        const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Expanded(
+                                child: _buildAttendanceButton(
+                                  'Present',
+                                  workerName,
+                                  currentStatus,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _buildAttendanceButton(
+                                  'Absent',
+                                  workerName,
+                                  currentStatus,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _buildAttendanceButton(
+                                  'Overtime',
+                                  workerName,
+                                  currentStatus,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _buildAttendanceButton(
+                                  'Half Day',
+                                  workerName,
+                                  currentStatus,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -825,23 +971,23 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
     return InkWell(
       onTap: () => _setAttendance(workerName, status),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? color : color.withOpacity(0.05),
+          color: isSelected ? color : color.withValues(alpha: 0.05),
           border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.3),
-            width: isSelected ? 2 : 1,
+            color: isSelected ? color : color.withValues(alpha: 0.25),
+            width: isSelected ? 1.8 : 1,
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    color: color.withValues(alpha: 0.35),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ]
               : [],
@@ -852,11 +998,9 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
             child: Text(
               status,
               style: TextStyle(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : color,
+                color: isSelected ? Colors.white : color,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 11.5,
               ),
             ),
           ),
@@ -865,8 +1009,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     );
   }
 
-  Widget _buildSubmitButton() {
-    final cs = Theme.of(context).colorScheme;
+  Widget _buildSubmitButton(Color primaryColor) {
     final markedCount = _attendanceStatus.values
         .where((status) => status.isNotEmpty)
         .length;
@@ -874,23 +1017,25 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: 48,
       child: ElevatedButton(
         onPressed: allMarked && !_isSubmitting ? _submitAttendance : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: allMarked
-              ? Theme.of(context).colorScheme.primary
-              : cs.onSurface.withOpacity(0.3),
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: Colors.grey.shade300,
+          disabledForegroundColor: Colors.grey.shade600,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
+          elevation: allMarked ? 3 : 0,
+          shadowColor: primaryColor.withValues(alpha: 0.35),
         ),
         child: _isSubmitting
-            ? Row(
+            ? const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(
+                  SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
@@ -898,18 +1043,26 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  const Text('Submitting...'),
+                  SizedBox(width: 12),
+                  Text('Submitting Attendance...'),
                 ],
               )
-            : Text(
-                allMarked
-                    ? 'Submit Attendance for $_currentDate'
-                    : 'Mark All Attendance to Submit ($markedCount/${_workers.length})',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(allMarked ? Icons.check_circle_rounded : Icons.lock_outline_rounded,
+                      size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    allMarked
+                        ? 'Submit Attendance for $_currentDate'
+                        : 'Mark All Workers to Submit ($markedCount/${_workers.length})',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
       ),
     );

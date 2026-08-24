@@ -7,6 +7,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_text_field.dart';
+import 'package:demo_cst/services/subscription_limit_service.dart';
 
 class ProjectSetupWizard extends StatefulWidget {
   const ProjectSetupWizard({super.key});
@@ -377,6 +378,22 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   }
 
   Future<void> _saveAll({bool skipSupervisorMapping = false}) async {
+    // Validate active subscription site limit
+    final subValidation = await SubscriptionLimitService.canCreateSite();
+    if (!subValidation.isAllowed) {
+      if (mounted) {
+        await SubscriptionLimitService.showLimitReachedDialog(
+          context,
+          title: 'Site Limit Reached',
+          message: subValidation.errorMessage ??
+              'You have reached your subscription plan limit for active sites.',
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
     setState(() => _isSaving = true);
 
     showDialog(

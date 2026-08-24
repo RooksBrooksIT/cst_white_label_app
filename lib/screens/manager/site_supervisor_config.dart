@@ -7,11 +7,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/services/subscription_limit_service.dart';
 
 class SiteSupervisorConfig extends StatefulWidget {
   const SiteSupervisorConfig({super.key});
   @override
-  _SiteSupervisorConfigState createState() => _SiteSupervisorConfigState();
+  State<SiteSupervisorConfig> createState() => _SiteSupervisorConfigState();
 }
 
 class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
@@ -392,6 +393,20 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
 
   Future<void> _createSupervisorAccount() async {
     try {
+      // Validate active subscription supervisor limit
+      final subValidation = await SubscriptionLimitService.canCreateSupervisor();
+      if (!subValidation.isAllowed) {
+        if (mounted) {
+          await SubscriptionLimitService.showLimitReachedDialog(
+            context,
+            title: 'Supervisor Limit Reached',
+            message: subValidation.errorMessage ??
+                'You have reached your subscription plan limit for supervisors.',
+          );
+        }
+        return;
+      }
+
       final snapshot = await FirestoreService.getCollection('supervisor')
           .orderBy('SupervisorId', descending: true)
           .limit(1)
