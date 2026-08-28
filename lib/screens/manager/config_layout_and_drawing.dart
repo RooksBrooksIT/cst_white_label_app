@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/app_storage_service.dart';
+import 'package:demo_cst/services/subscription_limit_service.dart';
+import 'package:demo_cst/screens/organization/pricing_screen.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 import 'package:demo_cst/screens/common/web_view_screen.dart';
@@ -109,6 +111,12 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
   String? _pickedFileName;
   bool _isSaving = false;
 
+  // ── Subscription & Usage State ────────────────────────────────────────────
+  DrawingPlanLimits? _drawingLimits;
+  SiteDrawingUsage? _currentSiteUsage;
+  bool _isLoadingPlan = true;
+  bool _isLoadingSiteUsage = false;
+
   // ── Reference Data ────────────────────────────────────────────────────────
   List<Map<String, String>> _allSites = [];
   bool _isLoadingSites = true;
@@ -129,6 +137,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
         _fetchAllDrawings();
       }
     });
+    _loadSubscriptionLimits();
     _loadInitialSites();
   }
 
@@ -142,6 +151,49 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
     _purposeController.dispose();
     _drawingSearchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSubscriptionLimits() async {
+    setState(() => _isLoadingPlan = true);
+    try {
+      final limits = await SubscriptionLimitService.getActivePlanLimits();
+      final drawingLimits = SubscriptionLimitService.getDrawingLimitsForPlan(limits.planName);
+      if (mounted) {
+        setState(() {
+          _drawingLimits = drawingLimits;
+          _isLoadingPlan = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading subscription limits: $e');
+      if (mounted) {
+        setState(() {
+          _drawingLimits = SubscriptionLimitService.getDrawingLimitsForPlan('Free Trial');
+          _isLoadingPlan = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchSiteDrawingUsage(String siteId) async {
+    setState(() => _isLoadingSiteUsage = true);
+    try {
+      final usage = await SubscriptionLimitService.getSiteDrawingUsage(siteId);
+      if (mounted) {
+        setState(() {
+          _currentSiteUsage = usage;
+          _isLoadingSiteUsage = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching site drawing usage: $e');
+      if (mounted) {
+        setState(() {
+          _currentSiteUsage = SiteDrawingUsage.empty(siteId);
+          _isLoadingSiteUsage = false;
+        });
+      }
+    }
   }
 
   String _formatBytes(int bytes) {
@@ -246,6 +298,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
       _pickedPlatformFile = null;
       _existingConfigDocs = [];
       _selectedConfigId = null;
+      _currentSiteUsage = null;
     });
 
     if (siteId == null || siteId.isEmpty) {
@@ -264,7 +317,8 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
     _projectNameController.text = siteData['projectName'] ?? '';
     _projectPhaseController.text = siteData['projectStage'] ?? '';
 
-    // Fetch previous drawing configs
+    // Fetch site drawing usage and previous drawing configs
+    _fetchSiteDrawingUsage(siteId);
     _fetchExistingConfigs(siteId);
   }
 
@@ -310,7 +364,40 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
     AppTheme.showSuccessToast(context, 'Loaded configuration: $docId');
   }
 
+  /// Evaluates whether the currently selected site has reached its maximum upload or re-upload capacity.
+  bool get _isUploadLockedForCurrentSite {
+    if (_selectedSiteId == null || _drawingLimits == null) return false;
+    final usage = _currentSiteUsage;
+    if (usage == null) return false;
+
+    // 1. Check max active documents capacity
+    if (usage.activeDocsCount >= _drawingLimits!.maxActiveDocsPerSite) {
+      return true;
+    }
+
+    // 2. Check re-upload restrictions for Silver and Gold
+    if (usage.totalUploadCount > 0) {
+      if (!_drawingLimits!.allowReupload) return true; // Silver
+      if (_drawingLimits!.maxReuploadsPerSite != null &&
+          usage.reuploadCount >= _drawingLimits!.maxReuploadsPerSite!) {
+        return true; // Gold exhausted
+      }
+    }
+
+    return false;
+  }
+
   Future<void> _pickFile() async {
+    if (_selectedSiteId == null || _selectedSiteId!.isEmpty) {
+      AppTheme.showErrorToast(context, 'Please select a Site first');
+      return;
+    }
+
+    if (_isUploadLockedForCurrentSite) {
+      _showUploadLimitDialog();
+      return;
+    }
+
     try {
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -339,7 +426,37 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
     }
   }
 
+  void _showUploadLimitDialog() {
+    final plan = _drawingLimits?.planName ?? 'Current';
+    final maxDocs = _drawingLimits?.maxActiveDocsPerSite ?? 1;
+
+    String msg;
+    if (plan.toLowerCase().contains('silver')) {
+      msg = 'On the Silver plan, you can upload 1 document per site (view only). Deletion and re-uploading are not available.';
+    } else if (plan.toLowerCase().contains('gold')) {
+      if ((_currentSiteUsage?.activeDocsCount ?? 0) >= 1) {
+        msg = 'On the Gold plan, you can have 1 active document per site. You can delete your existing document once and re-upload a replacement once.';
+      } else {
+        msg = 'You have already exhausted your 1 allowed deletion and 1 allowed re-upload for this site on the Gold plan.';
+      }
+    } else {
+      msg = 'On the $plan plan, you have reached the limit of $maxDocs active documents for this site. Delete an existing document to upload a replacement.';
+    }
+
+    SubscriptionLimitService.showLimitReachedDialog(
+      context,
+      title: 'Document Upload Limit',
+      message: msg,
+      currentPlan: plan,
+    );
+  }
+
   void _addDocumentToStaging() {
+    if (_selectedSiteId == null || _selectedSiteId!.isEmpty) {
+      AppTheme.showErrorToast(context, 'Please select a Site ID first');
+      return;
+    }
+
     final docName = _docNameController.text.trim();
     final purpose = _purposeController.text.trim();
 
@@ -350,6 +467,35 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
     if (purpose.isEmpty) {
       AppTheme.showErrorToast(context, 'Please enter the Purpose / Description');
       return;
+    }
+
+    // ── Check subscription limits before adding to staging ─────────────────
+    final maxDocs = _drawingLimits?.maxActiveDocsPerSite ?? 1;
+    final activeDocs = _currentSiteUsage?.activeDocsCount ?? 0;
+    final currentlyStaged = _stagedDocuments.length;
+
+    if (activeDocs + currentlyStaged + 1 > maxDocs) {
+      AppTheme.showErrorToast(
+        context,
+        'Cannot add: Maximum $maxDocs active ${maxDocs == 1 ? "document" : "documents"} per site allowed on ${_drawingLimits?.planName ?? "your"} plan.',
+      );
+      _showUploadLimitDialog();
+      return;
+    }
+
+    // Check re-upload restrictions
+    if ((_currentSiteUsage?.totalUploadCount ?? 0) > 0) {
+      if (_drawingLimits?.allowReupload == false) {
+        AppTheme.showErrorToast(context, 'Re-uploading is not allowed on the ${_drawingLimits?.planName} plan.');
+        _showUploadLimitDialog();
+        return;
+      }
+      if (_drawingLimits?.maxReuploadsPerSite != null &&
+          (_currentSiteUsage?.reuploadCount ?? 0) >= _drawingLimits!.maxReuploadsPerSite!) {
+        AppTheme.showErrorToast(context, 'Re-upload quota exhausted (1/1) on Gold plan.');
+        _showUploadLimitDialog();
+        return;
+      }
     }
 
     final pFile = _pickedPlatformFile;
@@ -637,6 +783,25 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
       return;
     }
 
+    // ── Backend Validation against Subscription Limits ───────────────────────
+    final validation = await SubscriptionLimitService.canUploadDrawing(
+      siteId: _selectedSiteId!,
+      newDocsCount: _stagedDocuments.length,
+      currentPlanName: _drawingLimits?.planName,
+    );
+
+    if (!validation.isAllowed) {
+      if (mounted) {
+        await SubscriptionLimitService.showLimitReachedDialog(
+          context,
+          title: 'Document Upload Restricted',
+          message: validation.errorMessage ?? 'Upload limit reached for this site.',
+          currentPlan: _drawingLimits?.planName,
+        );
+      }
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
@@ -724,6 +889,12 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
 
       await docRef.set(documentData, SetOptions(merge: true));
 
+      // ── Record Drawing Upload Operation in Site Usage ──────────────────────
+      await SubscriptionLimitService.recordDrawingUpload(
+        siteId: _selectedSiteId!,
+        count: _stagedDocuments.length,
+      );
+
       if (mounted) {
         await DialogUtils.showSuccessDialog(
           context,
@@ -758,6 +929,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
       _projectPhaseController.clear();
       _existingConfigDocs.clear();
       _selectedConfigId = null;
+      _currentSiteUsage = null;
     });
   }
 
@@ -797,13 +969,160 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
     }
   }
 
-  Future<void> _deleteDrawingSet(String docId) async {
+  /// Deletes an entire drawing configuration document set.
+  Future<void> _deleteDrawingSet(String docId, String siteId, int docCount) async {
+    // ── Backend Validation for Deletion ──────────────────────────────────────
+    final validation = await SubscriptionLimitService.canDeleteDrawing(
+      siteId: siteId,
+      currentPlanName: _drawingLimits?.planName,
+    );
+
+    if (!validation.isAllowed) {
+      if (mounted) {
+        await SubscriptionLimitService.showLimitReachedDialog(
+          context,
+          title: 'Deletion Restricted',
+          message: validation.errorMessage ?? 'Document deletion is restricted on your plan.',
+          currentPlan: _drawingLimits?.planName,
+        );
+      }
+      return;
+    }
+
+    final plan = _drawingLimits?.planName ?? 'Current';
+    String confirmationNotice = 'Are you sure you want to delete the configuration "$docId"? This action cannot be undone.';
+    if (plan.toLowerCase().contains('gold')) {
+      confirmationNotice =
+          'Notice for Gold Plan:\nYou are about to use your 1 permitted deletion for Site "$siteId". Once deleted, you will have 1 re-upload opportunity to attach a replacement document.\n\nAre you sure you want to delete this drawing set?';
+    }
+
+    if (!mounted) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Delete Drawing Set?', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Text('Are you sure you want to delete the configuration "$docId"? This action cannot be undone.'),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Delete Drawing Set?',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          confirmationNotice,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('DELETE SET', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await FirestoreService.getCollection('siteDrawings').doc(docId).delete();
+        await SubscriptionLimitService.recordDrawingDelete(siteId: siteId, count: docCount > 0 ? docCount : 1);
+        if (mounted) {
+          AppTheme.showSuccessToast(context, 'Drawing set deleted successfully');
+          _fetchAllDrawings();
+          if (_selectedSiteId == siteId) {
+            _fetchSiteDrawingUsage(siteId);
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          AppTheme.showErrorToast(context, 'Failed to delete: $e');
+        }
+      }
+    }
+  }
+
+  /// Deletes an individual drawing document from a configuration set.
+  Future<void> _deleteIndividualDocument({
+    required String docId,
+    required String siteId,
+    required int docIndex,
+    required String docName,
+  }) async {
+    // ── Backend Validation for Deletion ──────────────────────────────────────
+    final validation = await SubscriptionLimitService.canDeleteDrawing(
+      siteId: siteId,
+      currentPlanName: _drawingLimits?.planName,
+    );
+
+    if (!validation.isAllowed) {
+      if (mounted) {
+        await SubscriptionLimitService.showLimitReachedDialog(
+          context,
+          title: 'Deletion Restricted',
+          message: validation.errorMessage ?? 'Document deletion is restricted on your plan.',
+          currentPlan: _drawingLimits?.planName,
+        );
+      }
+      return;
+    }
+
+    final plan = _drawingLimits?.planName ?? 'Current';
+    String confirmationNotice = 'Are you sure you want to delete "$docName"? This action cannot be undone.';
+    if (plan.toLowerCase().contains('gold')) {
+      confirmationNotice =
+          'Notice for Gold Plan:\nYou are about to use your 1 permitted deletion for Site "$siteId". Once deleted, you will have 1 re-upload opportunity to attach a replacement document.\n\nAre you sure you want to delete "$docName"?';
+    }
+
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Delete Document?',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          confirmationNotice,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.45),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -824,19 +1143,38 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
 
     if (confirmed == true) {
       try {
-        await FirestoreService.getCollection('siteDrawings').doc(docId).delete();
-        if (mounted) {
-          AppTheme.showSuccessToast(context, 'Drawing set deleted');
-          _fetchAllDrawings();
+        final docRef = FirestoreService.getCollection('siteDrawings').doc(docId);
+        final snap = await docRef.get();
+        if (snap.exists && snap.data() != null) {
+          final List<dynamic> siteDocs = List.from(snap.data()!['siteDocs'] ?? []);
+          if (docIndex >= 0 && docIndex < siteDocs.length) {
+            siteDocs.removeAt(docIndex);
+            if (siteDocs.isEmpty) {
+              await docRef.delete();
+            } else {
+              await docRef.update({
+                'siteDocs': siteDocs,
+                'totalDocuments': siteDocs.length,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+            }
+            await SubscriptionLimitService.recordDrawingDelete(siteId: siteId, count: 1);
+            if (mounted) {
+              AppTheme.showSuccessToast(context, 'Document deleted successfully');
+              _fetchAllDrawings();
+              if (_selectedSiteId == siteId) {
+                _fetchSiteDrawingUsage(siteId);
+              }
+            }
+          }
         }
       } catch (e) {
         if (mounted) {
-          AppTheme.showErrorToast(context, 'Failed to delete: $e');
+          AppTheme.showErrorToast(context, 'Failed to delete document: $e');
         }
       }
     }
   }
-
 
   // ---------------------------------------------------------------------------
   // MAIN BUILD
@@ -993,6 +1331,10 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ── Subscription Plan & Limit Status Banner ────────────────────
+              _buildSubscriptionPlanBanner(darkAccent),
+              const SizedBox(height: 14),
+
               // ── 1. Site & Project Details Card ────────────────────────────
               Container(
                 padding: const EdgeInsets.all(20),
@@ -1087,6 +1429,12 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                               ),
                             ),
                     ),
+
+                    // Site Drawing Usage Metrics Bar
+                    if (_selectedSiteId != null) ...[
+                      const SizedBox(height: 14),
+                      _buildSiteDrawingUsageCard(darkAccent),
+                    ],
 
                     // Load saved drawing configuration
                     if (_existingConfigDocs.isNotEmpty) ...[
@@ -1196,12 +1544,24 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                           child: const Icon(Icons.note_add_rounded, color: Color(0xFF0284C7), size: 22),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          'Attach Drawing Document',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: darkAccent,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Attach Drawing Document',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: darkAccent,
+                                ),
+                              ),
+                              if (_drawingLimits != null)
+                                Text(
+                                  'Plan limit: ${_drawingLimits!.maxActiveDocsPerSite} active doc per site',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                ),
+                            ],
                           ),
                         ),
                       ],
@@ -1211,15 +1571,24 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                       child: Divider(color: Color(0xFFF1F5F9), height: 1),
                     ),
 
+                    // Locked Notice Banner if Quota is Reached
+                    if (_isUploadLockedForCurrentSite) ...[
+                      _buildUploadLockedBanner(),
+                      const SizedBox(height: 14),
+                    ],
+
                     _buildFieldLabel('Document Name / Title *', Icons.title_rounded),
                     const SizedBox(height: 6),
                     _buildInputContainer(
                       child: TextField(
                         controller: _docNameController,
+                        enabled: !_isUploadLockedForCurrentSite,
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. Structural Ground Floor Layout Plan',
-                          hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: _isUploadLockedForCurrentSite
+                              ? 'Upload locked (Quota reached for site)'
+                              : 'e.g. Structural Ground Floor Layout Plan',
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                           border: InputBorder.none,
                         ),
                       ),
@@ -1231,11 +1600,14 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                     _buildInputContainer(
                       child: TextField(
                         controller: _purposeController,
+                        enabled: !_isUploadLockedForCurrentSite,
                         maxLines: 2,
                         style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. For foundation reinforcement execution',
-                          hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: _isUploadLockedForCurrentSite
+                              ? 'Upload locked for this site'
+                              : 'e.g. For foundation reinforcement execution',
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                           border: InputBorder.none,
                         ),
                       ),
@@ -1297,15 +1669,24 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                           child: SizedBox(
                             height: 48,
                             child: OutlinedButton.icon(
-                              onPressed: _pickFile,
-                              icon: const Icon(Icons.attach_file_rounded, size: 18),
+                              onPressed: _isUploadLockedForCurrentSite ? _showUploadLimitDialog : _pickFile,
+                              icon: Icon(
+                                _isUploadLockedForCurrentSite ? Icons.lock_outline_rounded : Icons.attach_file_rounded,
+                                size: 18,
+                              ),
                               label: Text(
-                                _pickedFileName == null ? 'Browse File' : 'Change File',
+                                _isUploadLockedForCurrentSite
+                                    ? 'Locked'
+                                    : (_pickedFileName == null ? 'Browse File' : 'Change File'),
                                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                               ),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: primaryColor,
-                                side: BorderSide(color: primaryColor.withValues(alpha: 0.4)),
+                                foregroundColor: _isUploadLockedForCurrentSite ? const Color(0xFF94A3B8) : primaryColor,
+                                side: BorderSide(
+                                  color: _isUploadLockedForCurrentSite
+                                      ? const Color(0xFFE2E8F0)
+                                      : primaryColor.withValues(alpha: 0.4),
+                                ),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
                             ),
@@ -1316,14 +1697,14 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                           child: SizedBox(
                             height: 48,
                             child: ElevatedButton.icon(
-                              onPressed: _addDocumentToStaging,
-                              icon: const Icon(Icons.add_rounded, size: 18),
-                              label: const Text(
-                                'Add To List',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                              onPressed: _isUploadLockedForCurrentSite ? _showUploadLimitDialog : _addDocumentToStaging,
+                              icon: Icon(_isUploadLockedForCurrentSite ? Icons.lock_outline_rounded : Icons.add_rounded, size: 18),
+                              label: Text(
+                                _isUploadLockedForCurrentSite ? 'Limit Reached' : 'Add To List',
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
+                                backgroundColor: _isUploadLockedForCurrentSite ? const Color(0xFFCBD5E1) : primaryColor,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
@@ -1606,6 +1987,10 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 30),
         child: Column(
           children: [
+            // Plan Quota Summary Chip
+            _buildDirectoryPlanBadge(darkAccent),
+            const SizedBox(height: 12),
+
             // Search Bar
             Container(
               padding: const EdgeInsets.all(12),
@@ -1711,7 +2096,10 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                   final set = filtered[index];
                   final docs = set['siteDocs'] as List<dynamic>? ?? [];
                   final docId = set['docId']?.toString() ?? '';
+                  final siteId = set['siteId']?.toString() ?? '';
                   final date = set['date']?.toString() ?? '';
+
+                  final isDeleteAllowed = _drawingLimits?.allowDelete ?? false;
 
                   return Container(
                     padding: const EdgeInsets.all(18),
@@ -1740,7 +2128,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                set['siteId'] ?? '',
+                                siteId,
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w900,
@@ -1756,7 +2144,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                                   Text(
                                     set['projectName']?.toString().isNotEmpty == true
                                         ? set['projectName']
-                                        : 'Site ${set['siteId']}',
+                                        : 'Site $siteId',
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w800,
@@ -1777,13 +2165,28 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                                 ],
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                              tooltip: 'Delete set',
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: () => _deleteDrawingSet(docId),
-                            ),
+                            // Delete Drawing Set button
+                            if (isDeleteAllowed)
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                tooltip: 'Delete configuration set',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => _deleteDrawingSet(docId, siteId, docs.length),
+                              )
+                            else
+                              IconButton(
+                                icon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF94A3B8), size: 18),
+                                tooltip: 'Deletion disabled on ${_drawingLimits?.planName ?? "Silver"} plan',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => SubscriptionLimitService.showLimitReachedDialog(
+                                  context,
+                                  title: 'Deletion Restricted',
+                                  message: 'Document deletion is not permitted on the ${_drawingLimits?.planName ?? "Silver"} plan. Upgrade to Gold or Platinum to enable deletion and re-upload privileges.',
+                                  currentPlan: _drawingLimits?.planName,
+                                ),
+                              ),
                           ],
                         ),
                         if ((set['supervisorName'] ?? '').isNotEmpty || (set['projectPhase'] ?? '').isNotEmpty) ...[
@@ -1826,16 +2229,35 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Drawing Documents (${docs.length})',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: darkAccent,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Drawing Documents (${docs.length})',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: darkAccent,
+                                  ),
+                                ),
+                                if (!isDeleteAllowed)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'VIEW ONLY',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 8),
-                            ...docs.map((d) {
+                            ...docs.asMap().entries.map((entry) {
+                              final docIndex = entry.key;
+                              final d = entry.value;
                               final docMap = d is Map ? Map<String, dynamic>.from(d) : <String, dynamic>{};
                               final name = docMap['docName']?.toString() ?? 'Document';
                               final purpose = docMap['purpose']?.toString() ?? '';
@@ -1971,7 +2393,7 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: 6),
 
                                           // ── Download Button ─────────────────
                                           OutlinedButton.icon(
@@ -1989,6 +2411,22 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                             ),
                                           ),
+                                          const SizedBox(width: 6),
+
+                                          // ── Delete Document Button ──────────
+                                          if (isDeleteAllowed)
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 19),
+                                              tooltip: 'Delete this document',
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () => _deleteIndividualDocument(
+                                                docId: docId,
+                                                siteId: siteId,
+                                                docIndex: docIndex,
+                                                docName: name,
+                                              ),
+                                            ),
                                         ] else
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -2016,6 +2454,320 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // SUBSCRIPTION & QUOTA UI WIDGETS
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSubscriptionPlanBanner(Color darkAccent) {
+    if (_isLoadingPlan) {
+      return const SizedBox.shrink();
+    }
+
+    final planName = _drawingLimits?.planName ?? 'Silver';
+    final planDesc = _drawingLimits?.description ?? '';
+
+    Color badgeColor = const Color(0xFF64748B);
+    Color bannerBg = const Color(0xFFF1F5F9);
+    IconData planIcon = Icons.folder_shared_rounded;
+
+    if (planName.toLowerCase().contains('gold')) {
+      badgeColor = const Color(0xFF2563EB);
+      bannerBg = const Color(0xFFEFF6FF);
+      planIcon = Icons.star_rounded;
+    } else if (planName.toLowerCase().contains('platinum') || planName.toLowerCase().contains('enterprise')) {
+      badgeColor = const Color(0xFF7C3AED);
+      bannerBg = const Color(0xFFF5F3FF);
+      planIcon = Icons.workspace_premium_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bannerBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: badgeColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(planIcon, color: badgeColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: badgeColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$planName Plan'.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Document Rules',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  planDesc,
+                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569), height: 1.35),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PricingScreen(
+                    isManagingExisting: true,
+                    currentPlan: planName,
+                  ),
+                ),
+              );
+            },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: const Size(0, 30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'UPGRADE',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: badgeColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSiteDrawingUsageCard(Color darkAccent) {
+    if (_isLoadingSiteUsage) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    final usage = _currentSiteUsage ?? SiteDrawingUsage.empty(_selectedSiteId!);
+    final maxDocs = _drawingLimits?.maxActiveDocsPerSite ?? 1;
+    final maxDeletes = _drawingLimits?.maxDeletesPerSite;
+    final maxReuploads = _drawingLimits?.maxReuploadsPerSite;
+    final allowDelete = _drawingLimits?.allowDelete ?? false;
+    final allowReupload = _drawingLimits?.allowReupload ?? false;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.analytics_outlined, size: 16, color: Color(0xFF475569)),
+              const SizedBox(width: 6),
+              Text(
+                'Site Quota & Status (${usage.siteId})',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF334155)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuotaMetricChip(
+                  label: 'Active Docs',
+                  value: '${usage.activeDocsCount} / $maxDocs',
+                  isWarning: usage.activeDocsCount >= maxDocs,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuotaMetricChip(
+                  label: 'Deletions',
+                  value: !allowDelete
+                      ? 'No Delete'
+                      : (maxDeletes == null ? 'Unlimited' : '${usage.deleteCount} / $maxDeletes used'),
+                  isWarning: allowDelete && maxDeletes != null && usage.deleteCount >= maxDeletes,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuotaMetricChip(
+                  label: 'Re-uploads',
+                  value: !allowReupload
+                      ? 'No Re-upload'
+                      : (maxReuploads == null ? 'Unlimited' : '${usage.reuploadCount} / $maxReuploads used'),
+                  isWarning: allowReupload && maxReuploads != null && usage.reuploadCount >= maxReuploads,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuotaMetricChip({
+    required String label,
+    required String value,
+    required bool isWarning,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: isWarning ? const Color(0xFFFEF2F2) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isWarning ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              color: isWarning ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadLockedBanner() {
+    final plan = _drawingLimits?.planName ?? 'Current';
+    String message = 'Upload limit reached for this site.';
+
+    if (plan.toLowerCase().contains('silver')) {
+      message = 'Upload locked: Silver plan allows 1 document per site (view only). Deletion & re-upload are not available.';
+    } else if (plan.toLowerCase().contains('gold')) {
+      if ((_currentSiteUsage?.activeDocsCount ?? 0) >= 1) {
+        message = 'Upload locked: 1 document is already uploaded. You can delete it once if you wish to upload a replacement.';
+      } else {
+        message = 'Upload locked: You have used your 1 delete and 1 re-upload for this site on the Gold plan.';
+      }
+    } else {
+      message = 'Upload locked: Maximum 2 active documents reached for this site. Delete an existing document to upload a replacement.';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFF87171).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_rounded, color: Color(0xFFDC2626), size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF991B1B),
+                height: 1.35,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PricingScreen(
+                    isManagingExisting: true,
+                    currentPlan: plan,
+                  ),
+                ),
+              );
+            },
+            child: const Text('UPGRADE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11.5)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDirectoryPlanBadge(Color darkAccent) {
+    final plan = _drawingLimits?.planName ?? 'Silver';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF64748B)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$plan Plan: ${_drawingLimits?.description ?? ""}',
+              style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }

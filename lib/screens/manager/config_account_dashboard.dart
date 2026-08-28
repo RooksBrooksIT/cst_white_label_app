@@ -77,12 +77,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       "color": const Color(0xFFEA580C),
     },
     "Labour & Contractors": {
-      "subtitle": "Labour setup, worker roles, and contractor directory",
+      "subtitle": "Labour setup and contractor directory",
       "icon": Icons.engineering_rounded,
       "color": const Color(0xFF7C3AED),
     },
     "Workers Management": {
-      "subtitle": "Worker site mapping, availability, and attendance logs",
+      "subtitle": "Worker configuration, site mapping, and attendance logs",
       "icon": Icons.people_rounded,
       "color": const Color(0xFFF57C00),
     },
@@ -316,13 +316,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.brown,
       ),
       DashboardItem(
-        'Workers Configuration',
-        Icons.people_rounded,
-        const Color(0xFF8E24AA),
-        'Worker profiles and roles',
-        const Color(0xFF8E24AA),
-      ),
-      DashboardItem(
         'Contractor',
         Icons.person_4_rounded,
         const Color(0xFF7C3AED),
@@ -338,6 +331,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       ),
     ],
     "Workers Management": [
+      DashboardItem(
+        'Worker Configuration',
+        Icons.people_rounded,
+        const Color(0xFF8E24AA),
+        'Worker profiles and roles',
+        const Color(0xFF8E24AA),
+      ),
       DashboardItem(
         'Workers Site Mapping',
         Icons.place_rounded,
@@ -1720,7 +1720,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         userDetails: const {},
       ),
       'Material Config': MaterialScreen(),
-      'Workers Configuration': WorkersConfigPage(),
+      'Worker Configuration': const WorkersConfigPage(),
+      'Workers Configuration': const WorkersConfigPage(),
       'Workers Site Mapping': WorkerMappingPage(),
       'Workers Availability': const WorkersAvailabilityReportPage(),
       'Workers Attendance': WorkerAttendanceSalaryPage(),

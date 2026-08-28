@@ -937,6 +937,7 @@ class _PricingScreenState extends State<PricingScreen> {
           showBillingTabs: false,
           features: const [
             'Basic Project Management',
+            'Layout & Drawings (1 doc/site, view only)',
             'Task Tracking & Updates',
             'Limited Team Members (up to 2)',
             'Basic Reports & Analytics',
@@ -962,6 +963,7 @@ class _PricingScreenState extends State<PricingScreen> {
           showBillingTabs: true,
           features: const [
             'Basic Project Management',
+            'Layout & Drawings (1 doc/site, view only)',
             'Task Tracking & Updates',
             'Limited Team Members (3-5)',
             'Basic Reports & Data View',
@@ -988,6 +990,7 @@ class _PricingScreenState extends State<PricingScreen> {
           features: const [
             'Up to 10 Projects & Active Sites',
             'Up to 5 Managers & 10 Supervisors',
+            'Layout & Drawings (1 doc/site, 1 delete & re-upload)',
             'Advanced collaboration & Site monitoring',
             'Expense tracking & Monthly report views',
             'Role-based Access & Live Timeline',
@@ -1023,6 +1026,7 @@ class _PricingScreenState extends State<PricingScreen> {
             'Up to $_platinumProjectsCount Projects & Active Sites',
             'Up to ${(_platinumProjectsCount / 2).round().clamp(2, 25)} Managers',
             'Up to $_platinumProjectsCount Supervisors',
+            'Layout & Drawings (Up to 2 active docs/site, multi-delete & re-upload)',
             'Advanced collaboration & Workflows',
             'Real-time site monitoring & Live logs',
             'Comprehensive expense tracking & Audits',
@@ -1046,6 +1050,7 @@ class _PricingScreenState extends State<PricingScreen> {
           features: const [
             'Unlimited Projects & Active Sites',
             'Unlimited Managers & Supervisors',
+            'Layout & Drawings (Up to 2 active docs/site, multi-delete & re-upload)',
             'Custom Cloud Infrastructure & Dedicated DB',
             '24/7 Priority SLA & Dedicated Account Manager',
             'Custom API Integrations & Webhooks',

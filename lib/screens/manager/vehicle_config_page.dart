@@ -609,6 +609,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
             initialValue: _movementType,
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(14),
+            isExpanded: true,
             decoration: const InputDecoration(
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -616,7 +617,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
             ),
             style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
             items: ['Company → Site', 'Site → Site', 'Site → Company']
-                .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                .map((type) => DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis)))
                 .toList(),
             onChanged: (value) {
               setState(() => _movementType = value!);
@@ -632,6 +633,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
               initialValue: _selectedFromSite,
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(14),
+              isExpanded: true,
               decoration: const InputDecoration(
                 hintText: 'Select origin site',
                 hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
@@ -640,7 +642,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                 prefixIcon: Icon(Icons.location_on_rounded, color: Color(0xFF64748B), size: 20),
               ),
               style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-              items: _siteNames.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              items: _siteNames.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (val) => setState(() => _selectedFromSite = val),
               validator: (val) => (_movementType != 'Company → Site' && (val == null || val.isEmpty))
                   ? 'Please select origin site'
@@ -656,6 +658,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
               initialValue: _selectedToSite,
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(14),
+              isExpanded: true,
               decoration: const InputDecoration(
                 hintText: 'Select destination site',
                 hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
@@ -664,7 +667,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                 prefixIcon: Icon(Icons.place_rounded, color: Color(0xFF64748B), size: 20),
               ),
               style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-              items: _siteNames.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              items: _siteNames.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (val) => setState(() => _selectedToSite = val),
               validator: (val) => (_movementType != 'Site → Company' && (val == null || val.isEmpty))
                   ? 'Please select destination site'
@@ -688,6 +691,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
             initialValue: _selectedDriver,
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(14),
+            isExpanded: true,
             decoration: const InputDecoration(
               hintText: 'Assign driver for trip',
               hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
@@ -696,7 +700,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
               prefixIcon: Icon(Icons.person_rounded, color: Color(0xFF64748B), size: 20),
             ),
             style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            items: _driverNames.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+            items: _driverNames.map((d) => DropdownMenuItem(value: d, child: Text(d, overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (val) => setState(() => _selectedDriver = val),
             validator: (val) => val == null ? 'Please select driver' : null,
           ),
@@ -713,14 +717,15 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
                   initialValue: _selectedMaterial,
                   dropdownColor: Colors.white,
                   borderRadius: BorderRadius.circular(14),
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     hintText: 'Material',
-                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    prefixIcon: Icon(Icons.inventory_2_rounded, color: Color(0xFF64748B), size: 20),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                    prefixIcon: Icon(Icons.inventory_2_rounded, color: Color(0xFF64748B), size: 18),
                   ),
-                  style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
+                  style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
                   items: _materials.map((m) {
                     final name = m['materialName'] as String;
                     return DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis));

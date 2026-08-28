@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
 import '/services/expense_service.dart';
 import 'package:intl/intl.dart';
@@ -67,9 +68,25 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
   @override
   void initState() {
     super.initState();
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+      if (!FirestoreService.isReady) {
+        final orgId = widget.userDetails['org_id'] ??
+            widget.userDetails['orgId'] ??
+            widget.userDetails['organisation'] ??
+            widget.userDetails['orgPath'];
+        if (orgId != null && orgId.toString().isNotEmpty) {
+          FirestoreService.setOrgPath(orgId.toString());
+        }
+      }
+    }
+    _fetchSites();
     _fetchMaterialOptions();
     _fetchLabourOptions();
-    _fetchSites();
   }
 
   @override
@@ -88,6 +105,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
   }
 
   Future<void> _fetchSites() async {
+    if (!mounted) return;
     setState(() {
       isLoadingSites = true;
     });
@@ -106,7 +124,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
             final sId = data['site']?.toString() ?? '';
             return {
               'siteId': sId,
-              'siteName': siteNames[sId] ?? 'Unnamed Site',
+              'siteName': siteNames[sId] ?? (data['siteName']?.toString() ?? 'Unnamed Site'),
               'supervisor': data['supervisor']?.toString() ?? 'Not Available',
               'supervisorId':
                   (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ??
@@ -120,7 +138,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
           .toList();
 
       if (siteList.isNotEmpty) {
-        selectedSiteId = siteList.first['siteId'];
+        if (selectedSiteId == null || !siteList.any((s) => s['siteId'] == selectedSiteId)) {
+          selectedSiteId = siteList.first['siteId'];
+        }
         _onSiteSelected(selectedSiteId!);
       }
     } catch (e) {
@@ -156,60 +176,172 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
   }
 
   Future<void> _fetchMaterialOptions() async {
+    if (!mounted) return;
+    setState(() {
+      isLoadingMaterials = true;
+      materialError = null;
+    });
+
     try {
-      final snapshot = await FirestoreService.getCollection('materials').get();
-      List<String> options = [];
-      Map<String, num> prices = {};
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final name = data['materialName'] as String?;
-        final price = data['unitPrice'] as num?;
-        if (name != null && name.isNotEmpty) {
-          options.add(name);
-          if (price != null) {
+      final List<String> options = [];
+      final Map<String, num> prices = {};
+
+      void extractMaterialsFromSnapshot(QuerySnapshot<Map<String, dynamic>> snapshot) {
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          final rawName = data['materialName'] ??
+              data['name'] ??
+              data['item'] ??
+              data['material_name'];
+          final name = rawName?.toString().trim() ?? '';
+
+          if (name.isNotEmpty && !options.contains(name)) {
+            options.add(name);
+
+            final priceRaw = data['materialPrice'] ??
+                data['unitPrice'] ??
+                data['price'] ??
+                data['rate'];
+            num price = 0;
+            if (priceRaw is num) {
+              price = priceRaw;
+            } else if (priceRaw is String) {
+              price = num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+            }
             prices[name] = price;
           }
         }
       }
-      setState(() {
-        materialOptions = options;
-        materialPrices = prices;
-        isLoadingMaterials = false;
-      });
+
+      // 1. Primary: FirestoreService.getCollection('materials')
+      try {
+        final snapshot = await FirestoreService.getCollection('materials').get();
+        extractMaterialsFromSnapshot(snapshot);
+      } catch (e) {
+        debugPrint('Error loading materials: $e');
+      }
+
+      // 2. Fallback to root materials if empty
+      if (options.isEmpty && FirestoreService.currentOrgId != 'uninitialized') {
+        try {
+          final rootSnapshot = await FirebaseFirestore.instance.collection('materials').get();
+          extractMaterialsFromSnapshot(rootSnapshot);
+        } catch (e) {
+          debugPrint('Error loading root materials: $e');
+        }
+      }
+
+      options.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+      if (mounted) {
+        setState(() {
+          materialOptions = options;
+          materialPrices = prices;
+          if (selectedMaterial != null && !materialOptions.contains(selectedMaterial)) {
+            selectedMaterial = null;
+          }
+          isLoadingMaterials = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        materialError = 'Failed to load materials';
-        isLoadingMaterials = false;
-      });
+      debugPrint('Error fetching materials: $e');
+      if (mounted) {
+        setState(() {
+          materialError = 'Failed to load materials: $e';
+          isLoadingMaterials = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchLabourOptions() async {
+    if (!mounted) return;
+    setState(() {
+      isLoadingLabours = true;
+      labourError = null;
+    });
+
     try {
-      final snapshot = await FirestoreService.getCollection('labours').get();
-      List<String> options = [];
-      Map<String, num> salaries = {};
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final designation = data['designationName'] as String?;
-        final salary = data['salary'] as num?;
-        if (designation != null && designation.isNotEmpty) {
-          options.add(designation);
-          if (salary != null) {
+      final List<String> options = [];
+      final Map<String, num> salaries = {};
+
+      void extractLaboursFromSnapshot(QuerySnapshot<Map<String, dynamic>> snapshot) {
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          final rawDesignation = data['designation'] ??
+              data['designationName'] ??
+              data['labourDesignation'] ??
+              data['labourType'] ??
+              data['name'] ??
+              data['type'];
+          final designation = rawDesignation?.toString().trim() ?? '';
+
+          if (designation.isNotEmpty && !options.contains(designation)) {
+            options.add(designation);
+
+            final salaryRaw = data['salary'] ??
+                data['salaryPerDay'] ??
+                data['unitPrice'] ??
+                data['rate'] ??
+                data['dailySalary'] ??
+                data['amount'];
+            num salary = 0;
+            if (salaryRaw is num) {
+              salary = salaryRaw;
+            } else if (salaryRaw is String) {
+              salary = num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+            }
             salaries[designation] = salary;
           }
         }
       }
-      setState(() {
-        labourOptions = options;
-        labourSalaries = salaries;
-        isLoadingLabours = false;
-      });
+
+      // 1. Primary: FirestoreService.getCollection('labours')
+      try {
+        final snapshot = await FirestoreService.getCollection('labours').get();
+        extractLaboursFromSnapshot(snapshot);
+      } catch (e) {
+        debugPrint('Error loading labours: $e');
+      }
+
+      // 2. Secondary: Check workersConfig for any saved designations
+      try {
+        final workersSnapshot = await FirestoreService.getCollection('workersConfig').get();
+        extractLaboursFromSnapshot(workersSnapshot);
+      } catch (e) {
+        debugPrint('Error loading from workersConfig: $e');
+      }
+
+      // 3. Fallback: root collection if empty
+      if (options.isEmpty && FirestoreService.currentOrgId != 'uninitialized') {
+        try {
+          final rootSnapshot = await FirebaseFirestore.instance.collection('labours').get();
+          extractLaboursFromSnapshot(rootSnapshot);
+        } catch (e) {
+          debugPrint('Error loading root labours: $e');
+        }
+      }
+
+      options.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+      if (mounted) {
+        setState(() {
+          labourOptions = options;
+          labourSalaries = salaries;
+          if (selectedLabour != null && !labourOptions.contains(selectedLabour)) {
+            selectedLabour = null;
+          }
+          isLoadingLabours = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        labourError = 'Failed to load labours';
-        isLoadingLabours = false;
-      });
+      debugPrint('Error fetching labour options: $e');
+      if (mounted) {
+        setState(() {
+          labourError = 'Failed to load labours: $e';
+          isLoadingLabours = false;
+        });
+      }
     }
   }
 
@@ -725,7 +857,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                     (site) => DropdownMenuItem(
                                       value: site['siteId'],
                                       child: Text(
-                                        '${site['siteId']} - ${site['siteName']}',
+                                        site['siteId'] ?? '',
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: 13.5,
@@ -856,7 +988,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         ),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          initialValue: selectedMaterial,
+                          initialValue: (_filteredMaterialOptions ?? materialOptions).contains(selectedMaterial)
+                              ? selectedMaterial
+                              : null,
                           isExpanded: true,
                           dropdownColor: Colors.white,
                           style: const TextStyle(
@@ -1070,7 +1204,9 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                         ),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          initialValue: selectedLabour,
+                          initialValue: (_filteredLabourOptions ?? labourOptions).contains(selectedLabour)
+                              ? selectedLabour
+                              : null,
                           isExpanded: true,
                           dropdownColor: Colors.white,
                           style: const TextStyle(

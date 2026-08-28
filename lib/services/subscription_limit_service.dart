@@ -24,6 +24,54 @@ class SubscriptionPlanLimits {
   });
 }
 
+/// Exact document upload, delete, and re-upload rules for Layout & Drawings per subscription plan.
+class DrawingPlanLimits {
+  final String planName;
+  final int maxActiveDocsPerSite; // Silver: 1, Gold: 1, Platinum: 2, Enterprise: 2
+  final bool allowDelete; // Silver: false, Gold: true, Platinum: true
+  final int? maxDeletesPerSite; // Silver: 0, Gold: 1, Platinum: null (unlimited)
+  final bool allowReupload; // Silver: false, Gold: true, Platinum: true
+  final int? maxReuploadsPerSite; // Silver: 0, Gold: 1, Platinum: null (unlimited)
+  final String description;
+
+  const DrawingPlanLimits({
+    required this.planName,
+    required this.maxActiveDocsPerSite,
+    required this.allowDelete,
+    this.maxDeletesPerSite,
+    required this.allowReupload,
+    this.maxReuploadsPerSite,
+    required this.description,
+  });
+}
+
+/// Site-level drawing usage metrics tracked in Firestore.
+class SiteDrawingUsage {
+  final String siteId;
+  final int activeDocsCount;
+  final int deleteCount;
+  final int reuploadCount;
+  final int totalUploadCount;
+
+  const SiteDrawingUsage({
+    required this.siteId,
+    required this.activeDocsCount,
+    required this.deleteCount,
+    required this.reuploadCount,
+    required this.totalUploadCount,
+  });
+
+  factory SiteDrawingUsage.empty(String siteId) {
+    return SiteDrawingUsage(
+      siteId: siteId,
+      activeDocsCount: 0,
+      deleteCount: 0,
+      reuploadCount: 0,
+      totalUploadCount: 0,
+    );
+  }
+}
+
 /// Real-time workspace usage metrics.
 class SubscriptionUsage {
   final int siteCount;
@@ -74,6 +122,7 @@ class SubscriptionLimitService {
         features: [
           'Unlimited Projects & Active Sites',
           'Unlimited Managers & Supervisors',
+          'Layout & Drawings: Up to 2 active docs per site (multi-delete & re-upload)',
           'Custom Cloud Infrastructure & Dedicated Database',
           '24/7 Priority SLA & Dedicated Account Manager',
           'Custom API Integrations & Webhooks',
@@ -99,6 +148,7 @@ class SubscriptionLimitService {
           'Up to $sites Projects & Active Sites',
           'Up to $managers Managers',
           'Up to $supervisors Supervisors',
+          'Layout & Drawings: Up to 2 active docs per site (multi-delete & re-upload)',
           'Advanced collaboration & Workflows',
           'Real-time site monitoring & Live logs',
           'Comprehensive expense tracking & Audits',
@@ -115,6 +165,7 @@ class SubscriptionLimitService {
         features: [
           'Up to 10 Projects & Active Sites',
           'Up to 5 Managers & 10 Supervisors',
+          'Layout & Drawings: 1 doc per site (1 delete & 1 re-upload)',
           'Advanced collaboration & Site monitoring',
           'Expense tracking & Monthly report views',
           'Role-based Access & Live Timeline',
@@ -129,7 +180,8 @@ class SubscriptionLimitService {
         maxSupervisors: null, // Silver has no separate supervisor limit
         maxTotalUsers: 5,
         features: [
-          'Basic Project Management',
+          'Basic Project Management (up to 3 sites)',
+          'Layout & Drawings: 1 doc per site (view only, no delete/re-upload)',
           'Task Tracking & Updates',
           'Limited Team Members (3-5)',
           'Basic Reports & Data View',
@@ -146,11 +198,70 @@ class SubscriptionLimitService {
         maxTotalUsers: 2,
         features: [
           'Basic Project Management',
+          'Layout & Drawings: 1 doc per site (view only)',
           'Task Tracking & Updates',
           'Limited Team Members (up to 2)',
           'Basic Reports & Analytics',
           'Standard Cloud Storage',
         ],
+      );
+    }
+  }
+
+  /// Returns specific Layout & Drawings document upload, delete, and re-upload limits.
+  static DrawingPlanLimits getDrawingLimitsForPlan(String rawPlanName) {
+    final norm = rawPlanName.trim().toLowerCase();
+
+    if (norm.contains('enterprise')) {
+      return const DrawingPlanLimits(
+        planName: 'Enterprise',
+        maxActiveDocsPerSite: 2,
+        allowDelete: true,
+        maxDeletesPerSite: null,
+        allowReupload: true,
+        maxReuploadsPerSite: null,
+        description: 'Up to 2 active documents per site with unlimited deletions and re-uploads.',
+      );
+    } else if (norm.contains('platinum')) {
+      return const DrawingPlanLimits(
+        planName: 'Platinum',
+        maxActiveDocsPerSite: 2,
+        allowDelete: true,
+        maxDeletesPerSite: null,
+        allowReupload: true,
+        maxReuploadsPerSite: null,
+        description: 'Up to 2 active documents per site with unlimited deletions and re-uploads.',
+      );
+    } else if (norm.contains('gold')) {
+      return const DrawingPlanLimits(
+        planName: 'Gold',
+        maxActiveDocsPerSite: 1,
+        allowDelete: true,
+        maxDeletesPerSite: 1,
+        allowReupload: true,
+        maxReuploadsPerSite: 1,
+        description: '1 active document per site. 1 delete and 1 re-upload permitted.',
+      );
+    } else if (norm.contains('silver')) {
+      return const DrawingPlanLimits(
+        planName: 'Silver',
+        maxActiveDocsPerSite: 1,
+        allowDelete: false,
+        maxDeletesPerSite: 0,
+        allowReupload: false,
+        maxReuploadsPerSite: 0,
+        description: '1 document per site (upload and view only). No deletion or re-upload permitted.',
+      );
+    } else {
+      // Free Trial default
+      return const DrawingPlanLimits(
+        planName: 'Free Trial',
+        maxActiveDocsPerSite: 1,
+        allowDelete: false,
+        maxDeletesPerSite: 0,
+        allowReupload: false,
+        maxReuploadsPerSite: 0,
+        description: '1 document per site (upload and view only). No deletion or re-upload permitted.',
       );
     }
   }
@@ -253,6 +364,191 @@ class SubscriptionLimitService {
       supervisorCount: supervisorCount,
       totalUserCount: totalUserCount,
     );
+  }
+
+  /// Fetches site-level drawing metrics including active documents and historical operations.
+  static Future<SiteDrawingUsage> getSiteDrawingUsage(String siteId) async {
+    final cleanSiteId = siteId.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    int activeDocsCount = 0;
+    int deleteCount = 0;
+    int reuploadCount = 0;
+    int totalUploadCount = 0;
+
+    try {
+      // 1. Calculate active documents from siteDrawings collection
+      final drawingsSnap = await FirestoreService.getCollection('siteDrawings')
+          .where('siteId', isEqualTo: siteId.trim())
+          .get();
+
+      for (var doc in drawingsSnap.docs) {
+        final data = doc.data();
+        final docsList = data['siteDocs'] as List<dynamic>? ?? [];
+        activeDocsCount += docsList.length;
+      }
+
+      // 2. Fetch delete and re-upload tracking history from siteDrawingsUsage
+      final usageDoc = await FirestoreService.getCollection('siteDrawingsUsage')
+          .doc(cleanSiteId)
+          .get();
+
+      if (usageDoc.exists) {
+        final data = usageDoc.data()!;
+        deleteCount = (data['deleteCount'] as num?)?.toInt() ?? 0;
+        reuploadCount = (data['reuploadCount'] as num?)?.toInt() ?? 0;
+        totalUploadCount = (data['totalUploadCount'] as num?)?.toInt() ?? 0;
+      } else {
+        // Fallback: If no usage doc yet but active docs exist, total uploads is at least active docs
+        totalUploadCount = activeDocsCount;
+      }
+    } catch (e) {
+      debugPrint('Error loading drawing usage for site $siteId: $e');
+    }
+
+    return SiteDrawingUsage(
+      siteId: siteId,
+      activeDocsCount: activeDocsCount,
+      deleteCount: deleteCount,
+      reuploadCount: reuploadCount,
+      totalUploadCount: totalUploadCount,
+    );
+  }
+
+  /// Validates whether a new drawing document can be uploaded for a site.
+  static Future<SubscriptionValidationResult> canUploadDrawing({
+    required String siteId,
+    required int newDocsCount,
+    String? currentPlanName,
+  }) async {
+    if (newDocsCount <= 0) return SubscriptionValidationResult.allowed;
+
+    final limits = await getActivePlanLimits();
+    final plan = currentPlanName ?? limits.planName;
+    final drawingLimits = getDrawingLimitsForPlan(plan);
+    final usage = await getSiteDrawingUsage(siteId);
+
+    // 1. Check max active documents capacity
+    final resultingActiveDocs = usage.activeDocsCount + newDocsCount;
+    if (resultingActiveDocs > drawingLimits.maxActiveDocsPerSite) {
+      if (drawingLimits.maxActiveDocsPerSite == 1) {
+        return SubscriptionValidationResult(
+          isAllowed: false,
+          errorMessage:
+              'You have reached your limit of 1 active document for Site "$siteId" on the $plan plan. Upgrade to Platinum to upload up to 2 active documents per site.',
+          upgradePrompt: 'Upgrade to Platinum for 2 active documents per site.',
+        );
+      } else {
+        return SubscriptionValidationResult(
+          isAllowed: false,
+          errorMessage:
+              'You cannot exceed ${drawingLimits.maxActiveDocsPerSite} active documents for Site "$siteId" on the $plan plan. Please delete an existing document first.',
+          upgradePrompt: 'Maximum active documents limit reached for this site.',
+        );
+      }
+    }
+
+    // 2. Check re-upload / subsequent upload limits
+    if (usage.totalUploadCount > 0) {
+      // Re-upload restriction for Silver
+      if (!drawingLimits.allowReupload) {
+        return SubscriptionValidationResult(
+          isAllowed: false,
+          errorMessage:
+              'Re-uploading is not permitted on the $plan plan. Users can upload 1 document initially and view only. Upgrade to Gold or Platinum for deletion and re-upload capability.',
+          upgradePrompt: 'Upgrade to Gold or Platinum for re-upload capabilities.',
+        );
+      }
+
+      // Re-upload restriction for Gold
+      if (drawingLimits.maxReuploadsPerSite != null &&
+          usage.reuploadCount >= drawingLimits.maxReuploadsPerSite!) {
+        return SubscriptionValidationResult(
+          isAllowed: false,
+          errorMessage:
+              'You have exhausted your ${drawingLimits.maxReuploadsPerSite} allowed re-upload for Site "$siteId" on the $plan plan. Upgrade to Platinum for unlimited deletions and re-uploads.',
+          upgradePrompt: 'Upgrade to Platinum for unlimited re-uploads.',
+        );
+      }
+    }
+
+    return SubscriptionValidationResult.allowed;
+  }
+
+  /// Validates whether a drawing document can be deleted for a site.
+  static Future<SubscriptionValidationResult> canDeleteDrawing({
+    required String siteId,
+    String? currentPlanName,
+  }) async {
+    final limits = await getActivePlanLimits();
+    final plan = currentPlanName ?? limits.planName;
+    final drawingLimits = getDrawingLimitsForPlan(plan);
+    final usage = await getSiteDrawingUsage(siteId);
+
+    // 1. Check if delete is allowed for plan
+    if (!drawingLimits.allowDelete) {
+      return SubscriptionValidationResult(
+        isAllowed: false,
+        errorMessage:
+            'Document deletion is not permitted on the $plan plan. Users on the Silver plan can upload and view documents only. Upgrade to Gold or Platinum to enable deletion and replacement.',
+        upgradePrompt: 'Upgrade to Gold or Platinum to enable document deletion.',
+      );
+    }
+
+    // 2. Check if delete quota is exhausted (e.g. Gold plan 1 delete limit)
+    if (drawingLimits.maxDeletesPerSite != null &&
+        usage.deleteCount >= drawingLimits.maxDeletesPerSite!) {
+      return SubscriptionValidationResult(
+        isAllowed: false,
+        errorMessage:
+            'You have exhausted your ${drawingLimits.maxDeletesPerSite} allowed deletion for Site "$siteId" on the $plan plan. Upgrade to Platinum for unlimited deletions and re-uploads.',
+        upgradePrompt: 'Upgrade to Platinum for unlimited deletions.',
+      );
+    }
+
+    return SubscriptionValidationResult.allowed;
+  }
+
+  /// Records an upload or re-upload event in the site drawing usage tracking document.
+  static Future<void> recordDrawingUpload({
+    required String siteId,
+    required int count,
+  }) async {
+    try {
+      final cleanSiteId = siteId.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final docRef = FirestoreService.getCollection('siteDrawingsUsage').doc(cleanSiteId);
+      final docSnap = await docRef.get();
+
+      final isFirstTime = !docSnap.exists || ((docSnap.data()?['totalUploadCount'] as num?)?.toInt() ?? 0) == 0;
+
+      await docRef.set({
+        'siteId': siteId.trim(),
+        'totalUploadCount': FieldValue.increment(count),
+        if (!isFirstTime) 'reuploadCount': FieldValue.increment(count),
+        'lastUploadedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error recording drawing upload for site $siteId: $e');
+    }
+  }
+
+  /// Records a delete event in the site drawing usage tracking document.
+  static Future<void> recordDrawingDelete({
+    required String siteId,
+    int count = 1,
+  }) async {
+    try {
+      final cleanSiteId = siteId.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final docRef = FirestoreService.getCollection('siteDrawingsUsage').doc(cleanSiteId);
+
+      await docRef.set({
+        'siteId': siteId.trim(),
+        'deleteCount': FieldValue.increment(count),
+        'lastDeletedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error recording drawing delete for site $siteId: $e');
+    }
   }
 
   /// Validates whether a new Site / Project can be created.
@@ -427,3 +723,4 @@ class SubscriptionLimitService {
     );
   }
 }
+

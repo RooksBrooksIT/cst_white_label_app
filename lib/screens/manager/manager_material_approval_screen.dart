@@ -284,31 +284,37 @@ class _ManagerMaterialApprovalScreenState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: primaryColor.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.inventory_rounded,
+                            color: primaryColor,
+                            size: 20,
+                          ),
                         ),
-                        child: Icon(
-                          Icons.inventory_rounded,
-                          color: primaryColor,
-                          size: 20,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            data['matReqId'] ?? 'REQ-N/A',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0A183D),
+                              fontSize: 15,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        data['matReqId'] ?? 'REQ-N/A',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0A183D),
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   _buildStatusBadge(status),
                 ],
               ),
@@ -333,13 +339,17 @@ class _ManagerMaterialApprovalScreenState
                       fontSize: 13,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   const Spacer(),
-                  Text(
-                    data['date'] ?? '',
-                    style: const TextStyle(
-                      color: Color(0xFF64748B),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                  Flexible(
+                    child: Text(
+                      data['date'] ?? '',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -428,12 +438,15 @@ class _ManagerMaterialApprovalScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        data['matReqId'] ?? 'Request Details',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0A183D),
-                          fontSize: 18,
+                      Expanded(
+                        child: Text(
+                          data['matReqId'] ?? 'Request Details',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0A183D),
+                            fontSize: 18,
+                          ),
                         ),
                       ),
                       IconButton(

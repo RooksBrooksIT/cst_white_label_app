@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/reports/incentive_calculation_sheet.dart';
 import 'package:demo_cst/utils/app_theme.dart';
@@ -19,6 +20,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
 
   List<String> _siteIds = [];
   List<String> _filteredProjectStages = [];
+  List<String> _allProjectStages = [];
   Map<String, String> _siteSupervisors = {};
   Map<String, Set<String>> _siteProjectStages = {};
 
@@ -33,32 +35,145 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
   }
 
   Future<void> _fetchSiteSupervisorData() async {
+    setState(() => _loading = true);
     try {
-      final snapshot = await FirestoreService.siteSupervisorEntries.get();
+      if (!FirestoreService.isReady) {
+        await FirestoreService.initialize();
+      }
+
       final siteIds = <String>{};
       final siteSupervisors = <String, String>{};
       final siteProjectStages = <String, Set<String>>{};
+      final globalStages = <String>{};
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final site = data['siteId'] as String? ?? '';
-        final supervisor = data['supervisorId'] as String? ?? '';
-        final projectStage = data['projectStage'] as String? ?? '';
+      void processDoc(Map<String, dynamic> data, String fallbackId) {
+        final site = (data['siteId'] ??
+                data['site'] ??
+                data['siteCode'] ??
+                fallbackId)
+            .toString()
+            .trim();
+        final supervisor = (data['supervisor'] ??
+                data['supervisorName'] ??
+                data['Supervisor ID'] ??
+                data['supervisorId'] ??
+                '')
+            .toString()
+            .trim();
+        final projectStage = (data['projectStage'] ??
+                data['projectPhase'] ??
+                data['stage'] ??
+                '')
+            .toString()
+            .trim();
 
-        if (site.isNotEmpty) siteIds.add(site);
-        if (site.isNotEmpty && supervisor.isNotEmpty) {
-          siteSupervisors[site] = supervisor;
-        }
-        if (site.isNotEmpty && projectStage.isNotEmpty) {
-          siteProjectStages.putIfAbsent(site, () => <String>{}).add(projectStage);
+        if (site.isNotEmpty && site != 'uninitialized') {
+          siteIds.add(site);
+          if (supervisor.isNotEmpty && (siteSupervisors[site] == null || siteSupervisors[site]!.isEmpty)) {
+            siteSupervisors[site] = supervisor;
+          }
+          if (projectStage.isNotEmpty) {
+            siteProjectStages.putIfAbsent(site, () => <String>{}).add(projectStage);
+            globalStages.add(projectStage);
+          }
         }
       }
 
+      // 1. Fetch from siteSupervisorMap (primary site mapping)
+      try {
+        final mapSnap = await FirestoreService.siteSupervisorMap.get();
+        for (var doc in mapSnap.docs) {
+          processDoc(doc.data(), doc.id);
+        }
+      } catch (e) {
+        debugPrint('IncentiveCalc: Error fetching siteSupervisorMap: $e');
+      }
+
+      // 2. Fetch from siteSupervisorProjectStageSchedule
+      try {
+        final schedSnap = await FirestoreService.siteSupervisorProjectStageSchedule.get();
+        for (var doc in schedSnap.docs) {
+          processDoc(doc.data(), doc.id);
+        }
+      } catch (e) {
+        debugPrint('IncentiveCalc: Error fetching project stage schedule: $e');
+      }
+
+      // 3. Fetch from siteSupervisorProjectStageActual
+      try {
+        final actSnap = await FirestoreService.siteSupervisorProjectStageActual.get();
+        for (var doc in actSnap.docs) {
+          processDoc(doc.data(), doc.id);
+        }
+      } catch (e) {
+        debugPrint('IncentiveCalc: Error fetching project stage actual: $e');
+      }
+
+      // 4. Fetch from siteSupervisorEntries
+      try {
+        final entrySnap = await FirestoreService.siteSupervisorEntries.get();
+        for (var doc in entrySnap.docs) {
+          processDoc(doc.data(), doc.id);
+        }
+      } catch (e) {
+        debugPrint('IncentiveCalc: Error fetching siteSupervisorEntries: $e');
+      }
+
+      // 5. Fetch from Site collection (all configured sites)
+      try {
+        final siteSnap = await FirestoreService.sites.get();
+        for (var doc in siteSnap.docs) {
+          siteIds.add(doc.id);
+        }
+      } catch (e) {
+        debugPrint('IncentiveCalc: Error fetching Site collection: $e');
+      }
+
+      // 6. Fetch from projectStages collection
+      try {
+        final stagesSnap = await FirestoreService.projectStages.get();
+        for (var doc in stagesSnap.docs) {
+          final st = (doc.data()['projectStage'] ?? doc.data()['stage'] ?? '').toString().trim();
+          if (st.isNotEmpty) {
+            globalStages.add(st);
+          }
+        }
+      } catch (e) {
+        debugPrint('IncentiveCalc: Error fetching projectStages collection: $e');
+      }
+
+      // 7. Fallback to root collections if 0 sites found and orgId is initialized
+      if (siteIds.isEmpty && FirestoreService.currentOrgId != 'uninitialized') {
+        try {
+          final rootMap = await FirebaseFirestore.instance.collection('siteSupervisorMap').get();
+          for (var doc in rootMap.docs) {
+            processDoc(doc.data(), doc.id);
+          }
+          final rootSites = await FirebaseFirestore.instance.collection('Site').get();
+          for (var doc in rootSites.docs) {
+            siteIds.add(doc.id);
+          }
+        } catch (e) {
+          debugPrint('IncentiveCalc: Error fetching root fallback: $e');
+        }
+      }
+
+      // Ensure every site has at least the global project stages if none specific found
+      final allGlobalList = globalStages.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      for (var site in siteIds) {
+        if (!siteProjectStages.containsKey(site) || siteProjectStages[site]!.isEmpty) {
+          siteProjectStages[site] = Set<String>.from(allGlobalList);
+        }
+      }
+
+      final sortedSites = siteIds.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
       if (!mounted) return;
       setState(() {
-        _siteIds = siteIds.toList();
+        _siteIds = sortedSites;
         _siteSupervisors = siteSupervisors;
         _siteProjectStages = siteProjectStages;
+        _allProjectStages = allGlobalList;
         _filteredProjectStages = [];
         _loading = false;
       });
@@ -197,11 +312,15 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                         _supervisorName = newValue != null
                                             ? (_siteSupervisors[newValue] ?? '')
                                             : '';
-                                        _filteredProjectStages = newValue != null
-                                            ? _siteProjectStages[newValue]
-                                                      ?.toList() ??
-                                                  []
-                                            : [];
+                                        _filteredProjectStages = (newValue != null &&
+                                                _siteProjectStages[newValue] != null &&
+                                                _siteProjectStages[newValue]!.isNotEmpty)
+                                            ? (_siteProjectStages[newValue]!
+                                                .toList()
+                                              ..sort((a, b) => a
+                                                  .toLowerCase()
+                                                  .compareTo(b.toLowerCase())))
+                                            : List.from(_allProjectStages);
                                         _selectedProjectStage = null;
                                       });
                                     },
@@ -397,7 +516,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          value: (value != null && items.contains(value)) ? value : null,
+          initialValue: (value != null && items.contains(value)) ? value : null,
           isExpanded: true,
           dropdownColor: Colors.white,
           decoration: InputDecoration(

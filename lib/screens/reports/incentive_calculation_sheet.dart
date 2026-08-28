@@ -109,18 +109,36 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
     if (!mounted) return;
     setState(() => _loading = true);
 
+    if (!FirestoreService.isReady) {
+      await FirestoreService.initialize();
+    }
+
     debugPrint(
       'IncentiveSheet: Fetching data for Site="${widget.siteId}", Stage="${widget.projectStage}"',
     );
     debugPrint('IncentiveSheet: OrgID is "${FirestoreService.currentOrgId}"');
 
-    final scheduleSnapshot = await FirestoreService
+    var scheduleSnapshot = await FirestoreService
         .siteSupervisorProjectStageSchedule
         .get();
 
-    final actualSnapshot = await FirestoreService
+    var actualSnapshot = await FirestoreService
         .siteSupervisorProjectStageActual
         .get();
+
+    // Fallback to root collections if empty and org is initialized
+    if (scheduleSnapshot.docs.isEmpty && FirestoreService.currentOrgId != 'uninitialized') {
+      try {
+        final rootSched = await FirebaseFirestore.instance.collection('siteSupervisorProjectStageSchedule').get();
+        if (rootSched.docs.isNotEmpty) scheduleSnapshot = rootSched;
+      } catch (_) {}
+    }
+    if (actualSnapshot.docs.isEmpty && FirestoreService.currentOrgId != 'uninitialized') {
+      try {
+        final rootAct = await FirebaseFirestore.instance.collection('siteSupervisorProjectStageActual').get();
+        if (rootAct.docs.isNotEmpty) actualSnapshot = rootAct;
+      } catch (_) {}
+    }
 
     // Filter in memory for robustness (case-insensitive and trimmed)
     final siteId = widget.siteId.trim().toLowerCase();
@@ -128,12 +146,12 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
     final scheduleDocs = scheduleSnapshot.docs.where((doc) {
       final data = doc.data();
-      final dbSiteId = (data['siteId'] ?? '').toString().trim().toLowerCase();
-      final dbStage = (data['projectStage'] ?? '')
+      final dbSiteId = (data['siteId'] ?? data['site'] ?? data['siteCode'] ?? data['siteName'] ?? doc.id).toString().trim().toLowerCase();
+      final dbStage = (data['projectStage'] ?? data['projectPhase'] ?? data['stage'] ?? '')
           .toString()
           .trim()
           .toLowerCase();
-      final isMatch = dbSiteId == siteId && dbStage == stage;
+      final isMatch = (dbSiteId == siteId || doc.id.toLowerCase() == siteId) && dbStage == stage;
       if (!isMatch && scheduleSnapshot.docs.length < 10) {
         debugPrint(
           'IncentiveSheet: No match for schedule doc ${doc.id}. DB(Site: "$dbSiteId", Stage: "$dbStage") vs Search(Site: "$siteId", Stage: "$stage")',
@@ -144,12 +162,12 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
     final actualDocs = actualSnapshot.docs.where((doc) {
       final data = doc.data();
-      final dbSiteId = (data['siteId'] ?? '').toString().trim().toLowerCase();
-      final dbStage = (data['projectStage'] ?? '')
+      final dbSiteId = (data['siteId'] ?? data['site'] ?? data['siteCode'] ?? data['siteName'] ?? doc.id).toString().trim().toLowerCase();
+      final dbStage = (data['projectStage'] ?? data['projectPhase'] ?? data['stage'] ?? '')
           .toString()
           .trim()
           .toLowerCase();
-      final isMatch = dbSiteId == siteId && dbStage == stage;
+      final isMatch = (dbSiteId == siteId || doc.id.toLowerCase() == siteId) && dbStage == stage;
       if (!isMatch && actualSnapshot.docs.length < 10) {
         debugPrint(
           'IncentiveSheet: No match for actual doc ${doc.id}. DB(Site: "$dbSiteId", Stage: "$dbStage") vs Search(Site: "$siteId", Stage: "$stage")',
@@ -995,25 +1013,6 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         ),
       );
     }
-  }
-
-  void _reset() {
-    setState(() {
-      for (var data in _labourData) {
-        data.requested = 0;
-        data.approved = 0;
-        data.actual = 0;
-      }
-      _incentivePercentage = 10.0;
-      requestedTotal = 0;
-      approvedTotal = 0;
-      actualTotal = 0;
-      savedAmount = 0;
-
-      requestedDays = 0;
-      approvedDays = 0;
-      actualDays = 0;
-    });
   }
 
   Future<void> _generatePdf() async {
