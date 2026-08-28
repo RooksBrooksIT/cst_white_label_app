@@ -139,18 +139,42 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     _controller?.runJavaScript('''
       try {
         const url = window.location.href;
-        if (url.includes('/success') || url.includes('/failure') || url.includes('status=')) {
-          const data = {};
-          const searchParams = new URLSearchParams(window.location.search);
-          searchParams.forEach((v, k) => data[k] = v);
-          const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        const lowerUrl = url.toLowerCase();
+        
+        // Guard: Do not extract on initial data URIs or while loading payment page
+        if (url.startsWith('data:') || lowerUrl.includes('_payment')) {
+          return;
+        }
+
+        const data = {};
+        
+        // 1. URL search params
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.forEach((v, k) => data[k] = v);
+
+        // 2. URL hash params
+        if (window.location.hash) {
+          const hashClean = window.location.hash.replace(/^#\\/?/, '').replace(/^.*\\?/, '');
+          const hashParams = new URLSearchParams(hashClean);
           hashParams.forEach((v, k) => data[k] = v);
-          const inputs = document.querySelectorAll('input');
-          inputs.forEach(i => { if (i.name && i.value) data[i.name] = i.value; });
-          data['_pageUrl'] = url;
-          if (window.PayUBridge) {
-            window.PayUBridge.postMessage(JSON.stringify(data));
+        }
+
+        // 3. Form input values (PayU POST response body inputs on callback page)
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(i => {
+          if (i.name && i.value) {
+            data[i.name] = i.value;
           }
+        });
+
+        data['_pageUrl'] = url;
+        data['_title'] = document.title || '';
+
+        const hasExplicitStatus = data.status || data.unmappedstatus || data.error_Message;
+        const isCallbackPage = lowerUrl.includes('payuresponse') || lowerUrl.includes('/success') || lowerUrl.includes('#/success') || lowerUrl.includes('/failure') || lowerUrl.includes('#/failure') || lowerUrl.includes('test_response.php');
+
+        if ((hasExplicitStatus || isCallbackPage) && window.PayUBridge) {
+          window.PayUBridge.postMessage(JSON.stringify(data));
         }
       } catch(e) {}
     ''');
@@ -160,35 +184,68 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     if (_hasSubmitted) return;
     try {
       final Map<String, dynamic> parsed = jsonDecode(jsonString);
-      final String pageUrl = parsed['_pageUrl']?.toString() ?? '';
+      final String pageUrl = (parsed['_pageUrl']?.toString() ?? '').toLowerCase();
+
+      // Guard: Ignore if bridge data is from initial data url or payment loading page
+      if (pageUrl.startsWith('data:') || pageUrl.contains('_payment')) {
+        return;
+      }
+
       final Map<String, String> rawData = parsed.map((k, v) => MapEntry(k, v.toString()));
+      final String statusLower = (rawData['status'] ?? rawData['unmappedstatus'] ?? '').toLowerCase();
+      final String? mihpayid = rawData['mihpayid'] ?? rawData['payuMoneyId'];
+      final bool hasPayuId = mihpayid != null && mihpayid.trim().isNotEmpty && mihpayid != 'null' && mihpayid != '0';
 
-      final isSuccess = pageUrl.contains('/success') || rawData['status'] == 'success';
-      final isFailure = pageUrl.contains('/failure') || rawData['status'] == 'failure' || rawData['status'] == 'failed';
+      // Confirmed SUCCESS: Status is success or callback url reached with success
+      final bool isExplicitSuccess = statusLower == 'success' ||
+          ((pageUrl.contains('/success') ||
+                  pageUrl.contains('#/success') ||
+                  pageUrl.contains('payuresponse') ||
+                  pageUrl.contains('payuwebhook')) &&
+              (hasPayuId || statusLower == 'success'));
 
-      if (isSuccess && !_hasSubmitted) {
+      // Confirmed FAILURE: Explicit failure status or on failure URL or has error message
+      final bool isExplicitFailure = statusLower == 'failure' ||
+          statusLower == 'failed' ||
+          statusLower == 'cancel' ||
+          statusLower == 'cancelled' ||
+          statusLower == 'user_cancelled' ||
+          pageUrl.contains('/failure') ||
+          pageUrl.contains('#/failure') ||
+          pageUrl.contains('status=failure') ||
+          pageUrl.contains('status=failed') ||
+          pageUrl.contains('status=cancel') ||
+          (rawData['error_Message'] != null && rawData['error_Message']!.isNotEmpty && rawData['error_Message'] != 'No Error');
+
+      if (isExplicitSuccess && !_hasSubmitted) {
         _hasSubmitted = true;
         debugPrint('\n=================== PAYU BRIDGE SUCCESS DETECTED ===================');
+        debugPrint('PayU Money ID: $mihpayid');
         debugPrint('Extracted Data: $rawData');
         debugPrint('===================================================================\n');
 
         final result = PayUResult(
           isSuccess: true,
           txnid: rawData['txnid'] ?? widget.params.txnid,
-          payuMoneyId: rawData['mihpayid'] ?? rawData['payuMoneyId'],
+          payuMoneyId: mihpayid,
           rawData: rawData,
         );
         Navigator.pop(context, result);
-      } else if (isFailure && !_hasSubmitted) {
+      } else if (isExplicitFailure && !_hasSubmitted) {
         _hasSubmitted = true;
         debugPrint('\n=================== PAYU BRIDGE FAILURE DETECTED ===================');
         debugPrint('Extracted Data: $rawData');
         debugPrint('===================================================================\n');
 
+        final errorMsg = rawData['error_Message'] ??
+            rawData['field9'] ??
+            rawData['errorMessage'] ??
+            'Payment failed or was cancelled.';
+
         final result = PayUResult(
           isSuccess: false,
           txnid: rawData['txnid'] ?? widget.params.txnid,
-          errorMessage: rawData['error_Message'] ?? 'Payment failed or was cancelled.',
+          errorMessage: errorMsg,
           rawData: rawData,
         );
         Navigator.pop(context, result);
@@ -202,6 +259,15 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     debugPrint('PayU Navigated URL: $url');
 
     final String lowerUrl = url.toLowerCase();
+
+    // Guard: Allow initial data URI and PayU checkout pages to load unrestricted
+    if (lowerUrl.startsWith('data:') ||
+        lowerUrl.contains('secure.payu.in') ||
+        lowerUrl.contains('test.payu.in') ||
+        lowerUrl.contains('api.payu.in')) {
+      return NavigationDecision.navigate;
+    }
+
     // Intercept native Android UPI Intent & deep-link schemes
     if (lowerUrl.startsWith('upi://') ||
         lowerUrl.startsWith('intent://') ||
@@ -214,24 +280,31 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     }
 
     final uri = Uri.parse(url);
+    final String queryStatus = (uri.queryParameters['status'] ?? '').toLowerCase();
+    final String? mihpayid = uri.queryParameters['mihpayid'] ?? uri.queryParameters['payuMoneyId'];
+    final bool hasPayuId = mihpayid != null && mihpayid.trim().isNotEmpty && mihpayid != 'null' && mihpayid != '0';
 
-    // Check if redirect matches Success URL or contains success params
-    if (url.startsWith(widget.params.surl) ||
-        url.contains('/success') ||
-        url.contains('status=success') ||
-        uri.queryParameters['status'] == 'success') {
+    // Intercept confirmed query params with PayU ID
+    final bool isSuccessUrl = (lowerUrl.contains('payuresponse') ||
+            lowerUrl.contains('payuwebhook') ||
+            lowerUrl.contains('/success') ||
+            lowerUrl.contains('#/success') ||
+            queryStatus == 'success') &&
+        hasPayuId;
+
+    if (isSuccessUrl) {
       if (!_hasSubmitted) {
         _hasSubmitted = true;
         debugPrint('\n=================== PAYU PAYMENT SUCCESS CALLBACK ===================');
         debugPrint('Navigated URL: $url');
+        debugPrint('PayU Money ID: $mihpayid');
         debugPrint('Raw Parameters: ${uri.queryParameters}');
         debugPrint('=====================================================================\n');
 
-        final payuMoneyId = uri.queryParameters['mihpayid'] ?? uri.queryParameters['payuMoneyId'];
         final result = PayUResult(
           isSuccess: true,
-          txnid: widget.params.txnid,
-          payuMoneyId: payuMoneyId,
+          txnid: uri.queryParameters['txnid'] ?? widget.params.txnid,
+          payuMoneyId: mihpayid,
           rawData: uri.queryParameters,
         );
         Navigator.pop(context, result);
@@ -239,12 +312,18 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
       return NavigationDecision.prevent;
     }
 
-    // Check if redirect matches Failure URL or contains failure params
-    if (url.startsWith(widget.params.furl) ||
-        url.contains('/failure') ||
-        url.contains('status=failure') ||
-        url.contains('status=failed') ||
-        uri.queryParameters['status'] == 'failure') {
+    // Intercept explicit failure parameters in query or URL
+    final bool isFailureUrl = lowerUrl.contains('/failure') ||
+        lowerUrl.contains('#/failure') ||
+        queryStatus == 'failure' ||
+        queryStatus == 'failed' ||
+        queryStatus == 'cancel' ||
+        queryStatus == 'cancelled' ||
+        lowerUrl.contains('status=failure') ||
+        lowerUrl.contains('status=failed') ||
+        lowerUrl.contains('status=cancel');
+
+    if (isFailureUrl) {
       if (!_hasSubmitted) {
         _hasSubmitted = true;
         debugPrint('\n=================== PAYU PAYMENT FAILURE CALLBACK ===================');
@@ -252,10 +331,13 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
         debugPrint('Raw Parameters: ${uri.queryParameters}');
         debugPrint('=====================================================================\n');
 
-        final errorMsg = uri.queryParameters['error_Message'] ?? 'Payment failed or was cancelled by user.';
+        final errorMsg = uri.queryParameters['error_Message'] ??
+            uri.queryParameters['field9'] ??
+            'Payment failed or was cancelled by user.';
+
         final result = PayUResult(
           isSuccess: false,
-          txnid: widget.params.txnid,
+          txnid: uri.queryParameters['txnid'] ?? widget.params.txnid,
           errorMessage: errorMsg,
           rawData: uri.queryParameters,
         );

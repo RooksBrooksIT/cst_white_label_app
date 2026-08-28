@@ -7,6 +7,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 
 class PayUParams {
+  static const String defaultCallbackUrl =
+      'https://us-central1-cst-whitelabel-app.cloudfunctions.net/payuWebhook';
+  static const String defaultSuccessUrl =
+      'https://us-central1-cst-whitelabel-app.cloudfunctions.net/payuWebhook';
+  static const String defaultFailureUrl =
+      'https://us-central1-cst-whitelabel-app.cloudfunctions.net/payuWebhook';
+
   final String? merchantId;
   final String merchantKey;
   final String merchantSalt;
@@ -34,11 +41,16 @@ class PayUParams {
     required this.phone,
     String? surl,
     String? furl,
-    this.isSandbox = true,
-    this.pg = 'UPI',
-    this.bankcode = 'INTENT',
-  })  : surl = surl ?? dotenv.env['PAYU_SURL'] ?? 'https://api.payu.in/public/#/success',
-        furl = furl ?? dotenv.env['PAYU_FURL'] ?? 'https://api.payu.in/public/#/failure';
+    bool? isSandbox,
+    this.pg,
+    this.bankcode,
+  })  : isSandbox = isSandbox ?? !PayUService.isProduction,
+        surl = surl ??
+            dotenv.env['PAYU_SURL'] ??
+            defaultSuccessUrl,
+        furl = furl ??
+            dotenv.env['PAYU_FURL'] ??
+            defaultFailureUrl;
 
   String get payUrl => isSandbox
       ? (dotenv.env['PAYU_TEST_PAY_URL'] ?? 'https://test.payu.in/_payment')
@@ -68,11 +80,11 @@ class PayUService {
       (dotenv.env['PAYU_ENVIRONMENT'] ?? 'sandbox').trim().toLowerCase() == 'production';
 
   static String get productionMerchantId =>
-      dotenv.env['PAYU_PROD_MERCHANT_ID'] ?? 'YOUR_LIVE_MERCHANT_ID';
+      dotenv.env['PAYU_PROD_MERCHANT_ID'] ?? '13573851';
   static String get productionMerchantKey =>
-      dotenv.env['PAYU_PROD_KEY'] ?? 'YOUR_LIVE_MERCHANT_KEY';
+      dotenv.env['PAYU_PROD_KEY'] ?? 'a912BZ';
   static String get productionMerchantSalt =>
-      dotenv.env['PAYU_PROD_SALT'] ?? 'YOUR_LIVE_MERCHANT_SALT';
+      dotenv.env['PAYU_PROD_SALT'] ?? 'jgo9fpvFX8DO2QtQDaWJHvz4JByS8ytC';
 
   static String get testMerchantId =>
       dotenv.env['PAYU_TEST_MERCHANT_ID'] ?? '9193759'; // Merchant Test ID
@@ -260,6 +272,45 @@ class PayUService {
     return map;
   }
 
+  /// Verify SHA-512 Hash of PayU Response
+  static bool verifyResponseHash({
+    required Map<String, String> responseData,
+    required String merchantSalt,
+    required String merchantKey,
+  }) {
+    final String? receivedHash = responseData['hash'];
+    if (receivedHash == null || receivedHash.isEmpty) return false;
+
+    final String status = responseData['status'] ?? '';
+    final String email = responseData['email'] ?? '';
+    final String firstname = responseData['firstname'] ?? '';
+    final String productinfo = responseData['productinfo'] ?? '';
+    final double amount = double.tryParse(responseData['amount'] ?? '0') ?? 0.0;
+    final String txnid = responseData['txnid'] ?? '';
+    final String? additionalCharges = responseData['additionalCharges'];
+
+    final expectedHash = generateResponseHash(
+      merchantSalt: merchantSalt,
+      status: status,
+      email: email,
+      firstName: firstname,
+      productInfo: productinfo,
+      amount: amount,
+      txnid: txnid,
+      merchantKey: merchantKey,
+      udf1: responseData['udf1'] ?? '',
+      udf2: responseData['udf2'] ?? '',
+      udf3: responseData['udf3'] ?? '',
+      udf4: responseData['udf4'] ?? '',
+      udf5: responseData['udf5'] ?? '',
+      additionalCharges: additionalCharges,
+    );
+
+    final matches = receivedHash.toLowerCase() == expectedHash.toLowerCase();
+    debugPrint('PayUService: Response Hash Validation -> (Received: $receivedHash vs Expected: $expectedHash) -> Match: $matches');
+    return matches;
+  }
+
   /// Cloud Functions Backend URL base (Can be updated via .env or cloud config)
   static String get cloudFunctionsBaseUrl =>
       dotenv.env['FIREBASE_FUNCTIONS_URL'] ??
@@ -287,7 +338,7 @@ class PayUService {
   }
 
   /// Asynchronously fetch hash & postData from Firebase Cloud Function
-  /// Falls back to local hash generation if function is unreachable
+  /// Falls back to local hash generation if function is unreachable or returns mismatched key
   static Future<Map<String, String>> buildPostDataAsync(PayUParams params) async {
     final Map<String, dynamic> requestPayload = {
       'txnid': params.txnid,
@@ -296,10 +347,11 @@ class PayUService {
       'firstName': params.firstName,
       'email': params.email,
       'phone': params.phone,
+      'merchantKey': params.merchantKey,
+      'environment': params.isSandbox ? 'sandbox' : 'production',
       if (params.pg != null) 'pg': params.pg,
       if (params.bankcode != null) 'bankcode': params.bankcode,
     };
-
 
     debugPrint('\n=================== PAYU REQUEST PAYLOAD ===================');
     debugPrint('PayUService: Sending request to Backend Cloud Function...');
@@ -325,7 +377,12 @@ class PayUService {
         if (resultData != null && resultData['postData'] != null) {
           final Map<String, String> serverPostData =
               Map<String, String>.from(resultData['postData']);
-          return serverPostData;
+          // Ensure the returned key matches our intended merchant key and is not sandbox
+          if (serverPostData['key'] == params.merchantKey && (serverPostData['hash'] ?? '').isNotEmpty) {
+            return serverPostData;
+          } else {
+            debugPrint('PayUService: Server returned key (${serverPostData['key']}) != expected key (${params.merchantKey}). Falling back to local hash.');
+          }
         }
       }
       debugPrint('PayUService: Backend returned HTTP ${response.statusCode}, using local hash fallback.');
@@ -354,6 +411,8 @@ class PayUService {
       'payuMoneyId': payuMoneyId,
       'rawData': rawData,
       'planDetails': planDetails,
+      'environment': isProduction ? 'production' : 'sandbox',
+      'merchantKey': activeMerchantKey,
     };
 
     debugPrint('\n=================== VERIFY SUBSCRIPTION REQUEST ===================');
@@ -386,7 +445,6 @@ class PayUService {
     }
     return false;
   }
-
 
   /// Helper to generate unique transaction ID
   static String generateTxnId() {

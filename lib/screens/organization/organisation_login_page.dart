@@ -9,6 +9,7 @@ import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/screens/organization/organization_dashboard.dart';
+import 'package:demo_cst/screens/organization/pricing_screen.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/firestore_error_handler.dart';
 
@@ -148,8 +149,8 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       }
 
       if (userData != null) {
-        final String? email = userData['email'] as String?;
-        final String? storedOrgName = userData['orgName'] as String?;
+        final String? email = (userData['email'] ?? '').toString();
+        final String? storedOrgName = (userData['org_name'] ?? userData['orgName']) as String?;
 
         if (email != null && email.isNotEmpty) {
           // Authenticate with Firebase Authentication
@@ -193,12 +194,16 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           }
         }
 
+        final String? referralCode = userData['referralCode']?.toString() ??
+            userData['orgReferralCode']?.toString();
+
         // Write organization info to AuthService
         await AuthService().login(UserRole.organization, {
           'username': username,
           'dynamicPath': dynamicPath,
           'org_name': storedOrgName,
           'org_doc_path': fullConfigPath,
+          if (referralCode != null && referralCode.isNotEmpty) 'referral_code': referralCode,
         });
 
         // Refresh FirestoreService cache
@@ -213,6 +218,88 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           userType: 'organisation',
           userName: username,
         );
+
+        // Check if registration is completed but subscription/payment is pending
+        bool isPaymentPending = false;
+        if (dynamicPath != null && dynamicPath != 'uninitialized') {
+          try {
+            final subDoc = await FirebaseFirestore.instance
+                .collection('organisation')
+                .doc(dynamicPath)
+                .collection('data')
+                .doc('subscription')
+                .get();
+
+            final subData = subDoc.data();
+            final bool isSubActive = subData?['isSubscriptionActive'] == true;
+            final String onboardingStep = (subData?['onboardingStep'] ??
+                    userData['onboardingStep'] ??
+                    '')
+                .toString();
+            final String paymentStatus = (subData?['paymentStatus'] ??
+                    userData['paymentStatus'] ??
+                    '')
+                .toString();
+
+            if (!isSubActive &&
+                (onboardingStep == 'PAYMENT_PENDING' ||
+                    paymentStatus == 'PENDING' ||
+                    subData == null ||
+                    subData['subscriptionPlan'] == 'Pending Selection')) {
+              isPaymentPending = true;
+            }
+          } catch (subCheckErr) {
+            debugPrint('Subscription pending check note: $subCheckErr');
+          }
+        }
+
+        if (isPaymentPending) {
+          final rootDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(dynamicPath)
+              .get();
+          final rootData = rootDoc.data() ?? {};
+          final String effectiveOrgName = rootData['org_name'] ??
+              userData['org_name'] ??
+              storedOrgName ??
+              '';
+          final String effectiveAppName =
+              rootData['app_name'] ?? userData['app_name'] ?? effectiveOrgName;
+          final String themeHex =
+              rootData['theme_color'] ?? userData['theme_color'] ?? '#00A86B';
+          final Color primaryColor = AppTheme.hexToColor(themeHex);
+
+          String dateStr = '';
+          if (dynamicPath != null && dynamicPath.contains('_')) {
+            dateStr = dynamicPath.split('_').last;
+          }
+
+          final String phoneStr =
+              (userData['phone'] ?? rootData['phone'] ?? '').toString();
+
+          if (mounted) {
+            AppTheme.showSuccessToast(
+              context,
+              'Registration details found. Please choose your plan to activate your workspace.',
+            );
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PricingScreen(
+                  orgName: effectiveOrgName,
+                  email: email ?? '',
+                  phone: phoneStr,
+                  username: username,
+                  password: password,
+                  dateStr: dateStr,
+                  appName: effectiveAppName,
+                  selectedColor: primaryColor,
+                ),
+              ),
+            );
+            return;
+          }
+        }
 
         if (mounted) {
           Navigator.pushNamedAndRemoveUntil(

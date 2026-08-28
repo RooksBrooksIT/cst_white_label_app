@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/branding/branding_screen.dart';
+import 'package:demo_cst/screens/organization/pricing_screen.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 
 // Form screen for organization registration details
@@ -124,20 +125,110 @@ class _OrganisationRegistrationPageState
       final bool isPhoneUnique = results[1];
       final bool isUsernameUnique = results[2];
 
-      if (!isEmailUnique) {
-        _showError('Email address already registered');
-        setState(() => _isLoading = false);
-        return;
-      }
+      if (!isEmailUnique || !isPhoneUnique || !isUsernameUnique) {
+        // Check if there is a pending onboarding registration for this user
+        final pendingQuery = await FirebaseFirestore.instance
+            .collectionGroup('data')
+            .where('username', isEqualTo: username)
+            .get();
 
-      if (!isPhoneUnique) {
-        _showError('Phone number already registered');
-        setState(() => _isLoading = false);
-        return;
-      }
+        bool isPendingPayment = false;
+        Map<String, dynamic>? pendingData;
+        String? pendingOrgId;
 
-      if (!isUsernameUnique) {
-        _showError('Username is already taken');
+        for (var doc in pendingQuery.docs) {
+          final data = doc.data();
+          if (data['onboardingStep'] == 'PAYMENT_PENDING' ||
+              data['paymentStatus'] == 'PENDING') {
+            isPendingPayment = true;
+            pendingData = data;
+            pendingOrgId = doc.reference.parent.parent?.id;
+            break;
+          }
+        }
+
+        if (isPendingPayment && pendingData != null && mounted) {
+          setState(() => _isLoading = false);
+          final bool? shouldResume = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.pending_actions_rounded,
+                      color: Color(0xFF2563EB), size: 26),
+                  SizedBox(width: 10),
+                  Text('Pending Registration',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                ],
+              ),
+              content: Text(
+                'An account for "${pendingData!['org_name'] ?? username}" was already registered and is awaiting subscription payment.',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('CANCEL',
+                      style: TextStyle(color: Color(0xFF64748B))),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0B1942),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('RESUME PAYMENT',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldResume == true && mounted) {
+            final String orgName =
+                pendingData['org_name'] ?? _orgNameController.text.trim();
+            final String appName = pendingData['app_name'] ?? orgName;
+            final String themeHex = pendingData['theme_color'] ?? '#00A86B';
+            final Color primaryColor = AppTheme.hexToColor(themeHex);
+            String dateStr = '';
+            if (pendingOrgId != null && pendingOrgId.contains('_')) {
+              dateStr = pendingOrgId.split('_').last;
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PricingScreen(
+                  orgName: orgName,
+                  email: pendingData!['email'] ?? email,
+                  phone: pendingData['phone'] ?? phone,
+                  username: username,
+                  password: _passwordController.text.trim().isNotEmpty
+                      ? _passwordController.text.trim()
+                      : (pendingData['password'] ?? ''),
+                  dateStr: dateStr,
+                  appName: appName,
+                  selectedColor: primaryColor,
+                ),
+              ),
+            );
+            return;
+          }
+        }
+
+        if (!isEmailUnique) {
+          _showError('Email address already registered');
+        } else if (!isPhoneUnique) {
+          _showError('Phone number already registered');
+        } else {
+          _showError('Username is already taken');
+        }
         setState(() => _isLoading = false);
         return;
       }

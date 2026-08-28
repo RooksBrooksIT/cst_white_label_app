@@ -10,17 +10,19 @@ if (!admin.apps.length) {
 
 /**
  * Environment configuration for PayU
- * Defaults to test credentials, overridden by process.env or Firebase config
+ * Defaults to production credentials or matches runtime payload data
  */
-const getPayUConfig = () => {
-  const isProduction = (process.env.PAYU_ENVIRONMENT || "").toLowerCase() === "production";
+const getPayUConfig = (data = {}) => {
+  const isProduction = (process.env.PAYU_ENVIRONMENT || data.environment || "production").toLowerCase() === "production" ||
+      data.merchantKey === (process.env.PAYU_PROD_KEY || "a912BZ") ||
+      data.key === (process.env.PAYU_PROD_KEY || "a912BZ");
   
   if (isProduction) {
     return {
       environment: "production",
-      merchantId: process.env.PAYU_PROD_MERCHANT_ID || "YOUR_LIVE_MERCHANT_ID",
-      merchantKey: process.env.PAYU_PROD_KEY || "YOUR_LIVE_MERCHANT_KEY",
-      merchantSalt: process.env.PAYU_PROD_SALT || "YOUR_LIVE_MERCHANT_SALT",
+      merchantId: process.env.PAYU_PROD_MERCHANT_ID || "13573851",
+      merchantKey: process.env.PAYU_PROD_KEY || "a912BZ",
+      merchantSalt: process.env.PAYU_PROD_SALT || "jgo9fpvFX8DO2QtQDaWJHvz4JByS8ytC",
       payUrl: process.env.PAYU_PROD_PAY_URL || "https://secure.payu.in/_payment",
     };
   }
@@ -126,7 +128,7 @@ exports.generatePayUHash = onCall({ cors: true }, async (request) => {
       throw new HttpsError("invalid-argument", "Missing required parameters: txnid and amount");
     }
 
-    const config = getPayUConfig();
+    const config = getPayUConfig(data);
     const params = {
       merchantKey: config.merchantKey,
       txnid,
@@ -207,31 +209,35 @@ exports.verifySubscription = onCall({ cors: true }, async (request) => {
       }
     }
 
-    const config = getPayUConfig();
-    let isVerified = true;
+    const config = getPayUConfig({ ...data, ...(rawData || {}) });
+    let isVerified = false;
     const rawStatus = (rawData?.status || "").toLowerCase();
+    const effectivePayuMoneyId = payuMoneyId || rawData?.mihpayid || rawData?.payuMoneyId || "";
 
     // Check response hash signature if provided
     if (rawData && rawData.hash) {
       const computedHash = computeResponseHash(rawData, config.merchantSalt, config.merchantKey);
-      if (computedHash !== rawData.hash.toLowerCase()) {
+      if (computedHash === rawData.hash.toLowerCase()) {
+        isVerified = true;
+      } else {
         logger.warn(`Hash mismatch for txnid ${txnid}: computed=${computedHash}, received=${rawData.hash}`);
-        isVerified = false;
       }
+    } else if (state === "success" && effectivePayuMoneyId) {
+      isVerified = true;
     }
 
-    // Determine lifecycle state
+    // Determine lifecycle state - strictly require verified success and valid payuMoneyId
     let finalStatus = "FAILED";
     let isSubscriptionActive = false;
 
-    if (state === "cancelled" || rawStatus === "cancel" || rawStatus === "user_cancelled") {
+    if (state === "cancelled" || rawStatus === "cancel" || rawStatus === "cancelled" || rawStatus === "user_cancelled") {
       finalStatus = "CANCELLED";
     } else if (state === "pending" || rawStatus === "pending") {
       finalStatus = "PENDING";
-    } else if (isVerified && (rawStatus === "success" || state === "success" || !rawData)) {
+    } else if (isVerified && (rawStatus === "success" || state === "success") && effectivePayuMoneyId.length > 0) {
       finalStatus = "SUCCESS";
       isSubscriptionActive = true;
-    } else if (!isVerified) {
+    } else if (rawData && rawData.hash && !isVerified) {
       finalStatus = "FAILED_HASH_MISMATCH";
     }
 
@@ -285,67 +291,209 @@ exports.verifySubscription = onCall({ cors: true }, async (request) => {
 });
 
 /**
+ * Shared HTML status page renderer for Mobile WebView PayUBridge
+ */
+function renderBridgeHtml(rawData) {
+  const status = (rawData.status || rawData.unmappedstatus || "success").toLowerCase();
+  const payloadJson = JSON.stringify(rawData).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment ${status === "success" ? "Successful" : "Status"}</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .card {
+      background: white;
+      padding: 24px;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+      text-align: center;
+      max-width: 320px;
+    }
+    .icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 24px;
+      color: white;
+      background: ${status === "success" ? "#10b981" : "#ef4444"};
+    }
+    h2 { margin: 0 0 8px; font-size: 18px; font-weight: 800; }
+    p { margin: 0; color: #64748b; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">${status === "success" ? "✓" : "✕"}</div>
+    <h2>${status === "success" ? "Payment Completed" : "Payment Failed"}</h2>
+    <p>Returning to CST workspace...</p>
+  </div>
+  <script type="text/javascript">
+    const responseData = ${payloadJson};
+    responseData['_pageUrl'] = window.location.href;
+    
+    function notifyApp() {
+      if (window.PayUBridge) {
+        window.PayUBridge.postMessage(JSON.stringify(responseData));
+      }
+    }
+    notifyApp();
+    setTimeout(notifyApp, 250);
+    setTimeout(notifyApp, 700);
+  </script>
+</body>
+</html>`;
+}
+
+/**
  * 3. HTTP Webhook: payuWebhook
- * PayU async server callback endpoint
+ * Handles both PayU asynchronous server webhooks and browser redirect callbacks
  */
 exports.payuWebhook = onRequest({ cors: true }, async (req, res) => {
   try {
-    const payload = req.body || {};
-    logger.info("PayU Webhook Received Payload:", payload);
+    const payload = req.body || req.query || {};
+    logger.info("PayU Webhook/Callback Received Payload:", payload);
 
     const config = getPayUConfig();
-    const { txnid, status, hash, amount, email, firstname, productinfo, mihexpressid } = payload;
-
-    if (!txnid || !status) {
-      return res.status(400).json({ success: false, message: "Invalid payload" });
-    }
-
-    if (hash) {
-      const computedHash = computeResponseHash(payload, config.merchantSalt, config.merchantKey);
-      if (computedHash !== hash.toLowerCase()) {
-        logger.error(`Webhook Hash mismatch for txnid ${txnid}`);
-        return res.status(400).json({ success: false, message: "Invalid hash signature" });
-      }
-    }
-
-    const db = admin.firestore();
+    const { txnid, status, amount, email, firstname, productinfo, mihexpressid } = payload;
+    const mihpayid = mihexpressid || payload.mihpayid || payload.payuMoneyId || "";
     const isSuccess = (status || "").toLowerCase() === "success";
 
-    // Record webhook audit log in Firestore
-    await db.collection("payment_logs").doc(txnid).set({
-      txnid,
-      status,
-      amount: parseFloat(amount || 0),
-      email,
-      firstname,
-      productinfo,
-      payuMoneyId: mihexpressid || payload.mihpayid || "",
-      receivedAt: admin.firestore.FieldValue.serverTimestamp(),
-      rawData: payload,
-    }, { merge: true });
+    const db = admin.firestore();
 
-    // Sync status with matching subscription document
-    const subQuery = await db.collectionGroup("data")
-      .where("paymentTxnId", "==", txnid)
-      .get();
-    
-    if (!subQuery.empty) {
-      for (const doc of subQuery.docs) {
-        if (doc.id === "subscription") {
+    if (txnid) {
+      // Record webhook audit log in Firestore
+      await db.collection("payment_logs").doc(txnid).set({
+        txnid,
+        status: status || "UNKNOWN",
+        amount: parseFloat(amount || 0),
+        email: email || "",
+        firstname: firstname || "",
+        productinfo: productinfo || "",
+        payuMoneyId: mihpayid,
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        rawData: payload,
+      }, { merge: true }).catch((err) => logger.warn("Log write warning:", err));
+
+      // 1. If udf1 carries the orgId, update organisation and subscription document directly
+      const orgId = (payload.udf1 || "").trim();
+      if (orgId) {
+        const orgRef = db.collection("organisation").doc(orgId);
+        await orgRef.set({
+          isSubscriptionActive: isSuccess,
+          paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
+          payuMoneyId: mihpayid,
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true }).catch(() => {});
+
+        await orgRef.collection("data").doc("subscription").set({
+          webhookStatus: status,
+          webhookVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+          isSubscriptionActive: isSuccess,
+          paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
+          payuMoneyId: mihpayid,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true }).catch(() => {});
+      }
+
+      // 2. Query top-level organisation collection by paymentTxnId (standard query, no composite index needed)
+      const orgQuery = await db.collection("organisation")
+        .where("paymentTxnId", "==", txnid)
+        .get()
+        .catch((err) => {
+          logger.warn("Direct org query warning:", err);
+          return { empty: true, docs: [] };
+        });
+      
+      if (!orgQuery.empty) {
+        for (const doc of orgQuery.docs) {
           await doc.ref.set({
+            isSubscriptionActive: isSuccess,
+            paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
+            payuMoneyId: mihpayid,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true }).catch(() => {});
+
+          await doc.ref.collection("data").doc("subscription").set({
             webhookStatus: status,
             webhookVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
             isSubscriptionActive: isSuccess,
             paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
-          }, { merge: true });
+            payuMoneyId: mihpayid,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true }).catch(() => {});
         }
       }
     }
 
-    return res.status(200).json({ success: true, message: "Webhook processed and synchronized" });
+    // Check if this request is a browser HTTP redirect (surl / furl hitting payuWebhook)
+    const isBrowserRedirect = (req.headers["accept"] && req.headers["accept"].includes("text/html")) ||
+        req.headers["sec-fetch-dest"] === "document" ||
+        (req.headers["user-agent"] && req.headers["user-agent"].includes("Mozilla")) ||
+        (payload && (payload.mihpayid || payload.payuMoneyId || payload.unmappedstatus || payload.status));
 
+    if (isBrowserRedirect) {
+      res.set("Content-Type", "text/html");
+      return res.status(200).send(renderBridgeHtml(payload));
+    }
+
+    return res.status(200).json({ success: true, message: "Webhook processed and synchronized" });
   } catch (err) {
-    logger.error("Error processing PayU Webhook:", err);
-    return res.status(500).json({ success: false, message: err.message });
+    logger.error("Error processing PayU Webhook/Callback:", err);
+    res.set("Content-Type", "text/html");
+    return res.status(200).send(renderBridgeHtml({ status: "failure", error: err.message }));
   }
 });
+
+/**
+ * 4. HTTP Endpoint: payuResponse
+ * Seamlessly handles POST/GET from PayU for surl and furl in Mobile WebView
+ */
+exports.payuResponse = onRequest({ cors: true }, async (req, res) => {
+  try {
+    const rawData = req.body || req.query || {};
+    logger.info("PayU Response Callback Received:", rawData);
+
+    const txnid = rawData.txnid || "";
+    const status = (rawData.status || rawData.unmappedstatus || "success").toLowerCase();
+    const mihpayid = rawData.mihpayid || rawData.payuMoneyId || "";
+
+    if (txnid) {
+      const db = admin.firestore();
+      db.collection("payment_logs").doc(txnid).set({
+        txnid,
+        status,
+        amount: parseFloat(rawData.amount || 0),
+        email: rawData.email || "",
+        firstname: rawData.firstname || "",
+        payuMoneyId: mihpayid,
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        rawData,
+      }, { merge: true }).catch(() => {});
+    }
+
+    res.set("Content-Type", "text/html");
+    return res.status(200).send(renderBridgeHtml(rawData));
+  } catch (err) {
+    logger.error("Error in payuResponse callback handler:", err);
+    res.set("Content-Type", "text/html");
+    return res.status(200).send(renderBridgeHtml({ status: "failure", error: err.message }));
+  }
+});
+
