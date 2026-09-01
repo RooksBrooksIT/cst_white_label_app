@@ -39,24 +39,89 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         await FirestoreService.initialize();
       }
 
-      final referralDoc = await FirestoreService.referralDoc.get();
-
       String? code;
-      if (referralDoc.exists) {
-        final refData = referralDoc.data()!;
-        code =
-            refData['orgReferralCode'] as String? ??
-            refData['referralCode'] as String?;
+
+      // 1. SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final cachedPrefCode = prefs.getString('referral_code')?.trim();
+      if (cachedPrefCode != null && cachedPrefCode.isNotEmpty && cachedPrefCode != 'Not Set') {
+        code = cachedPrefCode;
       }
 
+      // 2. data/referralCode doc
       if (code == null || code.isEmpty) {
-        final rootDoc = await FirestoreService.rootOrgDoc.get();
-        if (rootDoc.exists) {
-          final rootData = rootDoc.data()!;
-          code =
-              rootData['orgReferralCode'] as String? ??
-              rootData['referralCode'] as String?;
+        try {
+          final referralDoc = await FirestoreService.referralDoc.get();
+          if (referralDoc.exists) {
+            final refData = referralDoc.data()!;
+            code = (refData['referralCode'] ?? refData['orgReferralCode'] ?? refData['code'])?.toString().trim();
+          }
+        } catch (_) {}
+      }
+
+      // 3. data/admin doc
+      if (code == null || code.isEmpty) {
+        try {
+          final adminDoc = await FirestoreService.orgDataDoc.get();
+          if (adminDoc.exists) {
+            final adminData = adminDoc.data()!;
+            code = (adminData['referralCode'] ?? adminData['orgReferralCode'] ?? adminData['code'])?.toString().trim();
+          }
+        } catch (_) {}
+      }
+
+      // 4. Root organisation doc
+      if (code == null || code.isEmpty) {
+        try {
+          final rootDoc = await FirestoreService.rootOrgDoc.get();
+          if (rootDoc.exists) {
+            final rootData = rootDoc.data()!;
+            code = (rootData['referralCode'] ?? rootData['orgReferralCode'] ?? rootData['code'])?.toString().trim();
+          }
+        } catch (_) {}
+      }
+
+      // 5. Legacy data/referral doc
+      if (code == null || code.isEmpty) {
+        try {
+          final legacyDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(FirestoreService.currentOrgId)
+              .collection('data')
+              .doc('referral')
+              .get();
+          if (legacyDoc.exists) {
+            final legacyData = legacyDoc.data()!;
+            code = (legacyData['referralCode'] ?? legacyData['orgReferralCode'] ?? legacyData['code'])?.toString().trim();
+          }
+        } catch (_) {}
+      }
+
+      // 6. Auto-generate and persist if not found for this organization
+      if ((code == null || code.isEmpty || code == 'Not Set') && FirestoreService.currentOrgId != 'uninitialized') {
+        try {
+          code = await FirestoreService.generateUniqueReferralCode();
+          await FirestoreService.referralDoc.set({
+            'referralCode': code,
+            'orgReferralCode': code,
+            'created_at': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          await FirestoreService.orgDataDoc.set({
+            'referralCode': code,
+            'orgReferralCode': code,
+          }, SetOptions(merge: true));
+          await FirestoreService.rootOrgDoc.set({
+            'referralCode': code,
+            'orgReferralCode': code,
+          }, SetOptions(merge: true));
+          await prefs.setString('referral_code', code);
+        } catch (e) {
+          debugPrint('Error generating fallback referral code: $e');
         }
+      }
+
+      if (code != null && code.isNotEmpty && code != 'Not Set') {
+        await prefs.setString('referral_code', code);
       }
 
       if (mounted) {

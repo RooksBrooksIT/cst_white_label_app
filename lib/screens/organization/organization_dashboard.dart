@@ -2396,6 +2396,46 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           ),
         ],
       ),
+      OrgCategoryData(
+        title: "Material Approvals",
+        subtitle: "Material requests & procurement approvals",
+        icon: Icons.inventory_2_rounded,
+        color: primary,
+        gradientColors: [primary, primary.withValues(alpha: 0.85)],
+        items: [
+          SubMenuItem(
+            title: "Material Approval",
+            subtitle: "Material procurement authorization",
+            icon: Icons.inventory_2_rounded,
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
+            tags: [
+              'approval',
+              'material',
+              'procurement',
+              'review',
+              'pending',
+              'requests',
+            ],
+            countStream: _getPendingMaterialRequestsCount(),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ManagerMaterialApprovalScreen(),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: "Materials Inventory",
+            subtitle: "Real-time stock monitoring",
+            icon: Icons.inventory_rounded,
+            color: primary,
+            cardBgColor: primary.withValues(alpha: 0.08),
+            tags: ['material', 'inventory', 'stock', 'report'],
+            onTap: () => _navigateToMaterialReport(context),
+          ),
+        ],
+      ),
     ];
   }
 

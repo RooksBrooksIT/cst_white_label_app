@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/reports/incentive_calculation_sheet.dart';
 import 'package:demo_cst/utils/app_theme.dart';
@@ -140,22 +139,6 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
         }
       } catch (e) {
         debugPrint('IncentiveCalc: Error fetching projectStages collection: $e');
-      }
-
-      // 7. Fallback to root collections if 0 sites found and orgId is initialized
-      if (siteIds.isEmpty && FirestoreService.currentOrgId != 'uninitialized') {
-        try {
-          final rootMap = await FirebaseFirestore.instance.collection('siteSupervisorMap').get();
-          for (var doc in rootMap.docs) {
-            processDoc(doc.data(), doc.id);
-          }
-          final rootSites = await FirebaseFirestore.instance.collection('Site').get();
-          for (var doc in rootSites.docs) {
-            siteIds.add(doc.id);
-          }
-        } catch (e) {
-          debugPrint('IncentiveCalc: Error fetching root fallback: $e');
-        }
       }
 
       // Ensure every site has at least the global project stages if none specific found

@@ -3,7 +3,10 @@ import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:demo_cst/screens/organization/pricing_screen.dart';
+import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/auth_service.dart';
 
 class BrandingScreen extends StatefulWidget {
   final String orgName;
@@ -137,10 +140,66 @@ class _BrandingScreenState extends State<BrandingScreen> {
         }
       }
 
+      // If username doc exists, check if it is this user's pending registration
       if (isTaken) {
-        _showError('Username already taken.');
-        setState(() => _isLoading = false);
-        return;
+        final cleanOrgName = widget.orgName.replaceAll(' ', '');
+        final expectedOrgId = '${cleanOrgName}_${widget.dateStr}';
+        bool isOwnPendingAccount = false;
+
+        for (var query in checkResults) {
+          for (var doc in query.docs) {
+            final docPath = doc.reference.path;
+            if (docPath.contains(expectedOrgId)) {
+              isOwnPendingAccount = true;
+              break;
+            }
+          }
+          if (isOwnPendingAccount) break;
+        }
+
+        if (!isOwnPendingAccount) {
+          _showError('Username already taken.');
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
+      // Persist full registration details immediately to Firestore with PAYMENT_PENDING status
+      final orgId = await FirestoreService.createPendingOrganizationRegistration(
+        orgName: widget.orgName,
+        appName: appName,
+        selectedColor: _selectedColor,
+        email: widget.email,
+        phone: widget.phone,
+        username: widget.username,
+        password: widget.password,
+        dateStr: widget.dateStr,
+      );
+
+      // Create or sync Firebase Auth credential
+      try {
+        await AuthService().registerWithEmail(widget.email, widget.password);
+      } catch (authError) {
+        debugPrint('Firebase Auth registration note (may already exist): $authError');
+      }
+
+      // Save local recovery draft in SharedPreferences
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pending_org_id', orgId);
+        await prefs.setString('pending_org_name', widget.orgName);
+        await prefs.setString('pending_email', widget.email);
+        await prefs.setString('pending_phone', widget.phone);
+        await prefs.setString('pending_username', widget.username);
+        await prefs.setString('pending_password', widget.password);
+        await prefs.setString('pending_app_name', appName);
+        await prefs.setString('pending_date_str', widget.dateStr);
+        await prefs.setString(
+          'pending_theme_color',
+          '#${_selectedColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
+        );
+      } catch (prefError) {
+        debugPrint('SharedPreferences recovery draft error: $prefError');
       }
 
       if (mounted) {
@@ -161,9 +220,9 @@ class _BrandingScreenState extends State<BrandingScreen> {
         );
       }
     } catch (e) {
-      debugPrint('Navigation error: $e');
+      debugPrint('Navigation/Registration persistence error: $e');
       if (mounted) {
-        _showError('Error: ${e.toString()}');
+        _showError('Error saving registration: ${e.toString()}');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

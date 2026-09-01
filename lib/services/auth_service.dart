@@ -259,88 +259,94 @@ class AuthService {
     switch (role) {
       case UserRole.organization:
         await _prefs.setBool('org_isLoggedIn', true);
-        if (data.containsKey('username')) {
-          await _prefs.setString('org_username', data['username']);
+        if (data['username'] != null) {
+          await _prefs.setString('org_username', data['username'].toString());
         }
-        if (data.containsKey('dynamicPath')) {
-          await _prefs.setString('org_dynamic_path', data['dynamicPath']);
+        if (data['dynamicPath'] != null) {
+          await _prefs.setString('org_dynamic_path', data['dynamicPath'].toString());
         }
-        if (data.containsKey('org_name')) {
-          await _prefs.setString('org_name', data['org_name']);
+        if (data['org_name'] != null) {
+          await _prefs.setString('org_name', data['org_name'].toString());
         }
-        if (data.containsKey('org_doc_path')) {
-          await _prefs.setString('org_doc_path', data['org_doc_path']);
+        if (data['org_doc_path'] != null) {
+          await _prefs.setString('org_doc_path', data['org_doc_path'].toString());
+        }
+        if (data['referral_code'] != null || data['referralCode'] != null || data['orgReferralCode'] != null) {
+          final refCode = (data['referral_code'] ?? data['referralCode'] ?? data['orgReferralCode']).toString();
+          if (refCode.isNotEmpty && refCode != 'Not Set') {
+            await _prefs.setString('referral_code', refCode);
+          }
         }
         break;
       case UserRole.manager:
         await _prefs.setBool('config_is_logged_in', true);
-        if (data.containsKey('username')) {
-          await _prefs.setString('config_username', data['username']);
+        if (data['username'] != null) {
+          await _prefs.setString('config_username', data['username'].toString());
         }
-        if (data.containsKey('password')) {
-          await _prefs.setString('config_password', data['password']);
+        if (data['password'] != null) {
+          await _prefs.setString('config_password', data['password'].toString());
         }
-        if (data.containsKey('orgId')) {
-          await _prefs.setString('config_org_path', data['orgId']);
+        if (data['orgId'] != null) {
+          await _prefs.setString('config_org_path', data['orgId'].toString());
         }
-        if (data.containsKey('config_org_doc_path')) {
+        if (data['config_org_doc_path'] != null) {
           await _prefs.setString(
             'config_org_doc_path',
-            data['config_org_doc_path'],
+            data['config_org_doc_path'].toString(),
           );
         }
         break;
       case UserRole.supervisor:
         await _prefs.setBool('sup_isLoggedIn', true);
-        if (data.containsKey('username')) {
-          await _prefs.setString('sup_username', data['username']);
+        if (data['username'] != null) {
+          await _prefs.setString('sup_username', data['username'].toString());
         }
-        if (data.containsKey('supervisorId')) {
-          await _prefs.setString('sup_supervisorId', data['supervisorId']);
+        if (data['supervisorId'] != null) {
+          await _prefs.setString('sup_supervisorId', data['supervisorId'].toString());
         }
-        if (data.containsKey('supervisorName')) {
-          await _prefs.setString('sup_supervisorName', data['supervisorName']);
+        if (data['supervisorName'] != null) {
+          await _prefs.setString('sup_supervisorName', data['supervisorName'].toString());
         }
-        if (data.containsKey('isContractor')) {
-          await _prefs.setBool('sup_isContractor', data['isContractor']);
+        if (data['isContractor'] != null) {
+          await _prefs.setBool('sup_isContractor', data['isContractor'] == true);
         }
-        if (data.containsKey('userType')) {
-          await _prefs.setString('sup_userType', data['userType']);
+        if (data['userType'] != null) {
+          await _prefs.setString('sup_userType', data['userType'].toString());
         }
-        if (data.containsKey('contractorName')) {
-          await _prefs.setString('sup_contractorName', data['contractorName']);
+        if (data['contractorName'] != null) {
+          await _prefs.setString('sup_contractorName', data['contractorName'].toString());
         }
-        if (data.containsKey('contractorField')) {
+        if (data['contractorField'] != null) {
           await _prefs.setString(
             'sup_contractorField',
-            data['contractorField'],
+            data['contractorField'].toString(),
           );
         }
-        if (data.containsKey('orgId')) {
-          await _prefs.setString('sup_org_path', data['orgId']);
+        if (data['orgId'] != null) {
+          await _prefs.setString('sup_org_path', data['orgId'].toString());
         }
-        if (data.containsKey('sup_org_doc_path')) {
-          await _prefs.setString('sup_org_doc_path', data['sup_org_doc_path']);
+        if (data['sup_org_doc_path'] != null) {
+          await _prefs.setString('sup_org_doc_path', data['sup_org_doc_path'].toString());
         }
         break;
       case UserRole.customer:
         await _prefs.setBool('cust_isLoggedIn', true);
-        if (data.containsKey('ownerName')) {
-          await _prefs.setString('cust_ownerName', data['ownerName']);
+        if (data['ownerName'] != null) {
+          await _prefs.setString('cust_ownerName', data['ownerName'].toString());
         }
-        if (data.containsKey('ownerPhoneNumber')) {
-          await _prefs.setString('cust_ownerPhoneNumber', data['ownerPhoneNumber']);
+        if (data['ownerPhoneNumber'] != null) {
+          await _prefs.setString('cust_ownerPhoneNumber', data['ownerPhoneNumber'].toString());
         }
-        if (data.containsKey('siteId')) {
-          await _prefs.setString('cust_siteId', data['siteId']);
+        if (data['siteId'] != null) {
+          await _prefs.setString('cust_siteId', data['siteId'].toString());
         }
-        if (data.containsKey('orgId')) {
-          await _prefs.setString('cust_org_path', data['orgId']);
+        if (data['orgId'] != null) {
+          await _prefs.setString('cust_org_path', data['orgId'].toString());
         }
-        if (data.containsKey('cust_org_doc_path')) {
+        if (data['cust_org_doc_path'] != null) {
           await _prefs.setString(
             'cust_org_doc_path',
-            data['cust_org_doc_path'],
+            data['cust_org_doc_path'].toString(),
           );
         }
         break;

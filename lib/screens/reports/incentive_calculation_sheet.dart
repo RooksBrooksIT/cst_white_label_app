@@ -118,27 +118,13 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
     );
     debugPrint('IncentiveSheet: OrgID is "${FirestoreService.currentOrgId}"');
 
-    var scheduleSnapshot = await FirestoreService
+    final scheduleSnapshot = await FirestoreService
         .siteSupervisorProjectStageSchedule
         .get();
 
-    var actualSnapshot = await FirestoreService
+    final actualSnapshot = await FirestoreService
         .siteSupervisorProjectStageActual
         .get();
-
-    // Fallback to root collections if empty and org is initialized
-    if (scheduleSnapshot.docs.isEmpty && FirestoreService.currentOrgId != 'uninitialized') {
-      try {
-        final rootSched = await FirebaseFirestore.instance.collection('siteSupervisorProjectStageSchedule').get();
-        if (rootSched.docs.isNotEmpty) scheduleSnapshot = rootSched;
-      } catch (_) {}
-    }
-    if (actualSnapshot.docs.isEmpty && FirestoreService.currentOrgId != 'uninitialized') {
-      try {
-        final rootAct = await FirebaseFirestore.instance.collection('siteSupervisorProjectStageActual').get();
-        if (rootAct.docs.isNotEmpty) actualSnapshot = rootAct;
-      } catch (_) {}
-    }
 
     // Filter in memory for robustness (case-insensitive and trimmed)
     final siteId = widget.siteId.trim().toLowerCase();

@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 
@@ -9,6 +9,16 @@ class FirestoreService {
   FirestoreService._internal();
 
   static String? _cachedDynamicPath;
+
+  /// Application identifier for strict cross-application data isolation in shared Firebase project
+  static const String cstAppId = 'cst_white_label';
+  static const String cstNamespacePrefix = 'cst_';
+
+  /// Checks if an organization ID belongs to the CST White Label application namespace.
+  static bool isCstOrgId(String orgId) {
+    if (orgId.isEmpty || orgId == 'uninitialized') return false;
+    return orgId.startsWith(cstNamespacePrefix) || orgId.contains('cst');
+  }
 
   /// Returns true if the service has a valid organization path cached.
   static bool get isReady =>
@@ -147,7 +157,7 @@ class FirestoreService {
         .collection('organisation')
         .doc(orgId)
         .collection('data')
-        .doc('referral');
+        .doc('referralCode');
   }
 
   /// Gets the organization's subscription status.
@@ -325,20 +335,24 @@ class FirestoreService {
   }
 
   /// Finds the Organization ID (document ID in /organisation collection) by search across
-  /// all admin documents in the 'data' collection group for a matching referralCode.
+  /// all admin documents in the 'data' collection group for a matching referralCode
+  /// strictly belonging to the CST application.
   static Future<String?> findOrgIdByReferralCode(String code) async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collectionGroup('data')
           .where('referralCode', isEqualTo: code)
-          .limit(1)
           .get();
 
-      if (snapshot.docs.isNotEmpty) {
-        final doc = snapshot.docs.first;
-        // The structure is /organisation/{orgId}/data/admin
-        // So doc.reference.parent is the 'data' collection, and .parent is the organization document
-        return doc.reference.parent.parent?.id;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+        final orgDocId = doc.reference.parent.parent?.id ?? '';
+
+        // Strictly verify that the document belongs to CST and ignore other applications (e.g., abc_academy_...)
+        if (appId == cstAppId || isCstOrgId(orgDocId) || data['is_cst_app'] == true) {
+          return orgDocId;
+        }
       }
       return null;
     } catch (e) {
@@ -347,67 +361,254 @@ class FirestoreService {
     }
   }
 
-  /// Checks if a referral code is unique across all organizations.
+  /// Checks if a referral code is unique across all CST organizations.
   static Future<bool> isReferralCodeUnique(String code) async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collectionGroup('data')
           .where('referralCode', isEqualTo: code)
-          .limit(1)
           .get();
 
-      return snapshot.docs.isEmpty;
+      final cstMatches = snapshot.docs.where((doc) {
+        final data = doc.data();
+        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+        final orgDocId = doc.reference.parent.parent?.id ?? '';
+        return appId == cstAppId || isCstOrgId(orgDocId) || data['is_cst_app'] == true;
+      });
+
+      return cstMatches.isEmpty;
     } catch (e) {
       debugPrint('Error checking referral code uniqueness: $e');
       rethrow;
     }
   }
 
-  /// Checks if an email is unique across all organizations.
+  /// Checks if an email is unique across all CST organizations.
   static Future<bool> isEmailUnique(String email) async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collectionGroup('data')
           .where('email', isEqualTo: email)
-          .limit(1)
           .get();
 
-      return snapshot.docs.isEmpty;
+      final cstMatches = snapshot.docs.where((doc) {
+        final data = doc.data();
+        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+        final orgDocId = doc.reference.parent.parent?.id ?? '';
+        return appId == cstAppId || isCstOrgId(orgDocId) || data['is_cst_app'] == true;
+      });
+
+      return cstMatches.isEmpty;
     } catch (e) {
       debugPrint('Error checking email uniqueness: $e');
       rethrow;
     }
   }
 
-  /// Checks if a phone number is unique across all organizations.
+  /// Checks if a phone number is unique across all CST organizations.
   static Future<bool> isPhoneUnique(String phone) async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collectionGroup('data')
           .where('phone', isEqualTo: phone)
-          .limit(1)
           .get();
 
-      return snapshot.docs.isEmpty;
+      final cstMatches = snapshot.docs.where((doc) {
+        final data = doc.data();
+        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+        final orgDocId = doc.reference.parent.parent?.id ?? '';
+        return appId == cstAppId || isCstOrgId(orgDocId) || data['is_cst_app'] == true;
+      });
+
+      return cstMatches.isEmpty;
     } catch (e) {
       debugPrint('Error checking phone uniqueness: $e');
       rethrow;
     }
   }
 
-  /// Checks if a username is unique across all organizations.
+  /// Checks if a username is unique across all CST organizations.
   static Future<bool> isUsernameUnique(String username) async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collectionGroup('data')
           .where('username', isEqualTo: username.toLowerCase())
-          .limit(1)
           .get();
 
-      return snapshot.docs.isEmpty;
+      final cstMatches = snapshot.docs.where((doc) {
+        final data = doc.data();
+        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+        final orgDocId = doc.reference.parent.parent?.id ?? '';
+        return appId == cstAppId || isCstOrgId(orgDocId) || data['is_cst_app'] == true;
+      });
+
+      return cstMatches.isEmpty;
     } catch (e) {
       debugPrint('Error checking username uniqueness: $e');
       rethrow;
     }
+  }
+
+  /// Persist initial organization registration details immediately into Firestore
+  /// with dedicated CST namespace and strict application tagging.
+  static Future<String> createPendingOrganizationRegistration({
+    required String orgName,
+    required String appName,
+    required Color selectedColor,
+    required String email,
+    required String phone,
+    required String username,
+    required String password,
+    required String dateStr,
+  }) async {
+    final cleanOrgName = orgName.replaceAll(' ', '');
+    // Ensure all new CST organizations are prefixed with cst_ namespace
+    final orgId = '$cstNamespacePrefix${cleanOrgName}_$dateStr';
+    final orgConfigDocPath = 'organisation/$orgId';
+    final themeHex =
+        '#${selectedColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
+
+    final batch = FirebaseFirestore.instance.batch();
+
+    // Generate unique referral code for organization
+    String referralCode = '';
+    try {
+      referralCode = await generateUniqueReferralCode();
+    } catch (_) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      final random = Random();
+      referralCode = List.generate(6, (i) => chars[random.nextInt(chars.length)]).join();
+    }
+
+    final rootDocPayload = {
+      'app_id': cstAppId,
+      'app_type': cstAppId,
+      'is_cst_app': true,
+      'org_name': orgName,
+      'app_name': appName,
+      'theme_color': themeHex,
+      'email': email,
+      'phone': phone,
+      'username': username,
+      'password': password,
+      'role': 'Organization',
+      'registrationStatus': 'COMPLETED',
+      'onboardingStep': 'PAYMENT_PENDING',
+      'isSubscriptionActive': false,
+      'paymentStatus': 'PENDING',
+      'referralCode': referralCode,
+      'orgReferralCode': referralCode,
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+
+    // 1. Root Org Document
+    final rootRef = FirebaseFirestore.instance.doc(orgConfigDocPath);
+    batch.set(rootRef, rootDocPayload, SetOptions(merge: true));
+
+    // 2. Data / admin doc
+    final dataAdminRef = rootRef.collection('data').doc('admin');
+    batch.set(
+      dataAdminRef,
+      {
+        'app_id': cstAppId,
+        'app_type': cstAppId,
+        'is_cst_app': true,
+        'org_name': orgName,
+        'app_name': appName,
+        'theme_color': themeHex,
+        'email': email,
+        'phone': phone,
+        'username': username,
+        'password': password,
+        'role': 'Organization',
+        'registrationStatus': 'COMPLETED',
+        'onboardingStep': 'PAYMENT_PENDING',
+        'isSubscriptionActive': false,
+        'paymentStatus': 'PENDING',
+        'referralCode': referralCode,
+        'orgReferralCode': referralCode,
+        'created_at': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    // 3. Data / branding doc
+    final dataBrandingRef = rootRef.collection('data').doc('branding');
+    batch.set(
+      dataBrandingRef,
+      {
+        'app_id': cstAppId,
+        'is_cst_app': true,
+        'appName': appName,
+        'app_name': appName,
+        'primaryColor': themeHex,
+        'theme_color': themeHex,
+        'created_at': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    // 4. Data / referralCode doc
+    final dataReferralRef = rootRef.collection('data').doc('referralCode');
+    batch.set(
+      dataReferralRef,
+      {
+        'app_id': cstAppId,
+        'is_cst_app': true,
+        'referralCode': referralCode,
+        'orgReferralCode': referralCode,
+        'created_at': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    // 5. Initial Pending Subscription doc in data/subscription
+    final initialSubData = {
+      'app_id': cstAppId,
+      'is_cst_app': true,
+      'isSubscriptionActive': false,
+      'paymentStatus': 'PENDING',
+      'onboardingStep': 'PAYMENT_PENDING',
+      'subscriptionPlan': 'Pending Selection',
+      'subscriptionType': 'Pending',
+      'created_at': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    batch.set(
+      rootRef.collection('data').doc('subscription'),
+      initialSubData,
+      SetOptions(merge: true),
+    );
+
+    // 6. Organization User doc (keyed uniquely by username)
+    final userPayload = {
+      'app_id': cstAppId,
+      'is_cst_app': true,
+      'org_name': orgName,
+      'email': email,
+      'phone': phone,
+      'username': username,
+      'password': password,
+      'role': 'Organization',
+      'created_at': FieldValue.serverTimestamp(),
+    };
+
+    final userDocId = username.isNotEmpty ? username : (phone.isNotEmpty ? phone : 'admin');
+    batch.set(
+      rootRef.collection('organizationUser').doc(userDocId),
+      userPayload,
+      SetOptions(merge: true),
+    );
+
+    await batch.commit();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('referral_code', referralCode);
+    } catch (_) {}
+
+    return orgId;
   }
 }

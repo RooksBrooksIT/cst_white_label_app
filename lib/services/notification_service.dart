@@ -129,6 +129,7 @@ class NotificationService {
   }) async {
     try {
       await FirebaseFirestore.instance.collection('notifications').add({
+        'app_id': FirestoreService.cstAppId,
         'title': title,
         'body': body,
         'type': type,

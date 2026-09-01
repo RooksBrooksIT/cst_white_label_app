@@ -32,7 +32,7 @@ class _SiteScreenState extends State<SiteScreen>
   DateTime? _startDate;
   DateTime? _endDate;
   String? _projectCategory;
-  String _status = 'In Progress';
+  String? _status;
 
   // Project Details Controllers
   final TextEditingController _projectNameController = TextEditingController();
@@ -159,21 +159,9 @@ class _SiteScreenState extends State<SiteScreen>
           .toSet()
           .toList();
 
-      final defaultStatuses = [
-        'Planning',
-        'In Progress',
-        'On Hold',
-        'Completed',
-        'Cancelled',
-      ];
-      for (var s in defaultStatuses) {
-        if (!statusList.contains(s)) {
-          statusList.add(s);
-        }
-      }
       return statusList;
     } catch (_) {
-      return ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'];
+      return [];
     }
   }
 
@@ -626,7 +614,7 @@ class _SiteScreenState extends State<SiteScreen>
       _projectStage = null;
       _projectContract = null;
       _projectStatus = null;
-      _status = 'In Progress';
+      _status = null;
       _isContractWork = false;
     });
   }
@@ -837,7 +825,7 @@ class _SiteScreenState extends State<SiteScreen>
                   items: statusList,
                   label: 'Site Status',
                   hint: 'Select Status',
-                  onChanged: (val) => setState(() => _status = val ?? 'In Progress'),
+                  onChanged: (val) => setState(() => _status = val),
                 );
               },
             ),
