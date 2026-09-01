@@ -54,15 +54,19 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
         totalSpent += spent;
       }
 
-      if (uniqueStatuses.isEmpty) {
-        uniqueStatuses.addAll([
-          'In-Progress',
-          'Pending',
-          'Planning',
-          'On-Hold',
-          'Complete',
-        ]);
-      }
+      // Also fetch custom user-defined statuses from projectStatus collection
+      try {
+        final statusSnapshot = await FirestoreService.getCollection(
+          'projectStatus',
+        ).get();
+        for (var doc in statusSnapshot.docs) {
+          final data = doc.data();
+          final statusVal = (data['projectState'] ?? data['projectStatus'])?.toString().trim();
+          if (statusVal != null && statusVal.isNotEmpty) {
+            uniqueStatuses.add(statusVal);
+          }
+        }
+      } catch (_) {}
 
       if (mounted) {
         setState(() {
@@ -72,7 +76,7 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
               ? _spentAmount / _budgetAmount
               : 0.0;
           _statusOptions = uniqueStatuses.toList()..sort();
-          _selectedStatus = _statusOptions.first;
+          _selectedStatus = _statusOptions.isNotEmpty ? _statusOptions.first : null;
           _isLoading = false;
           _errorMessage = null;
         });

@@ -106,6 +106,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       "icon": Icons.help_outline_rounded,
       "color": const Color(0xFF14B8A6),
     },
+    "Coming Soon": {
+      "subtitle": "Exciting new tools and features on the way",
+      "icon": Icons.sentiment_very_satisfied_rounded,
+      "color": const Color(0xFFF59E0B),
+      "isStatic": true,
+    },
   };
 
   @override
@@ -431,6 +437,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.teal,
       ),
     ],
+    "Coming Soon": [],
   };
 
   @override
@@ -1146,28 +1153,33 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final entry = categoryEntries[index];
+                final meta = _categoryMetadata[entry.key];
+                final isStatic = meta?["isStatic"] as bool? ?? false;
+
                 return _buildCategoryGridTile(
                   context: context,
                   sectionTitle: entry.key,
                   items: entry.value,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ConsoleCategoryDetailsPage(
-                          sectionTitle: entry.key,
-                          items: entry.value,
-                          managerName: _managerName,
-                          metadata: _categoryMetadata[entry.key],
-                          navigateToScreen: (title) =>
-                              _navigateToScreen(context, title),
-                          launchPrivacyPolicy: () =>
-                              _launchPrivacyPolicy(context),
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: isStatic
+                      ? null
+                      : () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ConsoleCategoryDetailsPage(
+                                sectionTitle: entry.key,
+                                items: entry.value,
+                                managerName: _managerName,
+                                metadata: _categoryMetadata[entry.key],
+                                navigateToScreen: (title) =>
+                                    _navigateToScreen(context, title),
+                                launchPrivacyPolicy: () =>
+                                    _launchPrivacyPolicy(context),
+                              ),
+                            ),
+                          );
+                        },
                 );
               },
               childCount: categoryEntries.length,
@@ -1305,17 +1317,18 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     required BuildContext context,
     required String sectionTitle,
     required List<DashboardItem> items,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
     final meta = _categoryMetadata[sectionTitle] ?? {
       "subtitle": "Management options and settings",
-      "icon": items.first.icon,
+      "icon": items.isNotEmpty ? items.first.icon : Icons.sentiment_satisfied_alt_rounded,
     };
 
     final String subtitle = meta["subtitle"] as String;
     final IconData categoryIcon = meta["icon"] as IconData;
+    final bool isStatic = meta["isStatic"] as bool? ?? false;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -1342,7 +1355,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: isStatic ? null : onTap,
           borderRadius: BorderRadius.circular(18),
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -1350,7 +1363,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top Row: Category Icon & Option Count Pill
+                // Top Row: Category Icon & Option Count / Stay Tuned Pill
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -1370,38 +1383,68 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                         ],
                       ),
                       child: Center(
-                        child: Icon(categoryIcon, color: Colors.white, size: 19),
+                        child: Icon(categoryIcon, color: Colors.white, size: 21),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primaryColor.withValues(alpha: 0.09),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${items.length} ${items.length == 1 ? "Option" : "Options"}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: primaryColor,
+                    isStatic
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withValues(alpha: 0.09),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.sentiment_satisfied_alt_rounded,
+                                  size: 13,
+                                  color: primaryColor,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Stay Tuned',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withValues(alpha: 0.09),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${items.length} ${items.length == 1 ? "Option" : "Options"}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 14,
+                                  color: primaryColor,
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 2),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            size: 14,
-                            color: primaryColor,
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -1736,7 +1779,237 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     if (screen != null) {
       HapticFeedback.lightImpact();
       Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
+    } else {
+      _showDummyFeatureSheet(context, title);
     }
+  }
+
+  void _showDummyFeatureSheet(BuildContext context, String title) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final primaryColor = theme.primaryColor;
+
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.dashboard_customize_rounded,
+                      color: primaryColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0A183D),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Demo / Sample Module',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF059669),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                    color: Colors.grey.shade500,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Module Overview',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'This is a preview of the "$title" management module. Full operational workflows and custom configurations will be enabled for your organization.',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF64748B),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Active Records',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            '12 Logs',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0A183D),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Sync Status',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Up to date',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF10B981),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Close Preview',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _launchPrivacyPolicy(BuildContext context) async {
@@ -1887,7 +2160,9 @@ class _ConsoleCategoryDetailsPageState
     final hPad = Responsive.horizontalPadding(context);
     final meta = widget.metadata ?? {
       "subtitle": "Management options and settings",
-      "icon": widget.items.first.icon,
+      "icon": widget.items.isNotEmpty
+          ? widget.items.first.icon
+          : Icons.sentiment_satisfied_alt_rounded,
     };
 
     final String subtitle = meta["subtitle"] as String;

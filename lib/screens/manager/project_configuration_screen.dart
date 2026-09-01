@@ -119,42 +119,6 @@ class _ProjectConfigurationScreenState
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _seedDefaultStatuses();
-  }
-
-  /// Seed default project statuses if Firestore collection is empty
-  Future<void> _seedDefaultStatuses() async {
-    try {
-      final snap =
-          await FirestoreService.getCollection('projectStatus').limit(1).get();
-      if (snap.docs.isEmpty) {
-        final defaultStatuses = [
-          'Planning',
-          'In Progress',
-          'On Hold',
-          'Completed',
-          'Cancelled',
-        ];
-        int index = 1;
-        for (var status in defaultStatuses) {
-          final id = 'PSTU${index.toString().padLeft(3, '0')}';
-          await FirestoreService.getCollection('projectStatus').doc(id).set({
-            'projectStatusId': id,
-            'projectStatus': status,
-            'projectState': status,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-          index++;
-        }
-      }
-    } catch (e) {
-      debugPrint('Error seeding default statuses: $e');
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
@@ -313,6 +277,7 @@ class __ProjectConfigSectionCardState
 
       if (widget.meta.type == ProjectConfigType.status) {
         docData['projectState'] = name;
+        docData['projectStatus'] = name;
       }
 
       await FirestoreService.getCollection(widget.meta.collectionName)

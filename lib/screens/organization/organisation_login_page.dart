@@ -84,7 +84,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       final password = _passwordController.text.trim();
 
       // 1. Search for organization credentials in 'admin' or 'data' collections
-      // This handles both path structures: /admin/data and /data/admin
+      // Strictly filtered to documents belonging to the CST White Label application
       QuerySnapshot<Map<String, dynamic>>? userQuery;
 
       // Try 'admin' collection group first
@@ -98,8 +98,13 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       if (userQuery.docs.isNotEmpty) {
         for (var doc in userQuery.docs) {
           if (doc.id == 'data' || doc.id == 'admin') {
-            dataDoc = doc;
-            break;
+            final data = doc.data();
+            final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+            final orgDocId = doc.reference.parent.parent?.id ?? '';
+            if (appId == FirestoreService.cstAppId || FirestoreService.isCstOrgId(orgDocId) || data['is_cst_app'] == true) {
+              dataDoc = doc;
+              break;
+            }
           }
         }
       }
@@ -114,8 +119,13 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         if (userQuery.docs.isNotEmpty) {
           for (var doc in userQuery.docs) {
             if (doc.id == 'admin' || doc.id == 'data') {
-              dataDoc = doc;
-              break;
+              final data = doc.data();
+              final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+              final orgDocId = doc.reference.parent.parent?.id ?? '';
+              if (appId == FirestoreService.cstAppId || FirestoreService.isCstOrgId(orgDocId) || data['is_cst_app'] == true) {
+                dataDoc = doc;
+                break;
+              }
             }
           }
         }
@@ -130,21 +140,24 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         dynamicPath = dataDoc.reference.parent.parent?.id ?? 'uninitialized';
         fullConfigPath = dataDoc.reference.path;
       } else {
-        // FALLBACK: Check root organisation collection for legacy accounts
+        // FALLBACK: Check root organisation collection for CST accounts
         final legacyQuery = await FirebaseFirestore.instance
             .collection('organisation')
             .where('username', isEqualTo: username)
-            .limit(1)
             .get();
 
-        if (legacyQuery.docs.isNotEmpty) {
-          final legacyDoc = legacyQuery.docs.first;
-          userData = legacyDoc.data();
-          dynamicPath = legacyDoc.id;
-          fullConfigPath = legacyDoc.reference.path;
-          debugPrint(
-            'Organisation_LoginPage: Logged in via legacy root fallback for $username',
-          );
+        for (var legacyDoc in legacyQuery.docs) {
+          final data = legacyDoc.data();
+          final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+          if (appId == FirestoreService.cstAppId || FirestoreService.isCstOrgId(legacyDoc.id) || data['is_cst_app'] == true) {
+            userData = data;
+            dynamicPath = legacyDoc.id;
+            fullConfigPath = legacyDoc.reference.path;
+            debugPrint(
+              'Organisation_LoginPage: Logged in via CST root fallback for $username',
+            );
+            break;
+          }
         }
       }
 

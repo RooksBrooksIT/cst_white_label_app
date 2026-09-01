@@ -484,6 +484,26 @@ class _PricingScreenState extends State<PricingScreen> {
           } catch (e) {
             debugPrint('Backend sync note for active upgrade: $e');
           }
+        } else {
+          try {
+            final orgPath = FirestoreService.subscriptionDoc.path.split('/')[1];
+            await PayUService.sendPlanInvoiceOnBackend(
+              orgId: orgPath,
+              planName: _selectedPlan,
+              planType: _selectedPlanType,
+              amount: amount,
+              payerEmail: widget.email,
+              payerName: widget.orgName.isEmpty
+                  ? widget.username
+                  : widget.orgName,
+              txnid: 'UPG_${DateTime.now().millisecondsSinceEpoch}',
+              paymentMethod: _selectedPlan == 'Free Trial'
+                  ? 'Free Trial Activation'
+                  : 'Direct Subscription',
+            );
+          } catch (e) {
+            debugPrint('Direct plan invoice dispatch note: $e');
+          }
         }
 
         if (mounted) {
@@ -801,6 +821,26 @@ class _PricingScreenState extends State<PricingScreen> {
           );
         } catch (backendError) {
           debugPrint('Backend subscription verification note: $backendError');
+        }
+      } else {
+        // Automatically dispatch Welcome / Subscription Invoice for Free Trial or Direct plan
+        try {
+          await PayUService.sendPlanInvoiceOnBackend(
+            orgId: orgId,
+            planName: _selectedPlan,
+            planType: _selectedPlanType,
+            amount: amount,
+            payerEmail: widget.email,
+            payerName: widget.orgName.isEmpty
+                ? widget.username
+                : widget.orgName,
+            txnid: 'TRIAL_${DateTime.now().millisecondsSinceEpoch}',
+            paymentMethod: _selectedPlan == 'Free Trial'
+                ? 'Free Trial Activation'
+                : 'Direct Subscription',
+          );
+        } catch (backendError) {
+          debugPrint('Free Trial invoice dispatch note: $backendError');
         }
       }
 

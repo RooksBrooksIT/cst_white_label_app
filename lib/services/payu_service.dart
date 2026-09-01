@@ -446,9 +446,63 @@ class PayUService {
     return false;
   }
 
+  /// Asynchronously request welcome / subscription invoice email delivery via Cloud Function
+  static Future<bool> sendPlanInvoiceOnBackend({
+    required String orgId,
+    required String planName,
+    required String planType,
+    required double amount,
+    String? payerEmail,
+    String? payerName,
+    String? txnid,
+    String? paymentMethod,
+  }) async {
+    final Map<String, dynamic> invoicePayload = {
+      'orgId': orgId,
+      'planName': planName,
+      'planType': planType,
+      'amount': amount,
+      'payerEmail': payerEmail,
+      'payerName': payerName,
+      'txnid': txnid ?? 'INV_${DateTime.now().millisecondsSinceEpoch}',
+      'paymentMethod': paymentMethod ?? (amount == 0 ? 'Free Trial Activation' : 'Direct'),
+    };
+
+    debugPrint('\n=================== SEND PLAN INVOICE REQUEST ===================');
+    debugPrint(const JsonEncoder.withIndent('  ').convert(invoicePayload));
+    debugPrint('==================================================================\n');
+
+    try {
+      final String endpointUrl = '$cloudFunctionsBaseUrl/sendNewSubscriptionInvoice';
+
+      final response = await http.post(
+        Uri.parse(endpointUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'data': invoicePayload}),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        debugPrint('\n=================== SEND PLAN INVOICE RESPONSE ===================');
+        debugPrint(const JsonEncoder.withIndent('  ').convert(decoded));
+        debugPrint('===================================================================\n');
+
+        final result = decoded['result'] ?? decoded;
+        if (result != null && result['success'] == true) {
+          return true;
+        }
+      }
+      debugPrint('PayUService: Backend invoice dispatch returned HTTP ${response.statusCode}');
+    } catch (e) {
+      debugPrint('PayUService: Backend invoice dispatch exception ($e)');
+    }
+    return false;
+  }
+
   /// Helper to generate unique transaction ID
   static String generateTxnId() {
     return 'PAYU_${DateTime.now().millisecondsSinceEpoch}';
   }
 }
+
 

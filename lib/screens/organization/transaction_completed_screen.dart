@@ -101,7 +101,7 @@ class TransactionCompletedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Your transaction has been verified and your workspace is now active.',
+                      'Your transaction has been verified, your workspace is active, and a detailed tax invoice has been sent to your email.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.7),

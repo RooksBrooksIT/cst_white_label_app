@@ -1241,23 +1241,19 @@ class _ProjectScreenState extends State<ProjectScreen>
                                   if (snapshot.hasData) {
                                     fetchedStates = snapshot.data!.docs
                                         .map(
-                                          (doc) =>
-                                              doc['projectState']
-                                                  as String,
+                                          (doc) {
+                                            final data = doc.data() as Map<String, dynamic>?;
+                                            return (data?['projectState'] ?? data?['projectStatus'])?.toString().trim() ?? '';
+                                          },
                                         )
+                                        .where((val) => val.isNotEmpty)
+                                        .toSet()
                                         .toList();
                                   }
-                                  final defaultStatuses = [
-                                    'Not Started',
-                                    'Ongoing',
-                                    'On Hold',
-                                    'Completed',
-                                    'Cancelled',
-                                  ];
-                                  for (var status in defaultStatuses) {
-                                    if (!fetchedStates.contains(status)) {
-                                      fetchedStates.add(status);
-                                    }
+                                  if (currentStatus != null &&
+                                      currentStatus!.isNotEmpty &&
+                                      !fetchedStates.contains(currentStatus)) {
+                                    fetchedStates.insert(0, currentStatus!);
                                   }
                                   String? dropdownValue =
                                       fetchedStates.contains(

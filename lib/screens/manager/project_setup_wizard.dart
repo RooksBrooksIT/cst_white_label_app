@@ -172,7 +172,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           // }
 
           _statuses = results[3].docs
-              .map((doc) => doc['projectState']?.toString() ?? '')
+              .map((doc) => (doc.data()['projectState'] ?? doc.data()['projectStatus'])?.toString().trim() ?? '')
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
@@ -200,17 +200,6 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           // Ensure supervisors are unique by ID
           final seenIds = <String>{};
           _supervisors.retainWhere((s) => seenIds.add(s['id']!));
-
-          if (_statuses.isEmpty) {
-            _statuses = [
-              'Started',
-              'Not Started',
-              'Ongoing',
-              'On Hold',
-              'Completed',
-              'Cancelled',
-            ];
-          }
 
           // if (_projectStagesList.isEmpty) {
           //   _projectStagesList = [
@@ -455,7 +444,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         'projectSubCategory': _projectSubCategory ?? '',
         'projectContract': _projectContract ?? '',
         'projectStage': _projectStage ?? '',
-        'currentStatus': _projectStatus ?? 'Planning',
+        'currentStatus':
+            _projectStatus ?? (_statuses.isNotEmpty ? _statuses.first : ''),
         'plannedStartDate': _siteStartDate != null
             ? Timestamp.fromDate(_siteStartDate!)
             : Timestamp.now(),
@@ -484,7 +474,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         'siteId': siteDocId,
         'createdAt': FieldValue.serverTimestamp(),
         'projectType': _siteProjectCategory ?? '',
-        'status': _projectStatus ?? 'Planning',
+        'status':
+            _projectStatus ?? (_statuses.isNotEmpty ? _statuses.first : ''),
       };
       await FirestoreService.getCollection(
         'projects',

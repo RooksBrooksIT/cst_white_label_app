@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: checks if a document is tagged with the CST application identifier
+    function isCstDoc(data) {
+      return data.app_id == 'cst_white_label' || data.appType == 'cst_white_label' || data.is_cst_app == true;
+    }
+
+    // Helper: checks if the organization ID is within the CST namespace
+    function isCstOrg(orgId) {
+      return orgId.matches('cst_.*') || orgId.matches('.*cst.*');
+    }
+
+    // ---------------------------------------------------------------------------
+    // Organisation Root & Tenant Isolation
+    // ---------------------------------------------------------------------------
+    match /organisation/{orgId} {
+      // CST app operations only access CST-namespaced organizations
+      allow read: if isCstOrg(orgId) || isCstDoc(resource.data) || resource == null;
+      allow create: if isCstOrg(orgId) || isCstDoc(request.resource.data);
+      allow update, delete: if isCstOrg(orgId) || isCstDoc(resource.data);
+
+      // Subcollections scoped under /organisation/{orgId}/...
+      match /{collectionName}/{docId} {
+        allow read, write: if isCstOrg(orgId) || request.auth != null;
+
+        match /{nestedSub=**} {
+          allow read, write: if isCstOrg(orgId) || request.auth != null;
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // In-App Notifications Collection Isolation
+    // ---------------------------------------------------------------------------
+    match /notifications/{notifId} {
+      allow read: if resource.data.app_id == 'cst_white_label' || resource == null;
+      allow create, update: if request.resource.data.app_id == 'cst_white_label';
+      allow delete: if resource.data.app_id == 'cst_white_label';
+    }
+
+    // ---------------------------------------------------------------------------
+    // Collection Group Queries ('data', 'admin', 'branding')
+    // ---------------------------------------------------------------------------
+    match /{path=**}/data/{docId} {
+      allow read: if resource.data.app_id == 'cst_white_label' || resource == null;
+      allow write: if request.resource.data.app_id == 'cst_white_label';
+    }
+  }
+}
