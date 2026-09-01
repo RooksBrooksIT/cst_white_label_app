@@ -515,18 +515,18 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   }) {
     final cs = Theme.of(context).colorScheme;
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       onChanged: onChanged,
       isExpanded: true,
       dropdownColor: cs.surfaceContainerHighest,
       style: TextStyle(color: cs.onSurface),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+        labelStyle: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
         prefixIcon: Icon(Icons.arrow_drop_down_circle_outlined, color: cs.primary),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
-        fillColor: cs.surface.withOpacity(0.05),
+        fillColor: cs.surface.withValues(alpha: 0.05),
       ),
       items: items.map((String item) {
         return DropdownMenuItem<String>(
@@ -548,9 +548,9 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: cs.surface.withOpacity(0.05),
+          color: cs.surface.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.onSurface.withOpacity(0.1)),
+          border: Border.all(color: cs.onSurface.withValues(alpha: 0.1)),
         ),
         child: Row(
           children: [
@@ -580,7 +580,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
         child: Column(
           children: [
             Container(
-              color: cs.primary.withOpacity(0.1),
+              color: cs.primary.withValues(alpha: 0.1),
               padding: EdgeInsets.symmetric(
                 vertical: Responsive.scaleV(context, 12),
                 horizontal: Responsive.scaleH(context, 8),

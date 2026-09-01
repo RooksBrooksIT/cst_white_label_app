@@ -2126,7 +2126,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          value: selectedId,
+          initialValue: selectedId,
           style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
           decoration: InputDecoration(
             labelText: label,
@@ -2176,7 +2176,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          value: _selectedMaterialName,
+          initialValue: _selectedMaterialName,
           style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
           decoration: InputDecoration(
             labelText: 'Select Material *',

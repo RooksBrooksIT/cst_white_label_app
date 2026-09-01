@@ -379,7 +379,7 @@ class _SupervisorWorkSchedulePageState
         final salary = (salaryRaw is int)
             ? salaryRaw
             : int.tryParse(salaryRaw?.toString() ?? '0') ?? 0;
-        return sum + (salary * (count as int));
+        return sum + (salary * (count));
       });
       final numberOfDays = _numberOfDays ?? 1;
       final grandTotalWithDays = grandTotal * numberOfDays;
@@ -744,7 +744,7 @@ class _SupervisorWorkSchedulePageState
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _selectedSiteId,
+            initialValue: _selectedSiteId,
             style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
             decoration: InputDecoration(
               labelText: 'Assigned Site',
@@ -1064,7 +1064,7 @@ class _SupervisorWorkSchedulePageState
             )
           else ...[
             DropdownButtonFormField<Map<String, dynamic>>(
-              value: _selectedLabour,
+              initialValue: _selectedLabour,
               isExpanded: true,
               style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
               decoration: InputDecoration(

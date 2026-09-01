@@ -25,7 +25,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   String? _selectedSiteName;
   List<Map<String, dynamic>> _sites = [];
   List<Map<String, dynamic>> _workers = [];
-  List<String> _assignedSiteNames = [];
+  final List<String> _assignedSiteNames = [];
 
   // Loading states
   bool _isLoadingSites = false;
@@ -314,7 +314,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         // Ensure we utilize workerId if available, fallback to a name-site combination
         final String workerId =
             worker['workerId']?.toString() ??
-            '${workerName}_${_selectedSiteName}';
+            '${workerName}_$_selectedSiteName';
         final String workerDocId = '${workerId}_$month';
         final docRef = FirestoreService.getCollection(
           'WorkerMonthlyAttendance',
@@ -612,7 +612,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DropdownButtonFormField<String>(
-            value: _selectedSiteId,
+            initialValue: _selectedSiteId,
             dropdownColor: Colors.white,
             style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
             decoration: InputDecoration(

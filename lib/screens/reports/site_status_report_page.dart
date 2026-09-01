@@ -110,7 +110,7 @@ class SiteStatusReportPage extends StatelessWidget {
                         Icon(
                           Icons.search_off,
                           size: 64,
-                          color: statusColor.withOpacity(0.5),
+                          color: statusColor.withValues(alpha: 0.5),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -141,7 +141,7 @@ class SiteStatusReportPage extends StatelessWidget {
                     horizontal: 16,
                   ),
                   itemCount: docs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  separatorBuilder: (_, _) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final data = docs[index].data() as Map<String, dynamic>;
                     final siteLocation =
@@ -169,7 +169,7 @@ class SiteStatusReportPage extends StatelessWidget {
     await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final pdfPrimaryColor = PdfColor.fromInt(
-      getStatusColor(context, status).value,
+      getStatusColor(context, status).toARGB32(),
     );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
@@ -204,7 +204,7 @@ class SiteStatusReportPage extends StatelessWidget {
           pw.Table.fromTextArray(
             headers: ['Project', 'Budget', 'Spent', 'Balance'],
             data: docs.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
+              final data = doc.data();
               final projectName = data['projectName']?.toString() ?? '-';
               final budget =
                   double.tryParse(data['projectBudget']?.toString() ?? '0') ??
@@ -324,7 +324,7 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
   Widget build(BuildContext context) {
     final details = widget.siteDetails;
     final balanceColor = getBalanceIndicatorColor(details);
-    final lighterStatusColor = widget.statusColor.withOpacity(0.1);
+    final lighterStatusColor = widget.statusColor.withValues(alpha: 0.1);
 
     String durationValue = '-';
     DateTime? start = parseDate(details['plannedStartDate']);
@@ -351,7 +351,7 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -398,7 +398,7 @@ class _ExpandableSiteTileState extends State<_ExpandableSiteTile> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       width: 2,
-                      color: balanceColor.withOpacity(0.5),
+                      color: balanceColor.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
@@ -574,9 +574,9 @@ class _FinancialInfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

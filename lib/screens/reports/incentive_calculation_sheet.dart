@@ -1017,7 +1017,7 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
 
   Future<void> _generatePdf() async {
     final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(_primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(_primaryColor.toARGB32());
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     pdf.addPage(

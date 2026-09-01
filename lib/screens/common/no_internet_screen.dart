@@ -101,7 +101,7 @@ class _NoInternetScreenState extends State<NoInternetScreen>
                                 Icon(
                                   Icons.wifi_off,
                                   size: 80,
-                                  color: primaryColor.withOpacity(0.2),
+                                  color: primaryColor.withValues(alpha: 0.2),
                                 ),
                                 Icon(
                                   Icons.wifi_off,
@@ -265,7 +265,7 @@ class ProfessionalJCBPainter extends CustomPainter {
   }
 
   void _drawClouds(Canvas canvas, Size size, double offset) {
-    final cloudPaint = Paint()..color = Colors.white.withOpacity(0.7);
+    final cloudPaint = Paint()..color = Colors.white.withValues(alpha: 0.7);
 
     // Cloud 1
     _drawCloud(canvas, Offset(offset + 50, 40), 40, cloudPaint);
@@ -274,14 +274,14 @@ class ProfessionalJCBPainter extends CustomPainter {
       canvas,
       Offset(offset - 80, 70),
       30,
-      cloudPaint..color = Colors.white.withOpacity(0.5),
+      cloudPaint..color = Colors.white.withValues(alpha: 0.5),
     );
     // Cloud 3
     _drawCloud(
       canvas,
       Offset(offset + 120, 55),
       25,
-      cloudPaint..color = Colors.white.withOpacity(0.6),
+      cloudPaint..color = Colors.white.withValues(alpha: 0.6),
     );
   }
 
@@ -377,7 +377,7 @@ class ProfessionalJCBPainter extends CustomPainter {
 
     // Body highlight
     final highlightPaint = Paint()
-      ..color = Colors.white.withOpacity(0.2)
+      ..color = Colors.white.withValues(alpha: 0.2)
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -428,7 +428,7 @@ class ProfessionalJCBPainter extends CustomPainter {
     double bucketRot,
   ) {
     final armPaint = Paint()
-      ..color = color.withOpacity(0.9)
+      ..color = color.withValues(alpha: 0.9)
       ..strokeWidth = 16
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -587,8 +587,8 @@ class ProfessionalJCBPainter extends CustomPainter {
 
     for (int i = 0; i < 8; i++) {
       final dustPaint = Paint()
-        ..color = Colors.grey.withOpacity(
-          opacity * (0.3 + random.nextDouble() * 0.4),
+        ..color = Colors.grey.withValues(
+          alpha: opacity * (0.3 + random.nextDouble() * 0.4),
         )
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
       final dx = (random.nextDouble() - 0.5) * 70;

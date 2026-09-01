@@ -233,7 +233,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       );
     }
     return DropdownButtonFormField<DateTime>(
-      value: availableUpdateDates.contains(selectedDate) ? selectedDate : null,
+      initialValue: availableUpdateDates.contains(selectedDate) ? selectedDate : null,
       items: availableUpdateDates.map((date) {
         return DropdownMenuItem(
           value: date,
@@ -639,7 +639,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          value: selectedSiteId,
+          initialValue: selectedSiteId,
           items: assignedSiteIds
               .map(
                 (siteId) => DropdownMenuItem(
@@ -975,7 +975,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          value: selectedMaterial,
+          initialValue: selectedMaterial,
           items: materialOptions
               .map(
                 (mat) => DropdownMenuItem(
@@ -1035,7 +1035,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          value: selectedUnit,
+          initialValue: selectedUnit,
           items: unitOptions
               .map(
                 (unit) => DropdownMenuItem(

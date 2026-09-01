@@ -215,11 +215,12 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         isLoadingMaterials = false;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           materialError = 'Failed to load materials';
           isLoadingMaterials = false;
         });
+      }
     }
   }
 
@@ -260,11 +261,12 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         isLoadingLabours = false;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           labourError = 'Failed to load labours';
           isLoadingLabours = false;
         });
+      }
     }
   }
 
@@ -442,10 +444,11 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       ).showSnackBar(const SnackBar(content: Text('Contractor entry saved')));
       _resetForm();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -544,7 +547,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                               }
                               return DropdownButtonFormField<String>(
                                 isExpanded: true,
-                                value: names.contains(_selectedContractorName)
+                                initialValue: names.contains(_selectedContractorName)
                                     ? _selectedContractorName
                                     : null,
                                 decoration: const InputDecoration(
@@ -600,7 +603,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                               ? const CircularProgressIndicator()
                               : DropdownButtonFormField<String>(
                                   isExpanded: true,
-                                  value: selectedMaterial,
+                                  initialValue: selectedMaterial,
                                   decoration: const InputDecoration(
                                     labelText: 'Select Material',
                                     border: OutlineInputBorder(),
@@ -672,7 +675,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                               ? const CircularProgressIndicator()
                               : DropdownButtonFormField<String>(
                                   isExpanded: true,
-                                  value: selectedLabour,
+                                  initialValue: selectedLabour,
                                   decoration: const InputDecoration(
                                     labelText: 'Select Labour',
                                     border: OutlineInputBorder(),

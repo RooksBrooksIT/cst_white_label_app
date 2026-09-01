@@ -47,7 +47,7 @@ class _DailySiteExpensesReportPageState
     DocumentSnapshot? filteredSupervisorDoc;
     if (supervisorDoc.exists) {
       if (widget.projectStage != null) {
-        final data = supervisorDoc.data() as Map<String, dynamic>?;
+        final data = supervisorDoc.data();
         final docStage = (data?['projectStage'] ?? data?['projectField'])
             ?.toString()
             .trim();
@@ -67,7 +67,7 @@ class _DailySiteExpensesReportPageState
     DocumentSnapshot? filteredManagerDoc;
     if (managerDoc.exists) {
       if (widget.projectStage != null) {
-        final data = managerDoc.data() as Map<String, dynamic>?;
+        final data = managerDoc.data();
         final docStage = (data?['projectStage'] ?? data?['projectField'])
             ?.toString()
             .trim();
@@ -211,10 +211,12 @@ class _DailySiteExpensesReportPageState
           child: FutureBuilder<Map<String, dynamic>>(
             future: _fetchAllReports(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
-              if (snapshot.hasError)
+              }
+              if (snapshot.hasError) {
                 return Center(child: Text('Error: ${snapshot.error}'));
+              }
 
               final data = snapshot.data!;
               final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
@@ -322,7 +324,7 @@ class _DailySiteExpensesReportPageState
           Text(
             'TOTAL DAILY EXPENDITURE',
             style: theme.textTheme.labelMedium?.copyWith(
-              color: cs.onPrimary.withOpacity(0.7),
+              color: cs.onPrimary.withValues(alpha: 0.7),
               letterSpacing: 1.2,
             ),
           ),
@@ -338,7 +340,7 @@ class _DailySiteExpensesReportPageState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: cs.onPrimary.withOpacity(0.1),
+              color: cs.onPrimary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -347,13 +349,13 @@ class _DailySiteExpensesReportPageState
                 Icon(
                   Icons.calendar_today,
                   size: 14,
-                  color: cs.onPrimary.withOpacity(0.7),
+                  color: cs.onPrimary.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   date,
                   style: TextStyle(
-                    color: cs.onPrimary.withOpacity(0.7),
+                    color: cs.onPrimary.withValues(alpha: 0.7),
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -462,8 +464,9 @@ class _DailySiteExpensesReportPageState
     List<DocumentSnapshot> entries,
   ) {
     num total = 0;
-    for (var doc in entries)
+    for (var doc in entries) {
       total += (doc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
+    }
 
     return GlassCard(
       child: Column(
@@ -562,15 +565,18 @@ class _DailySiteExpensesReportPageState
   num _calculateTotal(Map<String, dynamic> data) {
     num total = 0;
     final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
-    if (supervisorDoc != null)
+    if (supervisorDoc != null) {
       total +=
           (supervisorDoc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
+    }
 
     for (var doc
         in (data['managerEntries'] as List? ?? []).cast<DocumentSnapshot>()) {
       final bills =
           (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
-      for (var b in bills) total += _parseAmount(b['billAmount']);
+      for (var b in bills) {
+        total += _parseAmount(b['billAmount']);
+      }
     }
 
     for (var doc
@@ -578,7 +584,9 @@ class _DailySiteExpensesReportPageState
             .cast<DocumentSnapshot>()) {
       final bills =
           (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
-      for (var b in bills) total += _parseAmount(b['billAmount']);
+      for (var b in bills) {
+        total += _parseAmount(b['billAmount']);
+      }
     }
 
     for (var doc
@@ -608,7 +616,7 @@ class _DailySiteExpensesReportPageState
     await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final pdfPrimaryColor = PdfColor.fromInt(
-      Theme.of(context).primaryColor.value,
+      Theme.of(context).primaryColor.toARGB32(),
     );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
     final reportData = await _fetchAllReports();

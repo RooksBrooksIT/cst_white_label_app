@@ -9,8 +9,7 @@ import 'package:demo_cst/utils/responsive.dart';
 class CustomerWorkersSummary extends StatefulWidget {
   final String siteId;
 
-  const CustomerWorkersSummary({Key? key, required this.siteId})
-    : super(key: key);
+  const CustomerWorkersSummary({super.key, required this.siteId});
 
   @override
   _CustomerWorkersSummaryState createState() => _CustomerWorkersSummaryState();
@@ -258,7 +257,7 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
           width: 60,
           height: 60,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
             border: Border.all(color: color, width: 2),
           ),
@@ -379,7 +378,7 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
               label: Text(value, style: const TextStyle(fontSize: 12)),
               backgroundColor: Theme.of(
                 context,
-              ).colorScheme.primary.withOpacity(0.1),
+              ).colorScheme.primary.withValues(alpha: 0.1),
             )
           : null,
       onTap: onTap,
@@ -670,9 +669,9 @@ class _CustomerWorkersSummaryState extends State<CustomerWorkersSummary> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

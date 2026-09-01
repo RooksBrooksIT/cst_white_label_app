@@ -210,7 +210,7 @@ class _WorkerCalendarAvailabilityPageState
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.3),
+            color: colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -220,7 +220,7 @@ class _WorkerCalendarAvailabilityPageState
         children: [
           CircleAvatar(
             radius: 30,
-            backgroundColor: Colors.white.withOpacity(0.2),
+            backgroundColor: Colors.white.withValues(alpha: 0.2),
             child: Text(
               widget.workerName[0],
               style: const TextStyle(
@@ -246,7 +246,7 @@ class _WorkerCalendarAvailabilityPageState
                 Text(
                   widget.workerDesignation,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 14,
                   ),
                 ),
@@ -257,7 +257,7 @@ class _WorkerCalendarAvailabilityPageState
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -296,7 +296,7 @@ class _WorkerCalendarAvailabilityPageState
             fontWeight: FontWeight.bold,
           ),
           todayDecoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.1),
+            color: colorScheme.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           selectedDecoration: BoxDecoration(
@@ -374,19 +374,19 @@ class _WorkerCalendarAvailabilityPageState
             color: isSelected
                 ? colorScheme.primary
                 : isToday
-                ? colorScheme.primary.withOpacity(0.15)
-                : color.withOpacity(0.25),
+                ? colorScheme.primary.withValues(alpha: 0.15)
+                : color.withValues(alpha: 0.25),
             shape: BoxShape.circle,
             boxShadow: [
               if (hasStatus && !isOutside && !isSelected)
                 BoxShadow(
-                  color: color.withOpacity(0.3),
+                  color: color.withValues(alpha: 0.3),
                   blurRadius: 8,
                   spreadRadius: 1,
                 ),
               if (isSelected)
                 BoxShadow(
-                  color: colorScheme.primary.withOpacity(0.4),
+                  color: colorScheme.primary.withValues(alpha: 0.4),
                   blurRadius: 10,
                   spreadRadius: 2,
                 ),
@@ -395,8 +395,8 @@ class _WorkerCalendarAvailabilityPageState
               color: isSelected
                   ? Colors.white
                   : isToday
-                  ? colorScheme.primary.withOpacity(0.5)
-                  : color.withOpacity(isOutside ? 0.2 : 0.6),
+                  ? colorScheme.primary.withValues(alpha: 0.5)
+                  : color.withValues(alpha: isOutside ? 0.2 : 0.6),
               width: isSelected || isToday ? 2 : 1.5,
             ),
           ),
@@ -413,7 +413,7 @@ class _WorkerCalendarAvailabilityPageState
                     : isToday
                     ? colorScheme.primary
                     : isOutside
-                    ? Colors.grey.withOpacity(0.5)
+                    ? Colors.grey.withValues(alpha: 0.5)
                     : const Color(0xFF1E293B),
               ),
             ),
@@ -452,16 +452,16 @@ class _WorkerCalendarAvailabilityPageState
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(status).withOpacity(0.2),
+                  color: _getStatusColor(status).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _getStatusColor(status).withOpacity(0.5),
+                    color: _getStatusColor(status).withValues(alpha: 0.5),
                   ),
                 ),
                 child: Text(
                   status.toUpperCase(),
                   style: TextStyle(
-                    color: _getStatusColor(status).withOpacity(0.8),
+                    color: _getStatusColor(status).withValues(alpha: 0.8),
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),

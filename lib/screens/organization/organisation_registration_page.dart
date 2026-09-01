@@ -302,7 +302,7 @@ class _OrganisationRegistrationPageState
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -535,7 +535,7 @@ class _OrganisationRegistrationPageState
                         width: isDesktop ? 100.0 : 80.0,
                         height: 4.0,
                         decoration: BoxDecoration(
-                          color: _strengthColor.withOpacity(0.2),
+                          color: _strengthColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(2),
                         ),
                         child: FractionallySizedBox(

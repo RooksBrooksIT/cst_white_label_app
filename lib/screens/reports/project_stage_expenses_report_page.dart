@@ -362,7 +362,7 @@ class _ProjectStageExpensesReportPageState
 
   Future<void> _generatePdf() async {
     final pdfPrimaryColor = PdfColor.fromInt(
-      Theme.of(context).primaryColor.value,
+      Theme.of(context).primaryColor.toARGB32(),
     );
     try {
       final pdfBytes = await ProjectStagePdfHelper.buildExpenseRangeReport(

@@ -107,7 +107,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w400,
-                          color: secondaryTextColor.withOpacity(0.5),
+                          color: secondaryTextColor.withValues(alpha: 0.5),
                         ),
                       ),
                     ),
@@ -132,7 +132,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
         color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -165,7 +165,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: textColor.withOpacity(0.7),
+                      color: textColor.withValues(alpha: 0.7),
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -209,7 +209,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: theme.primaryColor.withOpacity(0.08),
+            color: theme.primaryColor.withValues(alpha: 0.08),
             blurRadius: 40,
             spreadRadius: 8,
           ),
@@ -222,7 +222,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
         errorBuilder: (context, error, stackTrace) => Icon(
           Icons.business_center_rounded,
           size: 90,
-          color: theme.primaryColor.withOpacity(0.5),
+          color: theme.primaryColor.withValues(alpha: 0.5),
         ),
       ),
     );
@@ -237,16 +237,16 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceVariant.withOpacity(0.2),
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
+              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
             ),
             child: Column(
               children: [
                 Icon(
                   Icons.lock_open_rounded,
                   size: 36,
-                  color: theme.primaryColor.withOpacity(0.7),
+                  color: theme.primaryColor.withValues(alpha: 0.7),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -279,7 +279,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
                 backgroundColor: theme.primaryColor,
                 foregroundColor: colorScheme.onPrimary,
                 elevation: 2,
-                shadowColor: theme.primaryColor.withOpacity(0.3),
+                shadowColor: theme.primaryColor.withValues(alpha: 0.3),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -304,16 +304,16 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceVariant.withOpacity(0.2),
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
+              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
             ),
             child: Column(
               children: [
                 Icon(
                   Icons.apartment_rounded,
                   size: 36,
-                  color: theme.primaryColor.withOpacity(0.7),
+                  color: theme.primaryColor.withValues(alpha: 0.7),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -347,7 +347,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
                 backgroundColor: theme.primaryColor,
                 foregroundColor: colorScheme.onPrimary,
                 elevation: 2,
-                shadowColor: theme.primaryColor.withOpacity(0.3),
+                shadowColor: theme.primaryColor.withValues(alpha: 0.3),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -383,7 +383,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
             Icon(
               Icons.qr_code_scanner_rounded,
               size: 22,
-              color: textColor.withOpacity(0.7),
+              color: textColor.withValues(alpha: 0.7),
             ),
             const SizedBox(width: 10),
             Text(
@@ -391,7 +391,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: textColor.withOpacity(0.8),
+                color: textColor.withValues(alpha: 0.8),
                 letterSpacing: 0.3,
               ),
             ),
@@ -399,7 +399,7 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
             Icon(
               Icons.arrow_forward_rounded,
               size: 18,
-              color: textColor.withOpacity(0.6),
+              color: textColor.withValues(alpha: 0.6),
             ),
           ],
         ),

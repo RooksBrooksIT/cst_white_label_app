@@ -14,7 +14,7 @@ class InventoryReportPdf {
     required List<Map<String, dynamic>> rows,
   }) async {
     final primaryColor = Theme.of(context).primaryColor;
-    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.toARGB32());
     final pdfBytes = await _buildPdf(title: title, rows: rows, primaryColor: pdfPrimaryColor);
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdfBytes,

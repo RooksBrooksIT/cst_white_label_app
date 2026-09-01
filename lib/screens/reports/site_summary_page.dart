@@ -415,7 +415,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                         Text(
                           'No project found for site ID: ${widget.siteId}',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: textColor.withOpacity(0.7)),
+                          style: TextStyle(color: textColor.withValues(alpha: 0.7)),
                         ),
                       ],
                     ),
@@ -629,10 +629,10 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                               Container(
                                 padding: EdgeInsets.all(20),
                                 decoration: BoxDecoration(
-                                  color: primaryColor.withOpacity(0.1),
+                                  color: primaryColor.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: primaryColor.withOpacity(0.3),
+                                    color: primaryColor.withValues(alpha: 0.3),
                                     width: 1,
                                   ),
                                 ),
@@ -671,7 +671,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                                     Text(
                                       '${(grandTotal / budget * 100).toStringAsFixed(1)}% of total budget',
                                       style: TextStyle(
-                                        color: textColor.withOpacity(0.7),
+                                        color: textColor.withValues(alpha: 0.7),
                                       ),
                                     ),
                                   ],
@@ -755,7 +755,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             title,
             style: TextStyle(
               fontWeight: FontWeight.w500,
-              color: textColor.withOpacity(0.7),
+              color: textColor.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(width: 12),
@@ -805,7 +805,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   'No expenses recorded',
-                  style: TextStyle(color: textColor.withOpacity(0.6)),
+                  style: TextStyle(color: textColor.withValues(alpha: 0.6)),
                 ),
               )
             else
@@ -919,7 +919,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
   }) async {
     await PdfTemplates.loadFonts();
     final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.toARGB32());
     final orgDetails = await PdfTemplates.fetchOrgDetails();
     final site = project['siteLocation']?.toString() ?? 'N/A';
     final projectName = project['projectName']?.toString() ?? 'N/A';
@@ -963,7 +963,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             children: [
               PdfTemplates.buildMetaBox(
                 'Budget',
-                '₹' + '${NumberFormat('#,##,###').format(budget)}',
+                '₹' NumberFormat('#,##,###').format(budget),
                 pdfPrimaryColor,
               ),
               PdfTemplates.buildMetaBox(
@@ -985,7 +985,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
               fontSize: 18,
               fontWeight: pw.FontWeight.bold,
               font: PdfTemplates.boldFont,
-              color: PdfColor.fromInt(primaryColor.value),
+              color: PdfColor.fromInt(primaryColor.toARGB32()),
             ),
           ),
           pw.SizedBox(height: 12),

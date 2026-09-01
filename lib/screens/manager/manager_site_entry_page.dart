@@ -879,7 +879,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                         border: Border.all(color: const Color(0xFFCBD5E1)),
                                       ),
                                       child: DropdownButtonFormField<String>(
-                                        value: selectedSiteId,
+                                        initialValue: selectedSiteId,
                                         isExpanded: true,
                                         dropdownColor: Colors.white,
                                         iconEnabledColor: const Color(0xFF0A183D),
@@ -1726,7 +1726,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         border: Border.all(color: const Color(0xFFCBD5E1)),
       ),
       child: DropdownButtonFormField<String>(
-        value: selectedMaterial,
+        initialValue: selectedMaterial,
         isExpanded: true,
         dropdownColor: Colors.white,
         iconEnabledColor: const Color(0xFF0A183D),
@@ -1784,7 +1784,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         border: Border.all(color: const Color(0xFFCBD5E1)),
       ),
       child: DropdownButtonFormField<String>(
-        value: selectedLabour,
+        initialValue: selectedLabour,
         isExpanded: true,
         dropdownColor: Colors.white,
         iconEnabledColor: const Color(0xFF0A183D),

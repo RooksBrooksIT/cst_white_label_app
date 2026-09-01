@@ -235,7 +235,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         color: colorScheme.primary,
         gradientColors: [
           colorScheme.primary,
-          colorScheme.primary.withOpacity(0.7),
+          colorScheme.primary.withValues(alpha: 0.7),
         ],
         items: [
           SubMenuItem(
@@ -274,7 +274,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         subtitle: "Financial reports and project analytics",
         icon: Icons.bar_chart_rounded,
         color: Colors.orange,
-        gradientColors: [Colors.orange, Colors.orange.withOpacity(0.7)],
+        gradientColors: [Colors.orange, Colors.orange.withValues(alpha: 0.7)],
         items: [
           SubMenuItem(
             title: 'Project Analytics',
@@ -312,7 +312,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
         subtitle: "Get help and view policies",
         icon: Icons.support_agent_rounded,
         color: Colors.teal,
-        gradientColors: [Colors.teal, Colors.teal.withOpacity(0.7)],
+        gradientColors: [Colors.teal, Colors.teal.withValues(alpha: 0.7)],
         items: [
           SubMenuItem(
             title: 'Privacy Policy',
@@ -415,7 +415,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [category.color, category.color.withOpacity(0.5)],
+                      colors: [category.color, category.color.withValues(alpha: 0.5)],
                     ),
                     borderRadius: BorderRadius.circular(4),
                   ),
@@ -449,7 +449,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: category.color.withOpacity(0.1),
+                    color: category.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -506,10 +506,10 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             color: theme.cardColor,
-            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+            border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 12,
                 spreadRadius: 1,
                 offset: const Offset(0, 4),
@@ -527,12 +527,12 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [item.color, item.color.withOpacity(0.7)],
+                      colors: [item.color, item.color.withValues(alpha: 0.7)],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: item.color.withOpacity(0.2),
+                        color: item.color.withValues(alpha: 0.2),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),

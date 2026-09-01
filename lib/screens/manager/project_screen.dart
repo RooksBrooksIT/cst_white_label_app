@@ -1437,11 +1437,13 @@ class _ProjectScreenState extends State<ProjectScreen>
                                   keyboardType: TextInputType.number,
                                   validator: (val) {
                                     if (!_isContractWork) return null;
-                                    if (val == null || val.trim().isEmpty)
+                                    if (val == null || val.trim().isEmpty) {
                                       return 'Required';
+                                    }
                                     final budget = double.tryParse(val);
-                                    if (budget == null)
+                                    if (budget == null) {
                                       return 'Invalid number';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -1592,16 +1594,19 @@ class _ProjectScreenState extends State<ProjectScreen>
                                 icon: Icons.currency_rupee_rounded,
                                 keyboardType: TextInputType.number,
                                 validator: (val) {
-                                  if (val == null || val.trim().isEmpty)
+                                  if (val == null || val.trim().isEmpty) {
                                     return 'Required';
+                                  }
                                   final budget = double.tryParse(val);
                                   final paid = double.tryParse(
                                     _amountPaidController.text,
                                   );
-                                  if (budget == null)
+                                  if (budget == null) {
                                     return 'Invalid number';
-                                  if (paid != null && budget < paid)
+                                  }
+                                  if (paid != null && budget < paid) {
                                     return 'Budget must be greater than Amount Received';
+                                  }
                                   return null;
                                 },
                                 readOnly: isUpdateMode,
@@ -1819,7 +1824,7 @@ class _ProjectScreenState extends State<ProjectScreen>
             ],
           ),
           child: DropdownButtonFormField<String>(
-            value: (value != null && uniqueItems.contains(value.trim()))
+            initialValue: (value != null && uniqueItems.contains(value.trim()))
                 ? value.trim()
                 : null,
             isExpanded: true,

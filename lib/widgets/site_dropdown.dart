@@ -24,13 +24,13 @@ class SiteDropdown extends StatelessWidget {
   final String label;
 
   const SiteDropdown({
-    Key? key,
+    super.key,
     required this.siteIds,
     required this.siteNameMap,
     required this.selectedSiteId,
     required this.onChanged,
     this.label = 'Select Site ID',
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +38,7 @@ class SiteDropdown extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
         isExpanded: true,
-      value: selectedSiteId,
+      initialValue: selectedSiteId,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),

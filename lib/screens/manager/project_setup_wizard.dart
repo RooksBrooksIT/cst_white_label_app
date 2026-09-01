@@ -689,7 +689,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                                       Theme.of(context).primaryColor,
                                       Theme.of(
                                         context,
-                                      ).primaryColor.withOpacity(0.7),
+                                      ).primaryColor.withValues(alpha: 0.7),
                                     ],
                                   )
                                 : null,
@@ -699,7 +699,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                                     BoxShadow(
                                       color: Theme.of(
                                         context,
-                                      ).primaryColor.withOpacity(0.3),
+                                      ).primaryColor.withValues(alpha: 0.3),
                                       blurRadius: 8,
                                       offset: const Offset(0, 3),
                                     ),
@@ -755,7 +755,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         color: theme.scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -775,7 +775,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  side: BorderSide(color: primaryColor.withOpacity(0.3)),
+                  side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
                   foregroundColor: primaryColor,
                 ),
               ),
@@ -821,7 +821,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 elevation: 2,
-                shadowColor: primaryColor.withOpacity(0.5),
+                shadowColor: primaryColor.withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -897,7 +897,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       side: BorderSide(
-                        color: Theme.of(context).primaryColor.withOpacity(0.5),
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.5),
                       ),
                     ),
                     icon: _isGettingLocation
@@ -1007,13 +1007,13 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Theme.of(context).primaryColor.withOpacity(0.1),
-                        Theme.of(context).primaryColor.withOpacity(0.05),
+                        Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                        Theme.of(context).primaryColor.withValues(alpha: 0.05),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Theme.of(context).primaryColor.withOpacity(0.2),
+                      color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Row(
@@ -1023,7 +1023,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                         decoration: BoxDecoration(
                           color: Theme.of(
                             context,
-                          ).primaryColor.withOpacity(0.1),
+                          ).primaryColor.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -1177,9 +1177,9 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
             ),
             child: Column(
               children: [
@@ -1270,7 +1270,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       trailing: Switch(
         value: _isContractWork,
         onChanged: (v) => setState(() => _isContractWork = v),
-        activeColor: Theme.of(context).primaryColor,
+        activeThumbColor: Theme.of(context).primaryColor,
       ),
       children: [
         if (!_isContractWork)
@@ -1400,12 +1400,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.green.shade900.withOpacity(0.2),
-            Colors.green.shade800.withOpacity(0.05),
+            Colors.green.shade900.withValues(alpha: 0.2),
+            Colors.green.shade800.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.green.shade700.withOpacity(0.2)),
+        border: Border.all(color: Colors.green.shade700.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -1416,7 +1416,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade700.withOpacity(0.2),
+                    color: Colors.green.shade700.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -1442,7 +1442,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                         'Review your configuration before saving',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.green.shade100.withOpacity(0.6),
+                          color: Colors.green.shade100.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -1501,7 +1501,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                           0,
                           0,
                           0,
-                        ).withOpacity(0.8),
+                        ).withValues(alpha: 0.8),
                         height: 1.4,
                       ),
                     ),
@@ -1566,12 +1566,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1587,7 +1587,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                    color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(

@@ -419,7 +419,7 @@ class _ProjectStageDailySiteExpensesReportPageState
           Icon(
             Icons.receipt_long_outlined,
             size: 64,
-            color: Colors.grey.withOpacity(0.5),
+            color: Colors.grey.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -606,11 +606,12 @@ class _ProjectStageDailySiteExpensesReportPageState
     if (supervisorData == null &&
         managerEntries.isEmpty &&
         orgEntries.isEmpty &&
-        contractorEntries.isEmpty)
+        contractorEntries.isEmpty) {
       return;
+    }
 
     final pdfPrimaryColor = PdfColor.fromInt(
-      Theme.of(context).primaryColor.value,
+      Theme.of(context).primaryColor.toARGB32(),
     );
     final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
 

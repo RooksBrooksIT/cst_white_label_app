@@ -154,10 +154,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 height: Responsive.isMobile(context) ? 100 : 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: colorScheme.primary.withOpacity(0.1),
+                  color: colorScheme.primary.withValues(alpha: 0.1),
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.15),
+                      color: colorScheme.primary.withValues(alpha: 0.15),
                       blurRadius: 40,
                       spreadRadius: 5,
                     ),

@@ -1588,7 +1588,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   ),
                 )
               : DropdownButtonFormField<String>(
-                  value: selectedId,
+                  initialValue: selectedId,
                   isExpanded: true,
                   dropdownColor: Colors.white,
                   borderRadius: BorderRadius.circular(14),
@@ -1687,7 +1687,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   ),
                 )
               : DropdownButtonFormField<String>(
-                  value: _selectedMaterialName,
+                  initialValue: _selectedMaterialName,
                   isExpanded: true,
                   dropdownColor: Colors.white,
                   borderRadius: BorderRadius.circular(14),
