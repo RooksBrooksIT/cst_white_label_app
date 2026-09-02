@@ -3,6 +3,28 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 
+class OrganizationValidationResult {
+  final bool isValid;
+  final String? errorMessage;
+  final bool isOrgNameDuplicate;
+  final bool isEmailDuplicate;
+  final bool isPhoneDuplicate;
+  final bool isUsernameDuplicate;
+  final Map<String, dynamic>? pendingData;
+  final String? pendingOrgId;
+
+  const OrganizationValidationResult({
+    required this.isValid,
+    this.errorMessage,
+    this.isOrgNameDuplicate = false,
+    this.isEmailDuplicate = false,
+    this.isPhoneDuplicate = false,
+    this.isUsernameDuplicate = false,
+    this.pendingData,
+    this.pendingOrgId,
+  });
+}
+
 class FirestoreService {
   static final FirestoreService _instance = FirestoreService._internal();
   factory FirestoreService() => _instance;
@@ -383,70 +405,166 @@ class FirestoreService {
     }
   }
 
+  /// Checks if an organization name is unique across all CST organizations.
+  static Future<bool> isOrgNameUnique(String orgName) async {
+    final clean = orgName.trim();
+    if (clean.isEmpty) return true;
+    final cleanLower = clean.toLowerCase();
+    final cleanNoSpace = cleanLower.replaceAll(' ', '');
+
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('organisation').get();
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final docOrgName = (data['org_name'] ?? data['orgName'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final docOrgNoSpace = docOrgName.replaceAll(' ', '');
+        final docId = doc.id.toLowerCase();
+
+        if (docOrgName == cleanLower ||
+            docOrgNoSpace == cleanNoSpace ||
+            docId.startsWith('cst_${cleanNoSpace}_') ||
+            docId == 'cst_$cleanNoSpace') {
+          return false;
+        }
+      }
+      return true;
+    } catch (e) {
+      debugPrint('isOrgNameUnique error: $e');
+      return true;
+    }
+  }
+
   /// Checks if an email is unique across all CST organizations.
   static Future<bool> isEmailUnique(String email) async {
+    final clean = email.trim().toLowerCase();
+    if (clean.isEmpty) return true;
+
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('data')
-          .where('email', isEqualTo: email)
-          .get();
-
-      final cstMatches = snapshot.docs.where((doc) {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('organisation').get();
+      for (var doc in snapshot.docs) {
         final data = doc.data();
-        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-        final orgDocId = doc.reference.parent.parent?.id ?? '';
-        return appId == cstAppId || isCstOrgId(orgDocId) || data['is_cst_app'] == true;
-      });
-
-      return cstMatches.isEmpty;
+        final docEmail =
+            (data['email'] ?? '').toString().trim().toLowerCase();
+        if (docEmail == clean) {
+          return false;
+        }
+      }
+      return true;
     } catch (e) {
-      debugPrint('Error checking email uniqueness: $e');
-      rethrow;
+      debugPrint('isEmailUnique error: $e');
+      return true;
     }
   }
 
   /// Checks if a phone number is unique across all CST organizations.
   static Future<bool> isPhoneUnique(String phone) async {
+    final clean = phone.trim();
+    if (clean.isEmpty) return true;
+
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('data')
-          .where('phone', isEqualTo: phone)
-          .get();
-
-      final cstMatches = snapshot.docs.where((doc) {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('organisation').get();
+      for (var doc in snapshot.docs) {
         final data = doc.data();
-        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-        final orgDocId = doc.reference.parent.parent?.id ?? '';
-        return appId == cstAppId || isCstOrgId(orgDocId) || data['is_cst_app'] == true;
-      });
-
-      return cstMatches.isEmpty;
+        final docPhone = (data['phone'] ??
+                data['phoneNumber'] ??
+                data['mobile'] ??
+                '')
+            .toString()
+            .trim();
+        if (docPhone == clean) {
+          return false;
+        }
+      }
+      return true;
     } catch (e) {
-      debugPrint('Error checking phone uniqueness: $e');
-      rethrow;
+      debugPrint('isPhoneUnique error: $e');
+      return true;
     }
   }
 
   /// Checks if a username is unique across all CST organizations.
   static Future<bool> isUsernameUnique(String username) async {
+    final clean = username.trim().toLowerCase();
+    if (clean.isEmpty) return true;
+
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('data')
-          .where('username', isEqualTo: username.toLowerCase())
-          .get();
-
-      final cstMatches = snapshot.docs.where((doc) {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('organisation').get();
+      for (var doc in snapshot.docs) {
         final data = doc.data();
-        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-        final orgDocId = doc.reference.parent.parent?.id ?? '';
-        return appId == cstAppId || isCstOrgId(orgDocId) || data['is_cst_app'] == true;
-      });
-
-      return cstMatches.isEmpty;
+        final docUsername =
+            (data['username'] ?? '').toString().trim().toLowerCase();
+        if (docUsername == clean) {
+          return false;
+        }
+      }
+      return true;
     } catch (e) {
-      debugPrint('Error checking username uniqueness: $e');
-      rethrow;
+      debugPrint('isUsernameUnique error: $e');
+      return true;
     }
+  }
+
+  /// Validates all 4 organization registration fields simultaneously.
+  static Future<OrganizationValidationResult> validateOrganizationRegistration({
+    required String orgName,
+    required String email,
+    required String phone,
+    required String username,
+  }) async {
+    final cleanOrgName = orgName.trim();
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPhone = phone.trim();
+    final cleanUsername = username.trim().toLowerCase();
+
+    final results = await Future.wait([
+      isOrgNameUnique(cleanOrgName),
+      isEmailUnique(cleanEmail),
+      isPhoneUnique(cleanPhone),
+      isUsernameUnique(cleanUsername),
+    ]);
+
+    final bool isOrgNameUniqueVal = results[0];
+    final bool isEmailUniqueVal = results[1];
+    final bool isPhoneUniqueVal = results[2];
+    final bool isUsernameUniqueVal = results[3];
+
+    if (!isOrgNameUniqueVal ||
+        !isEmailUniqueVal ||
+        !isPhoneUniqueVal ||
+        !isUsernameUniqueVal) {
+      String errorMessage = '';
+      if (!isOrgNameUniqueVal) {
+        errorMessage =
+            'Organization Name "$cleanOrgName" already exists. Please choose a different name.';
+      } else if (!isEmailUniqueVal) {
+        errorMessage =
+            'Email Address "$cleanEmail" is already registered. Please use a different email or log in.';
+      } else if (!isPhoneUniqueVal) {
+        errorMessage =
+            'Mobile Number "$cleanPhone" is already registered. Please use a different mobile number.';
+      } else if (!isUsernameUniqueVal) {
+        errorMessage =
+            'Admin Username "$cleanUsername" is already taken. Please choose a different username.';
+      }
+
+      return OrganizationValidationResult(
+        isValid: false,
+        errorMessage: errorMessage,
+        isOrgNameDuplicate: !isOrgNameUniqueVal,
+        isEmailDuplicate: !isEmailUniqueVal,
+        isPhoneDuplicate: !isPhoneUniqueVal,
+        isUsernameDuplicate: !isUsernameUniqueVal,
+      );
+    }
+
+    return const OrganizationValidationResult(isValid: true);
   }
 
   /// Persist initial organization registration details immediately into Firestore

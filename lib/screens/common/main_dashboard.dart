@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/screens/customer/customer_login_page.dart';
 import 'package:demo_cst/screens/organization/organisation_login_page.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_login_page.dart';
 import 'package:demo_cst/screens/common/config_login.dart';
@@ -92,13 +91,6 @@ class _MainDashboardState extends State<MainDashboard> {
         accentColor: const Color(0xFF10B981),
         destination: const SupervisorLoginPage(),
       ),
-      _RoleItem(
-        title: 'Customer',
-        subtitle: 'View your live project status & reports',
-        icon: Icons.person_rounded,
-        accentColor: const Color(0xFF06B6D4),
-        destination: const CustomerLoginPage(),
-      ),
     ];
 
     final appTitle = _isFromReferral ? (_orgName ?? 'eBricks') : 'eBricks';
@@ -117,10 +109,10 @@ class _MainDashboardState extends State<MainDashboard> {
                 final screenWidth = constraints.maxWidth;
                 final isDesktop = screenWidth >= 900;
                 final isTablet = screenWidth >= 600 && screenWidth < 900;
-                final crossAxisCount = isDesktop ? 4 : (isTablet ? 4 : 2);
+                final crossAxisCount = isDesktop ? 3 : (isTablet ? 3 : (screenWidth < 360 ? 1 : 2));
                 final containerMaxWidth = isDesktop
                     ? 960.0
-                    : (isTablet ? 760.0 : 500.0);
+                    : (isTablet ? 760.0 : 520.0);
 
                 return Align(
                   alignment: Alignment.topCenter,
@@ -172,9 +164,9 @@ class _MainDashboardState extends State<MainDashboard> {
                                     color: const Color(0xFF0A183D).withValues(alpha: 0.06),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Text(
-                                    '4 Portals',
-                                    style: TextStyle(
+                                  child: Text(
+                                    '${roleItems.length} Portals',
+                                    style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFF0A183D),

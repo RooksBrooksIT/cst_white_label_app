@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
@@ -45,6 +46,24 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
 
   bool _isPasswordVisible = false;
   bool _isSubmitting = false;
+
+  // Real-time debounced validation states
+  Timer? _usernameDebounceTimer;
+  Timer? _contactNoDebounceTimer;
+  Timer? _emailDebounceTimer;
+  Timer? _fullNameDebounceTimer;
+
+  bool _isCheckingUsername = false;
+  String? _usernameError;
+
+  bool _isCheckingContactNo = false;
+  String? _contactNoError;
+
+  bool _isCheckingEmail = false;
+  String? _emailError;
+
+  bool _isCheckingFullName = false;
+  String? _fullNameError;
 
   // Directory Search & Filter
   String _searchQuery = '';
@@ -99,37 +118,210 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     }
   }
 
+  // ── UNIQUENESS CHECKS AGAINST BACKEND/DATABASE ─────────────────────────
+
   Future<bool> _isUsernameUnique(String username, {String? excludeDocId}) async {
+    if (username.trim().isEmpty) return true;
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'manager',
-      ).where('UserName', isEqualTo: username.trim()).get();
-      if (excludeDocId != null) {
-        return querySnapshot.docs.every((doc) => doc.id == excludeDocId);
+      final snapshot = await FirestoreService.getCollection('manager').get();
+      final cleanInput = username.trim().toLowerCase();
+      for (var doc in snapshot.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) continue;
+        final data = doc.data();
+        final existing = (data['UserName'] ?? data['username'] ?? '').toString().trim().toLowerCase();
+        if (existing.isNotEmpty && existing == cleanInput) return false;
       }
-      return querySnapshot.docs.isEmpty;
+      return true;
     } catch (e) {
-      return false;
+      debugPrint('Error checking username uniqueness: $e');
+      return true;
     }
   }
 
   Future<bool> _isContactNoUnique(String contactNo, {String? excludeDocId}) async {
+    if (contactNo.trim().isEmpty) return true;
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'manager',
-      ).where('ContactNo', isEqualTo: contactNo.trim()).get();
-      if (excludeDocId != null) {
-        return querySnapshot.docs.every((doc) => doc.id == excludeDocId);
+      final snapshot = await FirestoreService.getCollection('manager').get();
+      final cleanInput = contactNo.trim().replaceAll(RegExp(r'\D'), '');
+      for (var doc in snapshot.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) continue;
+        final data = doc.data();
+        final existing = (data['ContactNo'] ?? data['contactNo'] ?? data['phone'] ?? '').toString().trim().replaceAll(RegExp(r'\D'), '');
+        if (existing.isNotEmpty && cleanInput.isNotEmpty && existing == cleanInput) return false;
       }
-      return querySnapshot.docs.isEmpty;
+      return true;
     } catch (e) {
-      return false;
+      debugPrint('Error checking contactNo uniqueness: $e');
+      return true;
     }
+  }
+
+  Future<bool> _isEmailUnique(String email, {String? excludeDocId}) async {
+    if (email.trim().isEmpty) return true;
+    try {
+      final snapshot = await FirestoreService.getCollection('manager').get();
+      final cleanInput = email.trim().toLowerCase();
+      for (var doc in snapshot.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) continue;
+        final data = doc.data();
+        final existing = (data['Email'] ?? data['email'] ?? '').toString().trim().toLowerCase();
+        if (existing.isNotEmpty && cleanInput.isNotEmpty && existing == cleanInput) return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error checking email uniqueness: $e');
+      return true;
+    }
+  }
+
+  Future<bool> _isFullNameUnique(String fullName, {String? excludeDocId}) async {
+    if (fullName.trim().isEmpty) return true;
+    try {
+      final snapshot = await FirestoreService.getCollection('manager').get();
+      final cleanInput = fullName.trim().toLowerCase();
+      for (var doc in snapshot.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) continue;
+        final data = doc.data();
+        final existing = (data['FullName'] ?? data['fullName'] ?? data['name'] ?? '').toString().trim().toLowerCase();
+        if (existing.isNotEmpty && existing == cleanInput) return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error checking fullName uniqueness: $e');
+      return true;
+    }
+  }
+
+  // ── REAL-TIME DEBOUNCED INPUT HANDLERS ─────────────────────────────────
+
+  void _onFullNameChanged(String value) {
+    _fullNameDebounceTimer?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _isCheckingFullName = false;
+        _fullNameError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingFullName = true;
+      _fullNameError = null;
+    });
+
+    _fullNameDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final isUnique = await _isFullNameUnique(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _isCheckingFullName = false;
+        if (!isUnique) {
+          _fullNameError = 'Full name already exists. Please use a unique name.';
+        } else {
+          _fullNameError = null;
+        }
+      });
+    });
+  }
+
+  void _onUsernameChanged(String value) {
+    _usernameDebounceTimer?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingUsername = true;
+      _usernameError = null;
+    });
+
+    _usernameDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final isUnique = await _isUsernameUnique(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _isCheckingUsername = false;
+        if (!isUnique) {
+          _usernameError = 'Username already exists. Please use a different name.';
+        } else {
+          _usernameError = null;
+        }
+      });
+    });
+  }
+
+  void _onContactNoChanged(String value) {
+    _contactNoDebounceTimer?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _isCheckingContactNo = false;
+        _contactNoError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingContactNo = true;
+      _contactNoError = null;
+    });
+
+    _contactNoDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final isUnique = await _isContactNoUnique(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _isCheckingContactNo = false;
+        if (!isUnique) {
+          _contactNoError = 'Phone number already exists. Please use another phone number.';
+        } else {
+          _contactNoError = null;
+        }
+      });
+    });
+  }
+
+  void _onEmailChanged(String value) {
+    _emailDebounceTimer?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _isCheckingEmail = false;
+        _emailError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingEmail = true;
+      _emailError = null;
+    });
+
+    _emailDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final isUnique = await _isEmailUnique(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _isCheckingEmail = false;
+        if (!isUnique) {
+          _emailError = 'Mail ID already exists. Please use another mail.';
+        } else {
+          _emailError = null;
+        }
+      });
+    });
   }
 
   Future<void> _validateAndSubmit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_isSubmitting) return;
+
+    if (_fullNameError != null || _usernameError != null || _contactNoError != null || _emailError != null) {
+      _showErrorSnackBar('Please resolve duplicate field errors before saving.');
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -149,19 +341,35 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
         return;
       }
 
+      final fullName = _fullNameController.text.trim();
       final username = _userNameController.text.trim();
       final contactNo = _contactNoController.text.trim();
+      final email = _emailController.text.trim();
+
+      if (!(await _isFullNameUnique(fullName))) {
+        setState(() => _fullNameError = 'Full name already exists. Please use a unique name.');
+        _showErrorSnackBar('Full name "$fullName" already exists. Please use a unique name.');
+        setState(() => _isSubmitting = false);
+        return;
+      }
 
       if (!(await _isUsernameUnique(username))) {
-        _showErrorSnackBar('Username "$username" is already taken.');
+        setState(() => _usernameError = 'Username already exists. Please use a different name.');
+        _showErrorSnackBar('Username "$username" already exists. Please use a different name.');
         setState(() => _isSubmitting = false);
         return;
       }
 
       if (!(await _isContactNoUnique(contactNo))) {
-        _showErrorSnackBar(
-          'Contact number "$contactNo" is already registered.',
-        );
+        setState(() => _contactNoError = 'Phone number already exists. Please use another phone number.');
+        _showErrorSnackBar('Phone number "$contactNo" already exists. Please use another phone number.');
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      if (email.isNotEmpty && !(await _isEmailUnique(email))) {
+        setState(() => _emailError = 'Mail ID already exists. Please use another mail.');
+        _showErrorSnackBar('Mail ID "$email" already exists. Please use another mail.');
         setState(() => _isSubmitting = false);
         return;
       }
@@ -345,6 +553,14 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     setState(() {
       _selectedDesignation = null;
       _selectedDepartment = null;
+      _usernameError = null;
+      _contactNoError = null;
+      _emailError = null;
+      _fullNameError = null;
+      _isCheckingUsername = false;
+      _isCheckingContactNo = false;
+      _isCheckingEmail = false;
+      _isCheckingFullName = false;
     });
   }
 
@@ -612,12 +828,34 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                                   if (!editFormKey.currentState!.validate()) return;
                                   setModalState(() => isSaving = true);
                                   try {
+                                    final editContact = editContactNoController.text.trim();
+                                    final editEmail = editEmailController.text.trim();
+                                    final editName = editFullNameController.text.trim();
+
+                                    if (editName.isNotEmpty && !(await _isFullNameUnique(editName, excludeDocId: docId))) {
+                                      setModalState(() => isSaving = false);
+                                      _showErrorSnackBar('Full name "$editName" already exists. Please use a unique name.');
+                                      return;
+                                    }
+
+                                    if (!(await _isContactNoUnique(editContact, excludeDocId: docId))) {
+                                      setModalState(() => isSaving = false);
+                                      _showErrorSnackBar('Phone number "$editContact" already exists. Please use another phone number.');
+                                      return;
+                                    }
+
+                                    if (editEmail.isNotEmpty && !(await _isEmailUnique(editEmail, excludeDocId: docId))) {
+                                      setModalState(() => isSaving = false);
+                                      _showErrorSnackBar('Mail ID "$editEmail" already exists. Please use another mail.');
+                                      return;
+                                    }
+
                                     await FirestoreService.getCollection('manager').doc(docId).update({
-                                      'FullName': editFullNameController.text.trim(),
+                                      'FullName': editName,
                                       'Designation': editDesignation,
                                       'Department': editDepartment,
-                                      'ContactNo': editContactNoController.text.trim(),
-                                      'Email': editEmailController.text.trim(),
+                                      'ContactNo': editContact,
+                                      'Email': editEmail,
                                       'Status': editStatus,
                                     });
                                     if (context.mounted) {
@@ -689,6 +927,10 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
 
   @override
   void dispose() {
+    _usernameDebounceTimer?.cancel();
+    _contactNoDebounceTimer?.cancel();
+    _emailDebounceTimer?.cancel();
+    _fullNameDebounceTimer?.cancel();
     _tabController?.dispose();
     _fullNameController.dispose();
     _userNameController.dispose();
@@ -919,6 +1161,11 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               icon: Icons.person_outline_rounded,
               hint: 'e.g. John Doe',
               isDesktop: isDesktop,
+              onChanged: _onFullNameChanged,
+              isChecking: _isCheckingFullName,
+              checkingText: 'Checking name availability...',
+              errorText: _fullNameError,
+              successText: 'Full name is available ✓',
             ),
             SizedBox(height: isDesktop ? 16.0 : 14.0),
             _buildTextField(
@@ -928,6 +1175,11 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               icon: Icons.alternate_email_rounded,
               hint: 'e.g. johndoe01',
               isDesktop: isDesktop,
+              onChanged: _onUsernameChanged,
+              isChecking: _isCheckingUsername,
+              checkingText: 'Checking username...',
+              errorText: _usernameError,
+              successText: 'Username is available ✓',
             ),
             SizedBox(height: isDesktop ? 16.0 : 14.0),
             _buildTextField(
@@ -988,6 +1240,11 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               icon: Icons.phone_android_rounded,
               hint: 'e.g. 9876543210',
               isDesktop: isDesktop,
+              onChanged: _onContactNoChanged,
+              isChecking: _isCheckingContactNo,
+              checkingText: 'Checking phone number...',
+              errorText: _contactNoError,
+              successText: 'Phone number is available ✓',
             ),
             SizedBox(height: isDesktop ? 16.0 : 14.0),
             _buildTextField(
@@ -997,6 +1254,11 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               icon: Icons.email_outlined,
               hint: 'e.g. manager@company.com',
               isDesktop: isDesktop,
+              onChanged: _onEmailChanged,
+              isChecking: _isCheckingEmail,
+              checkingText: 'Checking email...',
+              errorText: _emailError,
+              successText: 'Mail ID is available ✓',
             ),
             SizedBox(height: isDesktop ? 28.0 : 22.0),
             _buildActionButtons(isDesktop, isTablet, isMobile),
@@ -1059,7 +1321,16 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     IconData? icon,
     String? hint,
     required bool isDesktop,
+    ValueChanged<String>? onChanged,
+    bool isChecking = false,
+    String checkingText = 'Checking availability...',
+    String? errorText,
+    String? successText,
   }) {
+    final hasValue = controller.text.trim().isNotEmpty;
+    final hasError = errorText != null && errorText.isNotEmpty;
+    final isSuccess = hasValue && !isChecking && !hasError && successText != null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1076,6 +1347,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
           controller: controller,
           obscureText: isPassword && !_isPasswordVisible,
           keyboardType: keyboardType,
+          onChanged: onChanged,
           style: const TextStyle(
             color: Color(0xFF0A183D),
             fontWeight: FontWeight.w600,
@@ -1084,7 +1356,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
           decoration: InputDecoration(
             prefixIcon: Icon(
               icon,
-              color: primaryColor,
+              color: hasError
+                  ? const Color(0xFFDC2626)
+                  : (isSuccess ? const Color(0xFF16A34A) : primaryColor),
               size: 20.0,
             ),
             suffixIcon: isPassword
@@ -1099,7 +1373,23 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                       () => _isPasswordVisible = !_isPasswordVisible,
                     ),
                   )
-                : null,
+                : (isChecking
+                    ? const Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF64748B)),
+                          ),
+                        ),
+                      )
+                    : (hasError
+                        ? const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 20)
+                        : (isSuccess
+                            ? const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20)
+                            : null))),
             hintText: hint ?? 'Enter $label',
             hintStyle: TextStyle(
               color: Colors.grey.shade400,
@@ -1111,25 +1401,96 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFFCBD5E1),
+              borderSide: BorderSide(
+                color: hasError ? const Color(0xFFDC2626) : const Color(0xFFCBD5E1),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFFCBD5E1),
+              borderSide: BorderSide(
+                color: hasError
+                    ? const Color(0xFFDC2626)
+                    : (isSuccess ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1)),
+                width: (hasError || isSuccess) ? 1.5 : 1.0,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: primaryColor, width: 1.8),
+              borderSide: BorderSide(
+                color: hasError ? const Color(0xFFDC2626) : primaryColor,
+                width: 1.8,
+              ),
             ),
           ),
-          validator: (value) => (isRequired && (value == null || value.trim().isEmpty))
-              ? '$label is required'
-              : null,
+          validator: (value) {
+            if (isRequired && (value == null || value.trim().isEmpty)) {
+              return '$label is required';
+            }
+            if (errorText != null) {
+              return errorText;
+            }
+            return null;
+          },
         ),
+        if (hasValue && (isChecking || hasError || isSuccess))
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Row(
+              children: [
+                if (isChecking) ...[
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.8,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF64748B)),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    checkingText,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ] else if (hasError) ...[
+                  const Icon(
+                    Icons.cancel_rounded,
+                    size: 13,
+                    color: Color(0xFFDC2626),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      errorText,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ] else if (isSuccess) ...[
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    size: 13,
+                    color: Color(0xFF16A34A),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    successText,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
       ],
     );
   }
