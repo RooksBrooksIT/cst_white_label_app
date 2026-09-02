@@ -4,24 +4,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/manager/project_setup_wizard.dart';
 import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
-import 'package:demo_cst/screens/reports/insights_dashboard.dart';
-import 'package:demo_cst/screens/organization/org_menu_screen.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/responsive.dart';
 
-class OrgSitesListPage extends StatefulWidget {
+class ManagerSitesListPage extends StatefulWidget {
   final String initialFilter;
 
-  const OrgSitesListPage({
+  const ManagerSitesListPage({
     super.key,
     this.initialFilter = 'All',
   });
 
   @override
-  State<OrgSitesListPage> createState() => _OrgSitesListPageState();
+  State<ManagerSitesListPage> createState() => _ManagerSitesListPageState();
 }
 
-class _OrgSitesListPageState extends State<OrgSitesListPage> {
+class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late String _selectedStatus;
@@ -44,10 +42,12 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
     if (!_statusTabs.any((t) => t.toLowerCase() == _selectedStatus.toLowerCase())) {
       _selectedStatus = 'All';
     } else {
-      _selectedStatus = _statusTabs.firstWhere(
+      // Find matching case
+      final match = _statusTabs.firstWhere(
         (t) => t.toLowerCase() == _selectedStatus.toLowerCase(),
         orElse: () => 'All',
       );
+      _selectedStatus = match;
     }
   }
 
@@ -126,7 +126,7 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       children: ['Default', 'Name', 'Budget', 'Progress'].map((option) {
@@ -134,7 +134,7 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                         return ChoiceChip(
                           label: Text(option),
                           selected: isSelected,
-                          selectedColor: const Color(0xFF2563EB),
+                          selectedColor: const Color(0xFF1A56DB),
                           labelStyle: TextStyle(
                             color: isSelected ? Colors.white : const Color(0xFF1E293B),
                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -169,7 +169,6 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
       builder: (context, primaryColor, _) {
         return Scaffold(
           backgroundColor: const Color(0xFFF9FAFC),
-          bottomNavigationBar: _buildBottomNavigationBar(primaryColor),
           body: SafeArea(
             bottom: false,
             child: Center(
@@ -185,37 +184,56 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                       child: Row(
                         children: [
-                          if (Navigator.canPop(context))
-                            InkWell(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.pop(context);
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                margin: const EdgeInsets.only(right: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                ),
-                                child: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  size: 16,
-                                  color: Color(0xFF0F172A),
-                                ),
+                          InkWell(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              Navigator.pop(context);
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.03),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                size: 16,
+                                color: Color(0xFF0F172A),
                               ),
                             ),
-                          const Text(
-                            'Sites',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                              letterSpacing: -0.5,
-                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Sites & Projects',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              Text(
+                                'Manage live sites & track project stages',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -251,9 +269,9 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                   color: Color(0xFF0F172A),
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: 'Search sites...',
+                                  hintText: 'Search by name, ID, supervisor...',
                                   hintStyle: const TextStyle(
-                                    fontSize: 13.5,
+                                    fontSize: 13,
                                     color: Color(0xFF94A3B8),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -301,7 +319,7 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: _sortBy != 'Default'
-                                      ? const Color(0xFF2563EB)
+                                      ? const Color(0xFF1A56DB)
                                       : const Color(0xFFE2E8F0),
                                 ),
                                 boxShadow: [
@@ -317,7 +335,7 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                   Icons.tune_rounded,
                                   size: 20,
                                   color: _sortBy != 'Default'
-                                      ? const Color(0xFF2563EB)
+                                      ? const Color(0xFF1A56DB)
                                       : const Color(0xFF1E293B),
                                 ),
                               ),
@@ -327,7 +345,7 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                       ),
                     ),
 
-                    // 3. Status Tabs (All, Planning, In Progress, On Hold)
+                    // 3. Status Filter Tabs (All, Live, In Progress, Planning, Completed, On Hold)
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
@@ -353,13 +371,13 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? const Color(0xFF2563EB)
+                                      ? const Color(0xFF1A56DB)
                                       : const Color(0xFFF1F5F9),
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: isSelected
                                       ? [
                                           BoxShadow(
-                                            color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+                                            color: const Color(0xFF1A56DB).withValues(alpha: 0.25),
                                             blurRadius: 6,
                                             offset: const Offset(0, 2),
                                           ),
@@ -385,11 +403,10 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                       ),
                     ),
 
-                    // 4. Scrollable List of Site Cards + Fixed Bottom "+ Add Site" Button
+                    // 4. Real-Time Stream of Sites & Projects
                     Expanded(
                       child: Stack(
                         children: [
-                          // Real-time Stream of Projects & Sites
                           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                             stream: FirestoreService.projects.snapshots(),
                             builder: (context, projSnap) {
@@ -424,7 +441,7 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                     final siteId = (data['siteId'] ?? doc.id).toString();
                                     final projectType = (data['projectType'] ?? data['projectCategory'] ?? data['projectSubCategory'] ?? '').toString();
                                     final supervisor = (data['supervisor'] ?? data['supervisorName'] ?? supervisorMap[siteId] ?? '').toString();
-                                    final status = (data['currentStatus'] ?? data['status'] ?? 'Ongoing').toString();
+                                    final status = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
 
                                     // Search Query match
                                     final matchesQuery = q.isEmpty ||
@@ -578,11 +595,11 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                               child: Container(
                                 height: 50,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF2563EB),
+                                  color: const Color(0xFF1A56DB),
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF2563EB).withValues(alpha: 0.35),
+                                      color: const Color(0xFF1A56DB).withValues(alpha: 0.35),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
                                     ),
@@ -635,9 +652,10 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
       return p > 100 ? 100.0 : p;
     }
     final status = (data['currentStatus'] ?? data['status'] ?? '').toString().toLowerCase();
-    if (status.contains('complete')) return 100.0;
+    if (status.contains('complete') || status.contains('finish')) return 100.0;
     if (status.contains('progress') || status.contains('ongoing')) return 45.0;
     if (status.contains('plan')) return 10.0;
+    if (status.contains('live') || status.contains('active')) return 30.0;
     return 0.0;
   }
 
@@ -662,7 +680,7 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
             'Not Assigned')
         .toString();
 
-    final rawStatus = (data['currentStatus'] ?? data['status'] ?? 'Ongoing').toString();
+    final rawStatus = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
     final statusBadge = _getStatusBadge(rawStatus);
 
     final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : 0.0);
@@ -825,7 +843,11 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                     minHeight: 6,
                     backgroundColor: const Color(0xFFF1F5F9),
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      progress >= 50 ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                      progress >= 100
+                          ? const Color(0xFF7C3AED)
+                          : progress >= 50
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFF1A56DB),
                     ),
                   ),
                 ),
@@ -863,164 +885,41 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
 
   _StatusBadgeData _getStatusBadge(String rawStatus) {
     final s = rawStatus.toLowerCase();
-    if (s.contains('progress') || s.contains('ongoing') || s.contains('active')) {
+    if (s.contains('complete') || s.contains('finish') || s.contains('done')) {
+      return _StatusBadgeData(
+        label: 'Completed',
+        bgColor: const Color(0xFFF3E8FF),
+        textColor: const Color(0xFF7C3AED),
+      );
+    } else if (s.contains('progress') || s.contains('ongoing') || s.contains('execution')) {
       return _StatusBadgeData(
         label: 'In Progress',
-        bgColor: const Color(0xFFDCFCE7),
-        textColor: const Color(0xFF16A34A),
+        bgColor: const Color(0xFFDBEAFE),
+        textColor: const Color(0xFF1D4ED8),
       );
-    } else if (s.contains('plan') || s.contains('draft') || s.contains('setup')) {
+    } else if (s.contains('plan') || s.contains('draft') || s.contains('setup') || s.contains('upcoming')) {
       return _StatusBadgeData(
         label: 'Planning',
         bgColor: const Color(0xFFFEF3C7),
         textColor: const Color(0xFFD97706),
       );
-    } else if (s.contains('hold') || s.contains('delay') || s.contains('overdue')) {
+    } else if (s.contains('hold') || s.contains('delay') || s.contains('overdue') || s.contains('pause')) {
       return _StatusBadgeData(
         label: 'On Hold',
-        bgColor: const Color(0xFFEDE9FE),
-        textColor: const Color(0xFF7C3AED),
+        bgColor: const Color(0xFFFEE2E2),
+        textColor: const Color(0xFFDC2626),
       );
-    } else if (s.contains('complete') || s.contains('finish')) {
+    } else if (s.contains('live') || s.contains('active')) {
       return _StatusBadgeData(
-        label: 'Completed',
-        bgColor: const Color(0xFFDBEAFE),
-        textColor: const Color(0xFF2563EB),
+        label: 'Live',
+        bgColor: const Color(0xFFDCFCE7),
+        textColor: const Color(0xFF16A34A),
       );
     }
     return _StatusBadgeData(
-      label: rawStatus.isNotEmpty ? rawStatus : 'Planning',
-      bgColor: const Color(0xFFFEF3C7),
-      textColor: const Color(0xFFD97706),
-    );
-  }
-
-  // -------------------- 5. BOTTOM NAVIGATION BAR --------------------
-
-  Widget _buildBottomNavigationBar(Color primaryColor) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-        border: const Border(
-          top: BorderSide(color: Color(0xFFF1F5F9), width: 1),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                index: 0,
-                icon: Icons.home_rounded,
-                label: 'Home',
-                isSelected: false,
-                onTap: () => Navigator.pop(context),
-              ),
-              _buildNavItem(
-                index: 1,
-                icon: Icons.domain_rounded,
-                label: 'Sites',
-                isSelected: true,
-                onTap: () {
-                  _scrollController.animateTo(
-                    0,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOut,
-                  );
-                },
-              ),
-              _buildNavItem(
-                index: 2,
-                icon: Icons.account_balance_wallet_rounded,
-                label: 'Finance',
-                isSelected: false,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => SitePaymentScreen()),
-                  );
-                },
-              ),
-              _buildNavItem(
-                index: 3,
-                icon: Icons.bar_chart_rounded,
-                label: 'Reports',
-                isSelected: false,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => InsightsDashboard()),
-                  );
-                },
-              ),
-              _buildNavItem(
-                index: 4,
-                icon: Icons.grid_view_rounded,
-                label: 'More',
-                isSelected: false,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const OrgMenuScreen(standalone: true),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    const activeColor = Color(0xFF1E40AF); // Deep modern blue
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? activeColor : const Color(0xFF64748B),
-              size: 22,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                color: isSelected ? activeColor : const Color(0xFF64748B),
-              ),
-            ),
-          ],
-        ),
-      ),
+      label: rawStatus.isNotEmpty ? rawStatus : 'Live',
+      bgColor: const Color(0xFFDCFCE7),
+      textColor: const Color(0xFF16A34A),
     );
   }
 }

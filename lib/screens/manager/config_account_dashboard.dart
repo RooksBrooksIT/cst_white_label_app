@@ -40,6 +40,10 @@ import 'package:demo_cst/screens/reports/workers_availability_report_page.dart';
 import 'package:demo_cst/screens/common/contact_support_screen.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/screens/manager/project_setup_wizard.dart';
+import 'package:demo_cst/screens/manager/contractor_report_page.dart';
+import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
+import 'package:demo_cst/screens/manager/manager_sites_list_page.dart';
+import 'package:demo_cst/screens/organization/org_menu_screen.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
@@ -445,84 +449,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
-        final darkAccent = AppTheme.getDarkAccent(primaryColor);
-
         return Scaffold(
           backgroundColor: const Color(0xFFF1F5F9),
-          appBar: AppBar(
-            iconTheme: const IconThemeData(color: Colors.white),
-            title: Text(
-              _currentIndex == 0
-                  ? 'Management Console'
-                  : _currentIndex == 1
-                  ? 'Projects'
-                  : _currentIndex == 2
-                  ? 'Daily Site Entry'
-                  : 'Manager Expenses',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-            centerTitle: true,
-            elevation: 0,
-            flexibleSpace: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    darkAccent,
-                    Color.alphaBlend(
-                      primaryColor.withValues(alpha: 0.35),
-                      darkAccent,
-                    ),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-              onPressed: _currentIndex == 0
-                  ? () => Navigator.pop(context)
-                  : () => setState(() => _currentIndex = 0),
-            ),
-            actions: [
-              IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-                ),
-                tooltip: 'Refresh Console',
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  setState(() {});
-                },
-              ),
-              if (widget.showLogout) ...[
-                IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.logout_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                  onPressed: () => _showLogoutConfirmation(context),
-                  tooltip: 'Logout',
-                ),
-              ],
-              const SizedBox(width: 8),
-            ],
-          ),
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerDocked,
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           floatingActionButton: _currentIndex == 0
               ? FloatingActionButton(
                   onPressed: () {
@@ -534,7 +463,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                       ),
                     );
                   },
-                  backgroundColor: darkAccent,
+                  backgroundColor: const Color(0xFF1A56DB),
                   elevation: 4,
                   shape: const CircleBorder(),
                   child: const Icon(
@@ -544,113 +473,56 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   ),
                 )
               : null,
-          bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  darkAccent,
-                  Color.alphaBlend(
-                    primaryColor.withValues(alpha: 0.35),
-                    darkAccent,
-                  ),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: BottomAppBar(
-              elevation: 0,
-              color: Colors.transparent,
-              shape: const CircularNotchedRectangle(),
-              notchMargin: 8,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: Responsive.maxContentWidth,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildNavItem(
-                        context,
-                        Icons.dashboard_rounded,
-                        'Dashboard',
-                        _currentIndex == 0,
-                        () => setState(() => _currentIndex = 0),
-                      ),
-                      _buildNavItem(
-                        context,
-                        Icons.work_rounded,
-                        'Projects',
-                        _currentIndex == 1,
-                        () => setState(() => _currentIndex = 1),
-                      ),
-                      const SizedBox(width: 40),
-                      _buildNavItem(
-                        context,
-                        Icons.edit_note_rounded,
-                        'Daily Entry',
-                        _currentIndex == 2,
-                        () => setState(() => _currentIndex = 2),
-                      ),
-                      _buildNavItem(
-                        context,
-                        Icons.account_balance_wallet_rounded,
-                        'Expenses',
-                        _currentIndex == 3,
-                        () => setState(() => _currentIndex = 3),
-                      ),
-                    ],
-                  ),
+          bottomNavigationBar: _buildBottomNavigationBar(context),
+          body: SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: Responsive.maxContentWidth,
                 ),
-              ),
-            ),
-          ),
-          body: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: Responsive.maxContentWidth,
-              ),
-              child: IndexedStack(
-                index: _currentIndex,
-                children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      return CustomScrollView(
-                        controller: _scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
-                        ),
-                        slivers: [
-                          // Manager Header Banner
-                          SliverToBoxAdapter(
-                            child: _buildManagerHeaderBanner(context),
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return CustomScrollView(
+                          controller: _scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
                           ),
-                          // Live Operational Overview Header
-                          SliverToBoxAdapter(
-                            child: _buildOperationalOverview(context),
-                          ),
-                          // Search Box & Category Filters
-                          SliverToBoxAdapter(
-                            child: _buildSearchAndFilterBar(context),
-                          ),
-                          ..._buildGridSections(context, constraints.maxWidth),
-                          const SliverPadding(
-                            padding: EdgeInsets.only(bottom: 90),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const ProjectScreen(hideAppBar: true),
-                  ManagerSiteEntryPage(
-                    userName: _managerName,
-                    userDetails: AuthService().userData,
-                    hideAppBar: true,
-                  ),
-                  const ManagerExpenses(hideAppBar: true),
-                ],
+                          slivers: [
+                            // Manager Header / App Bar Banner
+                            SliverToBoxAdapter(
+                              child: _buildManagerHeaderBanner(context),
+                            ),
+                            // Project Overview Section (Live, In Progress, Planning, Completed)
+                            SliverToBoxAdapter(
+                              child: _buildProjectOverviewSection(context),
+                            ),
+                            // Search Box & Category Filters
+                            SliverToBoxAdapter(
+                              child: _buildSearchAndFilterBar(context),
+                            ),
+                            ..._buildGridSections(context, constraints.maxWidth),
+                            const SliverPadding(
+                              padding: EdgeInsets.only(bottom: 90),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const ProjectScreen(hideAppBar: false),
+                    const ManagerExpenses(hideAppBar: false),
+                    ManagerSiteEntryPage(
+                      userName: _managerName,
+                      userDetails: AuthService().userData,
+                      hideAppBar: false,
+                    ),
+                    _buildMoreTab(context),
+                  ],
+                ),
               ),
             ),
           ),
@@ -659,351 +531,508 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
-  /// Professional Header Banner displaying manager profile & status or Organizer viewing mode
+  /// Professional App Bar / Header Container for Management Console
   Widget _buildManagerHeaderBanner(BuildContext context) {
     final hPad = Responsive.horizontalPadding(context);
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
     final isOrgUser = _currentUserRole == UserRole.organization;
+    final canGoBack = Navigator.canPop(context) || _currentIndex != 0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isOrgUser
-                    ? primaryColor.withValues(alpha: 0.3)
-                    : const Color(0xFFE2E8F0),
-                width: isOrgUser ? 1.5 : 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isOrgUser
-                      ? primaryColor.withValues(alpha: 0.08)
-                      : const Color(0xFF0A183D).withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+      padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 14),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isOrgUser
+                ? primaryColor.withValues(alpha: 0.3)
+                : const Color(0xFFE2E8F0),
+            width: isOrgUser ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isOrgUser
+                  ? primaryColor.withValues(alpha: 0.08)
+                  : const Color(0xFF0A183D).withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Navigation & Action Row (Back Button, Console Title, Status Badge, Logout)
+            Row(
+              children: [
+                if (canGoBack) ...[
+                  InkWell(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      if (_currentIndex != 0) {
+                        setState(() => _currentIndex = 0);
+                      } else {
+                        Navigator.pop(context);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 15,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                Expanded(
+                  child: Text(
+                    isOrgUser
+                        ? 'Organization Administrator'
+                        : 'Management Console',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: isOrgUser
+                          ? primaryColor
+                          : const Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // Status Pill Badge (Active / Organizer)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isOrgUser
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isOrgUser
+                          ? primaryColor.withValues(alpha: 0.3)
+                          : const Color(0xFF10B981).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isOrgUser
+                            ? Icons.verified_rounded
+                            : Icons.verified_user_rounded,
+                        color: isOrgUser
+                            ? primaryColor
+                            : const Color(0xFF10B981),
+                        size: 13,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isOrgUser ? 'Organizer' : 'Active',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: isOrgUser
+                              ? primaryColor
+                              : const Color(0xFF10B981),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (widget.showLogout) ...[
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => _showLogoutConfirmation(context),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFECACA)),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.logout_rounded,
+                          color: Color(0xFFDC2626),
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 12),
+
+            // Profile Info Row (Avatar, Name, Designation)
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: isOrgUser
+                          ? [primaryColor, AppTheme.getDarkAccent(primaryColor)]
+                          : [const Color(0xFF1A56DB), const Color(0xFF3B82F6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isOrgUser ? primaryColor : const Color(0xFF1A56DB))
+                            .withValues(alpha: 0.25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isOrgUser
+                          ? Icons.business_center_rounded
+                          : Icons.person_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _managerName,
+                        style: const TextStyle(
+                          fontSize: 17.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.work_outline_rounded,
+                            size: 13,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _managerDesignation.isNotEmpty
+                                  ? _managerDesignation
+                                  : (isOrgUser ? 'Administrator' : 'Manager'),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+
+            if (isOrgUser) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: primaryColor.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Row(
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isOrgUser
-                            ? primaryColor.withValues(alpha: 0.12)
-                            : const Color(0xFF3B82F6).withValues(alpha: 0.12),
-                      ),
-                      child: Icon(
-                        isOrgUser
-                            ? Icons.business_center_rounded
-                            : Icons.badge_rounded,
-                        color:
-                            isOrgUser ? primaryColor : const Color(0xFF3B82F6),
-                        size: 26,
-                      ),
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: primaryColor,
+                      size: 16,
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isOrgUser
-                                ? 'Organization Administrator'
-                                : 'Operational Management Console',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isOrgUser
-                                  ? primaryColor
-                                  : const Color(0xFF64748B),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _managerName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0A183D),
-                              letterSpacing: -0.3,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (!isOrgUser && _managerDesignation.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.work_outline_rounded,
-                                  size: 13,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _managerDesignation,
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isOrgUser
-                            ? primaryColor.withValues(alpha: 0.12)
-                            : const Color(0xFF10B981).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isOrgUser
-                              ? primaryColor.withValues(alpha: 0.3)
-                              : const Color(0xFF10B981).withValues(alpha: 0.3),
+                      child: Text(
+                        'You are viewing this page as an Organizer / Organization user with administrative access.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: primaryColor,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isOrgUser
-                                ? Icons.verified_rounded
-                                : Icons.verified_user_rounded,
-                            color: isOrgUser
-                                ? primaryColor
-                                : const Color(0xFF10B981),
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isOrgUser ? 'Organizer' : 'Active',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isOrgUser
-                                  ? primaryColor
-                                  : const Color(0xFF10B981),
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],
                 ),
-                if (isOrgUser) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: primaryColor.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: primaryColor.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          color: primaryColor,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'You are viewing this page as an Organizer / Organization user with administrative access.',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: primaryColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Live Operational Stats (Live Sites, Supervisors, Total Modules)
-  Widget _buildOperationalOverview(BuildContext context) {
+  /// Project Overview Section (Live, In Progress, Planning, Completed)
+  Widget _buildProjectOverviewSection(BuildContext context) {
     final hPad = Responsive.horizontalPadding(context);
 
-    // Compute total modules count across all categories
-    int totalModules = 0;
-    for (var list in groupedItems.values) {
-      totalModules += list.length;
-    }
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreService.projects.snapshots(),
+      builder: (context, snapshot) {
+        int liveCount = 0;
+        int inProgressCount = 0;
+        int planningCount = 0;
+        int completedCount = 0;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 14),
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirestoreService.getCollection('Site').snapshots(),
-        builder: (context, sitesSnapshot) {
-          final liveSitesCount = sitesSnapshot.hasData
-              ? sitesSnapshot.data!.docs.length
-              : 0;
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data();
+            final s = (data['currentStatus'] ?? data['status'] ?? '').toString().toLowerCase();
 
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirestoreService.getCollection('supervisor').snapshots(),
-            builder: (context, superSnapshot) {
-              final supervisorsCount = superSnapshot.hasData
-                  ? superSnapshot.data!.docs.length
-                  : 0;
+            if (s.contains('complete') || s.contains('finish') || s.contains('closed') || s.contains('done')) {
+              completedCount++;
+            } else if (s.contains('plan') || s.contains('draft') || s.contains('setup') || s.contains('upcoming')) {
+              planningCount++;
+            } else if (s.contains('progress') || s.contains('ongoing') || s.contains('execution')) {
+              inProgressCount++;
+            } else if (s.contains('live') || s.contains('active')) {
+              liveCount++;
+            } else {
+              liveCount++;
+            }
+          }
+        }
 
-              return Row(
+        final liveStr = liveCount < 10 ? '0$liveCount' : '$liveCount';
+        final inProgStr = inProgressCount < 10 ? '0$inProgressCount' : '$inProgressCount';
+        final planStr = planningCount < 10 ? '0$planningCount' : '$planningCount';
+        final compStr = completedCount < 10 ? '0$completedCount' : '$completedCount';
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: Project Overview + View All
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: _buildOverviewMetricCard(
-                      context: context,
-                      title: 'Live Sites',
-                      value: '$liveSitesCount',
-                      subtitle: 'Active On Site',
-                      icon: Icons.location_city_rounded,
-                      accentColor: const Color(0xFF10B981),
+                  const Text(
+                    'Project Overview',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildOverviewMetricCard(
-                      context: context,
-                      title: 'Supervisors',
-                      value: '$supervisorsCount',
-                      subtitle: 'Active Staff',
-                      icon: Icons.supervisor_account_rounded,
-                      accentColor: const Color(0xFF3B82F6),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildOverviewMetricCard(
-                      context: context,
-                      title: 'Modules',
-                      value: '$totalModules',
-                      subtitle: 'Config Tools',
-                      icon: Icons.grid_view_rounded,
-                      accentColor: const Color(0xFF8B5CF6),
+                  InkWell(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _navigateToSitesList(context, 'All');
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text(
+                            'View All',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1A56DB),
+                            ),
+                          ),
+                          SizedBox(width: 3),
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 11,
+                            color: Color(0xFF1A56DB),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildOverviewMetricCard({
-    required BuildContext context,
-    required String title,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color accentColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: accentColor, size: 16),
               ),
-              const Spacer(),
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  shape: BoxShape.circle,
-                ),
+              const SizedBox(height: 12),
+
+              // 4 Status Cards: Live, In Progress, Planning, Completed
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildProjectStatusCard(
+                      title: 'Live',
+                      count: liveStr,
+                      icon: Icons.sensors_rounded,
+                      iconBgColor: const Color(0xFFECFDF5),
+                      iconColor: const Color(0xFF059669),
+                      countColor: const Color(0xFF059669),
+                      onTap: () => _navigateToSitesList(context, 'Live'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildProjectStatusCard(
+                      title: 'In Progress',
+                      count: inProgStr,
+                      icon: Icons.engineering_rounded,
+                      iconBgColor: const Color(0xFFEFF6FF),
+                      iconColor: const Color(0xFF2563EB),
+                      countColor: const Color(0xFF2563EB),
+                      onTap: () => _navigateToSitesList(context, 'In Progress'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildProjectStatusCard(
+                      title: 'Planning',
+                      count: planStr,
+                      icon: Icons.architecture_rounded,
+                      iconBgColor: const Color(0xFFFFFBEB),
+                      iconColor: const Color(0xFFD97706),
+                      countColor: const Color(0xFFD97706),
+                      onTap: () => _navigateToSitesList(context, 'Planning'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildProjectStatusCard(
+                      title: 'Completed',
+                      count: compStr,
+                      icon: Icons.task_alt_rounded,
+                      iconBgColor: const Color(0xFFF5F3FF),
+                      iconColor: const Color(0xFF7C3AED),
+                      countColor: const Color(0xFF7C3AED),
+                      onTap: () => _navigateToSitesList(context, 'Completed'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0A183D),
-              letterSpacing: -0.4,
+        );
+      },
+    );
+  }
+
+  Widget _buildProjectStatusCard({
+    required String title,
+    required String count,
+    required IconData icon,
+    required Color iconBgColor,
+    required Color iconColor,
+    required Color countColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0A183D).withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0A183D),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF64748B),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              count,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w900,
+                color: countColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToSitesList(BuildContext context, [String filter = 'All']) {
+    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManagerSitesListPage(initialFilter: filter),
       ),
     );
   }
@@ -1677,53 +1706,503 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     );
   }
 
-  Widget _buildNavItem(
-    BuildContext context,
-    IconData icon,
-    String label,
-    bool isActive,
-    VoidCallback onTap,
-  ) {
-    final activeIconColor = Colors.white;
-    final activeBgColor = Colors.white.withValues(alpha: 0.22);
-    final inactiveColor = Colors.white.withValues(alpha: 0.65);
+  Widget _buildBottomNavigationBar(BuildContext context) {
+    const activeColor = Color(0xFF1A56DB);
+    const inactiveColor = Color(0xFF64748B);
 
-    return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              decoration: BoxDecoration(
-                color: isActive ? activeBgColor : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                context: context,
+                icon: _currentIndex == 0
+                    ? Icons.home_rounded
+                    : Icons.home_outlined,
+                label: 'Home',
+                isActive: _currentIndex == 0,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+                onTap: () => setState(() => _currentIndex = 0),
               ),
-              child: Icon(
-                icon,
-                color: isActive ? activeIconColor : inactiveColor,
-                size: 22,
+              _buildNavItem(
+                context: context,
+                icon: _currentIndex == 1
+                    ? Icons.assignment_rounded
+                    : Icons.assignment_outlined,
+                label: 'Sites',
+                isActive: _currentIndex == 1,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+                onTap: () => setState(() => _currentIndex = 1),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? activeIconColor : inactiveColor,
-                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                fontSize: 10.5,
+              _buildNavItem(
+                context: context,
+                icon: _currentIndex == 2
+                    ? Icons.account_balance_wallet_rounded
+                    : Icons.account_balance_wallet_outlined,
+                label: 'Finance',
+                isActive: _currentIndex == 2,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+                onTap: () => setState(() => _currentIndex = 2),
               ),
-            ),
-          ],
+              _buildNavItem(
+                context: context,
+                icon: _currentIndex == 3
+                    ? Icons.insert_chart_rounded
+                    : Icons.insert_chart_outlined_rounded,
+                label: 'Reports',
+                isActive: _currentIndex == 3,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+                onTap: () => setState(() => _currentIndex = 3),
+              ),
+              _buildNavItem(
+                context: context,
+                icon: Icons.grid_view_rounded,
+                label: 'More',
+                isActive: _currentIndex == 4,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+                onTap: () => setState(() => _currentIndex = 4),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color activeColor,
+    required Color inactiveColor,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        splashColor: activeColor.withValues(alpha: 0.1),
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isActive ? activeColor : inactiveColor,
+                size: 24,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isActive ? activeColor : inactiveColor,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 11,
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMoreTab(BuildContext context) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    final List<Map<String, dynamic>> sections = [
+      {
+        'title': 'Management & Approvals',
+        'items': [
+          {
+            'title': 'Material Approvals',
+            'subtitle': 'Review supervisor material requests',
+            'icon': Icons.fact_check_rounded,
+            'color': const Color(0xFF10B981),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ManagerMaterialApprovalScreen(),
+                  ),
+                ),
+          },
+          {
+            'title': 'Supervisor Setup',
+            'subtitle': 'Manage supervisors and access',
+            'icon': Icons.badge_rounded,
+            'color': const Color(0xFF6366F1),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SiteSupervisorConfig(),
+                  ),
+                ),
+          },
+          {
+            'title': 'Site-Supervisor Map',
+            'subtitle': 'Assign supervisors to active sites',
+            'icon': Icons.map_rounded,
+            'color': const Color(0xFFEC4899),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SiteSupervisorMapScreen(),
+                  ),
+                ),
+          },
+          {
+            'title': 'New Project Setup',
+            'subtitle': 'Create new sites, clients, and blueprints',
+            'icon': Icons.add_business_rounded,
+            'color': const Color(0xFF0284C7),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ProjectSetupWizard(),
+                  ),
+                ),
+          },
+        ],
+      },
+      {
+        'title': 'Inventory & Resources',
+        'items': [
+          {
+            'title': 'Material Master',
+            'subtitle': 'Central material catalogue & stocks',
+            'icon': Icons.inventory_2_rounded,
+            'color': const Color(0xFF059669),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MaterialScreen(),
+                  ),
+                ),
+          },
+          {
+            'title': 'Tools Master',
+            'subtitle': 'Equipment catalog and asset IDs',
+            'icon': Icons.handyman_rounded,
+            'color': const Color(0xFF3B82F6),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ToolMasterPage(),
+                  ),
+                ),
+          },
+          {
+            'title': 'Tools Movement',
+            'subtitle': 'Track tool transfers between sites',
+            'icon': Icons.sync_alt_rounded,
+            'color': const Color(0xFF8B5CF6),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ToolsMovementPage(),
+                  ),
+                ),
+          },
+          {
+            'title': 'Labour Directory',
+            'subtitle': 'Labour profiles & contractor setups',
+            'icon': Icons.engineering_rounded,
+            'color': const Color(0xFFF59E0B),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => LabourScreen(),
+                  ),
+                ),
+          },
+          {
+            'title': 'Workers Config',
+            'subtitle': 'Workers directory & site allocations',
+            'icon': Icons.groups_rounded,
+            'color': const Color(0xFFEA580C),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const WorkersConfigPage(),
+                  ),
+                ),
+          },
+          {
+            'title': 'Vehicle Fleet',
+            'subtitle': 'Vehicles, drivers & maintenance',
+            'icon': Icons.directions_car_rounded,
+            'color': const Color(0xFFEF4444),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const VehicleDetailsPage(),
+                  ),
+                ),
+          },
+        ],
+      },
+      {
+        'title': 'Configurations & Settings',
+        'items': [
+          {
+            'title': 'Master Configurations',
+            'subtitle': 'Project categories, stages & contracts',
+            'icon': Icons.tune_rounded,
+            'color': const Color(0xFF475569),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const ProjectConfigurationScreen(initialIndex: 0),
+                  ),
+                ),
+          },
+          {
+            'title': 'Contractor Reports',
+            'subtitle': 'Export contractor expense logs & PDFs',
+            'icon': Icons.picture_as_pdf_rounded,
+            'color': const Color(0xFFDC2626),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ContractorReportPage(),
+                  ),
+                ),
+          },
+          if (_currentUserRole == UserRole.organization)
+            {
+              'title': 'Organization Portal',
+              'subtitle': 'Switch to master organization hub',
+              'icon': Icons.admin_panel_settings_rounded,
+              'color': const Color(0xFF0F172A),
+              'action': () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrgMenuScreen(standalone: true),
+                    ),
+                  ),
+            },
+          {
+            'title': 'Contact Support',
+            'subtitle': 'Get technical assistance or report issues',
+            'icon': Icons.support_agent_rounded,
+            'color': const Color(0xFF0D9488),
+            'action': () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ContactSupportScreen(),
+                  ),
+                ),
+          },
+        ],
+      },
+    ];
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 100),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        // Manager Profile Header Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF1A56DB),
+                      Color(0xFF3B82F6),
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(Icons.person_rounded, color: Colors.white, size: 26),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _managerName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _managerDesignation,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.showLogout)
+                IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.logout_rounded, color: Colors.red, size: 18),
+                  ),
+                  onPressed: () => _showLogoutConfirmation(context),
+                  tooltip: 'Logout',
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Section Cards
+        ...sections.map((section) {
+          final items = section['items'] as List<Map<String, dynamic>>;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 10, top: 8),
+                child: Text(
+                  section['title'] as String,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF475569),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: items.length,
+                  separatorBuilder: (context, index) => const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFF1F5F9),
+                    indent: 56,
+                  ),
+                  itemBuilder: (context, idx) {
+                    final item = items[idx];
+                    final color = item['color'] as Color;
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          item['icon'] as IconData,
+                          color: color,
+                          size: 22,
+                        ),
+                      ),
+                      title: Text(
+                        item['title'] as String,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      subtitle: Text(
+                        item['subtitle'] as String,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Color(0xFF94A3B8),
+                        size: 20,
+                      ),
+                      onTap: item['action'] as VoidCallback?,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+          );
+        }),
+      ],
     );
   }
 
