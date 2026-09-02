@@ -158,7 +158,7 @@ class _SupervisorMaterialViewRequestScreenState
                         Text(
                           'Error loading requests',
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                             fontSize: 16,
                           ),
                         ),
@@ -169,7 +169,7 @@ class _SupervisorMaterialViewRequestScreenState
                             snapshot.error.toString(),
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: cs.error.withOpacity(0.7),
+                              color: cs.error.withValues(alpha: 0.7),
                               fontSize: 12,
                             ),
                           ),
@@ -270,7 +270,7 @@ class _SupervisorMaterialViewRequestScreenState
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  separatorBuilder: (_, _) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final doc = filtered[index];
                     final data = doc.data();
@@ -331,7 +331,7 @@ class _SupervisorMaterialViewRequestScreenState
           // Search Bar
           Container(
             decoration: BoxDecoration(
-              color: cs.surface.withOpacity(0.3),
+              color: cs.surface.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(15),
               border: Border.all(color: cs.outlineVariant),
             ),
@@ -341,7 +341,7 @@ class _SupervisorMaterialViewRequestScreenState
               style: TextStyle(color: cs.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search requests...',
-                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.5)),
+                hintStyle: TextStyle(color: cs.onSurface.withValues(alpha: 0.5)),
                 filled: true,
                 fillColor: Colors.transparent,
                 contentPadding: const EdgeInsets.symmetric(
@@ -351,13 +351,13 @@ class _SupervisorMaterialViewRequestScreenState
                 border: InputBorder.none,
                 prefixIcon: Icon(
                   Icons.search,
-                  color: cs.onSurface.withOpacity(0.5),
+                  color: cs.onSurface.withValues(alpha: 0.5),
                 ),
                 suffixIcon: _searchCtrl.text.isNotEmpty
                     ? IconButton(
                         icon: Icon(
                           Icons.clear,
-                          color: cs.onSurface.withOpacity(0.5),
+                          color: cs.onSurface.withValues(alpha: 0.5),
                         ),
                         onPressed: () {
                           _searchCtrl.clear();
@@ -405,14 +405,14 @@ class _SupervisorMaterialViewRequestScreenState
         children: [
           Icon(
             Icons.inventory_2_outlined,
-            color: cs.onSurface.withOpacity(0.3),
+            color: cs.onSurface.withValues(alpha: 0.3),
             size: 80,
           ),
           const SizedBox(height: 20),
           Text(
             'No Requests Found',
             style: TextStyle(
-              color: cs.onSurface.withOpacity(0.6),
+              color: cs.onSurface.withValues(alpha: 0.6),
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -421,7 +421,7 @@ class _SupervisorMaterialViewRequestScreenState
           Text(
             'Your material requests will appear here',
             style: TextStyle(
-              color: cs.onSurface.withOpacity(0.5),
+              color: cs.onSurface.withValues(alpha: 0.5),
               fontSize: 14,
             ),
           ),
@@ -438,14 +438,14 @@ class _SupervisorMaterialViewRequestScreenState
           children: [
             Icon(
               Icons.search_off,
-              color: cs.onSurface.withOpacity(0.3),
+              color: cs.onSurface.withValues(alpha: 0.3),
               size: 80,
             ),
             const SizedBox(height: 20),
             Text(
               'No Matching Requests',
               style: TextStyle(
-                color: cs.onSurface.withOpacity(0.6),
+                color: cs.onSurface.withValues(alpha: 0.6),
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
@@ -454,7 +454,7 @@ class _SupervisorMaterialViewRequestScreenState
             Text(
               'For: ${widget.supervisorName}',
               style: TextStyle(
-                color: cs.onSurface.withOpacity(0.4),
+                color: cs.onSurface.withValues(alpha: 0.4),
                 fontSize: 14,
                 fontStyle: FontStyle.italic,
               ),
@@ -463,7 +463,7 @@ class _SupervisorMaterialViewRequestScreenState
             Text(
               'Try changing your search or filter',
               style: TextStyle(
-                color: cs.onSurface.withOpacity(0.5),
+                color: cs.onSurface.withValues(alpha: 0.5),
                 fontSize: 14,
               ),
             ),
@@ -483,7 +483,7 @@ class _SupervisorMaterialViewRequestScreenState
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: cs.primary.withOpacity(0.3)),
+                  side: BorderSide(color: cs.primary.withValues(alpha: 0.3)),
                 ),
               ),
             ),
@@ -515,7 +515,7 @@ class _FilterChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? cs.primary : cs.surface.withOpacity(0.3),
+            color: isSelected ? cs.primary : cs.surface.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isSelected ? cs.primary : cs.outlineVariant,
@@ -524,7 +524,7 @@ class _FilterChip extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? cs.onPrimary : cs.onSurface.withOpacity(0.7),
+              color: isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -545,7 +545,6 @@ class _RequestCard extends StatelessWidget {
   final List materials;
 
   const _RequestCard({
-    super.key,
     required this.matReqId,
     required this.date,
     required this.status,
@@ -627,7 +626,7 @@ class _RequestCard extends StatelessWidget {
                       Text(
                         date,
                         style: TextStyle(
-                          color: cs.onPrimary.withOpacity(0.7),
+                          color: cs.onPrimary.withValues(alpha: 0.7),
                           fontSize: 12,
                         ),
                       ),
@@ -640,7 +639,7 @@ class _RequestCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: cs.onPrimary.withOpacity(0.2),
+                    color: cs.onPrimary.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -736,7 +735,7 @@ class _InfoRow extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: cs.onSurface.withOpacity(0.6),
+                  color: cs.onSurface.withValues(alpha: 0.6),
                   fontSize: 12,
                 ),
               ),
@@ -774,7 +773,7 @@ class _MaterialItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cs.surface.withOpacity(0.3),
+        color: cs.surface.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outlineVariant),
       ),
@@ -805,7 +804,7 @@ class _MaterialItem extends StatelessWidget {
                 Text(
                   '$qty $unit • $priority Priority',
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),

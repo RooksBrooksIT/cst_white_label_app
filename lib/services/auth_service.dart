@@ -54,7 +54,9 @@ class AuthService {
   /// Check if the current organization's subscription is active and not expired.
   Future<bool> checkSubscriptionStatus() async {
     final role = userRole;
-    if (role != UserRole.organization) return true; // Only enforce for organizations
+    if (role != UserRole.organization) {
+      return true; // Only enforce for organizations
+    }
 
     try {
       String orgId = FirestoreService.currentOrgId;

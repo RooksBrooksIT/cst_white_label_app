@@ -5,9 +5,7 @@ import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/screens/reports/project_stage_expenses_report_page.dart';
 import 'package:demo_cst/screens/reports/project_stage_site_summary_report.dart';
-import 'package:demo_cst/screens/reports/daily_site_report.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_button.dart';
@@ -119,8 +117,9 @@ class _ProjectstageInsightsDashboardState
         for (var doc in snap.docs) {
           final data = doc.data();
           final stage = data['projectStage'] ?? data['projectField'];
-          if (stage != null && stage.toString().isNotEmpty)
+          if (stage != null && stage.toString().isNotEmpty) {
             stageSet.add(stage.toString());
+          }
         }
       }
       if (mounted) {
@@ -237,9 +236,9 @@ class _ProjectstageInsightsDashboardState
                 : 'date';
             final rawDate = data[dateField];
             DateTime? entryDate;
-            if (rawDate is Timestamp)
+            if (rawDate is Timestamp) {
               entryDate = rawDate.toDate();
-            else if (rawDate is String)
+            } else if (rawDate is String)
               entryDate = DateTime.tryParse(rawDate);
 
             if (entryDate == null ||
@@ -261,9 +260,9 @@ class _ProjectstageInsightsDashboardState
                       formattedDateYMD != null) {
                     final billDateRaw = bill['billDate'];
                     String? billDateStr;
-                    if (billDateRaw is String)
+                    if (billDateRaw is String) {
                       billDateStr = billDateRaw;
-                    else if (billDateRaw is Timestamp)
+                    } else if (billDateRaw is Timestamp)
                       billDateStr = DateFormat(
                         'yyyy-MM-dd',
                       ).format(billDateRaw.toDate());
@@ -438,7 +437,7 @@ class _ProjectstageInsightsDashboardState
           ),
           const SizedBox(height: 20),
           DropdownButtonFormField<String>(
-            value: selectedProjectStage,
+            initialValue: selectedProjectStage,
             decoration: const InputDecoration(
               labelText: 'Project Stage',
               prefixIcon: Icon(Icons.layers_outlined),
@@ -554,7 +553,7 @@ class _ProjectstageInsightsDashboardState
       },
       child: GlassCard(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        color: isSelected ? theme.primaryColor.withOpacity(0.05) : null,
+        color: isSelected ? theme.primaryColor.withValues(alpha: 0.05) : null,
         border: isSelected
             ? Border.all(color: theme.primaryColor, width: 2)
             : null,

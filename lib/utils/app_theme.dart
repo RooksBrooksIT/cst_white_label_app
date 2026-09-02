@@ -232,7 +232,7 @@ class AppTheme {
 
   /// Converts a [Color] to a hex string in the format #AARRGGBB.
   static String colorToHex(Color color) {
-    return '#${color.value.toRadixString(16).padLeft(8, '0').toUpperCase()}';
+    return '#${color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
   }
 
   /// Parses a hex string into a [Color].

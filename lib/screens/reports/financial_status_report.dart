@@ -7,7 +7,6 @@ import 'package:printing/printing.dart';
 import '/services/firestore_service.dart';
 import '/utils/pdf_templates.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 
@@ -220,7 +219,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(Icons.apartment, color: theme.colorScheme.primary),
@@ -367,7 +366,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             color: usage > 90
                 ? theme.colorScheme.error
                 : theme.colorScheme.primary,
-            backgroundColor: theme.colorScheme.primary.withOpacity(0.05),
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.05),
           ),
         ],
       ),
@@ -414,7 +413,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -464,7 +463,7 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final primaryColor = Theme.of(context).primaryColor;
-    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.toARGB32());
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     final budget = _parseNum(projectData?['projectBudget']);

@@ -8,9 +8,7 @@ import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/list_extensions.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_button.dart';
 
 // --- SupervisorEntry Model ---
 class SupervisorEntry {
@@ -366,7 +364,7 @@ class _OrganizationInsightsScreenState
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
-                            value: selectedSupervisorEntry?.siteId,
+                            initialValue: selectedSupervisorEntry?.siteId,
                             items: uniqueSiteIds.map((siteId) {
                               return DropdownMenuItem<String>(
                                 value: siteId,
@@ -532,7 +530,7 @@ class _OrganizationInsightsScreenState
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: selectedReportType == type
-                    ? colorScheme.primary.withOpacity(0.1)
+                    ? colorScheme.primary.withValues(alpha: 0.1)
                     : theme.cardColor,
                 shape: BoxShape.circle,
               ),
@@ -561,7 +559,7 @@ class _OrganizationInsightsScreenState
                     style: TextStyle(
                       fontSize: 14,
                       color: selectedReportType == type
-                          ? colorScheme.primary.withOpacity(0.7)
+                          ? colorScheme.primary.withValues(alpha: 0.7)
                           : colorScheme.onSurfaceVariant,
                     ),
                   ),

@@ -173,15 +173,15 @@ class ProjectStagePdfHelper {
               data: [
                 [
                   'Food / Mess',
-                  '₹ ${toNum(supervisorData?['food']).toStringAsFixed(2)}',
+                  '₹ ${toNum(supervisorData['food']).toStringAsFixed(2)}',
                 ],
                 [
                   'Fuel',
-                  '₹ ${toNum(supervisorData?['fuel']).toStringAsFixed(2)}',
+                  '₹ ${toNum(supervisorData['fuel']).toStringAsFixed(2)}',
                 ],
                 [
                   'Transport / Travel',
-                  '₹ ${toNum(supervisorData?['transport']).toStringAsFixed(2)}',
+                  '₹ ${toNum(supervisorData['transport']).toStringAsFixed(2)}',
                 ],
               ],
               headerStyle: pw.TextStyle(

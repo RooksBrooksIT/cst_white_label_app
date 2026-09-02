@@ -123,8 +123,9 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                     paymentDates,
                   ),
                   builder: (context, openingSnapshot) {
-                    if (!openingSnapshot.hasData)
+                    if (!openingSnapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
+                    }
 
                     final int openingBalance =
                         (openingSnapshot.data?['openingBalance'] as num? ?? 0)
@@ -208,7 +209,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
           Icon(
             isError ? Icons.error_outline_rounded : Icons.receipt_long_rounded,
             size: 80,
-            color: colorScheme.onSurfaceVariant.withOpacity(0.2),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
           ),
           const SizedBox(height: 16),
           Text(
@@ -264,10 +265,10 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.1),
+                  color: colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: colorScheme.primary.withOpacity(0.2),
+                    color: colorScheme.primary.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Text(
@@ -375,10 +376,10 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.04),
+            color: color.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -389,7 +390,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 18, color: color),
@@ -458,7 +459,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
         children: [
           TableRow(
             decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.05),
+              color: colorScheme.primary.withValues(alpha: 0.05),
             ),
             children: [
               _buildTableCell(context, 'Date', isHeader: true),
@@ -536,10 +537,11 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     Color? txtColor = colorScheme.onSurface;
     if (isHeader) txtColor = colorScheme.onSurfaceVariant;
-    if (isNet)
+    if (isNet) {
       txtColor = netValue >= 0
           ? const Color(0xFF10B981)
           : const Color(0xFFEF4444);
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -594,7 +596,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
         .get();
     if (snap.docs.isEmpty) return 0;
 
-    final data = snap.docs.first.data() as Map<String, dynamic>;
+    final data = snap.docs.first.data();
     final List<dynamic> payments = (data['payments'] ?? []) as List<dynamic>;
     final List<String> dates = payments
         .map((p) => p['paymentDate']?.toString() ?? '')
@@ -653,7 +655,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
 
   Future<void> _generatePdf(BuildContext context, String siteId, String period) async {
     final pdf = pw.Document();
-    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(Theme.of(context).primaryColor.toARGB32());
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     // Fetch same data as in build
@@ -665,7 +667,7 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
         .get();
     
     if (snap.docs.isEmpty) return;
-    final summary = snap.docs.first.data() as Map<String, dynamic>;
+    final summary = snap.docs.first.data();
     final List<dynamic> payments = (summary['payments'] ?? []) as List<dynamic>;
     final List<String> dates = payments.map((p) => p['paymentDate']?.toString() ?? '').where((d) => d.isNotEmpty).toList();
     

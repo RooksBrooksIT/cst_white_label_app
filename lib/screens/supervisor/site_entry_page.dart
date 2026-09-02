@@ -13,10 +13,10 @@ class SiteEntryPage extends StatefulWidget {
   final String userName;
   final Map<String, dynamic> userDetails;
   const SiteEntryPage({
-    Key? key,
+    super.key,
     required this.userName,
     required this.userDetails,
-  }) : super(key: key);
+  });
 
   @override
   State<SiteEntryPage> createState() => _SiteEntryPageState();
@@ -1104,7 +1104,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: DropdownButtonFormField<String>(
-                                  value: selectedSiteId,
+                                  initialValue: selectedSiteId,
                                   isExpanded: true,
                                   dropdownColor: dropdownBg,
                                   style: TextStyle(
@@ -1401,7 +1401,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                               ),
                                               const SizedBox(height: 8),
                                               DropdownButtonFormField<String>(
-                                                value: selectedMaterial,
+                                                initialValue: selectedMaterial,
                                                 isExpanded: true,
                                                 dropdownColor: dropdownBg,
                                                 style: TextStyle(
@@ -1828,7 +1828,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                               ),
                                               const SizedBox(height: 8),
                                               DropdownButtonFormField<String>(
-                                                value: selectedLabour,
+                                                initialValue: selectedLabour,
                                                 isExpanded: true,
                                                 dropdownColor: dropdownBg,
                                                 style: TextStyle(

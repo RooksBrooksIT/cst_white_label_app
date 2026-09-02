@@ -6,7 +6,6 @@ import 'package:demo_cst/screens/reports/site_summary_page.dart';
 import 'package:demo_cst/screens/reports/site_expenses_report_page.dart';
 import 'package:demo_cst/screens/reports/daily_site_report.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 // --- SupervisorEntry Model ---
 class CustomerEntry {
@@ -217,9 +216,9 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                 : 'date';
             final rawDate = data[dateField];
             DateTime? entryDate;
-            if (rawDate is Timestamp)
+            if (rawDate is Timestamp) {
               entryDate = rawDate.toDate();
-            else if (rawDate is String)
+            } else if (rawDate is String)
               entryDate = DateTime.tryParse(rawDate);
 
             if (entryDate == null ||
@@ -241,9 +240,9 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                       formattedDateYMD != null) {
                     final billDateRaw = bill['billDate'];
                     String? billDateStr;
-                    if (billDateRaw is String)
+                    if (billDateRaw is String) {
                       billDateStr = billDateRaw;
-                    else if (billDateRaw is Timestamp)
+                    } else if (billDateRaw is Timestamp)
                       billDateStr = DateFormat(
                         'yyyy-MM-dd',
                       ).format(billDateRaw.toDate());
@@ -620,7 +619,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 2,
             blurRadius: 8,
             offset: const Offset(0, 4),
@@ -655,8 +654,8 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: selectedReportType == type
-                    ? Theme.of(context).primaryColor.withOpacity(
-                        0.1,
+                    ? Theme.of(context).primaryColor.withValues(
+                        alpha: 0.1,
                       ) // 10% opacity of primary
                     : Colors.grey[50],
                 shape: BoxShape.circle,
@@ -689,7 +688,7 @@ class _CustomerInsightsScreenState extends State<CustomerInsightsScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       color: selectedReportType == type
-                          ? Theme.of(context).primaryColor.withOpacity(0.7)
+                          ? Theme.of(context).primaryColor.withValues(alpha: 0.7)
                           : Colors.grey,
                     ),
                   ),

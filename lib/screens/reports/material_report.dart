@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
-import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
-import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
 import '/utils/app_theme.dart';
 import 'package:pdf/pdf.dart';
@@ -238,7 +235,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
             const LinearProgressIndicator()
           else
             DropdownButtonFormField<String>(
-              value: selectedMaterial,
+              initialValue: selectedMaterial,
               dropdownColor: Colors.white,
               iconEnabledColor: cardAccent,
               style: const TextStyle(
@@ -377,7 +374,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: reportRows.length,
-            separatorBuilder: (_, __) => Divider(
+            separatorBuilder: (_, _) => Divider(
               height: 1,
               color: Colors.white.withValues(alpha: 0.12),
             ),

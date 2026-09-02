@@ -10,6 +10,8 @@ import 'package:demo_cst/widgets/glass_button.dart';
 import 'package:demo_cst/utils/responsive.dart';
 
 class customerProjectFinancialStatusReportPage extends StatefulWidget {
+  const customerProjectFinancialStatusReportPage({super.key});
+
   @override
   _customerProjectFinancialStatusReportPageState createState() =>
       _customerProjectFinancialStatusReportPageState();
@@ -77,11 +79,9 @@ class _customerProjectFinancialStatusReportPageState
       final snapshot = await query.get();
       final ids = snapshot.docs
           .map(
-            (doc) => doc.data() is Map
-                ? (doc.data() as Map)['siteId']?.toString()
-                : null,
+            (doc) => (doc.data() as Map)['siteId']?.toString(),
           )
-          .where((v) => v != null && v!.trim().isNotEmpty)
+          .where((v) => v != null && v.trim().isNotEmpty)
           .map((v) => v!)
           .toSet()
           .toList();
@@ -253,7 +253,7 @@ class _customerProjectFinancialStatusReportPageState
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: theme.colorScheme.outlineVariant),
           ),

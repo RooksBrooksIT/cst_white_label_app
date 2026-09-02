@@ -9,8 +9,7 @@ import 'package:demo_cst/utils/responsive.dart';
 class CustomerWorkerDetails extends StatefulWidget {
   final String siteId;
 
-  const CustomerWorkerDetails({Key? key, required this.siteId})
-    : super(key: key);
+  const CustomerWorkerDetails({super.key, required this.siteId});
 
   @override
   State<CustomerWorkerDetails> createState() => _CustomerWorkerDetailsState();
@@ -191,7 +190,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                 return Column(
                   children: [
                     DropdownButtonFormField<String>(
-                      value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
+                      initialValue: _selectedMonth.isNotEmpty ? _selectedMonth : null,
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Month',
@@ -209,7 +208,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _selectedYear.isNotEmpty ? _selectedYear : null,
+                      initialValue: _selectedYear.isNotEmpty ? _selectedYear : null,
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Year',
@@ -233,7 +232,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                   // Month Dropdown
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _selectedMonth.isNotEmpty ? _selectedMonth : null,
+                      initialValue: _selectedMonth.isNotEmpty ? _selectedMonth : null,
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Month',
@@ -254,7 +253,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                   // Year Dropdown
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _selectedYear.isNotEmpty ? _selectedYear : null,
+                      initialValue: _selectedYear.isNotEmpty ? _selectedYear : null,
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Year',
@@ -453,7 +452,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
             final workerData = workerEntry.value as Map<String, dynamic>;
 
             return _buildWorkerTile(workerName, workerData);
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -505,7 +504,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1E293B),
+                    color: Color(0xFF1E293B),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -526,7 +525,7 @@ class _CustomerWorkerDetailsState extends State<CustomerWorkerDetails> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: attendanceColor.withOpacity(0.1),
+                  color: attendanceColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(color: attendanceColor),
                 ),

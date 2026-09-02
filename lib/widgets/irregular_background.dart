@@ -30,7 +30,7 @@ class IrregularBackground extends StatelessWidget {
           right: -blobSize1 * 0.25,
           child: CustomPaint(
             size: Size(blobSize1, blobSize1),
-            painter: _BlobPainter(color.withOpacity(0.08)),
+            painter: _BlobPainter(color.withValues(alpha: 0.08)),
           ),
         ),
         // Bottom-left blob
@@ -39,7 +39,7 @@ class IrregularBackground extends StatelessWidget {
           left: -blobSize2 * 0.27,
           child: CustomPaint(
             size: Size(blobSize2, blobSize2),
-            painter: _BlobPainter(color.withOpacity(0.06)),
+            painter: _BlobPainter(color.withValues(alpha: 0.06)),
           ),
         ),
         // Bottom-right blob
@@ -48,7 +48,7 @@ class IrregularBackground extends StatelessWidget {
           right: -blobSize3 * 0.3,
           child: CustomPaint(
             size: Size(blobSize3, blobSize3),
-            painter: _BlobPainter(color.withOpacity(0.04)),
+            painter: _BlobPainter(color.withValues(alpha: 0.04)),
           ),
         ),
         // Middle-right subtle blob
@@ -57,7 +57,7 @@ class IrregularBackground extends StatelessWidget {
           right: -blobSize4 * 0.44,
           child: CustomPaint(
             size: Size(blobSize4, blobSize4),
-            painter: _BlobPainter(color.withOpacity(0.03)),
+            painter: _BlobPainter(color.withValues(alpha: 0.03)),
           ),
         ),
         // Ensure child is on top and fills the area

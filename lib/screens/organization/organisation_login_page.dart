@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/utils/app_theme.dart';
-import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:demo_cst/screens/organization/organisation_registration_page.dart';
@@ -163,7 +162,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       }
 
       if (userData != null) {
-        final String? email = (userData['email'] ?? '').toString();
+        final String email = (userData['email'] ?? '').toString();
         final String? storedOrgName = (userData['org_name'] ?? userData['orgName']) as String?;
 
         if (email != null && email.isNotEmpty) {
@@ -232,88 +231,6 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           userType: 'organisation',
           userName: username,
         );
-
-        // Check if registration is completed but subscription/payment is pending
-        bool isPaymentPending = false;
-        if (dynamicPath != null && dynamicPath != 'uninitialized') {
-          try {
-            final subDoc = await FirebaseFirestore.instance
-                .collection('organisation')
-                .doc(dynamicPath)
-                .collection('data')
-                .doc('subscription')
-                .get();
-
-            final subData = subDoc.data();
-            final bool isSubActive = subData?['isSubscriptionActive'] == true;
-            final String plan = (subData?['subscriptionPlan'] ?? '').toString().trim();
-            final String onboardingStep = (subData?['onboardingStep'] ??
-                    userData['onboardingStep'] ??
-                    '')
-                .toString();
-            final String paymentStatus = (subData?['paymentStatus'] ??
-                    userData['paymentStatus'] ??
-                    '')
-                .toString();
-
-            if (!isSubActive &&
-                (onboardingStep == 'PAYMENT_PENDING' ||
-                    plan == 'Pending Selection' ||
-                    (plan.isEmpty && onboardingStep != 'COMPLETED' && paymentStatus == 'PENDING'))) {
-              isPaymentPending = true;
-            }
-          } catch (subCheckErr) {
-            debugPrint('Subscription pending check note: $subCheckErr');
-          }
-        }
-
-        if (isPaymentPending) {
-          final rootDoc = await FirebaseFirestore.instance
-              .collection('organisation')
-              .doc(dynamicPath)
-              .get();
-          final rootData = rootDoc.data() ?? {};
-          final String effectiveOrgName = rootData['org_name'] ??
-              userData['org_name'] ??
-              storedOrgName ??
-              '';
-          final String effectiveAppName =
-              rootData['app_name'] ?? userData['app_name'] ?? effectiveOrgName;
-          final String themeHex =
-              rootData['theme_color'] ?? userData['theme_color'] ?? '#00A86B';
-          final Color primaryColor = AppTheme.hexToColor(themeHex);
-
-          String dateStr = '';
-          if (dynamicPath != null && dynamicPath.contains('_')) {
-            dateStr = dynamicPath.split('_').last;
-          }
-
-          final String phoneStr =
-              (userData['phone'] ?? rootData['phone'] ?? '').toString();
-
-          if (mounted) {
-            AppTheme.showSuccessToast(
-              context,
-              'Registration details found. Please choose your plan to activate your workspace.',
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => PricingScreen(
-                  orgName: effectiveOrgName,
-                  email: email ?? '',
-                  phone: phoneStr,
-                  username: username,
-                  password: password,
-                  dateStr: dateStr,
-                  appName: effectiveAppName,
-                  selectedColor: primaryColor,
-                ),
-              ),
-            );
-            return;
-          }
-        }
 
         final isSubscriptionValid = await AuthService().checkSubscriptionStatus();
         if (mounted) {

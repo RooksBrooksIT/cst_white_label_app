@@ -1,5 +1,4 @@
 import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -44,7 +43,7 @@ class _NotificationPageState extends State<NotificationPage>
       bottom: TabBar(
         controller: _tabController,
         labelColor: cs.onPrimary,
-        unselectedLabelColor: cs.onPrimary.withOpacity(0.6),
+        unselectedLabelColor: cs.onPrimary.withValues(alpha: 0.6),
         indicatorColor: cs.onPrimary,
         indicatorWeight: 3,
         tabs: const [
@@ -85,7 +84,7 @@ class _NotificationPageState extends State<NotificationPage>
 
         return ListView.separated(
           padding: const EdgeInsets.all(16),
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data();
@@ -123,7 +122,7 @@ class _NotificationPageState extends State<NotificationPage>
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 16),
                 decoration: BoxDecoration(
-                  color: cs.error.withOpacity(0.1),
+                  color: cs.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(Icons.delete_outline, color: cs.error),
@@ -136,16 +135,16 @@ class _NotificationPageState extends State<NotificationPage>
                   decoration: BoxDecoration(
                     color: isRead
                         ? cs.surface
-                        : statusColor.withOpacity(0.06),
+                        : statusColor.withValues(alpha: 0.06),
                     border: Border.all(
                       color: isRead
                           ? cs.outlineVariant
-                          : statusColor.withOpacity(0.3),
+                          : statusColor.withValues(alpha: 0.3),
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: cs.shadow.withOpacity(0.04),
+                        color: cs.shadow.withValues(alpha: 0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -158,7 +157,7 @@ class _NotificationPageState extends State<NotificationPage>
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.12),
+                        color: statusColor.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(statusIcon, color: statusColor, size: 22),
@@ -183,7 +182,7 @@ class _NotificationPageState extends State<NotificationPage>
                           const SizedBox(height: 4),
                           Text(dateStr,
                               style: TextStyle(
-                                  color: cs.onSurfaceVariant.withOpacity(0.6),
+                                  color: cs.onSurfaceVariant.withValues(alpha: 0.6),
                                   fontSize: 11)),
                         ],
                       ],
@@ -228,7 +227,7 @@ class _NotificationPageState extends State<NotificationPage>
 
         return ListView.separated(
           padding: const EdgeInsets.all(16),
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
@@ -258,7 +257,7 @@ class _NotificationPageState extends State<NotificationPage>
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.15),
+                      color: statusColor.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(_statusIcon(status),
@@ -333,7 +332,7 @@ class _NotificationPageState extends State<NotificationPage>
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: cs.onSurface.withOpacity(0.5))),
+                  color: cs.onSurface.withValues(alpha: 0.5))),
           const SizedBox(height: 6),
           Text(subtitle,
               textAlign: TextAlign.center,
@@ -362,9 +361,9 @@ class _NotificationPageState extends State<NotificationPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(status,
           style: TextStyle(

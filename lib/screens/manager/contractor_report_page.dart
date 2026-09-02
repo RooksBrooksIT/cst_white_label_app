@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_button.dart';
 import 'package:demo_cst/utils/responsive.dart';
@@ -370,7 +369,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     Color cardAccent,
   ) {
     return DropdownButtonFormField<String>(
-      value: (value != null && items.contains(value)) ? value : null,
+      initialValue: (value != null && items.contains(value)) ? value : null,
       dropdownColor: Colors.white,
       iconEnabledColor: cardAccent,
       style: const TextStyle(
@@ -467,7 +466,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: expenses.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (ctx, i) {
             final exp = expenses[i];
             final date = _formatDate(exp['date']);
@@ -479,7 +478,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: theme.primaryColor.withOpacity(0.08),
+                      color: theme.primaryColor.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -601,7 +600,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final pdfPrimaryColor = PdfColor.fromInt(
-      Theme.of(context).primaryColor.value,
+      Theme.of(context).primaryColor.toARGB32(),
     );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 

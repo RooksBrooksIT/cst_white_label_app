@@ -142,11 +142,11 @@ class ProjectDetailsPage extends StatefulWidget {
   final String ownerPhoneNumber;
 
   const ProjectDetailsPage({
-    Key? key,
+    super.key,
     required this.siteId,
     required this.ownerName,
     required this.ownerPhoneNumber,
-  }) : super(key: key);
+  });
 
   @override
   State<ProjectDetailsPage> createState() => _ProjectDetailsPageState();
@@ -531,6 +531,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -551,7 +553,7 @@ class MyApp extends StatelessWidget {
 
 // Project list page to navigate to details
 class ProjectListPage extends StatelessWidget {
-  const ProjectListPage({Key? key}) : super(key: key);
+  const ProjectListPage({super.key});
 
   @override
   Widget build(BuildContext context) {

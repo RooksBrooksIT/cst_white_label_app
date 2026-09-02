@@ -208,13 +208,13 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
               const Text('FINANCIAL UTILIZATION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: healthColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: healthColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                 child: Text(status, style: TextStyle(color: healthColor, fontWeight: FontWeight.bold, fontSize: 12)),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          LinearProgressIndicator(value: progress, backgroundColor: theme.colorScheme.surfaceVariant, color: healthColor, minHeight: 12, borderRadius: BorderRadius.circular(6)),
+          LinearProgressIndicator(value: progress, backgroundColor: theme.colorScheme.surfaceContainerHighest, color: healthColor, minHeight: 12, borderRadius: BorderRadius.circular(6)),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

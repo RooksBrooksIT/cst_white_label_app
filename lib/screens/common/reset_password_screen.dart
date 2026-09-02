@@ -176,7 +176,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       Text(
                         'Enter your registered email address to receive a password reset link.',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -210,7 +210,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   child: Text(
                     'Back to Login',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       fontWeight: FontWeight.w600,
                     ),
                   ),

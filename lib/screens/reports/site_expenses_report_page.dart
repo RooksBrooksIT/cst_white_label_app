@@ -5,7 +5,6 @@ import 'package:demo_cst/services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'dart:typed_data';
 import '/utils/pdf_templates.dart';
 import '/utils/app_theme.dart';
 
@@ -62,7 +61,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       ).doc(docId).get();
       Map<String, dynamic>? supervisorData;
       if (supervisorDoc.exists) {
-        final data = supervisorDoc.data() as Map<String, dynamic>?;
+        final data = supervisorDoc.data();
         if (widget.projectStage != null) {
           final docStage = (data?['projectStage'] ?? data?['projectField'])
               ?.toString()
@@ -190,7 +189,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
   ) async {
     final pdf = pw.Document();
     final DateFormat displayDateFormat = DateFormat('dd-MMM-yyyy');
-    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.toARGB32());
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     pdf.addPage(
@@ -595,7 +594,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
+                              color: Colors.grey.withValues(alpha: 0.1),
                               blurRadius: 8,
                               offset: Offset(0, 4),
                             ),
@@ -676,7 +675,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 20.0),
                       child: Card(
-                        color: primaryColor.withOpacity(0.1),
+                        color: primaryColor.withValues(alpha: 0.1),
                         elevation: 2,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -733,7 +732,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                   );
                   return ListView.separated(
                     itemCount: cards.length,
-                    separatorBuilder: (_, __) => SizedBox(height: 12),
+                    separatorBuilder: (_, _) => SizedBox(height: 12),
                     itemBuilder: (context, index) => cards[index],
                   );
                 },
@@ -755,7 +754,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),
@@ -803,7 +802,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: textColor.withOpacity(0.7),
+                color: textColor.withValues(alpha: 0.7),
                 fontSize: 14,
               ),
             ),
@@ -880,7 +879,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
             scrollDirection: Axis.horizontal,
             child: DataTable(
               headingRowColor: WidgetStateProperty.all(
-                primaryColor.withOpacity(0.1),
+                primaryColor.withValues(alpha: 0.1),
               ),
               columns: [
                 DataColumn(

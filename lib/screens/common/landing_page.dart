@@ -204,105 +204,10 @@ class _LandingPageState extends State<LandingPage> {
     FirestoreService.setOrgPath(dynamicPath ?? '');
     await AppTheme.syncWithFirestore(dynamicPath ?? '');
 
-    // Check payment pending state
-    bool isPaymentPending = false;
-    try {
-      var subDoc = await FirebaseFirestore.instance
-          .collection('organisation')
-          .doc(dynamicPath)
-          .collection('data')
-          .doc('subscription')
-          .get();
-      if (!subDoc.exists) {
-        subDoc = await FirebaseFirestore.instance
-            .collection('organisation')
-            .doc(dynamicPath)
-            .get();
-      }
-      final subData = subDoc.data();
-      if (subData != null) {
-        final plan = (subData['subscriptionPlan'] ?? '').toString().trim();
-        final onboardingStep = (subData['onboardingStep'] ??
-                userData['onboardingStep'] ??
-                '')
-            .toString()
-            .trim();
-        final paymentStatus = (subData['paymentStatus'] ??
-                userData['paymentStatus'] ??
-                '')
-            .toString()
-            .trim();
-        final isSubActive = subData['isSubscriptionActive'] == true;
-
-        if (!isSubActive &&
-            (onboardingStep == 'PAYMENT_PENDING' ||
-                plan == 'Pending Selection' ||
-                (plan.isEmpty && onboardingStep != 'COMPLETED' && paymentStatus == 'PENDING'))) {
-          isPaymentPending = true;
-        }
-      }
-    } catch (_) {}
-
-    final authData = {
-      ...userData,
-      'dynamicPath': dynamicPath,
-      'fullConfigPath': fullConfigPath,
-    };
-    await AuthService().login(UserRole.organization, authData);
-
-    if (!mounted) return;
-
-    if (isPaymentPending) {
-      final rootDoc = await FirebaseFirestore.instance
-          .collection('organisation')
-          .doc(dynamicPath)
-          .get();
-      final rootData = rootDoc.data() ?? {};
-      final String effectiveOrgName =
-          rootData['org_name'] ?? storedOrgName ?? 'Organization';
-      final String effectiveAppName =
-          rootData['app_name'] ?? effectiveOrgName;
-      final String themeHex = rootData['theme_color'] ?? '#00A86B';
-      final Color primaryColor = AppTheme.hexToColor(themeHex);
-
-      String dateStr = '';
-      if (dynamicPath != null && dynamicPath.contains('_')) {
-        dateStr = dynamicPath.split('_').last;
-      }
-
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PricingScreen(
-            orgName: effectiveOrgName,
-            appName: effectiveAppName,
-            selectedColor: primaryColor,
-            dateStr: dateStr,
-            username: username,
-            password: password,
-            email: email,
-          ),
-        ),
-      );
-      return;
-    }
-
-    final isSubscriptionValid = await AuthService().checkSubscriptionStatus();
-    if (!mounted) return;
-
-    if (isSubscriptionValid) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const OrganizationDashboard()),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const OrganizationSubscriptionPage()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const OrganizationDashboard()),
+    );
   }
 
   // 2. Manager Login

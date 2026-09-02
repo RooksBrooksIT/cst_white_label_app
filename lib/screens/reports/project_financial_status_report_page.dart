@@ -41,7 +41,7 @@ class _ProjectFinancialStatusReportPageState
       final snapshot = await FirestoreService.getCollection('projects').get();
       final ids = snapshot.docs
           .map((doc) => doc.data()['siteId']?.toString())
-          .where((v) => v != null && v!.trim().isNotEmpty)
+          .where((v) => v != null && v.trim().isNotEmpty)
           .map((v) => v!)
           .toSet()
           .toList();
@@ -246,7 +246,7 @@ class _ProjectFinancialStatusReportPageState
                     child: CircularProgressIndicator(),
                   ))
                 : DropdownButtonFormField<String>(
-                    value: selectedSiteId,
+                    initialValue: selectedSiteId,
                     isExpanded: true,
                     dropdownColor: Colors.white,
                     iconEnabledColor: primaryColor,

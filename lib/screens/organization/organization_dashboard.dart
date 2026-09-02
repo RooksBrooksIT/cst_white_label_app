@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
-import 'package:demo_cst/screens/reports/insights_dashboard.dart';
 import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
 import 'package:demo_cst/screens/organization/organization_expenses.dart';
 import 'package:demo_cst/screens/reports/tools_inventory_report.dart';
@@ -16,10 +15,9 @@ import 'package:demo_cst/screens/organization/org_notification_page.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/screens/organization/org_menu_screen.dart';
-import 'package:demo_cst/screens/organization/org_subscription_page.dart';
 import 'package:demo_cst/screens/organization/org_sites_list_page.dart';
 import 'package:demo_cst/screens/manager/manager_config_screen.dart';
-import 'package:demo_cst/screens/manager/project_setup_wizard.dart';
+import 'package:demo_cst/widgets/bottom_nav.dart';
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -30,19 +28,52 @@ class OrganizationDashboard extends StatefulWidget {
 
 class _OrganizationDashboardState extends State<OrganizationDashboard> {
   final ScrollController _scrollController = ScrollController();
+  final PageController _kpiPageController = PageController(
+    initialPage: 400,
+    viewportFraction: 0.92,
+  );
+  final ValueNotifier<int> _currentKpiPageNotifier = ValueNotifier<int>(0);
   StreamSubscription<DocumentSnapshot>? _subscriptionListener;
   String _userName = '';
   String _userRole = 'Organization Head';
-  int _selectedNavIndex = 0;
   String _selectedKpiPeriod = 'Today';
   DateTime? _lastBackPressTime;
+  Timer? _carouselTimer;
+
+  // Cached Stream handles to avoid repeated subscriptions on rebuilds
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _notificationsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _projectsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _materialRequestsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _siteScheduleStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _supervisorRequestsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _expensesStream;
 
   @override
   void initState() {
     super.initState();
+    _initStreams();
     _loadUserData();
-    _checkSubscription();
-    _startSubscriptionListener();
+    _startAutoPlayCarousel();
+  }
+
+  void _initStreams() {
+    _notificationsStream = FirestoreService.getCollection('notifications').snapshots();
+    _projectsStream = FirestoreService.projects.snapshots();
+    _materialRequestsStream = FirestoreService.getCollection('materialRequests').snapshots();
+    _siteScheduleStream = FirestoreService.siteSupervisorProjectStageSchedule.snapshots();
+    _supervisorRequestsStream = FirestoreService.getCollection('supervisor_requests').snapshots();
+    _expensesStream = FirestoreService.getCollection('totalSiteExpensesPerDay').snapshots();
+  }
+
+  void _startAutoPlayCarousel() {
+    _carouselTimer?.cancel();
+    _carouselTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!mounted || !_kpiPageController.hasClients) return;
+      _kpiPageController.nextPage(
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeInOutCubic,
+      );
+    });
   }
 
   String _getGreeting() {
@@ -68,44 +99,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       _userName = name.toString();
       _userRole = userData['role'] ?? 'Organization Head';
     });
-  }
-
-  void _startSubscriptionListener() {
-    _subscriptionListener = FirestoreService.subscriptionDoc.snapshots().listen(
-      (snapshot) {
-        if (snapshot.exists && mounted) {
-          final data = snapshot.data()!;
-          final isActive = data['isSubscriptionActive'] as bool? ?? true;
-          final endDate = data['subscriptionEndDate'] as Timestamp?;
-          bool isExpired = false;
-          if (endDate != null) {
-            isExpired = DateTime.now().isAfter(
-              endDate.toDate().add(const Duration(hours: 1)),
-            );
-          }
-          if (!isActive || isExpired) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrganizationSubscriptionPage(),
-              ),
-            );
-          }
-        }
-      },
-    );
-  }
-
-  Future<void> _checkSubscription() async {
-    final isValid = await AuthService().checkSubscriptionStatus();
-    if (!isValid && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const OrganizationSubscriptionPage(),
-        ),
-      );
-    }
   }
 
   String _formatCurrency(num value) {
@@ -134,8 +127,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   @override
   void dispose() {
+    _carouselTimer?.cancel();
+    _currentKpiPageNotifier.dispose();
     _subscriptionListener?.cancel();
     _scrollController.dispose();
+    _kpiPageController.dispose();
     super.dispose();
   }
 
@@ -188,67 +184,70 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       child: ValueListenableBuilder<Color>(
         valueListenable: AppTheme.primaryColor,
         builder: (context, primaryColor, _) {
+          final darkAccent = AppTheme.getDarkAccent(primaryColor);
+          final dynamicGradientColors =
+              AppTheme.getBackgroundGradientColors(primaryColor);
+
           return Theme(
             data: AppTheme.getTheme(primaryColor),
-            child: Builder(
-              builder: (context) {
-                final darkAccent = AppTheme.getDarkAccent(primaryColor);
-
-                return Scaffold(
-                  backgroundColor: const Color(0xFFF9FAFC),
-                  bottomNavigationBar: _buildBottomNavigationBar(
-                    primaryColor,
-                    darkAccent,
-                  ),
-                  body: SafeArea(
-                    bottom: false,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: Responsive.maxContentWidth,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: dynamicGradientColors,
+                  stops: const [0.0, 0.35, 0.7, 1.0],
+                ),
+              ),
+              child: Scaffold(
+                backgroundColor: Colors.transparent,
+                extendBody: true,
+                bottomNavigationBar: const BottomNav(currentIndex: 0),
+                body: SafeArea(
+                  bottom: false,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: Responsive.maxContentWidth,
+                      ),
+                      child: CustomScrollView(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
                         ),
-                        child: CustomScrollView(
-                          controller: _scrollController,
-                          physics: const AlwaysScrollableScrollPhysics(
-                            parent: BouncingScrollPhysics(),
+                        slivers: [
+                          // 1. Top Header
+                          SliverToBoxAdapter(
+                            child: _buildHeader(context, primaryColor),
                           ),
-                          slivers: [
-                            // 1. Top Header (Greeting, User Name, Role, Notification, Avatar)
-                            SliverToBoxAdapter(
-                              child: _buildHeader(context, primaryColor),
-                            ),
 
-                            // 2. Dashboard KPIs Overview (Real-time dynamic data)
-                            SliverToBoxAdapter(
-                              child: _buildKPIsOverview(context, primaryColor),
+                          // 2. Dashboard KPIs Overview Carousel (includes Site Status tab)
+                          SliverToBoxAdapter(
+                            child: _buildKPIsCarousel(
+                              context,
+                              primaryColor,
+                              darkAccent,
                             ),
+                          ),
 
-                            // 3. Site Status (Planning, In Progress, Overdue, Pending)
-                            SliverToBoxAdapter(
-                              child: _buildSiteStatusSection(
-                                context,
-                                primaryColor,
-                              ),
+                          // 3. Quick Actions Bento Section
+                          SliverToBoxAdapter(
+                            child: _buildQuickActionsBentoSection(
+                              context,
+                              primaryColor,
+                              darkAccent,
                             ),
+                          ),
 
-                            // 4. Quick Actions (8 shortcuts)
-                            SliverToBoxAdapter(
-                              child: _buildQuickActionsSection(
-                                context,
-                                primaryColor,
-                              ),
-                            ),
-
-                            const SliverToBoxAdapter(
-                              child: SizedBox(height: 30),
-                            ),
-                          ],
-                        ),
+                          const SliverToBoxAdapter(
+                            child: SizedBox(height: 80),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
           );
         },
@@ -262,46 +261,60 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     final hPad = Responsive.horizontalPadding(context);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 18),
+      padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left: Greeting, Name, Role
+          // Greeting & User info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _getGreeting(),
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF64748B),
-                    letterSpacing: 0.1,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      _getGreeting(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _userRole,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   _userName.isNotEmpty ? _userName : 'Organization',
                   style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF0F172A),
-                    letterSpacing: -0.4,
+                    letterSpacing: -0.5,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _userRole,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF94A3B8),
-                  ),
                 ),
               ],
             ),
@@ -313,9 +326,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             children: [
               // Notification Bell with Badge
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirestoreService.getCollection(
-                  'notifications',
-                ).snapshots(),
+                stream: _notificationsStream,
                 builder: (context, snapshot) {
                   final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
 
@@ -334,9 +345,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
@@ -367,13 +378,14 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       ),
                       if (count > 0)
                         Positioned(
-                          top: -2,
-                          right: -2,
+                          top: -1,
+                          right: -1,
                           child: Container(
                             padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFEF4444),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444),
                               shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
                             ),
                             constraints: const BoxConstraints(
                               minWidth: 18,
@@ -384,7 +396,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                                 '$count',
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 10,
+                                  fontSize: 9.5,
                                   fontWeight: FontWeight.w900,
                                   height: 1,
                                 ),
@@ -396,25 +408,25 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   );
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
 
               // Profile Avatar
               GestureDetector(
                 onTap: () => _navigateToOrgMenu(context),
                 child: Container(
-                  width: 46,
-                  height: 46,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                    gradient: LinearGradient(
+                      colors: [primaryColor, AppTheme.getDarkAccent(primaryColor)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     border: Border.all(color: Colors.white, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
+                        color: primaryColor.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -424,8 +436,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     child: Text(
                       _userName.isNotEmpty ? _userName[0].toUpperCase() : 'O',
                       style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
                         color: Colors.white,
                       ),
                     ),
@@ -439,37 +451,54 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  // -------------------- 2. KPIS OVERVIEW --------------------
+  // -------------------- 2. KPIS OVERVIEW CAROUSEL --------------------
 
-  Widget _buildKPIsOverview(BuildContext context, Color primaryColor) {
+  Widget _buildKPIsCarousel(
+    BuildContext context,
+    Color primaryColor,
+    Color darkAccent,
+  ) {
     final hPad = Responsive.horizontalPadding(context);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title & Dropdown Row
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title & Filter Dropdown Row
+        Padding(
+          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'KPIs Overview',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: -0.3,
-                ),
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'KPIs Overview',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
               ),
               // Filter Dropdown Pill
               PopupMenuButton<String>(
                 initialValue: _selectedKpiPeriod,
                 onSelected: (val) => setState(() => _selectedKpiPeriod = val),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                elevation: 4,
+                elevation: 6,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -481,15 +510,21 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 13,
+                        color: primaryColor,
+                      ),
+                      const SizedBox(width: 6),
                       Text(
                         _selectedKpiPeriod,
                         style: const TextStyle(
@@ -516,329 +551,770 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+        ),
 
-          // Streams for real-time project metrics & financial metrics
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirestoreService.projects.snapshots(),
-            builder: (context, projSnap) {
-              final projDocs = projSnap.hasData ? projSnap.data!.docs : [];
-              int activeSitesCount = 0;
-              int projectsInProgressCount = 0;
-              double totalAmountSpent = 0.0;
-              double totalAmountBalance = 0.0;
-              double totalAmountPaid = 0.0;
+        // Real-time Streams (using cached stream subscriptions)
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _projectsStream,
+          builder: (context, projSnap) {
+            final projDocs = projSnap.hasData ? projSnap.data!.docs : [];
+            int activeSitesCount = 0;
+            int projectsInProgressCount = 0;
+            int planningCount = 0;
+            int overdueCount = 0;
+            int pendingSitesCount = 0;
+            double totalAmountSpent = 0.0;
+            double totalAmountBalance = 0.0;
+            double totalAmountPaid = 0.0;
 
-              for (var doc in projDocs) {
-                final data = doc.data();
-                final status =
-                    (data['currentStatus'] ?? data['status'] ?? 'Ongoing')
-                        .toString()
-                        .toLowerCase();
+            final now = DateTime.now();
+            for (var doc in projDocs) {
+              final data = doc.data();
+              final s =
+                  (data['currentStatus'] ?? data['status'] ?? 'Ongoing')
+                      .toString()
+                      .toLowerCase();
 
-                if (status.contains('ongoing') ||
-                    status.contains('active') ||
-                    status.contains('progress') ||
-                    status.contains('execution')) {
-                  projectsInProgressCount++;
-                  activeSitesCount++;
-                } else if (!status.contains('complete') &&
-                    !status.contains('finish') &&
-                    !status.contains('closed')) {
-                  activeSitesCount++;
-                }
-
-                if (data['amountSpent'] is num) {
-                  totalAmountSpent += (data['amountSpent'] as num).toDouble();
-                }
-                if (data['amountBalance'] is num) {
-                  totalAmountBalance += (data['amountBalance'] as num).toDouble();
-                }
-                if (data['amountPaid'] is num) {
-                  totalAmountPaid += (data['amountPaid'] as num).toDouble();
-                }
+              DateTime? endDate;
+              if (data['endDate'] is Timestamp) {
+                endDate = (data['endDate'] as Timestamp).toDate();
+              } else if (data['expectedCompletionDate'] is Timestamp) {
+                endDate = (data['expectedCompletionDate'] as Timestamp).toDate();
               }
 
-              final displayActiveSites = activeSitesCount < 10
-                  ? '0$activeSitesCount'
-                  : '$activeSitesCount';
-              final displayProjects = projectsInProgressCount < 10
-                  ? '0$projectsInProgressCount'
-                  : '$projectsInProgressCount';
+              final isDelayed = s.contains('delay') ||
+                  s.contains('overdue') ||
+                  (endDate != null && endDate.isBefore(now) && !s.contains('complete') && !s.contains('finish'));
 
-              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirestoreService.getCollection('materialRequests').snapshots(),
-                builder: (context, matSnap) {
-                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirestoreService.siteSupervisorProjectStageSchedule.snapshots(),
-                    builder: (context, wsSnap) {
-                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: FirestoreService.getCollection('supervisor_requests').snapshots(),
-                        builder: (context, supSnap) {
-                          int pendingApprovalsCount = 0;
-                          if (matSnap.hasData) {
-                            pendingApprovalsCount += matSnap.data!.docs.where((d) {
-                              final s = (d.data()['status'] ?? 'Processing').toString().toLowerCase();
-                              return s.contains('pending') || s.contains('processing');
-                            }).length;
-                          }
-                          if (wsSnap.hasData) {
-                            pendingApprovalsCount += wsSnap.data!.docs.where((d) {
-                              final s = (d.data()['approvalStatus'] ?? d.data()['status'] ?? 'Pending').toString().toLowerCase();
-                              return s.contains('pending') || s.contains('processing');
-                            }).length;
-                          }
-                          if (supSnap.hasData) {
-                            pendingApprovalsCount += supSnap.data!.docs.where((d) {
-                              final s = (d.data()['status'] ?? 'Pending').toString().toLowerCase();
-                              return s.contains('pending') || s.contains('processing');
-                            }).length;
-                          }
+              if (isDelayed) {
+                overdueCount++;
+              } else if (s.contains('plan') || s.contains('draft') || s.contains('upcoming') || s.contains('setup')) {
+                planningCount++;
+              } else if (s.contains('progress') || s.contains('ongoing') || s.contains('active') || s.contains('execution')) {
+                projectsInProgressCount++;
+              } else if (s.contains('hold') || s.contains('pending') || s.contains('pause') || s.contains('suspend')) {
+                pendingSitesCount++;
+              } else if (!s.contains('complete') && !s.contains('finish')) {
+                projectsInProgressCount++;
+              }
 
-                          final displayPending = pendingApprovalsCount < 10
-                              ? '0$pendingApprovalsCount'
-                              : '$pendingApprovalsCount';
+              if (s.contains('ongoing') ||
+                  s.contains('active') ||
+                  s.contains('progress') ||
+                  s.contains('execution') ||
+                  (!s.contains('complete') && !s.contains('finish') && !s.contains('closed'))) {
+                activeSitesCount++;
+              }
 
-                          // Real-time Expense Stream
-                          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                            stream: FirestoreService.getCollection('totalSiteExpensesPerDay').snapshots(),
-                            builder: (context, expSnap) {
-                              double computedExpenses = 0.0;
-                              final now = DateTime.now();
-                              final todayStr1 = DateFormat('yyyy-MM-dd').format(now);
-                              final todayStr2 = DateFormat('dd-MM-yyyy').format(now);
-                              final todayStr3 = DateFormat('d-M-yyyy').format(now);
-                              final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-                              final startOfMonth = DateTime(now.year, now.month, 1);
+              if (data['amountSpent'] is num) {
+                totalAmountSpent += (data['amountSpent'] as num).toDouble();
+              }
+              if (data['amountBalance'] is num) {
+                totalAmountBalance += (data['amountBalance'] as num).toDouble();
+              }
+              if (data['amountPaid'] is num) {
+                totalAmountPaid += (data['amountPaid'] as num).toDouble();
+              }
+            }
 
-                              if (expSnap.hasData) {
-                                for (var doc in expSnap.data!.docs) {
-                                  final data = doc.data();
-                                  double amount = 0.0;
-                                  if (data['totalAllExpenses'] is num) {
-                                    amount = (data['totalAllExpenses'] as num).toDouble();
-                                  } else {
-                                    final sExp = (data['totalSiteExpense'] is num ? (data['totalSiteExpense'] as num).toDouble() : 0.0);
-                                    final mExp = (data['totalMgrExpense'] is num ? (data['totalMgrExpense'] as num).toDouble() : 0.0);
-                                    final oExp = (data['totalOrgExpense'] is num ? (data['totalOrgExpense'] as num).toDouble() : 0.0);
-                                    final cExp = (data['totalContractorExpense'] is num ? (data['totalContractorExpense'] as num).toDouble() : 0.0);
-                                    final iExp = (data['totalIncentiveExpenses'] is num ? (data['totalIncentiveExpenses'] as num).toDouble() : 0.0);
-                                    amount = sExp + mExp + oExp + cExp + iExp;
-                                  }
+            final displayActiveSites = activeSitesCount < 10
+                ? '0$activeSitesCount'
+                : '$activeSitesCount';
+            final displayProjects = projectsInProgressCount < 10
+                ? '0$projectsInProgressCount'
+                : '$projectsInProgressCount';
+            final displayPlanning = planningCount < 10
+                ? '0$planningCount'
+                : '$planningCount';
+            final displayOverdue = overdueCount < 10
+                ? '0$overdueCount'
+                : '$overdueCount';
+            final displayPendingSites = pendingSitesCount < 10
+                ? '0$pendingSitesCount'
+                : '$pendingSitesCount';
 
-                                  final docDateStr = (data['date'] ?? '').toString();
-                                  DateTime? docDate;
-                                  if (data['updatedAt'] is Timestamp) {
-                                    docDate = (data['updatedAt'] as Timestamp).toDate();
-                                  } else if (data['timestamp'] is Timestamp) {
-                                    docDate = (data['timestamp'] as Timestamp).toDate();
-                                  } else if (docDateStr.isNotEmpty) {
-                                    try {
-                                      docDate = DateTime.tryParse(docDateStr);
-                                    } catch (_) {}
-                                  }
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _materialRequestsStream,
+              builder: (context, matSnap) {
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _siteScheduleStream,
+                  builder: (context, wsSnap) {
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: _supervisorRequestsStream,
+                      builder: (context, supSnap) {
+                        int pendingApprovalsCount = 0;
+                        if (matSnap.hasData) {
+                          pendingApprovalsCount += matSnap.data!.docs.where((d) {
+                            final s = (d.data()['status'] ?? 'Processing').toString().toLowerCase();
+                            return s.contains('pending') || s.contains('processing');
+                          }).length;
+                        }
+                        if (wsSnap.hasData) {
+                          pendingApprovalsCount += wsSnap.data!.docs.where((d) {
+                            final s = (d.data()['approvalStatus'] ?? d.data()['status'] ?? 'Pending').toString().toLowerCase();
+                            return s.contains('pending') || s.contains('processing');
+                          }).length;
+                        }
+                        if (supSnap.hasData) {
+                          pendingApprovalsCount += supSnap.data!.docs.where((d) {
+                            final s = (d.data()['status'] ?? 'Pending').toString().toLowerCase();
+                            return s.contains('pending') || s.contains('processing');
+                          }).length;
+                        }
 
-                                  if (_selectedKpiPeriod == 'Today') {
-                                    if (docDateStr == todayStr1 ||
-                                        docDateStr == todayStr2 ||
-                                        docDateStr == todayStr3 ||
-                                        (docDate != null &&
-                                            docDate.year == now.year &&
-                                            docDate.month == now.month &&
-                                            docDate.day == now.day)) {
-                                      computedExpenses += amount;
-                                    }
-                                  } else if (_selectedKpiPeriod == 'This Week') {
-                                    if (docDate != null && docDate.isAfter(startOfWeek.subtract(const Duration(days: 1)))) {
-                                      computedExpenses += amount;
-                                    } else if (docDate == null) {
-                                      computedExpenses += amount;
-                                    }
-                                  } else if (_selectedKpiPeriod == 'This Month') {
-                                    if (docDate != null && docDate.isAfter(startOfMonth.subtract(const Duration(days: 1)))) {
-                                      computedExpenses += amount;
-                                    } else if (docDate == null) {
-                                      computedExpenses += amount;
-                                    }
-                                  } else {
-                                    // 'All Time'
+                        final displayPending = pendingApprovalsCount < 10
+                            ? '0$pendingApprovalsCount'
+                            : '$pendingApprovalsCount';
+
+                        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: _expensesStream,
+                          builder: (context, expSnap) {
+                            double computedExpenses = 0.0;
+                            final now = DateTime.now();
+                            final todayStr1 = DateFormat('yyyy-MM-dd').format(now);
+                            final todayStr2 = DateFormat('dd-MM-yyyy').format(now);
+                            final todayStr3 = DateFormat('d-M-yyyy').format(now);
+                            final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+                            final startOfMonth = DateTime(now.year, now.month, 1);
+
+                            if (expSnap.hasData) {
+                              for (var doc in expSnap.data!.docs) {
+                                final data = doc.data();
+                                double amount = 0.0;
+                                if (data['totalAllExpenses'] is num) {
+                                  amount = (data['totalAllExpenses'] as num).toDouble();
+                                } else {
+                                  final sExp = (data['totalSiteExpense'] is num ? (data['totalSiteExpense'] as num).toDouble() : 0.0);
+                                  final mExp = (data['totalMgrExpense'] is num ? (data['totalMgrExpense'] as num).toDouble() : 0.0);
+                                  final oExp = (data['totalOrgExpense'] is num ? (data['totalOrgExpense'] as num).toDouble() : 0.0);
+                                  final cExp = (data['totalContractorExpense'] is num ? (data['totalContractorExpense'] as num).toDouble() : 0.0);
+                                  final iExp = (data['totalIncentiveExpenses'] is num ? (data['totalIncentiveExpenses'] as num).toDouble() : 0.0);
+                                  amount = sExp + mExp + oExp + cExp + iExp;
+                                }
+
+                                final docDateStr = (data['date'] ?? '').toString();
+                                DateTime? docDate;
+                                if (data['updatedAt'] is Timestamp) {
+                                  docDate = (data['updatedAt'] as Timestamp).toDate();
+                                } else if (data['timestamp'] is Timestamp) {
+                                  docDate = (data['timestamp'] as Timestamp).toDate();
+                                } else if (docDateStr.isNotEmpty) {
+                                  try {
+                                    docDate = DateTime.tryParse(docDateStr);
+                                  } catch (_) {}
+                                }
+
+                                if (_selectedKpiPeriod == 'Today') {
+                                  if (docDateStr == todayStr1 ||
+                                      docDateStr == todayStr2 ||
+                                      docDateStr == todayStr3 ||
+                                      (docDate != null &&
+                                          docDate.year == now.year &&
+                                          docDate.month == now.month &&
+                                          docDate.day == now.day)) {
                                     computedExpenses += amount;
                                   }
+                                } else if (_selectedKpiPeriod == 'This Week') {
+                                  if (docDate != null && docDate.isAfter(startOfWeek.subtract(const Duration(days: 1)))) {
+                                    computedExpenses += amount;
+                                  } else if (docDate == null) {
+                                    computedExpenses += amount;
+                                  }
+                                } else if (_selectedKpiPeriod == 'This Month') {
+                                  if (docDate != null && docDate.isAfter(startOfMonth.subtract(const Duration(days: 1)))) {
+                                    computedExpenses += amount;
+                                  } else if (docDate == null) {
+                                    computedExpenses += amount;
+                                  }
+                                } else {
+                                  computedExpenses += amount;
                                 }
                               }
+                            }
 
-                              if (computedExpenses == 0.0 && _selectedKpiPeriod == 'All Time') {
-                                computedExpenses = totalAmountSpent;
-                              }
+                            if (computedExpenses == 0.0 && _selectedKpiPeriod == 'All Time') {
+                              computedExpenses = totalAmountSpent;
+                            }
 
-                              double availableBalance = totalAmountBalance;
-                              if (availableBalance <= 0.0 && totalAmountPaid > 0.0) {
-                                availableBalance = totalAmountPaid - totalAmountSpent;
-                              }
+                            double availableBalance = totalAmountBalance;
+                            if (availableBalance <= 0.0 && totalAmountPaid > 0.0) {
+                              availableBalance = totalAmountPaid - totalAmountSpent;
+                            }
 
-                              final expenseLabel = _selectedKpiPeriod == 'Today'
-                                  ? "Today's Expenses"
-                                  : (_selectedKpiPeriod == 'This Week'
-                                      ? "This Week's Expenses"
-                                      : (_selectedKpiPeriod == 'This Month'
-                                          ? "Monthly Expenses"
-                                          : "Total Expenses"));
+                            final expenseLabel = _selectedKpiPeriod == 'Today'
+                                ? "Today's Expenses"
+                                : (_selectedKpiPeriod == 'This Week'
+                                    ? "This Week's Expenses"
+                                    : (_selectedKpiPeriod == 'This Month'
+                                        ? "Monthly Expenses"
+                                        : "Total Expenses"));
 
-                              final displayExpenses = _formatCurrency(computedExpenses);
-                              final displayBalance = _formatCurrency(availableBalance);
+                            final displayExpenses = _formatCurrency(computedExpenses);
+                            final displayBalance = _formatCurrency(availableBalance);
 
-                              return Column(
-                                children: [
-                                  // 2x2 Grid Summary Cards
-                                  Row(
-                                    children: [
-                                      // Card 1: Active Sites (Soft Blue)
-                                      Expanded(
-                                        child: _buildKpiCard(
-                                          value: displayActiveSites,
-                                          label: 'Active Sites',
-                                          valueColor: const Color(0xFF2563EB),
-                                          labelColor: const Color(0xFF2563EB),
-                                          bgColor: const Color(0xFFEEF5FF),
-                                          borderColor: const Color(0xFFDBEAFE),
-                                          onTap: () => _navigateToSitesList(context, 'All'),
+                            // Build Carousel Slides
+                            final slides = [
+                              // Slide 1: Financial Overview (Hero Gradient Card)
+                              _buildHeroBalanceSlide(
+                                context,
+                                balance: displayBalance,
+                                expenses: displayExpenses,
+                                expenseLabel: expenseLabel,
+                                primaryColor: primaryColor,
+                                darkAccent: darkAccent,
+                              ),
+
+                              // Slide 2: Site Status & Progress (All Site Statuses)
+                              _buildSiteStatusSlide(
+                                context,
+                                activeSites: displayActiveSites,
+                                planning: displayPlanning,
+                                inProgress: displayProjects,
+                                overdue: displayOverdue,
+                                pending: displayPendingSites,
+                                primaryColor: primaryColor,
+                              ),
+
+                              // Slide 3: Approvals & Tasks
+                              _buildApprovalsSlide(
+                                context,
+                                pendingCount: displayPending,
+                                primaryColor: primaryColor,
+                              ),
+
+                              // Slide 4: Expense Breakdown
+                              _buildExpensesSlide(
+                                context,
+                                expenses: displayExpenses,
+                                expenseLabel: expenseLabel,
+                                period: _selectedKpiPeriod,
+                                primaryColor: primaryColor,
+                              ),
+                            ];
+
+                            return Column(
+                              children: [
+                                SizedBox(
+                                  height: 196,
+                                  child: PageView.builder(
+                                    controller: _kpiPageController,
+                                    onPageChanged: (index) {
+                                      _currentKpiPageNotifier.value = index % slides.length;
+                                      _startAutoPlayCarousel();
+                                    },
+                                    itemBuilder: (context, index) {
+                                      final slideIndex = index % slides.length;
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Card 2: Projects In Progress (Soft Grey/Ice)
-                                      Expanded(
-                                        child: _buildKpiCard(
-                                          value: displayProjects,
-                                          label: 'Projects In Progress',
-                                          valueColor: const Color(0xFF0F172A),
-                                          labelColor: const Color(0xFF64748B),
-                                          bgColor: const Color(0xFFF8FAFC),
-                                          borderColor: const Color(0xFFE2E8F0),
-                                          onTap: () => _navigateToSitesList(context, 'In Progress'),
-                                        ),
-                                      ),
-                                    ],
+                                        child: slides[slideIndex],
+                                      );
+                                    },
                                   ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      // Card 3: Pending Approvals (Soft Amber)
-                                      Expanded(
-                                        child: _buildKpiCard(
-                                          value: displayPending,
-                                          label: 'Pending Approvals',
-                                          valueColor: const Color(0xFF0F172A),
-                                          labelColor: const Color(0xFFD97706),
-                                          bgColor: const Color(0xFFFFFBEB),
-                                          borderColor: const Color(0xFFFEF3C7),
-                                          onTap: () => Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => const ManagerApprovalScreen(),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Card 4: Expenses (Soft Rose/Pink)
-                                      Expanded(
-                                        child: _buildKpiCard(
-                                          value: displayExpenses,
-                                          prefix: '₹ ',
-                                          prefixColor: const Color(0xFFDC2626),
-                                          label: expenseLabel,
-                                          valueColor: const Color(0xFF0F172A),
-                                          labelColor: const Color(0xFF64748B),
-                                          bgColor: const Color(0xFFFEF2F2),
-                                          borderColor: const Color(0xFFFEE2E2),
-                                          onTap: () => _navigateToOrganizationExpenses(context),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-
-                                  // Full-Width Card: Available Balance (Soft Mint)
-                                  InkWell(
-                                    onTap: () => _navigateToSitePaymentEntry(context),
-                                    borderRadius: BorderRadius.circular(18),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 18,
-                                        vertical: 16,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF0FDF4),
-                                        borderRadius: BorderRadius.circular(18),
-                                        border: Border.all(
-                                          color: const Color(0xFFDCFCE7),
-                                          width: 1.2,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          RichText(
-                                            text: TextSpan(
-                                              children: [
-                                                const TextSpan(
-                                                  text: '₹ ',
-                                                  style: TextStyle(
-                                                    fontSize: 22,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: Color(0xFF16A34A),
-                                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                // Modern Interactive Segmented Pill Indicator
+                                ValueListenableBuilder<int>(
+                                  valueListenable: _currentKpiPageNotifier,
+                                  builder: (context, activeIndex, _) {
+                                    final titles = ['Treasury', 'Operations', 'Approvals', 'Expenses'];
+                                    return Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: List.generate(
+                                        slides.length,
+                                        (index) {
+                                          final isSelected = activeIndex == index;
+                                          return GestureDetector(
+                                            onTap: () {
+                                              HapticFeedback.selectionClick();
+                                              if (_kpiPageController.hasClients) {
+                                                final currentTotalPage = (_kpiPageController.page ?? 400).round();
+                                                final currentMod = currentTotalPage % slides.length;
+                                                final targetPage = currentTotalPage + (index - currentMod);
+                                                _kpiPageController.animateToPage(
+                                                  targetPage,
+                                                  duration: const Duration(milliseconds: 450),
+                                                  curve: Curves.easeInOutCubic,
+                                                );
+                                              }
+                                              _startAutoPlayCarousel();
+                                            },
+                                            child: AnimatedContainer(
+                                              duration: const Duration(milliseconds: 280),
+                                              curve: Curves.easeOutCubic,
+                                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: isSelected ? 12 : 6,
+                                                vertical: 5,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: isSelected
+                                                    ? primaryColor
+                                                    : Colors.white.withValues(alpha: 0.6),
+                                                borderRadius: BorderRadius.circular(20),
+                                                border: Border.all(
+                                                  color: isSelected
+                                                      ? primaryColor
+                                                      : const Color(0xFFE2E8F0),
+                                                  width: 1,
                                                 ),
-                                                TextSpan(
-                                                  text: displayBalance,
-                                                  style: const TextStyle(
-                                                    fontSize: 22,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: Color(0xFF16A34A),
-                                                    letterSpacing: -0.5,
+                                                boxShadow: isSelected
+                                                    ? [
+                                                        BoxShadow(
+                                                          color: primaryColor.withValues(alpha: 0.25),
+                                                          blurRadius: 6,
+                                                          offset: const Offset(0, 2),
+                                                        ),
+                                                      ]
+                                                    : null,
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Container(
+                                                    width: 6,
+                                                    height: 6,
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      color: isSelected
+                                                          ? Colors.white
+                                                          : const Color(0xFF94A3B8),
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                  if (isSelected) ...[
+                                                    const SizedBox(width: 5),
+                                                    Text(
+                                                      titles[index],
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w800,
+                                                        letterSpacing: 0.2,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          const Text(
-                                            'Available Balance',
-                                            style: TextStyle(
-                                              fontSize: 12.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF22C55E),
-                                            ),
-                                          ),
-                                        ],
+                                          );
+                                        },
                                       ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            },
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // Slide 1: Treasury & Available Balance
+  Widget _buildHeroBalanceSlide(
+    BuildContext context, {
+    required String balance,
+    required String expenses,
+    required String expenseLabel,
+    required Color primaryColor,
+    required Color darkAccent,
+  }) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _navigateToSitePaymentEntry(context);
+      },
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Top Bar
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: primaryColor,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Financial Treasury',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Manage Funds',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            // Middle Amount
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Net Available Balance',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '₹ $balance',
+                      style: const TextStyle(
+                        fontSize: 27,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFEE2E2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Total Outflow',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF991B1B),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '₹ $expenses',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            // Bottom Progress / Sync Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF22C55E),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Live Balance Sync Active',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    expenseLabel,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Slide 2: Operations Center Modal (2x2 Matrix)
+  Widget _buildSiteStatusSlide(
+    BuildContext context, {
+    required String activeSites,
+    required String planning,
+    required String inProgress,
+    required String overdue,
+    required String pending,
+    required Color primaryColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Header Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.domain_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Site Operations',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFDBEAFE)),
+                    ),
+                    child: Text(
+                      'Total: $activeSites',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () => _navigateToSitesList(context, 'All'),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'All Sites',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        size: 11,
+                        color: primaryColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // 2x2 Grid of Status Tiles filling the card
+          Expanded(
+            child: Column(
+              children: [
+                // Row 1: Planning & In Progress
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildSiteStatusTile(
+                          title: 'Planning',
+                          count: planning,
+                          icon: Icons.architecture_rounded,
+                          accentColor: const Color(0xFF2563EB),
+                          bgColor: const Color(0xFFEFF6FF),
+                          borderColor: const Color(0xFFDBEAFE),
+                          onTap: () => _navigateToSitesList(context, 'Planning'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSiteStatusTile(
+                          title: 'In Progress',
+                          count: inProgress,
+                          icon: Icons.engineering_rounded,
+                          accentColor: const Color(0xFF16A34A),
+                          bgColor: const Color(0xFFF0FDF4),
+                          borderColor: const Color(0xFFDCFCE7),
+                          onTap: () => _navigateToSitesList(context, 'In Progress'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Row 2: Overdue & On Hold
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildSiteStatusTile(
+                          title: 'Overdue',
+                          count: overdue,
+                          icon: Icons.access_time_filled_rounded,
+                          accentColor: const Color(0xFFD97706),
+                          bgColor: const Color(0xFFFFFBEB),
+                          borderColor: const Color(0xFFFEF3C7),
+                          onTap: () => _navigateToSitesList(context, 'On Hold'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSiteStatusTile(
+                          title: 'On Hold',
+                          count: pending,
+                          icon: Icons.hourglass_top_rounded,
+                          accentColor: const Color(0xFFDC2626),
+                          bgColor: const Color(0xFFFEF2F2),
+                          borderColor: const Color(0xFFFEE2E2),
+                          onTap: () => _navigateToSitesList(context, 'On Hold'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildKpiCard({
-    required String value,
-    String? prefix,
-    Color? prefixColor,
-    required String label,
-    required Color valueColor,
-    required Color labelColor,
+  Widget _buildSiteStatusTile({
+    required String title,
+    required String count,
+    required IconData icon,
+    required Color accentColor,
     required Color bgColor,
     required Color borderColor,
     required VoidCallback onTap,
@@ -848,51 +1324,69 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         HapticFeedback.lightImpact();
         onTap();
       },
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: borderColor, width: 1.2),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor, width: 1.1),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            RichText(
-              text: TextSpan(
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor.withValues(alpha: 0.12),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(icon, color: accentColor, size: 17),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (prefix != null)
-                    TextSpan(
-                      text: prefix,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: prefixColor ?? valueColor,
-                      ),
-                    ),
-                  TextSpan(
-                    text: value,
+                  Text(
+                    count,
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      color: valueColor,
-                      letterSpacing: -0.5,
+                      color: accentColor,
+                      letterSpacing: -0.3,
+                      height: 1.0,
                     ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF475569),
+                      height: 1.0,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: labelColor,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 15,
+              color: accentColor.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -900,66 +1394,401 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  // -------------------- 3. SITE STATUS SECTION --------------------
+  // Slide 3: Workflow Approvals
+  Widget _buildApprovalsSlide(
+    BuildContext context, {
+    required String pendingCount,
+    required Color primaryColor,
+  }) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ManagerApprovalScreen(),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Top Bar
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.fact_check_rounded,
+                        color: Color(0xFFD97706),
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Workflow Approvals',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD97706),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFD97706).withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Review All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
-  Widget _buildSiteStatusSection(BuildContext context, Color primaryColor) {
-    final hPad = Responsive.horizontalPadding(context);
+            // Middle Info
+            Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFFEF3C7), width: 2),
+                  ),
+                  child: Center(
+                    child: Text(
+                      pendingCount,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Action Required',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF92400E),
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Supervisor & material requests are awaiting organizational authorization.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                          height: 1.25,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirestoreService.projects.snapshots(),
-      builder: (context, snapshot) {
-        int planningCount = 0;
-        int inProgressCount = 0;
-        int overdueCount = 0;
-        int pendingCount = 0;
+            // Bottom Alert Strip
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFEF3C7)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.notification_important_rounded,
+                    color: Color(0xFFD97706),
+                    size: 13,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Prompt approvals keep site schedules on track',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-        if (snapshot.hasData) {
-          final now = DateTime.now();
-          for (var doc in snapshot.data!.docs) {
-            final data = doc.data();
-            final s = (data['currentStatus'] ?? data['status'] ?? '').toString().toLowerCase();
+  // Slide 4: Expense Intelligence
+  Widget _buildExpensesSlide(
+    BuildContext context, {
+    required String expenses,
+    required String expenseLabel,
+    required String period,
+    required Color primaryColor,
+  }) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _navigateToOrganizationExpenses(context);
+      },
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Top Bar
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.receipt_long_rounded,
+                        color: Color(0xFFDC2626),
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Expense Intelligence',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDC2626),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFDC2626).withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Details',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
-            DateTime? endDate;
-            if (data['endDate'] is Timestamp) {
-              endDate = (data['endDate'] as Timestamp).toDate();
-            } else if (data['expectedCompletionDate'] is Timestamp) {
-              endDate = (data['expectedCompletionDate'] as Timestamp).toDate();
-            }
+            // Middle Amount
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      expenseLabel,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '₹ $expenses',
+                      style: const TextStyle(
+                        fontSize: 27,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF991B1B),
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFEE2E2)),
+                  ),
+                  child: const Icon(
+                    Icons.insights_rounded,
+                    color: Color(0xFFDC2626),
+                    size: 24,
+                  ),
+                ),
+              ],
+            ),
 
-            final isDelayed = s.contains('delay') ||
-                s.contains('overdue') ||
-                (endDate != null && endDate.isBefore(now) && !s.contains('complete') && !s.contains('finish'));
-
-            if (isDelayed) {
-              overdueCount++;
-            } else if (s.contains('plan') || s.contains('draft') || s.contains('upcoming') || s.contains('setup')) {
-              planningCount++;
-            } else if (s.contains('progress') || s.contains('ongoing') || s.contains('active') || s.contains('execution')) {
-              inProgressCount++;
-            } else if (s.contains('hold') || s.contains('pending') || s.contains('pause') || s.contains('suspend')) {
-              pendingCount++;
-            } else if (!s.contains('complete') && !s.contains('finish')) {
-              inProgressCount++;
-            }
-          }
-        }
-
-        final planStr = planningCount < 10 ? '0$planningCount' : '$planningCount';
-        final progStr = inProgressCount < 10 ? '0$inProgressCount' : '$inProgressCount';
-        final overStr = overdueCount < 10 ? '0$overdueCount' : '$overdueCount';
-        final pendStr = pendingCount < 10 ? '0$pendingCount' : '$pendingCount';
-
-        return Padding(
-          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Row
-              Row(
+            // Bottom Period Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFEE2E2)),
+              ),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Site Status',
+                    'Categorized site, mgr & vendor expenses',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF991B1B),
+                    ),
+                  ),
+                  Text(
+                    period,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -------------------- 3. QUICK ACTIONS 2-COLUMN SECTION (EXECUTIVE WHITE LABEL) --------------------
+
+  Widget _buildQuickActionsBentoSection(
+    BuildContext context,
+    Color primaryColor,
+    Color darkAccent,
+  ) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Quick Actions',
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
@@ -967,91 +1796,124 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                       letterSpacing: -0.3,
                     ),
                   ),
-                  InkWell(
-                    onTap: () => _navigateToSitesList(context, 'All'),
-                    borderRadius: BorderRadius.circular(6),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Text(
-                        'View All',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-
-              // 4 Status Cards Row (Real-time computed data)
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatusCard(
-                      title: 'Planning',
-                      count: planStr,
-                      icon: Icons.architecture_rounded,
-                      iconBgColor: const Color(0xFFEFF6FF),
-                      iconColor: const Color(0xFF2563EB),
-                      countColor: const Color(0xFF2563EB),
-                      onTap: () => _navigateToSitesList(context, 'Planning'),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.8)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bolt_rounded, size: 13, color: primaryColor),
+                    const SizedBox(width: 3),
+                    Text(
+                      'Shortcuts',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: primaryColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatusCard(
-                      title: 'In Progress',
-                      count: progStr,
-                      icon: Icons.engineering_rounded,
-                      iconBgColor: const Color(0xFFF0FDF4),
-                      iconColor: const Color(0xFF16A34A),
-                      countColor: const Color(0xFF16A34A),
-                      onTap: () => _navigateToSitesList(context, 'In Progress'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatusCard(
-                      title: 'Overdue',
-                      count: overStr,
-                      icon: Icons.access_time_filled_rounded,
-                      iconBgColor: const Color(0xFFFFFBEB),
-                      iconColor: const Color(0xFFD97706),
-                      countColor: const Color(0xFFD97706),
-                      onTap: () => _navigateToSitesList(context, 'On Hold'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatusCard(
-                      title: 'Pending',
-                      count: pendStr,
-                      icon: Icons.hourglass_top_rounded,
-                      iconBgColor: const Color(0xFFFEF2F2),
-                      iconColor: const Color(0xFFDC2626),
-                      countColor: const Color(0xFFDC2626),
-                      onTap: () => _navigateToSitesList(context, 'On Hold'),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 14),
+
+          // 2-Column Grid (1 1 / 1 1 / 1 1) with executive construction white cards
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 1.16,
+            children: [
+              // 1. Record Expense
+              _buildConstructionActionCard(
+                title: 'Record Expense',
+                subtitle: 'Bills & site expenses',
+                icon: Icons.receipt_long_rounded,
+                accentColor: const Color(0xFFEF4444),
+                onTap: () => _navigateToOrganizationExpenses(context),
+              ),
+
+              // 2. Site Payment
+              _buildConstructionActionCard(
+                title: 'Site Payment',
+                subtitle: 'Vendor & worker pay',
+                icon: Icons.payments_rounded,
+                accentColor: const Color(0xFF2563EB),
+                onTap: () => _navigateToSitePaymentEntry(context),
+              ),
+
+              // 3. Approvals
+              _buildConstructionActionCard(
+                title: 'Approvals',
+                subtitle: 'Stage authorizations',
+                icon: Icons.fact_check_rounded,
+                accentColor: const Color(0xFFD97706),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ManagerApprovalScreen(),
+                  ),
+                ),
+              ),
+
+              // 4. Material Req.
+              _buildConstructionActionCard(
+                title: 'Material Req.',
+                subtitle: 'Site supply orders',
+                icon: Icons.inventory_2_rounded,
+                accentColor: const Color(0xFFE11D48),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ManagerMaterialApprovalScreen(),
+                  ),
+                ),
+              ),
+
+              // 5. Tool Movement
+              _buildConstructionActionCard(
+                title: 'Tool Movement',
+                subtitle: 'Equipment & inventory',
+                icon: Icons.construction_rounded,
+                accentColor: const Color(0xFF0D9488),
+                onTap: () => _navigateToToolsInventory(context),
+              ),
+
+              // 6. Manager Config
+              _buildConstructionActionCard(
+                title: 'Manager Config',
+                subtitle: 'Roles & permissions',
+                icon: Icons.manage_accounts_rounded,
+                accentColor: const Color(0xFF4F46E5),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ManagerConfigScreen(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildStatusCard({
+  Widget _buildConstructionActionCard({
     required String title,
-    required String count,
+    required String subtitle,
     required IconData icon,
-    required Color iconBgColor,
-    required Color iconColor,
-    required Color countColor,
+    required Color accentColor,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -1059,346 +1921,120 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         HapticFeedback.lightImpact();
         onTap();
       },
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(22),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: const Color(0xFFE2E8F0),
+            width: 1.2,
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0A183D).withValues(alpha: 0.03),
-              blurRadius: 6,
+              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+              blurRadius: 14,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: accentColor.withValues(alpha: 0.05),
+              blurRadius: 10,
+              spreadRadius: 0,
               offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1E293B),
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              count,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: countColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            // Top Row: Soft Tinted Icon Badge + Top-Right Action Arrow Pill
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Prominent Tinted Icon Badge with Layered Depth
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        accentColor.withValues(alpha: 0.16),
+                        accentColor.withValues(alpha: 0.07),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.24),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      icon,
+                      color: accentColor,
+                      size: 23,
+                    ),
+                  ),
+                ),
 
-  // -------------------- 4. QUICK ACTIONS SECTION --------------------
-
-  Widget _buildQuickActionsSection(BuildContext context, Color primaryColor) {
-    final hPad = Responsive.horizontalPadding(context);
-
-    final actions = [
-      {
-        'title': 'Add Expense',
-        'icon': Icons.receipt_long_rounded,
-        'color': const Color(0xFFEF4444),
-        'bgColor': const Color(0xFFFEF2F2),
-        'onTap': () => _navigateToOrganizationExpenses(context),
-      },
-      {
-        'title': 'Site Payment',
-        'icon': Icons.payments_rounded,
-        'color': const Color(0xFF2563EB),
-        'bgColor': const Color(0xFFEFF6FF),
-        'onTap': () => _navigateToSitePaymentEntry(context),
-      },
-      {
-        'title': 'Approvals',
-        'icon': Icons.fact_check_rounded,
-        'color': const Color(0xFFF97316),
-        'bgColor': const Color(0xFFFFF7ED),
-        'onTap': () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const ManagerApprovalScreen(),
-          ),
-        ),
-      },
-      {
-        'title': 'Add Site',
-        'icon': Icons.person_pin_circle_rounded,
-        'color': const Color(0xFFA855F7),
-        'bgColor': const Color(0xFFFAF5FF),
-        'onTap': () => _navigateToCreateProject(context),
-      },
-      {
-        'title': 'Manager Account',
-        'icon': Icons.manage_accounts_rounded,
-        'color': const Color(0xFF4F46E5),
-        'bgColor': const Color(0xFFEEF2FF),
-        'onTap': () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const ManagerConfigScreen(),
-          ),
-        ),
-      },
-      {
-        'title': 'Material Request',
-        'icon': Icons.inventory_2_rounded,
-        'color': const Color(0xFFF43F5E),
-        'bgColor': const Color(0xFFFFF1F2),
-        'onTap': () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const ManagerMaterialApprovalScreen(),
-          ),
-        ),
-      },
-      {
-        'title': 'Workforce Request',
-        'icon': Icons.groups_rounded,
-        'color': const Color(0xFF0D9488),
-        'bgColor': const Color(0xFFF0FDFA),
-        'onTap': () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const ManagerApprovalScreen(),
-          ),
-        ),
-      },
-      {
-        'title': 'Tool Movement',
-        'icon': Icons.construction_rounded,
-        'color': const Color(0xFFD97706),
-        'bgColor': const Color(0xFFFEFCE8),
-        'onTap': () => _navigateToToolsInventory(context),
-      },
-      {
-        'title': 'More',
-        'icon': Icons.more_horiz_rounded,
-        'color': const Color(0xFF475569),
-        'bgColor': const Color(0xFFF1F5F9),
-        'onTap': () => _navigateToOrgMenu(context),
-      },
-    ];
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Quick Actions',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 14),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: actions.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 14,
-              childAspectRatio: 0.78,
-            ),
-            itemBuilder: (context, index) {
-              final item = actions[index];
-              return _buildQuickActionButton(
-                title: item['title'] as String,
-                icon: item['icon'] as IconData,
-                iconColor: item['color'] as Color,
-                bgColor: item['bgColor'] as Color,
-                onTap: item['onTap'] as VoidCallback,
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionButton({
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-    required Color bgColor,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: iconColor.withValues(alpha: 0.12),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+                // Top-Right Glass Outward Arrow Pill
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 14,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
                 ),
               ],
             ),
-            child: Center(
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1E293B),
-              height: 1.15,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
 
-  // -------------------- 5. BOTTOM NAVIGATION BAR --------------------
-
-  Widget _buildBottomNavigationBar(Color primaryColor, Color darkAccent) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-        border: const Border(
-          top: BorderSide(color: Color(0xFFF1F5F9), width: 1),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                index: 0,
-                icon: Icons.home_rounded,
-                label: 'Home',
-                onTap: () => setState(() => _selectedNavIndex = 0),
-              ),
-              _buildNavItem(
-                index: 1,
-                icon: Icons.domain_rounded,
-                label: 'Sites',
-                onTap: () => _navigateToSitesList(context),
-              ),
-              _buildNavItem(
-                index: 2,
-                icon: Icons.account_balance_wallet_rounded,
-                label: 'Finance',
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  _navigateToSitePaymentEntry(context);
-                },
-              ),
-              _buildNavItem(
-                index: 3,
-                icon: Icons.bar_chart_rounded,
-                label: 'Reports',
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  _navigateToInsights(context);
-                },
-              ),
-              _buildNavItem(
-                index: 4,
-                icon: Icons.grid_view_rounded,
-                label: 'More',
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  _navigateToOrgMenu(context);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    final isSelected = _selectedNavIndex == index;
-    const activeColor = Color(0xFF1E40AF); // Deep modern blue matching image
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? activeColor : const Color(0xFF64748B),
-              size: 22,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                color: isSelected ? activeColor : const Color(0xFF64748B),
-              ),
+            // Bottom Block: Bold Title + Clean Subtitle
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                    height: 1.15,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ],
         ),
@@ -1418,10 +2054,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  void _navigateToInsights(BuildContext context) => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => InsightsDashboard()),
-  );
 
   void _navigateToSitePaymentEntry(BuildContext context) => Navigator.push(
     context,
@@ -1438,15 +2070,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     MaterialPageRoute(builder: (context) => const ToolsInventoryPage()),
   );
 
-  void _navigateToCreateProject(BuildContext context) {
-    HapticFeedback.mediumImpact();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const ProjectSetupWizard(),
-      ),
-    );
-  }
 
   void _navigateToOrgMenu(BuildContext context) => Navigator.push(
     context,

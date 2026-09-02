@@ -24,7 +24,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
-  bool _isContractor = false;
+  final bool _isContractor = false;
   List<String> _supervisorNames = [];
   String? _selectedSupervisorName;
   String? _tempOrgName;
@@ -140,7 +140,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
 
   Future<void> _fetchContractorNames() async {
     try {
-      final contractorsCollection = await FirestoreService.contractors;
+      final contractorsCollection = FirestoreService.contractors;
       final querySnapshot = await contractorsCollection.get();
       final names = querySnapshot.docs
           .map((doc) => doc.data()['contractorName'] as String?)
@@ -201,7 +201,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
       await AppTheme.syncWithFirestore(orgId);
 
       // 3. Authenticate within organization
-      final supervisorCollection = await FirestoreService.supervisors;
+      final supervisorCollection = FirestoreService.supervisors;
       final querySnapshot = await supervisorCollection
           .where('UserName', isEqualTo: _usernameController.text.trim())
           .where('Password', isEqualTo: _passwordController.text.trim())
@@ -215,7 +215,7 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
             doc.data()['Name'] ?? _usernameController.text.trim();
 
         if (_isContractor && _selectedSupervisorName != null) {
-          final contractorsCollection = await FirestoreService.contractors;
+          final contractorsCollection = FirestoreService.contractors;
           final contractorQuery = await contractorsCollection
               .where('contractorName', isEqualTo: _selectedSupervisorName)
               .limit(1)

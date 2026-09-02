@@ -653,7 +653,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
-            value: selectedSite,
+            initialValue: selectedSite,
             isExpanded: true,
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -728,7 +728,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
-            value: (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
+            initialValue: (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
                 ? selectedSupervisorId
                 : null,
             isExpanded: true,

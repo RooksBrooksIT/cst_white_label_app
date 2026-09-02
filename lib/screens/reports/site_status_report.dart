@@ -335,7 +335,7 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedStatus,
+              initialValue: _selectedStatus,
               dropdownColor: Colors.white,
               iconEnabledColor: primaryColor,
               style: const TextStyle(

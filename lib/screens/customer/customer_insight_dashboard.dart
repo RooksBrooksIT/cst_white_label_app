@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/screens/customer/customer_insights_screen.dart';
 import 'package:demo_cst/screens/customer/customer_project_financial_statusreport.dart';
-import 'package:demo_cst/screens/reports/site_status_report.dart';
 import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/responsive.dart';  
 
 class CustomerWorkProgress extends StatelessWidget {
   const CustomerWorkProgress({
@@ -99,7 +96,7 @@ class CustomerWorkProgress extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           colorScheme.primary,
-                          colorScheme.primary.withOpacity(0.5),
+                          colorScheme.primary.withValues(alpha: 0.5),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(4),
@@ -173,16 +170,16 @@ class CustomerWorkProgress extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             color: theme.cardColor,
-            border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+            border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 blurRadius: 20,
                 spreadRadius: 2,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 4,
                 spreadRadius: 0,
                 offset: const Offset(0, 2),
@@ -200,12 +197,12 @@ class CustomerWorkProgress extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [item.color, item.color.withOpacity(0.7)],
+                      colors: [item.color, item.color.withValues(alpha: 0.7)],
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: item.color.withOpacity(0.2),
+                        color: item.color.withValues(alpha: 0.2),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),

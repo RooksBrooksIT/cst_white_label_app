@@ -3,9 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
-import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
-import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
 import '/utils/project_stage_pdf_helper.dart';
 import 'package:demo_cst/screens/reports/pdf_preview_page.dart';
@@ -362,7 +360,7 @@ class _ProjectStageExpensesReportPageState
 
   Future<void> _generatePdf() async {
     final pdfPrimaryColor = PdfColor.fromInt(
-      Theme.of(context).primaryColor.value,
+      Theme.of(context).primaryColor.toARGB32(),
     );
     try {
       final pdfBytes = await ProjectStagePdfHelper.buildExpenseRangeReport(

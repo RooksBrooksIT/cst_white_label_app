@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
-import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/utils/responsive.dart';
 import '/utils/project_stage_pdf_helper.dart';
@@ -45,7 +44,7 @@ class _ProjectstageSiteSummaryReportState
         _fetchExpenseTotals(),
       ]);
       setState(() {
-        projectInfo = results[0] as Map<String, dynamic>?;
+        projectInfo = results[0];
         expenseTotals = results[1] as Map<String, num>;
         grandTotal = expenseTotals.values.fold(0, (a, b) => a + b);
         isLoading = false;
@@ -139,7 +138,7 @@ class _ProjectstageSiteSummaryReportState
     num food = 0, fuel = 0, transport = 0, labours = 0, materials = 0;
     num managerTotal = 0, organizationTotal = 0, contractorTotal = 0;
 
-    num _getDocTotal(Map<String, dynamic> data) {
+    num getDocTotal(Map<String, dynamic> data) {
       if (data.containsKey('bills') && data['bills'] is List) {
         num total = 0;
         for (var bill in data['bills']) {
@@ -159,7 +158,7 @@ class _ProjectstageSiteSummaryReportState
             ?.toString()
             .trim();
         if (docStage != targetStage) continue;
-        managerTotal += _getDocTotal(data);
+        managerTotal += getDocTotal(data);
       }
     }
 
@@ -170,7 +169,7 @@ class _ProjectstageSiteSummaryReportState
             ?.toString()
             .trim();
         if (docStage != targetStage) continue;
-        organizationTotal += _getDocTotal(data);
+        organizationTotal += getDocTotal(data);
       }
     }
 
@@ -187,10 +186,14 @@ class _ProjectstageSiteSummaryReportState
       transport += _toNum(data['transport']);
 
       if (data['labours'] is List) {
-        for (var l in data['labours']) labours += _toNum(l['amount']);
+        for (var l in data['labours']) {
+          labours += _toNum(l['amount']);
+        }
       }
       if (data['materials'] is List) {
-        for (var m in data['materials']) materials += _toNum(m['amount']);
+        for (var m in data['materials']) {
+          materials += _toNum(m['amount']);
+        }
       }
     }
 
@@ -448,7 +451,7 @@ class _ProjectstageSiteSummaryReportState
 
   Future<void> _generatePdf() async {
     final pdfPrimaryColor = PdfColor.fromInt(
-      Theme.of(context).primaryColor.value,
+      Theme.of(context).primaryColor.toARGB32(),
     );
     try {
       final pdfBytes = await ProjectStagePdfHelper.buildSiteSummaryReport(
