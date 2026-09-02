@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_text_field.dart';
 import 'package:demo_cst/services/subscription_limit_service.dart';
+import 'package:demo_cst/utils/app_theme.dart';
 
 class ProjectSetupWizard extends StatefulWidget {
   const ProjectSetupWizard({super.key});
@@ -134,42 +134,18 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
-          // if (_categories.isEmpty) {
-          //   _categories = [
-          //     'Residential',
-          //     'Commercial',
-          //     'Industrial',
-          //     'Infrastructure',
-          //   ];
-          // }
 
           _subCategories = results[1].docs
               .map((doc) => doc['projectSubCategory']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
-          // if (_subCategories.isEmpty) {
-          //   _subCategories = [
-          //     'New Construction',
-          //     'Renovation',
-          //     'Expansion',
-          //     'Maintenance',
-          //   ];
-          // }
 
           _contracts = results[2].docs
               .map((doc) => doc['projectContract']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
-          // if (_contracts.isEmpty) {
-          //   _contracts = [
-          //     'Fixed Price',
-          //     'Cost Plus',
-          //     'Unit Price',
-          //     'Time & Materials',
-          //   ];
-          // }
 
           _statuses = results[3].docs
               .map((doc) => (doc.data()['projectState'] ?? doc.data()['projectStatus'])?.toString().trim() ?? '')
@@ -184,7 +160,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               .toList();
 
           _contractors = results[6].docs
-              .map((doc) => doc['contractorName']?.toString() ?? '')
+              .map((doc) => doc['contractorType']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
@@ -201,24 +177,6 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           final seenIds = <String>{};
           _supervisors.retainWhere((s) => seenIds.add(s['id']!));
 
-          // if (_projectStagesList.isEmpty) {
-          //   _projectStagesList = [
-          //     'Planning',
-          //     'Foundation',
-          //     'Structure',
-          //     'Finishing',
-          //     'Handover',
-          //   ];
-          // }
-
-          // if (_contractors.isEmpty) {
-          //   _contractors = [
-          //     'General Contractor',
-          //     'Sub Contractor',
-          //     'Independent',
-          //   ];
-          // }
-
           _isLoadingDropdowns = false;
         });
       }
@@ -226,7 +184,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       debugPrint('Error fetching dropdown data: $e');
       if (mounted) {
         setState(() => _isLoadingDropdowns = false);
-        _showErrorSnackBar('Failed to load data. Please try again.');
+        _showErrorSnackBar('Failed to load dropdown data: $e');
       }
     }
   }
@@ -234,34 +192,131 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade400,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: const Color(0xFFEF4444),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
 
   // -------------------- LOCATION --------------------
+  Future<void> _showEnableLocationDialog() async {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.location_off_rounded,
+                color: Color(0xFFF59E0B),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Location Turned Off',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0A183D),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Location is turned off. Would you like to turn on Location on your phone?',
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF475569),
+            height: 1.4,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text(
+              'No',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await Geolocator.openLocationSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor.value,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Yes',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _getCurrentLocation() async {
     setState(() => _isGettingLocation = true);
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw 'Location services are disabled.';
+        setState(() => _isGettingLocation = false);
+        await _showEnableLocationDialog();
+        return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw 'Location permissions are denied';
+          _showErrorSnackBar('Location permissions are denied');
+          return;
         }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        _showErrorSnackBar(
+          'Location permissions are permanently denied. Please enable them in App Settings.',
+        );
+        return;
       }
 
       final Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
         ),
       );
 
@@ -315,13 +370,16 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       isValid = _projectFormKey.currentState?.validate() ?? false;
     } else if (_currentStep == 2) {
       isValid = _mapFormKey.currentState?.validate() ?? false;
-      if (isValid) _saveAll();
+      if (isValid) {
+        _saveAll();
+      }
       return;
     }
 
     if (isValid && _currentStep < 2) {
+      HapticFeedback.lightImpact();
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOutCubic,
       );
       _animationController.forward(from: 0);
@@ -330,8 +388,9 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
   void _previousStep() {
     if (_currentStep > 0) {
+      HapticFeedback.lightImpact();
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOutCubic,
       );
     }
@@ -339,11 +398,10 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
   void _setupAmountListeners() {
     _amountPaidController.addListener(_updateBalanceAmount);
+    _projectBudgetController.addListener(_updateBalanceAmount);
   }
 
   void _updateBalanceAmount() {
-    // In the wizard, spent is always 0 for new projects, so balance = paid
-    // But we keep the logic consistent with project_screen.dart
     setState(() {});
   }
 
@@ -388,20 +446,45 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(
-              skipSupervisorMapping
-                  ? 'Saving project details...'
-                  : 'Setting up your project...',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ],
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                color: AppTheme.primaryColor.value,
+                strokeWidth: 3,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                skipSupervisorMapping
+                    ? 'Saving project details...'
+                    : 'Setting up your project...',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0A183D),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Please wait while we initialize services',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -492,7 +575,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      if (!skipSupervisorMapping) {
+      if (!skipSupervisorMapping && _selectedSupervisorId != null) {
         // Map Supervisor
         final supervisorMapId =
             '${siteId}_${_locationController.text.trim().replaceAll(' ', '')}_$_selectedSupervisorId';
@@ -522,14 +605,15 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         });
       }
 
-      Navigator.of(context).pop(); // Close loading dialog
-
       if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
         _showSuccessDialog(skippedAssignment: skipSupervisorMapping);
       }
     } catch (e) {
-      Navigator.of(context).pop();
-      _showErrorSnackBar('Error saving: $e');
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _showErrorSnackBar('Error saving project: $e');
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -541,399 +625,522 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green.shade400, size: 32),
-            const SizedBox(width: 12),
-            const Text('Success!'),
-          ],
-        ),
+        backgroundColor: Colors.white,
+        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Your project has been successfully configured.'),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF10B981),
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Project Created!',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0A183D),
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
-              '✓ Site created\n✓ Project configured${skippedAssignment ? '' : '\n✓ Supervisor assigned'}',
-              style: const TextStyle(fontSize: 14),
+              'Your project and site architecture have been configured successfully.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  _buildSuccessCheckRow('Site created & registered'),
+                  const SizedBox(height: 8),
+                  _buildSuccessCheckRow('Project configuration saved'),
+                  const SizedBox(height: 8),
+                  _buildSuccessCheckRow(
+                    skippedAssignment
+                        ? 'Supervisor assignment skipped'
+                        : 'Supervisor mapped to site',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor.value,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'Done & Return to Dashboard',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.green.shade700),
-            child: const Text('DONE'),
-          ),
-        ],
       ),
     );
   }
 
-  // -------------------- UI BUILD --------------------
+  Widget _buildSuccessCheckRow(String text) {
+    return Row(
+      children: [
+        const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF334155),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // -------------------- MAIN BUILD --------------------
   @override
   Widget build(BuildContext context) {
     final bool isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    return GlassScaffold(
-      title: 'Project Setup Wizard',
-      onBack: () => Navigator.pop(context),
-      actions: [
-        if (_currentStep == 2)
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: TextButton(
-              onPressed: _isSaving
-                  ? null
-                  : () => _saveAll(skipSupervisorMapping: true),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
-              child: const Text(
-                'Skip',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            elevation: 0,
+            titleSpacing: 16,
+            backgroundColor: primaryColor,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryColor, darkAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
             ),
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+                tooltip: 'Back',
+              ),
+            ),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Project Setup Wizard',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                Text(
+                  _currentStep == 0
+                      ? 'Step 1 of 3 • Site Details'
+                      : _currentStep == 1
+                          ? 'Step 2 of 3 • Project Configuration'
+                          : 'Step 3 of 3 • Supervisor Assignment',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              if (_currentStep == 2)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: TextButton(
+                    onPressed: _isSaving
+                        ? null
+                        : () => _saveAll(skipSupervisorMapping: true),
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.15),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.25),
+                        ),
+                      ),
+                    ),
+                    child: const Text(
+                      'Skip Step',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 4),
+            ],
           ),
-      ],
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: Column(
-            children: [
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (index) => setState(() => _currentStep = index),
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 840),
+                child: Column(
                   children: [
-                    _buildSiteStep(),
-                    _buildProjectStep(),
-                    _buildMapStep(),
+                    // Persistent Step Indicator
+                    _buildStepperBar(primaryColor),
+
+                    // Step Pages
+                    Expanded(
+                      child: PageView(
+                        controller: _pageController,
+                        physics: const NeverScrollableScrollPhysics(),
+                        onPageChanged: (index) =>
+                            setState(() => _currentStep = index),
+                        children: [
+                          _buildSiteStep(primaryColor),
+                          _buildProjectStep(primaryColor),
+                          _buildMapStep(primaryColor),
+                        ],
+                      ),
+                    ),
+
+                    // Sticky Bottom Navigation Buttons
+                    if (!isKeyboardVisible)
+                      _buildBottomNavBar(primaryColor, darkAccent),
                   ],
                 ),
               ),
-              if (!isKeyboardVisible) _buildNavigationButtons(),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  // -------------------- STEP INDICATOR --------------------
-  Widget _buildModernStepIndicator() {
+  // -------------------- STEPPER BAR --------------------
+  Widget _buildStepperBar(Color primaryColor) {
     final steps = [
-      {'icon': Icons.location_on_rounded, 'title': 'Site'},
-      {'icon': Icons.work_rounded, 'title': 'Project'},
-      {'icon': Icons.people_rounded, 'title': 'Assignment'},
+      {'title': 'Site Details', 'icon': Icons.location_on_rounded},
+      {'title': 'Configuration', 'icon': Icons.settings_rounded},
+      {'title': 'Supervisor', 'icon': Icons.person_pin_rounded},
     ];
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
-      child: Column(
-        children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              // Background Line
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Row(
-                  children: List.generate(steps.length - 1, (index) {
-                    return Expanded(
-                      child: Container(
-                        height: 2,
-                        color: index < _currentStep
-                            ? Theme.of(context).primaryColor
-                            : Colors.grey.shade300,
-                      ),
-                    );
-                  }),
-                ),
-              ),
-              // Step Circles
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(steps.length, (index) {
-                  final isActive = index <= _currentStep;
-                  final isCompleted = index < _currentStep;
-
-                  return Expanded(
-                    child: Column(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: isActive
-                                ? LinearGradient(
-                                    colors: [
-                                      Theme.of(context).primaryColor,
-                                      Theme.of(
-                                        context,
-                                      ).primaryColor.withValues(alpha: 0.7),
-                                    ],
-                                  )
-                                : null,
-                            color: !isActive ? Colors.grey.shade300 : null,
-                            boxShadow: isActive
-                                ? [
-                                    BoxShadow(
-                                      color: Theme.of(
-                                        context,
-                                      ).primaryColor.withValues(alpha: 0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Center(
-                            child: isCompleted
-                                ? const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 20,
-                                  )
-                                : Icon(
-                                    steps[index]['icon'] as IconData,
-                                    color: isActive
-                                        ? Colors.white
-                                        : Colors.grey.shade600,
-                                    size: 20,
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          steps[index]['title'] as String,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: isActive
-                                ? Theme.of(context).primaryColor
-                                : Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavigationButtons() {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          if (_currentStep > 0)
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _previousStep,
-                icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                label: const Text('Back'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
-                  foregroundColor: primaryColor,
+        children: List.generate(steps.length * 2 - 1, (index) {
+          if (index.isOdd) {
+            final stepIndex = index ~/ 2;
+            final isPassed = stepIndex < _currentStep;
+            return Expanded(
+              child: Container(
+                height: 2.5,
+                margin: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  color: isPassed
+                      ? primaryColor
+                      : const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            )
-          else
-            const Spacer(),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton.icon(
-              onPressed: (_isSaving || (_currentStep == 2 && !_isTermsAgreed))
-                  ? null
-                  : _nextStep,
-              icon: _isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Icon(
-                      _currentStep == 2
-                          ? Icons.check_rounded
-                          : Icons.arrow_forward_rounded,
-                      size: 18,
+            );
+          }
+
+          final stepIdx = index ~/ 2;
+          final isActive = stepIdx == _currentStep;
+          final isCompleted = stepIdx < _currentStep;
+
+          return InkWell(
+            onTap: () {
+              if (stepIdx < _currentStep) {
+                _pageController.animateToPage(
+                  stepIdx,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              }
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isCompleted
+                        ? const Color(0xFF10B981)
+                        : isActive
+                            ? primaryColor
+                            : const Color(0xFFF1F5F9),
+                    border: Border.all(
+                      color: isCompleted
+                          ? const Color(0xFF10B981)
+                          : isActive
+                              ? primaryColor
+                              : const Color(0xFFCBD5E1),
+                      width: 1.5,
                     ),
-              label: Text(
-                _isSaving
-                    ? 'Processing...'
-                    : (_currentStep == 2 ? 'Complete' : 'Continue'),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
+                  ),
+                  child: Center(
+                    child: isCompleted
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          )
+                        : Icon(
+                            steps[stepIdx]['icon'] as IconData,
+                            color: isActive
+                                ? Colors.white
+                                : const Color(0xFF94A3B8),
+                            size: 15,
+                          ),
+                  ),
                 ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(width: 8),
+                Text(
+                  steps[stepIdx]['title'] as String,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight:
+                        isActive ? FontWeight.w800 : FontWeight.w600,
+                    color: isCompleted
+                        ? const Color(0xFF0F172A)
+                        : isActive
+                            ? primaryColor
+                            : const Color(0xFF64748B),
+                  ),
                 ),
-                elevation: 2,
-                shadowColor: primaryColor.withValues(alpha: 0.5),
-              ),
+              ],
             ),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
 
   // -------------------- STEP 1: SITE DETAILS --------------------
-  Widget _buildSiteStep() {
+  Widget _buildSiteStep(Color primaryColor) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
       child: Form(
         key: _siteFormKey,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildModernStepIndicator(),
             _buildStepHeader(
               'Site Information',
-              'Enter the basic details of your site',
+              'Register the physical location, GPS coordinates, and timeline for the new site.',
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _buildSectionCard(
-              title: 'Basic Information',
-              subtitle: 'Identify your site and its physical location',
-              icon: Icons.info_outline_rounded,
+              title: 'Basic Site Information',
+              subtitle: 'Identify your site and its physical address',
+              icon: Icons.domain_rounded,
+              primaryColor: primaryColor,
               children: [
-                GlassTextField(
+                _buildInputField(
                   controller: _siteNameController,
                   label: 'Site Name',
-                  icon: Icons.place_rounded,
+                  hint: 'e.g. Skyline Heights Phase 1',
+                  icon: Icons.apartment_rounded,
+                  isRequired: true,
+                  primaryColor: primaryColor,
                   validator: (v) =>
-                      v == null || v.isEmpty ? 'Site name is required' : null,
+                      v == null || v.trim().isEmpty ? 'Site name is required' : null,
                 ),
                 const SizedBox(height: 16),
-                GlassTextField(
+                _buildInputField(
                   controller: _locationController,
                   label: 'Location Address',
+                  hint: 'e.g. 42 Main Avenue, North District',
                   icon: Icons.location_on_rounded,
+                  isRequired: true,
+                  primaryColor: primaryColor,
                   validator: (v) =>
-                      v == null || v.isEmpty ? 'Location is required' : null,
+                      v == null || v.trim().isEmpty ? 'Location address is required' : null,
                 ),
               ],
             ),
             _buildSectionCard(
-              title: 'Geolocation',
-              subtitle: 'Precision coordinates for site tracking',
-              icon: Icons.map_rounded,
+              title: 'Geolocation Coordinates',
+              subtitle: 'GPS precision coordinates for field supervisor check-ins',
+              icon: Icons.satellite_alt_rounded,
+              primaryColor: primaryColor,
               children: [
-                GlassTextField(
-                  controller: _latitudeController,
-                  label: 'Latitude',
-                  icon: Icons.map_rounded,
-                  readOnly: true,
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInputField(
+                        controller: _latitudeController,
+                        label: 'Latitude',
+                        hint: '0.000000',
+                        icon: Icons.explore_outlined,
+                        readOnly: true,
+                        primaryColor: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildInputField(
+                        controller: _longitudeController,
+                        label: 'Longitude',
+                        hint: '0.000000',
+                        icon: Icons.explore_outlined,
+                        readOnly: true,
+                        primaryColor: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                GlassTextField(
-                  controller: _longitudeController,
-                  label: 'Longitude',
-                  icon: Icons.map_rounded,
-                  readOnly: true,
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _isGettingLocation ? null : _getCurrentLocation,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: primaryColor, width: 1.2),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      side: BorderSide(
-                        color: Theme.of(context).primaryColor.withValues(alpha: 0.5),
-                      ),
+                      foregroundColor: primaryColor,
+                      backgroundColor: primaryColor.withValues(alpha: 0.05),
                     ),
                     icon: _isGettingLocation
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: primaryColor,
+                            ),
                           )
-                        : Icon(
-                            Icons.my_location_rounded,
-                            color: Theme.of(context).primaryColor,
-                          ),
+                        : Icon(Icons.my_location_rounded, size: 18, color: primaryColor),
                     label: Text(
                       _isGettingLocation
-                          ? 'Getting location...'
-                          : 'Get Current Location',
-                      style: TextStyle(color: Theme.of(context).primaryColor),
+                          ? 'Acquiring GPS Position...'
+                          : 'Fetch Current Device Location',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: primaryColor,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
             _buildSectionCard(
-              title: 'Project Timeline',
-              subtitle: 'Estimated start and end dates for the site',
-              icon: Icons.calendar_today_rounded,
+              title: 'Site Timeline & Initial Status',
+              subtitle: 'Estimated active operation period and status',
+              icon: Icons.calendar_month_rounded,
+              primaryColor: primaryColor,
               children: [
-                _buildDateField(
-                  'Start Date',
-                  _siteStartDate,
-                  (d) => setState(() => _siteStartDate = d),
-                ),
-                const SizedBox(height: 16),
-                _buildDateField(
-                  'End Date',
-                  _siteEndDate,
-                  (d) => setState(() => _siteEndDate = d),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDateField(
+                        'Start Date',
+                        _siteStartDate,
+                        (d) => setState(() => _siteStartDate = d),
+                        primaryColor: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildDateField(
+                        'End Date',
+                        _siteEndDate,
+                        (d) => setState(() => _siteEndDate = d),
+                        primaryColor: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 _buildDropdownField(
                   'Site Status',
                   _siteStatus,
-                  _statuses,
+                  _statuses.isNotEmpty
+                      ? _statuses
+                      : ['Planning', 'Ongoing', 'On Hold', 'Completed'],
                   (v) => setState(() => _siteStatus = v),
                   isLoading: _isLoadingDropdowns,
+                  primaryColor: primaryColor,
                 ),
               ],
             ),
@@ -944,105 +1151,109 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   }
 
   // -------------------- STEP 2: PROJECT CONFIGURATION --------------------
-  Widget _buildProjectStep() {
+  Widget _buildProjectStep(Color primaryColor) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
       child: Form(
         key: _projectFormKey,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildModernStepIndicator(),
             _buildStepHeader(
               'Project Configuration',
-              'Define project scope, financial details, and timeline',
+              'Set up project scope, budget allocation, owner contact, and classification.',
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _buildSectionCard(
-              title: 'Core Details',
-              subtitle: 'Basic information about the project and its owner',
-              icon: Icons.work_outline_rounded,
+              title: 'Core Project Information',
+              subtitle: 'Identity and client / owner details',
+              icon: Icons.engineering_rounded,
+              primaryColor: primaryColor,
               children: [
-                GlassTextField(
+                _buildInputField(
                   controller: _projectNameController,
                   label: 'Project Name',
-                  icon: Icons.work_rounded,
-                  validator: (v) => v == null || v.isEmpty
+                  hint: 'e.g. Skyline Towers Commercial Block',
+                  icon: Icons.business_center_rounded,
+                  isRequired: true,
+                  primaryColor: primaryColor,
+                  validator: (v) => v == null || v.trim().isEmpty
                       ? 'Project name is required'
                       : null,
                 ),
                 const SizedBox(height: 16),
-                GlassTextField(
+                _buildInputField(
                   controller: _ownerNameController,
-                  label: 'Owner Name',
-                  icon: Icons.person_rounded,
+                  label: 'Owner / Client Name',
+                  hint: 'e.g. John Doe',
+                  icon: Icons.person_outline_rounded,
+                  isRequired: true,
+                  primaryColor: primaryColor,
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Owner name is required'
+                      : null,
                 ),
                 const SizedBox(height: 16),
-                GlassTextField(
+                _buildInputField(
                   controller: _ownerPhoneController,
-                  label: 'Owner Phone',
-                  icon: Icons.phone_rounded,
+                  label: 'Owner Phone Number',
+                  hint: '10-digit mobile number',
+                  icon: Icons.phone_android_rounded,
                   keyboardType: TextInputType.phone,
-                  // maxLength: 10,
+                  isRequired: true,
+                  primaryColor: primaryColor,
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Phone is required';
-                    if (v.trim().length != 10) return 'Must be 10 digits';
+                    if (v == null || v.trim().isEmpty) return 'Phone number is required';
+                    if (v.trim().length != 10) return 'Must be exactly 10 digits';
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-                // Customer Login Info Note
+                // Customer Login Info Banner
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                        Theme.of(context).primaryColor.withValues(alpha: 0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                    ),
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).primaryColor.withValues(alpha: 0.1),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          Icons.lock_person_outlined,
-                          color: Theme.of(context).primaryColor,
-                          size: 18,
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          color: Color(0xFF059669),
+                          size: 16,
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Customer Login Info',
+                              'Automatic Customer Portal Access',
                               style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).primaryColor,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF065F46),
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            SizedBox(height: 3),
                             Text(
-                              'The Owner Name and Phone Number will be used as the username and password for the Customer Login.',
+                              'The Owner Name and Phone Number will be automatically configured as the credentials for customer login portal.',
                               style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade700,
-                                height: 1.3,
+                                fontSize: 11.5,
+                                color: Color(0xFF047857),
+                                height: 1.35,
                               ),
                             ),
                           ],
@@ -1053,173 +1264,210 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 ),
               ],
             ),
-            _buildFinancialSection(),
+            _buildFinancialSection(primaryColor),
             _buildSectionCard(
-              title: 'Classification',
-              subtitle: 'Categorize the project for better reporting',
-              icon: Icons.class_rounded,
+              title: 'Classification & Scope',
+              subtitle: 'Categorization and contractual terms',
+              icon: Icons.category_rounded,
+              primaryColor: primaryColor,
               children: [
                 _buildDropdownField(
                   'Project Category',
                   _siteProjectCategory,
-                  _categories,
+                  _categories.isNotEmpty
+                      ? _categories
+                      : ['Residential', 'Commercial', 'Industrial', 'Infrastructure'],
                   (v) => setState(() => _siteProjectCategory = v),
                   isLoading: _isLoadingDropdowns,
+                  primaryColor: primaryColor,
                 ),
                 const SizedBox(height: 16),
                 _buildDropdownField(
                   'Sub Category',
                   _projectSubCategory,
-                  _subCategories,
+                  _subCategories.isNotEmpty
+                      ? _subCategories
+                      : ['New Construction', 'Renovation', 'Expansion', 'Interior Fitout'],
                   (v) => setState(() => _projectSubCategory = v),
                   isLoading: _isLoadingDropdowns,
+                  primaryColor: primaryColor,
                 ),
                 const SizedBox(height: 16),
                 _buildDropdownField(
                   'Contract Type',
                   _projectContract,
-                  _contracts,
+                  _contracts.isNotEmpty
+                      ? _contracts
+                      : ['Turnkey', 'Item Rate', 'Lump Sum', 'Labor Contract'],
                   (v) => setState(() => _projectContract = v),
                   isLoading: _isLoadingDropdowns,
+                  primaryColor: primaryColor,
                 ),
                 const SizedBox(height: 16),
                 _buildDropdownField(
                   'Project Stage',
                   _projectStage,
-                  _projectStagesList,
+                  _projectStagesList.isNotEmpty
+                      ? _projectStagesList
+                      : ['Planning', 'Foundation', 'Structure', 'Finishing', 'Handover'],
                   (v) => setState(() => _projectStage = v),
                   isLoading: _isLoadingDropdowns,
+                  primaryColor: primaryColor,
                 ),
                 const SizedBox(height: 16),
                 _buildDropdownField(
                   'Current Status',
                   _projectStatus,
-                  _statuses,
+                  _statuses.isNotEmpty
+                      ? _statuses
+                      : ['Active', 'In Progress', 'Pending Approval', 'Completed'],
                   (v) => setState(() => _projectStatus = v),
                   isLoading: _isLoadingDropdowns,
+                  primaryColor: primaryColor,
                 ),
               ],
             ),
             _buildSectionCard(
-              title: 'Project Timeline',
-              subtitle: 'Set the key dates for project execution',
-              icon: Icons.calendar_today_rounded,
+              title: 'Execution Timeline',
+              subtitle: 'Track actual commencement and completion dates',
+              icon: Icons.date_range_rounded,
+              primaryColor: primaryColor,
               children: [
-                _buildDateField(
-                  'Actual Start',
-                  _actualStartDate,
-                  (d) => setState(() => _actualStartDate = d),
-                ),
-                const SizedBox(height: 16),
-                _buildDateField(
-                  'Actual End',
-                  _actualEndDate,
-                  (d) => setState(() => _actualEndDate = d),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDateField(
+                        'Actual Start Date',
+                        _actualStartDate,
+                        (d) => setState(() => _actualStartDate = d),
+                        primaryColor: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildDateField(
+                        'Actual End Date',
+                        _actualEndDate,
+                        (d) => setState(() => _actualEndDate = d),
+                        primaryColor: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            _buildContractWorkSection(),
+            _buildContractWorkSection(primaryColor),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFinancialSection() {
+  // Financial Section with interactive progress bar
+  Widget _buildFinancialSection(Color primaryColor) {
     final double budget = double.tryParse(_projectBudgetController.text) ?? 0;
     final double paid = double.tryParse(_amountPaidController.text) ?? 0;
     final double balance = budget - paid;
     final double percentage = budget > 0 ? (paid / budget).clamp(0.0, 1.0) : 0;
 
     return _buildSectionCard(
-      title: 'Financial Information',
-      subtitle: 'Manage budget and payment status',
+      title: 'Financial & Budgeting',
+      subtitle: 'Manage overall project budget and initial advance',
       icon: Icons.account_balance_wallet_rounded,
+      primaryColor: primaryColor,
       children: [
-        GlassTextField(
+        _buildInputField(
           controller: _projectBudgetController,
-          label: 'Project Budget (₹)',
-          icon: Icons.account_balance_wallet_rounded,
+          label: 'Total Project Budget (₹)',
+          hint: 'e.g. 5000000',
+          icon: Icons.currency_rupee_rounded,
           keyboardType: TextInputType.number,
-          onChanged: (v) => setState(() {}),
+          primaryColor: primaryColor,
           validator: (v) {
             if (v != null && v.isNotEmpty) {
-              if (double.tryParse(v) == null) return 'Invalid amount';
+              if (double.tryParse(v) == null) return 'Enter a valid number';
             }
             return null;
           },
         ),
         const SizedBox(height: 16),
-        GlassTextField(
+        _buildInputField(
           controller: _amountPaidController,
-          label: 'Amount Paid (₹)',
-          icon: Icons.currency_rupee_rounded,
+          label: 'Initial Amount Paid / Advance (₹)',
+          hint: 'e.g. 1000000',
+          icon: Icons.payments_outlined,
           keyboardType: TextInputType.number,
-          onChanged: (v) => setState(() {}),
+          primaryColor: primaryColor,
           validator: (v) {
             if (v != null && v.isNotEmpty) {
-              if (double.tryParse(v) == null) return 'Invalid amount';
+              if (double.tryParse(v) == null) return 'Enter a valid number';
             }
             return null;
           },
         ),
         if (budget > 0) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Payment Progress',
+                    const Text(
+                      'Payment Coverage',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade400,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 12.5,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
                       '${(percentage * 100).toStringAsFixed(1)}%',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: primaryColor,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
                     value: percentage,
-                    backgroundColor: Colors.white10,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).primaryColor,
-                    ),
-                    minHeight: 6,
+                    backgroundColor: const Color(0xFFE2E8F0),
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                    minHeight: 8,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Row(
                   children: [
-                    _buildFinancialMiniStat(
-                      'Balance',
-                      '₹${NumberFormat('#,##,###').format(balance)}',
-                      balance < 0 ? Colors.red.shade300 : Colors.green.shade300,
-                    ),
-                    const SizedBox(width: 16),
-                    _buildFinancialMiniStat(
+                    _buildFinancialMiniPill(
                       'Budget',
                       '₹${NumberFormat('#,##,###').format(budget)}',
-                      Colors.blue.shade300,
+                      const Color(0xFF3B82F6),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFinancialMiniPill(
+                      'Paid',
+                      '₹${NumberFormat('#,##,###').format(paid)}',
+                      const Color(0xFF10B981),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFinancialMiniPill(
+                      'Remaining',
+                      '₹${NumberFormat('#,##,###').format(balance)}',
+                      balance < 0
+                          ? const Color(0xFFEF4444)
+                          : const Color(0xFFF59E0B),
                     ),
                   ],
                 ),
@@ -1231,77 +1479,104 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     );
   }
 
-  Widget _buildFinancialMiniStat(String label, String value, Color color) {
+  Widget _buildFinancialMiniPill(String label, String value, Color color) {
     return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: color,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
             ),
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildContractWorkSection() {
+  // Contract Work Section
+  Widget _buildContractWorkSection(Color primaryColor) {
     return _buildSectionCard(
-      title: 'Contract Work',
-      subtitle: 'Details if this project involves an external contractor',
+      title: 'Sub-contractor Assignment',
+      subtitle: 'Specify if project execution is outsourced to a contractor',
       icon: Icons.handyman_rounded,
+      primaryColor: primaryColor,
       trailing: Switch(
         value: _isContractWork,
         onChanged: (v) => setState(() => _isContractWork = v),
-        activeThumbColor: Theme.of(context).primaryColor,
+        activeTrackColor: primaryColor.withValues(alpha: 0.6),
+        activeThumbColor: primaryColor,
       ),
       children: [
         if (!_isContractWork)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Enable to add contractor details',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              'Toggle the switch if this project involves third-party contractor management.',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12.5),
             ),
           ),
         if (_isContractWork) ...[
           _buildDropdownField(
-            'Contractor Name',
+            'Contractor Name / Agency',
             _contractorNameController.text.isEmpty
                 ? null
                 : _contractorNameController.text,
-            _contractors,
+            _contractors.isNotEmpty
+                ? _contractors
+                : ['General Contractor', 'Civil Contractor', 'Electrical Contractor', 'Turnkey Agency'],
             (v) => setState(() => _contractorNameController.text = v ?? ''),
             isLoading: _isLoadingDropdowns,
+            primaryColor: primaryColor,
           ),
           const SizedBox(height: 16),
-          GlassTextField(
+          _buildInputField(
             controller: _contractorBudgetController,
-            label: 'Contractor Budget (₹)',
-            icon: Icons.money_rounded,
+            label: 'Contractor Allocated Budget (₹)',
+            hint: 'e.g. 2500000',
+            icon: Icons.account_balance_wallet_outlined,
             keyboardType: TextInputType.number,
+            primaryColor: primaryColor,
           ),
           const SizedBox(height: 16),
-          _buildDateField(
-            'Contract Start',
-            _contractStartDate,
-            (d) => setState(() => _contractStartDate = d),
-          ),
-          const SizedBox(height: 16),
-          _buildDateField(
-            'Contract End',
-            _contractEndDate,
-            (d) => setState(() => _contractEndDate = d),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDateField(
+                  'Contract Start',
+                  _contractStartDate,
+                  (d) => setState(() => _contractStartDate = d),
+                  primaryColor: primaryColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildDateField(
+                  'Contract End',
+                  _contractEndDate,
+                  (d) => setState(() => _contractEndDate = d),
+                  primaryColor: primaryColor,
+                ),
+              ),
+            ],
           ),
         ],
       ],
@@ -1309,25 +1584,26 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   }
 
   // -------------------- STEP 3: SUPERVISOR ASSIGNMENT --------------------
-  Widget _buildMapStep() {
+  Widget _buildMapStep(Color primaryColor) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
       child: Form(
         key: _mapFormKey,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildModernStepIndicator(),
             _buildStepHeader(
               'Supervisor Assignment',
-              'Assign a supervisor to manage this project on-site',
+              'Assign a certified on-site supervisor and review overall project readiness.',
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _buildSectionCard(
-              title: 'Supervisor Selection',
-              subtitle: 'Choose from registered supervisors',
-              icon: Icons.people_rounded,
+              title: 'On-Site Field Supervisor',
+              subtitle: 'Select from available registered supervisor profiles',
+              icon: Icons.badge_rounded,
+              primaryColor: primaryColor,
               children: [
                 _buildDropdownField(
                   'Select Supervisor',
@@ -1341,99 +1617,110 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                     });
                   },
                   displayItems: _supervisors
-                      .map((s) => '${s['id']} - ${s['name']}')
+                      .map((s) => '${s['name']} (${s['id']})')
                       .toList(),
                   isLoading: _isLoadingDropdowns,
+                  primaryColor: primaryColor,
                   validator: (v) =>
-                      v == null ? 'Please select a supervisor' : null,
+                      v == null ? 'Please select a supervisor (or skip)' : null,
                 ),
               ],
             ),
             _buildSectionCard(
-              title: 'Assignment Details',
-              subtitle: 'Set initial stage and joined date',
-              icon: Icons.assignment_rounded,
+              title: 'Assignment Parameters',
+              subtitle: 'Initial stage handoff and joining timestamp',
+              icon: Icons.assignment_turned_in_rounded,
+              primaryColor: primaryColor,
               children: [
                 _buildDropdownField(
-                  'Project Stage',
-                  _mapProjectStage,
-                  _projectStagesList,
+                  'Initial Supervision Stage',
+                  _mapProjectStage ?? _projectStage,
+                  _projectStagesList.isNotEmpty
+                      ? _projectStagesList
+                      : ['Planning', 'Foundation', 'Structure', 'Finishing', 'Handover'],
                   (v) => setState(() => _mapProjectStage = v),
                   isLoading: _isLoadingDropdowns,
+                  primaryColor: primaryColor,
                 ),
                 const SizedBox(height: 16),
                 _buildDateField(
-                  'Joined Date',
+                  'Supervisor Joined Date',
                   _joinedDate,
                   (d) => setState(() => _joinedDate = d),
+                  primaryColor: primaryColor,
                 ),
                 const SizedBox(height: 16),
-                GlassTextField(
+                _buildInputField(
                   controller: _commentsController,
-                  label: 'Site Comments (Optional)',
-                  icon: Icons.comment_rounded,
+                  label: 'Site Brief / Notes (Optional)',
+                  hint: 'Enter any specific site instructions or comments...',
+                  icon: Icons.notes_rounded,
                   maxLines: 3,
+                  primaryColor: primaryColor,
                 ),
               ],
             ),
-            _buildSummaryCard(),
+            _buildSummaryCard(primaryColor),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSummaryCard() {
+  // Summary Card
+  Widget _buildSummaryCard(Color primaryColor) {
     return Container(
-      margin: const EdgeInsets.only(top: 10, bottom: 30),
+      margin: const EdgeInsets.only(top: 4, bottom: 24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.green.shade900.withValues(alpha: 0.2),
-            Colors.green.shade800.withValues(alpha: 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.green.shade700.withValues(alpha: 0.2)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(18),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade700.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    Icons.fact_check_rounded,
-                    color: Colors.green.shade300,
-                    size: 24,
+                  child: const Icon(
+                    Icons.verified_rounded,
+                    color: Color(0xFF10B981),
+                    size: 22,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
+                const SizedBox(width: 14),
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Project Readiness',
+                        'Project Architecture Summary',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green.shade300,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
                         ),
                       ),
+                      SizedBox(height: 2),
                       Text(
-                        'Review your configuration before saving',
+                        'Confirm details before initializing database entries',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.green.shade100.withValues(alpha: 0.6),
+                          color: Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -1442,57 +1729,52 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               ],
             ),
           ),
-          const Divider(height: 1, color: Color.fromARGB(26, 0, 0, 0)),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(18),
             child: Column(
               children: [
                 _buildSummaryRow('Site Name', _siteNameController.text),
-                _buildSummaryRow('Project', _projectNameController.text),
-                _buildSummaryRow('Owner', _ownerNameController.text),
-                _buildSummaryRow('Supervisor', _selectedSupervisorName),
-                _buildSummaryRow('Stage', _projectStage),
+                _buildSummaryRow('Project Name', _projectNameController.text),
+                _buildSummaryRow('Owner / Client', _ownerNameController.text),
+                _buildSummaryRow('Assigned Supervisor', _selectedSupervisorName ?? 'Not Assigned'),
+                _buildSummaryRow('Current Stage', _projectStage ?? 'Planning'),
+                _buildSummaryRow(
+                  'Project Budget',
+                  _projectBudgetController.text.isNotEmpty
+                      ? '₹${_projectBudgetController.text}'
+                      : 'Not Set',
+                ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Colors.white10),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.all(18),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  height: 24,
-                  width: 24,
+                  height: 22,
+                  width: 22,
                   child: Checkbox(
                     value: _isTermsAgreed,
-                    onChanged: (v) =>
-                        setState(() => _isTermsAgreed = v ?? false),
-                    activeColor: Colors.black,
-                    checkColor: Colors.white,
-                    side: const BorderSide(
-                      color: Color.fromARGB(179, 0, 0, 0),
-                      width: 1.5,
-                    ),
+                    onChanged: (v) => setState(() => _isTermsAgreed = v ?? false),
+                    activeColor: primaryColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _isTermsAgreed = !_isTermsAgreed),
-                    child: Text(
-                      'I have reviewed and agree to the project configuration and terms and conditions.',
+                    onTap: () => setState(() => _isTermsAgreed = !_isTermsAgreed),
+                    child: const Text(
+                      'I confirm that all site and project parameters have been reviewed and comply with the project standards.',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: const Color.fromARGB(
-                          255,
-                          0,
-                          0,
-                          0,
-                        ).withValues(alpha: 0.8),
+                        fontSize: 12.5,
+                        color: Color(0xFF475569),
                         height: 1.4,
                       ),
                     ),
@@ -1508,24 +1790,32 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
   Widget _buildSummaryRow(String label, String? value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           Text(
-            (value == null || value.isEmpty) ? 'Not set' : value,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            (value == null || value.trim().isEmpty) ? '—' : value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: Color(0xFF0F172A),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // -------------------- REUSABLE UI COMPONENTS --------------------
+  // -------------------- REUSABLE FORM COMPONENTS --------------------
   Widget _buildStepHeader(String title, String subtitle) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1533,15 +1823,20 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         Text(
           title,
           style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.4,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF64748B),
+            height: 1.35,
+          ),
         ),
       ],
     );
@@ -1552,18 +1847,19 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     String? subtitle,
     required IconData icon,
     required List<Widget> children,
+    required Color primaryColor,
     Widget? trailing,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
+            color: const Color(0xFF0A183D).withValues(alpha: 0.03),
+            blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
@@ -1572,19 +1868,19 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                    color: primaryColor.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     icon,
                     size: 20,
-                    color: Theme.of(context).primaryColor,
+                    color: primaryColor,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1595,17 +1891,18 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                       Text(
                         title,
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.2,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                          letterSpacing: -0.2,
                         ),
                       ),
                       if (subtitle != null)
                         Text(
                           subtitle,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade500,
+                            color: Color(0xFF64748B),
                           ),
                         ),
                     ],
@@ -1615,9 +1912,9 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               ],
             ),
           ),
-          const Divider(height: 1, color: Colors.white10),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,
@@ -1628,21 +1925,109 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     );
   }
 
-  Widget _buildDateField(
-    String label,
-    DateTime? date,
-    Function(DateTime) onSelected,
-  ) {
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    required IconData icon,
+    required Color primaryColor,
+    bool isRequired = false,
+    bool readOnly = false,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: Color(0xFF334155),
+              ),
+            ),
+            if (isRequired)
+              const Text(
+                ' *',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        TextFormField(
+          controller: controller,
+          readOnly: readOnly,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          validator: validator,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(
+              fontSize: 13.5,
+              color: Color(0xFF94A3B8),
+              fontWeight: FontWeight.normal,
+            ),
+            prefixIcon: Icon(icon, size: 20, color: primaryColor),
+            filled: true,
+            fillColor: readOnly ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: primaryColor, width: 1.8),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFEF4444)),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+            ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildDateField(
+    String label,
+    DateTime? date,
+    Function(DateTime) onSelected, {
+    required Color primaryColor,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            color: Color(0xFF334155),
+          ),
+        ),
+        const SizedBox(height: 7),
         InkWell(
           onTap: () async {
             final picked = await showDatePicker(
@@ -1653,11 +2038,11 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               builder: (context, child) {
                 return Theme(
                   data: Theme.of(context).copyWith(
-                    colorScheme: ColorScheme.dark(
-                      primary: Theme.of(context).primaryColor,
+                    colorScheme: ColorScheme.light(
+                      primary: primaryColor,
                       onPrimary: Colors.white,
-                      surface: Colors.grey.shade800,
-                      onSurface: Colors.white,
+                      surface: Colors.white,
+                      onSurface: const Color(0xFF0F172A),
                     ),
                   ),
                   child: child!,
@@ -1666,32 +2051,36 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             );
             if (picked != null) onSelected(picked);
           },
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Row(
               children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: 18,
+                  color: primaryColor,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     date == null
                         ? 'Select date'
                         : DateFormat('dd MMM yyyy').format(date),
                     style: TextStyle(
-                      color: date == null ? Colors.grey.shade600 : Colors.black,
-                      fontWeight: date != null ? FontWeight.w500 : null,
-                      fontSize: 14,
+                      color: date == null
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF0F172A),
+                      fontWeight:
+                          date != null ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 13.5,
                     ),
                   ),
-                ),
-                Icon(
-                  Icons.calendar_today_rounded,
-                  size: 18,
-                  color: Colors.black,
                 ),
               ],
             ),
@@ -1708,45 +2097,62 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     Function(String?) onChanged, {
     List<String>? displayItems,
     bool isLoading = false,
+    required Color primaryColor,
     String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            color: Color(0xFF334155),
           ),
         ),
+        const SizedBox(height: 7),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: DropdownButtonHideUnderline(
             child: isLoading
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 14),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     child: Center(
                       child: SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: primaryColor,
+                        ),
                       ),
                     ),
                   )
                 : DropdownButton<String>(
-                    value: value,
+                    value: (value != null && items.contains(value)) ? value : null,
                     isExpanded: true,
-                    style: const TextStyle(color: Colors.black, fontSize: 14),
-                    iconEnabledColor: Colors.black,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Color(0xFF64748B),
+                    ),
                     hint: Text(
                       'Select $label',
-                      style: TextStyle(color: Colors.grey.shade600),
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.normal,
+                      ),
                     ),
                     items: List.generate(
                       items.length,
@@ -1755,19 +2161,112 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                         child: Text(
                           displayItems != null ? displayItems[i] : items[i],
                           style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black,
+                            fontSize: 13.5,
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ),
                     onChanged: onChanged,
                     dropdownColor: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
           ),
         ),
       ],
+    );
+  }
+
+  // Sticky Bottom Navigation Buttons
+  Widget _buildBottomNavBar(Color primaryColor, Color darkAccent) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (_currentStep > 0) ...[
+            Expanded(
+              flex: 1,
+              child: OutlinedButton.icon(
+                onPressed: _previousStep,
+                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                label: const Text('Back'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+                  foregroundColor: const Color(0xFF475569),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+          ],
+          Expanded(
+            flex: 2,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryColor, darkAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: ElevatedButton.icon(
+                onPressed: (_isSaving || (_currentStep == 2 && !_isTermsAgreed))
+                    ? null
+                    : _nextStep,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(
+                        _currentStep == 2
+                            ? Icons.check_circle_rounded
+                            : Icons.arrow_forward_rounded,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                label: Text(
+                  _isSaving
+                      ? 'Saving Project...'
+                      : (_currentStep == 2
+                          ? 'Complete & Create Project'
+                          : 'Continue to ${_currentStep == 0 ? 'Project Setup' : 'Supervisor'}'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: Colors.white,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

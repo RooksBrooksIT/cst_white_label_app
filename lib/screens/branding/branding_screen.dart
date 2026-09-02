@@ -112,40 +112,30 @@ class _BrandingScreenState extends State<BrandingScreen> {
           ? _appNameController.text.trim()
           : widget.orgName;
 
-      final checkResults = await Future.wait([
-        FirebaseFirestore.instance
-            .collectionGroup('admin')
-            .where('username', isEqualTo: widget.username)
-            .get(),
-        FirebaseFirestore.instance
-            .collectionGroup('organizationUser')
-            .where('username', isEqualTo: widget.username)
-            .limit(1)
-            .get(),
-        FirebaseFirestore.instance
-            .collection('organisation')
-            .where('username', isEqualTo: widget.username)
-            .limit(1)
-            .get(),
-      ]);
+      final cleanOrgName = widget.orgName.replaceAll(' ', '');
+      final expectedOrgId = '${cleanOrgName}_${widget.dateStr}';
 
-      bool isTaken =
-          checkResults[1].docs.isNotEmpty || checkResults[2].docs.isNotEmpty;
-      if (!isTaken) {
-        for (var doc in checkResults[0].docs) {
-          if (doc.id == 'data') {
-            isTaken = true;
-            break;
-          }
-        }
-      }
+      final validation = await FirestoreService.validateOrganizationRegistration(
+        orgName: widget.orgName,
+        email: widget.email,
+        phone: widget.phone,
+        username: widget.username,
+      );
 
-      // If username doc exists, check if it is this user's pending registration
-      if (isTaken) {
-        final cleanOrgName = widget.orgName.replaceAll(' ', '');
-        final expectedOrgId = '${cleanOrgName}_${widget.dateStr}';
+      if (!validation.isValid) {
+        final checkResults = await Future.wait([
+          FirebaseFirestore.instance
+              .collectionGroup('admin')
+              .where('username', isEqualTo: widget.username)
+              .get(),
+          FirebaseFirestore.instance
+              .collection('organisation')
+              .where('username', isEqualTo: widget.username)
+              .limit(1)
+              .get(),
+        ]);
+
         bool isOwnPendingAccount = false;
-
         for (var query in checkResults) {
           for (var doc in query.docs) {
             final docPath = doc.reference.path;
@@ -158,7 +148,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
         }
 
         if (!isOwnPendingAccount) {
-          _showError('Username already taken.');
+          _showError(validation.errorMessage ?? 'Details already exist.');
           setState(() => _isLoading = false);
           return;
         }
