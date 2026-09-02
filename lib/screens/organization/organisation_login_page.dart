@@ -161,7 +161,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       }
 
       if (userData != null) {
-        final String? email = (userData['email'] ?? '').toString();
+        final String email = (userData['email'] ?? '').toString();
         final String? storedOrgName = (userData['org_name'] ?? userData['orgName']) as String?;
 
         if (email != null && email.isNotEmpty) {

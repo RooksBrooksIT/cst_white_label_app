@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,9 +7,7 @@ import 'package:demo_cst/screens/customer/customer_worker_details.dart';
 import 'package:demo_cst/screens/customer/customer_workers_summary.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/responsive.dart';  
 
 import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
 

@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/screens/customer/customer_insights_screen.dart';
 import 'package:demo_cst/screens/customer/customer_project_financial_statusreport.dart';
-import 'package:demo_cst/screens/reports/site_status_report.dart';
 import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/responsive.dart';  
 
 class CustomerWorkProgress extends StatelessWidget {
   const CustomerWorkProgress({
