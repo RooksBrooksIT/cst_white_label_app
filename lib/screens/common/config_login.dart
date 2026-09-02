@@ -7,6 +7,7 @@ import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/firestore_error_handler.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/screens/manager/config_account_dashboard.dart';
+import 'package:demo_cst/screens/common/portal_loading_screen.dart';
 
 class ConfigLoginPage extends StatefulWidget {
   const ConfigLoginPage({super.key});
@@ -169,8 +170,15 @@ class _ConfigLoginPageState extends State<ConfigLoginPage> {
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(
-              builder: (context) => const ConfigAccountDashboard(),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const PortalLoadingScreen(
+                expectedRole: UserRole.manager,
+                initialStatusMessage: 'Loading manager portal…',
+              ),
+              transitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+                  FadeTransition(opacity: animation, child: child),
             ),
             (route) => false,
           );

@@ -1,18 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/screens/organization/organization_dashboard.dart';
-import 'package:demo_cst/screens/organization/pricing_screen.dart';
-import 'package:demo_cst/screens/manager/config_account_dashboard.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
-import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
-import 'package:demo_cst/screens/organization/org_subscription_page.dart';
-import 'package:demo_cst/screens/customer/customer_dashboard.dart';
 import 'package:demo_cst/utils/terms_helper.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:demo_cst/screens/common/portal_loading_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -116,68 +109,18 @@ class _SplashScreenState extends State<SplashScreen>
 
     final auth = AuthService();
     if (auth.isLoggedIn) {
-      final data = auth.userData;
-      switch (auth.userRole) {
-        case UserRole.organization:
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const OrganizationDashboard(),
-            ),
-          );
-          break;
-        case UserRole.manager:
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ConfigAccountDashboard(),
-            ),
-          );
-          break;
-        case UserRole.supervisor:
-          final isContractor = data['isContractor'] ?? false;
-          if (isContractor) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ContractorEntryPage(
-                  userName: data['username'] ?? '',
-                  userDetails: {
-                    'supervisorId': data['supervisorId'] ?? '',
-                    'contractorName': data['contractorName'] ?? '',
-                    'contractorField': data['contractorField'] ?? '',
-                  },
-                ),
-              ),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SupervisorDashboard(
-                  supervisorId: data['supervisorId'] ?? '',
-                  supervisorName: data['supervisorName'] ?? '',
-                  username: data['username'] ?? '',
-                ),
-              ),
-            );
-          }
-          break;
-        case UserRole.customer:
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CustomerDashboardPage(
-                ownerName: data['ownerName'] ?? '',
-                ownerPhoneNumber: data['ownerPhoneNumber'] ?? '',
-                siteId: data['siteId'] ?? '',
-              ),
-            ),
-          );
-          break;
-        default:
-          Navigator.pushReplacementNamed(context, '/landing');
-      }
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const PortalLoadingScreen(
+            initialStatusMessage: 'Loading your dashboard…',
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+      );
     } else {
       Navigator.pushReplacementNamed(context, '/landing');
     }

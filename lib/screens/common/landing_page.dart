@@ -7,13 +7,7 @@ import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/screens/organization/organization_dashboard.dart';
-import 'package:demo_cst/screens/organization/org_subscription_page.dart';
-import 'package:demo_cst/screens/organization/pricing_screen.dart';
-import 'package:demo_cst/screens/manager/config_account_dashboard.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
-
-enum LoginRole { organization, manager, supervisor }
+import 'package:demo_cst/screens/common/portal_loading_screen.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -23,7 +17,6 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
-  LoginRole _selectedRole = LoginRole.organization;
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _usernameController = TextEditingController();
@@ -43,27 +36,39 @@ class _LandingPageState extends State<LandingPage> {
     AppTheme.showErrorToast(context, message);
   }
 
-  // -------------------- LOGIN HANDLER --------------------
+  // -------------------- UNIFIED ROLE-BASED LOGIN HANDLER --------------------
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     HapticFeedback.lightImpact();
 
     setState(() => _isLoading = true);
 
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
     try {
-      switch (_selectedRole) {
-        case LoginRole.organization:
-          await _loginOrganization();
-          break;
-        case LoginRole.manager:
-          await _loginManager();
-          break;
-        case LoginRole.supervisor:
-          await _loginSupervisor();
-          break;
+      // 1. Check if user is an Organization Admin
+      final bool isOrg = await _tryOrganizationLogin(username, password);
+      if (isOrg) return;
+
+      // 2. Check if user is a Manager
+      final bool isManager = await _tryManagerLogin(username, password);
+      if (isManager) return;
+
+      // 3. Check if user is a Supervisor / Contractor
+      final bool isSupervisor = await _trySupervisorLogin(username, password);
+      if (isSupervisor) return;
+
+      // 4. Check if user is a Customer / Client
+      final bool isCustomer = await _tryCustomerLogin(username, password);
+      if (isCustomer) return;
+
+      // If no matching account found across any role:
+      if (mounted) {
+        _showError('Incorrect username or password. Please check your credentials.');
       }
     } catch (e) {
-      debugPrint('Login Exception: $e');
+      debugPrint('Universal Login Exception: $e');
       if (mounted) {
         _showError('Login failed: ${e.toString().replaceAll("Exception: ", "")}');
       }
@@ -74,47 +79,22 @@ class _LandingPageState extends State<LandingPage> {
     }
   }
 
-  // 1. Organization Login
-  Future<void> _loginOrganization() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
+  // 1. Organization Login Check
+  Future<bool> _tryOrganizationLogin(String username, String password) async {
+    try {
+      QuerySnapshot<Map<String, dynamic>>? userQuery;
 
-    QuerySnapshot<Map<String, dynamic>>? userQuery;
-
-    // Try 'admin' collection group
-    userQuery = await FirebaseFirestore.instance
-        .collectionGroup('admin')
-        .where('username', isEqualTo: username)
-        .get();
-
-    QueryDocumentSnapshot<Map<String, dynamic>>? dataDoc;
-
-    if (userQuery.docs.isNotEmpty) {
-      for (var doc in userQuery.docs) {
-        if (doc.id == 'data' || doc.id == 'admin') {
-          final data = doc.data();
-          final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-          final orgDocId = doc.reference.parent.parent?.id ?? '';
-          if (appId == FirestoreService.cstAppId ||
-              FirestoreService.isCstOrgId(orgDocId) ||
-              data['is_cst_app'] == true) {
-            dataDoc = doc;
-            break;
-          }
-        }
-      }
-    }
-
-    // Try 'data' collection group
-    if (dataDoc == null) {
+      // Check 'admin' collection group
       userQuery = await FirebaseFirestore.instance
-          .collectionGroup('data')
+          .collectionGroup('admin')
           .where('username', isEqualTo: username)
           .get();
 
+      QueryDocumentSnapshot<Map<String, dynamic>>? dataDoc;
+
       if (userQuery.docs.isNotEmpty) {
         for (var doc in userQuery.docs) {
-          if (doc.id == 'admin' || doc.id == 'data') {
+          if (doc.id == 'data' || doc.id == 'admin') {
             final data = doc.data();
             final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
             final orgDocId = doc.reference.parent.parent?.id ?? '';
@@ -127,232 +107,345 @@ class _LandingPageState extends State<LandingPage> {
           }
         }
       }
-    }
 
-    Map<String, dynamic>? userData;
-    String? dynamicPath;
-    String? fullConfigPath;
+      // Check 'data' collection group
+      if (dataDoc == null) {
+        userQuery = await FirebaseFirestore.instance
+            .collectionGroup('data')
+            .where('username', isEqualTo: username)
+            .get();
 
-    if (dataDoc != null) {
-      userData = dataDoc.data();
-      dynamicPath = dataDoc.reference.parent.parent?.id ?? 'uninitialized';
-      fullConfigPath = dataDoc.reference.path;
-    } else {
-      // Fallback: Check root organisation collection
-      final legacyQuery = await FirebaseFirestore.instance
-          .collection('organisation')
-          .where('username', isEqualTo: username)
-          .get();
-
-      for (var legacyDoc in legacyQuery.docs) {
-        final data = legacyDoc.data();
-        final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-        if (appId == FirestoreService.cstAppId ||
-            FirestoreService.isCstOrgId(legacyDoc.id) ||
-            data['is_cst_app'] == true) {
-          userData = data;
-          dynamicPath = legacyDoc.id;
-          fullConfigPath = legacyDoc.reference.path;
-          break;
-        }
-      }
-    }
-
-    if (userData == null) {
-      _showError('Invalid username or organization account not found');
-      return;
-    }
-
-    final String email = (userData['email'] ?? '').toString();
-    final String? storedOrgName =
-        (userData['org_name'] ?? userData['orgName']) as String?;
-
-    if (email.isNotEmpty) {
-      try {
-        await AuthService().loginWithEmail(email, password);
-        if (userData['password'] != password && fullConfigPath != null) {
-          final WriteBatch batch = FirebaseFirestore.instance.batch();
-          batch.update(FirebaseFirestore.instance.doc(fullConfigPath), {
-            'password': password,
-          });
-          if (dynamicPath != null && dynamicPath != 'uninitialized') {
-            batch.update(
-              FirebaseFirestore.instance.collection('organisation').doc(dynamicPath),
-              {'password': password},
-            );
+        if (userQuery.docs.isNotEmpty) {
+          for (var doc in userQuery.docs) {
+            if (doc.id == 'admin' || doc.id == 'data') {
+              final data = doc.data();
+              final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+              final orgDocId = doc.reference.parent.parent?.id ?? '';
+              if (appId == FirestoreService.cstAppId ||
+                  FirestoreService.isCstOrgId(orgDocId) ||
+                  data['is_cst_app'] == true) {
+                dataDoc = doc;
+                break;
+              }
+            }
           }
-          await batch.commit();
-        }
-      } catch (authError) {
-        if (userData['password'] == password) {
-          try {
-            await AuthService().registerWithEmail(email, password);
-          } catch (_) {}
-        } else {
-          _showError('Incorrect password. Please try again.');
-          return;
         }
       }
-    } else {
-      if (userData['password'] != password) {
-        _showError('Incorrect password. Please try again.');
-        return;
-      }
-    }
 
-    // Set org path and sync branding
-    FirestoreService.setOrgPath(dynamicPath ?? '');
-    await AppTheme.syncWithFirestore(dynamicPath ?? '');
+      Map<String, dynamic>? userData;
+      String? dynamicPath;
+      String? fullConfigPath;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const OrganizationDashboard()),
-    );
-  }
+      if (dataDoc != null) {
+        userData = dataDoc.data();
+        dynamicPath = dataDoc.reference.parent.parent?.id ?? 'uninitialized';
+        fullConfigPath = dataDoc.reference.path;
+      } else {
+        // Fallback check root organisation collection
+        final legacyQuery = await FirebaseFirestore.instance
+            .collection('organisation')
+            .where('username', isEqualTo: username)
+            .get();
 
-  // 2. Manager Login
-  Future<void> _loginManager() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
-
-    QuerySnapshot<Map<String, dynamic>>? querySnapshot;
-
-    // 1. Search in collectionGroup 'manager'
-    querySnapshot = await FirebaseFirestore.instance
-        .collectionGroup('manager')
-        .where('UserName', isEqualTo: username)
-        .where('Password', isEqualTo: password)
-        .get();
-
-    // 2. Also search in collectionGroup 'configUsers'
-    if (querySnapshot.docs.isEmpty) {
-      querySnapshot = await FirebaseFirestore.instance
-          .collectionGroup('configUsers')
-          .where('UserName', isEqualTo: username)
-          .where('Password', isEqualTo: password)
-          .get();
-    }
-
-    if (querySnapshot.docs.isNotEmpty) {
-      final doc = querySnapshot.docs.first;
-      final docData = doc.data();
-
-      // Extract orgId from document path (organisation/{orgId}/...)
-      String orgId = '';
-      final segments = doc.reference.path.split('/');
-      final orgIndex = segments.indexOf('organisation');
-      if (orgIndex != -1 && orgIndex + 1 < segments.length) {
-        orgId = segments[orgIndex + 1];
+        for (var legacyDoc in legacyQuery.docs) {
+          final data = legacyDoc.data();
+          final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
+          if (appId == FirestoreService.cstAppId ||
+              FirestoreService.isCstOrgId(legacyDoc.id) ||
+              data['is_cst_app'] == true) {
+            userData = data;
+            dynamicPath = legacyDoc.id;
+            fullConfigPath = legacyDoc.reference.path;
+            break;
+          }
+        }
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      if (orgId.isNotEmpty) {
-        await prefs.setString('config_org_path', orgId);
-        final String resolvedPath = 'organisation/$orgId/data/admin';
-        await prefs.setString('config_org_doc_path', resolvedPath);
-        FirestoreService.setOrgPath(orgId);
-        await FirestoreService.initialize();
-        await AppTheme.syncWithFirestore(orgId);
+      if (userData == null) return false;
+
+      final String email = (userData['email'] ?? '').toString();
+      final String? storedOrgName =
+          (userData['org_name'] ?? userData['orgName']) as String?;
+
+      if (email.isNotEmpty) {
+        try {
+          await AuthService().loginWithEmail(email, password);
+          if (userData['password'] != password && fullConfigPath != null) {
+            final WriteBatch batch = FirebaseFirestore.instance.batch();
+            batch.update(FirebaseFirestore.instance.doc(fullConfigPath), {
+              'password': password,
+            });
+            if (dynamicPath != null && dynamicPath != 'uninitialized') {
+              batch.update(
+                FirebaseFirestore.instance
+                    .collection('organisation')
+                    .doc(dynamicPath)
+                    .collection('organizationUser')
+                    .doc(username),
+                {'password': password},
+              );
+            }
+            await batch.commit();
+          }
+        } catch (_) {
+          // If Firebase Auth fails, compare direct password as fallback
+          if (userData['password'] != password) {
+            return false;
+          }
+        }
+      } else {
+        if (userData['password'] != password) {
+          return false;
+        }
       }
 
-      final Map<String, dynamic> data = {
+      // Set org path and sync branding
+      FirestoreService.setOrgPath(dynamicPath ?? '');
+      await AppTheme.syncWithFirestore(dynamicPath ?? '');
+
+      await AuthService().login(UserRole.organization, {
         'username': username,
-        'password': password,
-        'orgId': orgId,
-        'config_org_doc_path': 'organisation/$orgId/data/admin',
-        ...docData,
-      };
-      await AuthService().login(UserRole.manager, data);
+        'dynamicPath': dynamicPath,
+        'org_name': storedOrgName,
+        'org_doc_path': fullConfigPath,
+      });
 
       await NotificationService.saveToken(
         userId: username,
-        userType: 'manager',
+        userType: 'organisation',
         userName: username,
       );
 
       if (mounted) {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const ConfigAccountDashboard()),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const PortalLoadingScreen(
+              expectedRole: UserRole.organization,
+              initialStatusMessage: 'Loading your dashboard…',
+            ),
+            transitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+                FadeTransition(opacity: animation, child: child),
+          ),
+          (route) => false,
         );
       }
-    } else {
-      _showError('Invalid Manager username or password');
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
-  // 3. Supervisor Login
-  Future<void> _loginSupervisor() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
+  // 2. Manager Login Check
+  Future<bool> _tryManagerLogin(String username, String password) async {
+    try {
+      QuerySnapshot<Map<String, dynamic>>? querySnapshot;
 
-    QuerySnapshot<Map<String, dynamic>>? querySnapshot;
-
-    // 1. Search in collectionGroup 'supervisor'
-    querySnapshot = await FirebaseFirestore.instance
-        .collectionGroup('supervisor')
-        .where('UserName', isEqualTo: username)
-        .where('Password', isEqualTo: password)
-        .limit(1)
-        .get();
-
-    // 2. Also search in collectionGroup 'supervisors'
-    if (querySnapshot.docs.isEmpty) {
+      // Check 'manager' collection group
       querySnapshot = await FirebaseFirestore.instance
-          .collectionGroup('supervisors')
+          .collectionGroup('manager')
+          .where('UserName', isEqualTo: username)
+          .where('Password', isEqualTo: password)
+          .get();
+
+      // Check 'configUsers' collection group
+      if (querySnapshot.docs.isEmpty) {
+        querySnapshot = await FirebaseFirestore.instance
+            .collectionGroup('configUsers')
+            .where('UserName', isEqualTo: username)
+            .where('Password', isEqualTo: password)
+            .get();
+      }
+
+      if (querySnapshot.docs.isNotEmpty) {
+        final doc = querySnapshot.docs.first;
+        final docData = doc.data();
+
+        // Extract orgId from document path (organisation/{orgId}/...)
+        String orgId = '';
+        final segments = doc.reference.path.split('/');
+        final orgIndex = segments.indexOf('organisation');
+        if (orgIndex != -1 && orgIndex + 1 < segments.length) {
+          orgId = segments[orgIndex + 1];
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        if (orgId.isNotEmpty) {
+          await prefs.setString('config_org_path', orgId);
+          final String resolvedPath = 'organisation/$orgId/data/admin';
+          await prefs.setString('config_org_doc_path', resolvedPath);
+          FirestoreService.setOrgPath(orgId);
+          await FirestoreService.initialize();
+          await AppTheme.syncWithFirestore(orgId);
+        }
+
+        final Map<String, dynamic> data = {
+          'username': username,
+          'password': password,
+          'orgId': orgId,
+          'config_org_doc_path': 'organisation/$orgId/data/admin',
+          ...docData,
+        };
+        await AuthService().login(UserRole.manager, data);
+
+        await NotificationService.saveToken(
+          userId: username,
+          userType: 'manager',
+          userName: username,
+        );
+
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const PortalLoadingScreen(
+                expectedRole: UserRole.manager,
+                initialStatusMessage: 'Loading manager portal…',
+              ),
+              transitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
+            (route) => false,
+          );
+        }
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // 3. Supervisor Login Check
+  Future<bool> _trySupervisorLogin(String username, String password) async {
+    try {
+      QuerySnapshot<Map<String, dynamic>>? querySnapshot;
+
+      querySnapshot = await FirebaseFirestore.instance
+          .collectionGroup('supervisor')
           .where('UserName', isEqualTo: username)
           .where('Password', isEqualTo: password)
           .limit(1)
           .get();
-    }
 
-    if (querySnapshot.docs.isNotEmpty) {
-      final doc = querySnapshot.docs.first;
-      final supervisorId = doc.id;
-      final supervisorName = doc.data()['Name'] ?? doc.data()['supervisorName'] ?? username;
-
-      // Extract orgId from document path (organisation/{orgId}/...)
-      String orgId = '';
-      final segments = doc.reference.path.split('/');
-      final orgIndex = segments.indexOf('organisation');
-      if (orgIndex != -1 && orgIndex + 1 < segments.length) {
-        orgId = segments[orgIndex + 1];
+      if (querySnapshot.docs.isEmpty) {
+        querySnapshot = await FirebaseFirestore.instance
+            .collectionGroup('supervisors')
+            .where('UserName', isEqualTo: username)
+            .where('Password', isEqualTo: password)
+            .limit(1)
+            .get();
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      if (orgId.isNotEmpty) {
-        await prefs.setString('sup_org_path', orgId);
-        final String resolvedPath = 'organisation/$orgId/data/admin';
-        await prefs.setString('sup_org_doc_path', resolvedPath);
-        FirestoreService.setOrgPath(orgId);
-        await FirestoreService.initialize();
-        await AppTheme.syncWithFirestore(orgId);
-      }
+      if (querySnapshot.docs.isNotEmpty) {
+        final doc = querySnapshot.docs.first;
+        final supervisorId = doc.id;
+        final supervisorName =
+            doc.data()['Name'] ?? doc.data()['supervisorName'] ?? username;
 
-      await AuthService().login(UserRole.supervisor, {
-        'username': username,
-        'supervisorId': supervisorId,
-        'supervisorName': supervisorName,
-        'isContractor': false,
-        'userType': 'supervisor',
-        'orgId': orgId,
-        'sup_org_doc_path': 'organisation/$orgId/data/admin',
-      });
+        // Extract orgId from document path (organisation/{orgId}/...)
+        String orgId = '';
+        final segments = doc.reference.path.split('/');
+        final orgIndex = segments.indexOf('organisation');
+        if (orgIndex != -1 && orgIndex + 1 < segments.length) {
+          orgId = segments[orgIndex + 1];
+        }
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SupervisorDashboard(
-              supervisorId: supervisorId,
-              supervisorName: supervisorName,
-              username: username,
-            ),
-          ),
+        final prefs = await SharedPreferences.getInstance();
+        if (orgId.isNotEmpty) {
+          await prefs.setString('sup_org_path', orgId);
+          final String resolvedPath = 'organisation/$orgId/data/admin';
+          await prefs.setString('sup_org_doc_path', resolvedPath);
+          FirestoreService.setOrgPath(orgId);
+          await FirestoreService.initialize();
+          await AppTheme.syncWithFirestore(orgId);
+        }
+
+        await AuthService().login(UserRole.supervisor, {
+          'username': username,
+          'supervisorId': supervisorId,
+          'supervisorName': supervisorName,
+          'isContractor': false,
+          'userType': 'supervisor',
+          'orgId': orgId,
+          'sup_org_doc_path': 'organisation/$orgId/data/admin',
+        });
+
+        await NotificationService.saveToken(
+          userId: supervisorId,
+          userType: 'supervisor',
+          userName: supervisorName,
         );
+
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const PortalLoadingScreen(
+                expectedRole: UserRole.supervisor,
+                initialStatusMessage: 'Loading supervisor portal…',
+              ),
+              transitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
+            (route) => false,
+          );
+        }
+        return true;
       }
-    } else {
-      _showError('Invalid Supervisor username or password');
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // 4. Customer Login Check
+  Future<bool> _tryCustomerLogin(String username, String password) async {
+    try {
+      QuerySnapshot<Map<String, dynamic>> querySnapshot =
+          await FirebaseFirestore.instance
+              .collectionGroup('customers')
+              .where('ownerPhoneNumber', isEqualTo: username)
+              .limit(1)
+              .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        final doc = querySnapshot.docs.first;
+        final data = doc.data();
+
+        await AuthService().login(UserRole.customer, {
+          'ownerName': data['ownerName'] ?? username,
+          'ownerPhoneNumber': data['ownerPhoneNumber'] ?? username,
+          'siteId': data['siteId'] ?? '',
+        });
+
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const PortalLoadingScreen(
+                expectedRole: UserRole.customer,
+                initialStatusMessage: 'Loading client portal…',
+              ),
+              transitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
+            (route) => false,
+          );
+        }
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -379,19 +472,52 @@ class _LandingPageState extends State<LandingPage> {
                   child: Column(
                     children: [
                       // 1. Branding Header
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: SizedBox(
-                          width: 88,
-                          height: 88,
-                          child: Image.asset(
-                            'assets/images/logo_main.png',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Icon(
-                              Icons.construction_rounded,
-                              size: 56,
-                              color: primaryColor,
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: primaryColor.withValues(alpha: 0.2),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
                             ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: ValueListenableBuilder<String>(
+                            valueListenable: AppTheme.logoUrl,
+                            builder: (context, logoUrl, _) {
+                              if (logoUrl.isNotEmpty) {
+                                return Image.network(
+                                  logoUrl,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Image.asset(
+                                    'assets/images/logo_main.png',
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (c, e, s) => Icon(
+                                      Icons.construction_rounded,
+                                      size: 48,
+                                      color: primaryColor,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return Image.asset(
+                                'assets/images/logo_main.png',
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(
+                                  Icons.construction_rounded,
+                                  size: 48,
+                                  color: primaryColor,
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -437,54 +563,48 @@ class _LandingPageState extends State<LandingPage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // 2. Role Selector Tabs
-                      _buildRoleSelector(primaryColor, darkAccent),
-                      const SizedBox(height: 18),
-
-                      // 3. Unified Form Card
-                      _buildLoginFormCard(primaryColor, darkAccent),
+                      // 2. Unified Sign In Card
+                      _buildUnifiedLoginFormCard(primaryColor, darkAccent),
                       const SizedBox(height: 20),
 
-                      // 4. Create Account Link (Only visible on Organization tab)
-                      if (_selectedRole == LoginRole.organization) ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Don't have an account? ",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white.withValues(alpha: 0.92),
-                                fontWeight: FontWeight.w500,
-                              ),
+                      // 3. Register New Account Link
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an account? ",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withValues(alpha: 0.95),
+                              fontWeight: FontWeight.w500,
                             ),
-                            InkWell(
-                              onTap: () => Navigator.pushNamed(
-                                context,
-                                '/orgRegistrationForm',
+                          ),
+                          InkWell(
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              '/orgRegistrationForm',
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
                               ),
-                              borderRadius: BorderRadius.circular(6),
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 2,
-                                ),
-                                child: Text(
-                                  'Create Account',
-                                  style: TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: Colors.white,
-                                  ),
+                              child: Text(
+                                'Create Account',
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Colors.white,
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                      ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -496,131 +616,22 @@ class _LandingPageState extends State<LandingPage> {
     );
   }
 
-  // -------------------- ROLE SELECTOR --------------------
-  Widget _buildRoleSelector(Color primaryColor, Color darkAccent) {
-    final roles = [
-      {
-        'role': LoginRole.organization,
-        'title': 'Organization',
-        'icon': Icons.business_center_rounded,
-      },
-      {
-        'role': LoginRole.manager,
-        'title': 'Manager',
-        'icon': Icons.manage_accounts_rounded,
-      },
-      {
-        'role': LoginRole.supervisor,
-        'title': 'Supervisor',
-        'icon': Icons.supervisor_account_rounded,
-      },
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: roles.map((item) {
-          final role = item['role'] as LoginRole;
-          final isSelected = _selectedRole == role;
-          final title = item['title'] as String;
-          final icon = item['icon'] as IconData;
-
-          return Expanded(
-            child: InkWell(
-              onTap: () {
-                if (_selectedRole != role) {
-                  HapticFeedback.selectionClick();
-                  setState(() {
-                    _selectedRole = role;
-                  });
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: isSelected
-                      ? LinearGradient(
-                          colors: [primaryColor, darkAccent],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: isSelected ? null : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: primaryColor.withValues(alpha: 0.28),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      icon,
-                      size: 20,
-                      color: isSelected ? Colors.white : const Color(0xFF64748B),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? Colors.white : const Color(0xFF64748B),
-                      ),
-                      maxLines: 1,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  // -------------------- LOGIN FORM CARD --------------------
-  Widget _buildLoginFormCard(Color primaryColor, Color darkAccent) {
-    final roleName = _selectedRole == LoginRole.organization
-        ? 'Organization'
-        : _selectedRole == LoginRole.manager
-            ? 'Manager'
-            : 'Supervisor';
-
+  // -------------------- UNIFIED LOGIN FORM CARD --------------------
+  Widget _buildUnifiedLoginFormCard(Color primaryColor, Color darkAccent) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.05),
-            blurRadius: 18,
+            color: const Color(0xFF0A183D).withValues(alpha: 0.06),
+            blurRadius: 20,
             offset: const Offset(0, 6),
           ),
           BoxShadow(
-            color: primaryColor.withValues(alpha: 0.04),
-            blurRadius: 12,
+            color: primaryColor.withValues(alpha: 0.05),
+            blurRadius: 14,
             offset: const Offset(0, 2),
           ),
         ],
@@ -635,61 +646,54 @@ class _LandingPageState extends State<LandingPage> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(9),
                   decoration: BoxDecoration(
                     color: primaryColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    _selectedRole == LoginRole.organization
-                        ? Icons.domain_rounded
-                        : _selectedRole == LoginRole.manager
-                            ? Icons.badge_rounded
-                            : Icons.engineering_rounded,
-                    size: 20,
+                    Icons.lock_person_rounded,
+                    size: 22,
                     color: primaryColor,
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$roleName Sign In',
-                      style: const TextStyle(
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.w800,
+                      'Portal Sign In',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
                         color: Color(0xFF0A183D),
-                        letterSpacing: -0.2,
+                        letterSpacing: -0.3,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
-                      'Enter your credentials to continue',
-                      style: const TextStyle(
+                      'Sign in with your assigned account',
+                      style: TextStyle(
                         fontSize: 11.5,
                         color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
 
-            // Username Field
+            // Username or Email Field
             _buildInputField(
               controller: _usernameController,
-              label: _selectedRole == LoginRole.organization
-                  ? 'Username or Email'
-                  : '$roleName Username',
-              hint: _selectedRole == LoginRole.organization
-                  ? 'Enter admin username or email'
-                  : 'Enter $roleName username',
+              label: 'Username or Email',
+              hint: 'Enter username or email',
               icon: Icons.person_outline_rounded,
               primaryColor: primaryColor,
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Username is required' : null,
+                  v == null || v.trim().isEmpty ? 'Username or email is required' : null,
             ),
             const SizedBox(height: 16),
 
@@ -697,7 +701,7 @@ class _LandingPageState extends State<LandingPage> {
             _buildInputField(
               controller: _passwordController,
               label: 'Password',
-              hint: 'Enter password',
+              hint: 'Enter your password',
               icon: Icons.lock_outline_rounded,
               isPassword: true,
               isObscured: _isPasswordObscured,
@@ -709,31 +713,29 @@ class _LandingPageState extends State<LandingPage> {
                   v == null || v.trim().isEmpty ? 'Password is required' : null,
             ),
 
-            // Forgot Password Link for Organization
-            if (_selectedRole == LoginRole.organization) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: InkWell(
-                  onTap: () => Navigator.pushNamed(context, '/resetPassword'),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    child: Text(
-                      'Forgot Password?',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: primaryColor,
-                      ),
+            // Forgot Password Link
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: InkWell(
+                onTap: () => Navigator.pushNamed(context, '/resetPassword'),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Text(
+                    'Forgot Password?',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: primaryColor,
                     ),
                   ),
                 ),
               ),
-            ],
+            ),
             const SizedBox(height: 22),
 
-            // Submit Login CTA Button
+            // Submit Sign In CTA Button
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -744,12 +746,12 @@ class _LandingPageState extends State<LandingPage> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                      color: primaryColor.withValues(alpha: 0.38),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
@@ -760,7 +762,7 @@ class _LandingPageState extends State<LandingPage> {
                     shadowColor: Colors.transparent,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: _isLoading
@@ -772,15 +774,15 @@ class _LandingPageState extends State<LandingPage> {
                             color: Colors.white,
                           ),
                         )
-                      : Row(
+                      : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.login_rounded, size: 20),
-                            const SizedBox(width: 10),
+                            Icon(Icons.login_rounded, size: 20),
+                            SizedBox(width: 10),
                             Text(
-                              'Login as $roleName',
-                              style: const TextStyle(
-                                fontSize: 15,
+                              'Sign In to Portal',
+                              style: TextStyle(
+                                fontSize: 15.5,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.2,
                               ),
@@ -851,7 +853,10 @@ class _LandingPageState extends State<LandingPage> {
                 : null,
             filled: true,
             fillColor: const Color(0xFFF8FAFC),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),

@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/screens/organization/organization_dashboard.dart';
-import 'package:demo_cst/screens/organization/org_subscription_page.dart';
-import 'package:demo_cst/screens/manager/config_account_dashboard.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
+import 'package:demo_cst/screens/common/portal_loading_screen.dart';
 
 class OrganisationLandingPage extends StatefulWidget {
   const OrganisationLandingPage({super.key});
@@ -36,46 +33,19 @@ class _OrganisationLandingPageState extends State<OrganisationLandingPage>
   Future<void> _checkExistingSession() async {
     final auth = AuthService();
     if (auth.isLoggedIn && mounted) {
-      switch (auth.userRole) {
-        case UserRole.organization:
-          final isValid = await auth.checkSubscriptionStatus();
-          if (mounted) {
-            if (isValid) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const OrganizationDashboard()),
-                (route) => false,
-              );
-            } else {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const OrganizationSubscriptionPage()),
-                (route) => false,
-              );
-            }
-          }
-          break;
-        case UserRole.manager:
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const ConfigAccountDashboard()),
-            (route) => false,
-          );
-          break;
-        case UserRole.supervisor:
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => SupervisorDashboard(
-              supervisorId: auth.userData['supervisorId'] ?? '',
-              supervisorName: auth.userData['supervisorName'] ?? '',
-              username: auth.userData['username'] ?? '',
-            )),
-            (route) => false,
-          );
-          break;
-        default:
-          break;
-      }
+      Navigator.pushAndRemoveUntil(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const PortalLoadingScreen(
+            initialStatusMessage: 'Loading your dashboard…',
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+        (route) => false,
+      );
     }
   }
 
