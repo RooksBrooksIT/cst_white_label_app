@@ -639,10 +639,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       await prefs.remove('org_isLoggedIn');
       await prefs.remove('org_username');
 
-      if (mounted) {
+      if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/authSelection',
+          '/landing',
           (route) => false,
         );
       }

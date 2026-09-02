@@ -9,6 +9,7 @@ import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/screens/organization/organization_dashboard.dart';
+import 'package:demo_cst/screens/organization/org_subscription_page.dart';
 import 'package:demo_cst/screens/organization/pricing_screen.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/firestore_error_handler.dart';
@@ -245,6 +246,7 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
             final subData = subDoc.data();
             final bool isSubActive = subData?['isSubscriptionActive'] == true;
+            final String plan = (subData?['subscriptionPlan'] ?? '').toString().trim();
             final String onboardingStep = (subData?['onboardingStep'] ??
                     userData['onboardingStep'] ??
                     '')
@@ -256,9 +258,8 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
             if (!isSubActive &&
                 (onboardingStep == 'PAYMENT_PENDING' ||
-                    paymentStatus == 'PENDING' ||
-                    subData == null ||
-                    subData['subscriptionPlan'] == 'Pending Selection')) {
+                    plan == 'Pending Selection' ||
+                    (plan.isEmpty && onboardingStep != 'COMPLETED' && paymentStatus == 'PENDING'))) {
               isPaymentPending = true;
             }
           } catch (subCheckErr) {
@@ -314,12 +315,23 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           }
         }
 
+        final isSubscriptionValid = await AuthService().checkSubscriptionStatus();
         if (mounted) {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            '/orgDashboard',
-            (route) => false,
-          );
+          if (isSubscriptionValid) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/orgDashboard',
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrganizationSubscriptionPage(),
+              ),
+              (route) => false,
+            );
+          }
         }
       } else {
         _showError('Invalid username or password');

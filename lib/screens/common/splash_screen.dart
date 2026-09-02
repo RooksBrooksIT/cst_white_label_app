@@ -123,18 +123,30 @@ class _SplashScreenState extends State<SplashScreen>
           bool isPaymentPending = false;
           if (orgId != null && orgId.toString().isNotEmpty) {
             try {
-              final subDoc = await FirebaseFirestore.instance
+              var subDoc = await FirebaseFirestore.instance
                   .collection('organisation')
                   .doc(orgId.toString())
                   .collection('data')
                   .doc('subscription')
                   .get();
+              if (!subDoc.exists) {
+                subDoc = await FirebaseFirestore.instance
+                    .collection('organisation')
+                    .doc(orgId.toString())
+                    .get();
+              }
               final subData = subDoc.data();
-              if (subData != null &&
-                  subData['isSubscriptionActive'] != true &&
-                  (subData['onboardingStep'] == 'PAYMENT_PENDING' ||
-                      subData['subscriptionPlan'] == 'Pending Selection')) {
-                isPaymentPending = true;
+              if (subData != null) {
+                final plan = (subData['subscriptionPlan'] ?? '').toString().trim();
+                final onboardingStep = (subData['onboardingStep'] ?? '').toString().trim();
+                final isSubActive = subData['isSubscriptionActive'] == true;
+
+                if (!isSubActive &&
+                    (onboardingStep == 'PAYMENT_PENDING' ||
+                        plan == 'Pending Selection' ||
+                        (plan.isEmpty && onboardingStep != 'COMPLETED'))) {
+                  isPaymentPending = true;
+                }
               }
             } catch (_) {}
           }

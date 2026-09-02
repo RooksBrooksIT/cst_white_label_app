@@ -10,6 +10,7 @@ import 'package:demo_cst/services/payu_service.dart';
 import 'package:demo_cst/screens/organization/payu_checkout_screen.dart';
 import 'package:demo_cst/screens/organization/organization_dashboard.dart';
 import 'package:demo_cst/screens/organization/transaction_completed_screen.dart';
+import 'package:demo_cst/screens/organization/org_subscription_page.dart';
 import 'package:demo_cst/screens/common/contact_support_screen.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 
@@ -99,6 +100,136 @@ class _PricingScreenState extends State<PricingScreen> {
     _planPageController = PageController(
       initialPage: initialIndex >= 0 ? initialIndex : 0,
     );
+
+    if (!widget.isManagingExisting) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkExistingSubscriptionStatus();
+      });
+    }
+  }
+
+  Future<void> _checkExistingSubscriptionStatus() async {
+    if (widget.isManagingExisting) return;
+
+    try {
+      final auth = AuthService();
+      String orgId = '';
+      if (auth.isLoggedIn && auth.userRole == UserRole.organization) {
+        orgId = (auth.userData['dynamicPath'] ?? auth.userData['orgId'] ?? '').toString();
+      }
+      if (orgId.isEmpty) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final pendingOrgId = prefs.getString('pending_org_id');
+          if (pendingOrgId != null && pendingOrgId.isNotEmpty) {
+            orgId = pendingOrgId;
+          }
+        } catch (_) {}
+      }
+      if (orgId.isEmpty && widget.username.isNotEmpty) {
+        try {
+          final userQuery = await FirebaseFirestore.instance
+              .collectionGroup('admin')
+              .where('username', isEqualTo: widget.username)
+              .limit(1)
+              .get();
+          if (userQuery.docs.isNotEmpty) {
+            orgId = userQuery.docs.first.reference.parent.parent?.id ?? '';
+          }
+          if (orgId.isEmpty) {
+            final dataQuery = await FirebaseFirestore.instance
+                .collectionGroup('data')
+                .where('username', isEqualTo: widget.username)
+                .limit(1)
+                .get();
+            if (dataQuery.docs.isNotEmpty) {
+              orgId = dataQuery.docs.first.reference.parent.parent?.id ?? '';
+            }
+          }
+        } catch (_) {}
+      }
+      if (orgId.isEmpty && widget.orgName.isNotEmpty) {
+        final now = DateTime.now();
+        final effectiveDateStr = widget.dateStr.isNotEmpty
+            ? widget.dateStr
+            : DateFormat('dd-MM-yyyy').format(now);
+        final clean = widget.orgName.replaceAll(' ', '');
+        orgId = '${FirestoreService.cstNamespacePrefix}${clean}_$effectiveDateStr';
+      }
+
+      if (orgId.isNotEmpty) {
+        var subDoc = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(orgId)
+            .collection('data')
+            .doc('subscription')
+            .get();
+
+        if (!subDoc.exists) {
+          subDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(orgId)
+              .get();
+        }
+
+        // Also check un-prefixed/prefixed counterpart if still not found
+        if (!subDoc.exists) {
+          final altOrgId = orgId.startsWith(FirestoreService.cstNamespacePrefix)
+              ? orgId.substring(FirestoreService.cstNamespacePrefix.length)
+              : '${FirestoreService.cstNamespacePrefix}$orgId';
+          subDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(altOrgId)
+              .collection('data')
+              .doc('subscription')
+              .get();
+          if (!subDoc.exists) {
+            subDoc = await FirebaseFirestore.instance
+                .collection('organisation')
+                .doc(altOrgId)
+                .get();
+          }
+          if (subDoc.exists) {
+            orgId = altOrgId;
+          }
+        }
+
+        if (subDoc.exists && subDoc.data() != null) {
+          final data = subDoc.data()!;
+          final plan = (data['subscriptionPlan'] ?? '').toString().trim();
+          final onboardingStep = (data['onboardingStep'] ?? '').toString().trim();
+          final isActive = data['isSubscriptionActive'] as bool? ?? false;
+          final endDate = data['subscriptionEndDate'] as Timestamp?;
+          final isNotExpired = endDate == null || endDate.toDate().isAfter(DateTime.now());
+
+          if (plan.isNotEmpty &&
+              plan != 'Pending Selection' &&
+              onboardingStep != 'PAYMENT_PENDING') {
+            if (!mounted) return;
+            FirestoreService.setOrgPath(orgId);
+            if (isActive && isNotExpired) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrganizationDashboard(),
+                ),
+                (route) => false,
+              );
+            } else {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrganizationSubscriptionPage(),
+                ),
+                (route) => false,
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('PricingScreen subscription check note: $e');
+    }
   }
 
   @override
@@ -461,6 +592,18 @@ class _PricingScreenState extends State<PricingScreen> {
           SetOptions(merge: true),
         );
 
+        try {
+          await FirestoreService.rootOrgDoc.set({
+            'subscriptionPlan': _selectedPlan,
+            'subscriptionType': _selectedPlanType,
+            'subscriptionStartDate': Timestamp.fromDate(startDate),
+            'subscriptionEndDate': Timestamp.fromDate(endDate),
+            'isSubscriptionActive': true,
+            'onboardingStep': 'COMPLETED',
+            'updated_at': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (_) {}
+
         if (payuResult != null && payuResult.isSuccess) {
           try {
             final orgPath = FirestoreService.subscriptionDoc.path.split('/')[1];
@@ -611,11 +754,57 @@ class _PricingScreenState extends State<PricingScreen> {
 
     try {
       final now = DateTime.now();
+      String orgId = '';
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final pendingOrgId = prefs.getString('pending_org_id');
+        if (pendingOrgId != null && pendingOrgId.isNotEmpty) {
+          orgId = pendingOrgId;
+        }
+      } catch (_) {}
+
+      if (orgId.isEmpty) {
+        final authData = AuthService().userData;
+        final sessionOrgId = (authData['dynamicPath'] ?? authData['orgId'] ?? '').toString();
+        if (sessionOrgId.isNotEmpty) {
+          orgId = sessionOrgId;
+        }
+      }
+
+      if (orgId.isEmpty && widget.username.isNotEmpty) {
+        try {
+          final userQuery = await FirebaseFirestore.instance
+              .collectionGroup('admin')
+              .where('username', isEqualTo: widget.username)
+              .limit(1)
+              .get();
+          if (userQuery.docs.isNotEmpty) {
+            orgId = userQuery.docs.first.reference.parent.parent?.id ?? '';
+          }
+          if (orgId.isEmpty) {
+            final dataQuery = await FirebaseFirestore.instance
+                .collectionGroup('data')
+                .where('username', isEqualTo: widget.username)
+                .limit(1)
+                .get();
+            if (dataQuery.docs.isNotEmpty) {
+              orgId = dataQuery.docs.first.reference.parent.parent?.id ?? '';
+            }
+          }
+        } catch (_) {}
+      }
+
       final effectiveDateStr = widget.dateStr.isNotEmpty
           ? widget.dateStr
           : DateFormat('dd-MM-yyyy').format(now);
-      final orgId = '${widget.orgName.replaceAll(' ', '')}_$effectiveDateStr';
+      final cleanOrgName = widget.orgName.replaceAll(' ', '');
+
+      if (orgId.isEmpty) {
+        orgId = '${FirestoreService.cstNamespacePrefix}${cleanOrgName}_$effectiveDateStr';
+      }
+
       final orgConfigDocPath = 'organisation/$orgId';
+      FirestoreService.setOrgPath(orgId);
 
       final subscriptionStartDate = now;
       final int durationDays;
@@ -752,7 +941,7 @@ class _PricingScreenState extends State<PricingScreen> {
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // 4. Admin credentials and metadata under data/admin
+      // 4. Admin credentials and metadata under data/admin, data/data, admin/data
       final adminData = {
         'org_name': widget.orgName,
         'app_name': widget.appName,
@@ -764,7 +953,9 @@ class _PricingScreenState extends State<PricingScreen> {
         'password': widget.password,
         'role': 'Organization',
         'isSubscriptionActive': true,
+        'subscriptionPlan': _selectedPlan,
         'onboardingStep': 'COMPLETED',
+        'registrationStatus': 'COMPLETED',
         'paymentStatus': payuResult != null
             ? (payuResult.isSuccess ? 'SUCCESS' : 'FAILED')
             : 'SUCCESS',
@@ -778,6 +969,47 @@ class _PricingScreenState extends State<PricingScreen> {
           .collection('data')
           .doc('admin')
           .set(adminData, SetOptions(merge: true));
+
+      await FirebaseFirestore.instance
+          .doc(orgConfigDocPath)
+          .collection('data')
+          .doc('data')
+          .set(adminData, SetOptions(merge: true));
+
+      await FirebaseFirestore.instance
+          .doc(orgConfigDocPath)
+          .collection('admin')
+          .doc('data')
+          .set(adminData, SetOptions(merge: true));
+
+      // Also mirror to alternate namespace if existing to prevent stale pending records
+      final altOrgId = orgId.startsWith(FirestoreService.cstNamespacePrefix)
+          ? orgId.substring(FirestoreService.cstNamespacePrefix.length)
+          : '${FirestoreService.cstNamespacePrefix}$orgId';
+      try {
+        final altDoc = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(altOrgId)
+            .get();
+        if (altDoc.exists) {
+          await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(altOrgId)
+              .set(rootDocData, SetOptions(merge: true));
+          await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(altOrgId)
+              .collection('data')
+              .doc('subscription')
+              .set(subscriptionData, SetOptions(merge: true));
+          await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(altOrgId)
+              .collection('data')
+              .doc('admin')
+              .set(adminData, SetOptions(merge: true));
+        }
+      } catch (_) {}
 
       final userData = {
         'org_name': widget.orgName,
@@ -865,10 +1097,14 @@ class _PricingScreenState extends State<PricingScreen> {
         await AuthService().login(UserRole.organization, {
           'username': widget.username.isEmpty ? 'admin' : widget.username,
           'dynamicPath': orgId,
+          'orgId': orgId,
           'org_name': widget.orgName.isEmpty
               ? 'My Organization'
               : widget.orgName,
           'org_doc_path': orgConfigDocPath,
+          'isSubscriptionActive': true,
+          'subscriptionPlan': _selectedPlan,
+          'onboardingStep': 'COMPLETED',
         });
       } catch (loginError) {
         debugPrint('AuthService login fallback: $loginError');

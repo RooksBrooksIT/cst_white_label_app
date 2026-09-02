@@ -54,25 +54,39 @@ class AuthService {
   /// Check if the current organization's subscription is active and not expired.
   Future<bool> checkSubscriptionStatus() async {
     final role = userRole;
-    if (role != UserRole.organization)
-      return true; // Only enforce for organizations
+    if (role != UserRole.organization) return true; // Only enforce for organizations
 
     try {
+      String orgId = FirestoreService.currentOrgId;
+      if (orgId == 'uninitialized' || orgId.isEmpty) {
+        final data = userData;
+        orgId = (data['dynamicPath'] ?? data['orgId'] ?? '').toString();
+        if (orgId.isNotEmpty) {
+          FirestoreService.setOrgPath(orgId);
+        }
+      }
+
       var doc = await FirestoreService.subscriptionDoc.get();
 
-      // Fallback: If admin/subscription doc doesn't exist, check root doc (legacy)
+      // Fallback 1: If data/subscription doc doesn't exist, check root doc
       if (!doc.exists) {
-        debugPrint(
-          'AuthService: Subscription doc not found in admin, falling back to root.',
-        );
         doc = await FirestoreService.rootOrgDoc.get();
+      }
+
+      // Fallback 2: Check data/admin doc
+      if (!doc.exists && orgId.isNotEmpty && orgId != 'uninitialized') {
+        doc = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(orgId)
+            .collection('data')
+            .doc('admin')
+            .get();
       }
 
       if (!doc.exists) return false;
 
       final data = doc.data()!;
       // Default to true if fields are missing to avoid locking out valid users
-      // during transitions or if initialization hasn't finished.
       final isActive = data['isSubscriptionActive'] as bool? ?? true;
       final endDate = data['subscriptionEndDate'] as Timestamp?;
 

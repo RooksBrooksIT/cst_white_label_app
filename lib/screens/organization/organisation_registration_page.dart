@@ -394,8 +394,14 @@ class _OrganisationRegistrationPageState
 
         for (var doc in pendingQuery.docs) {
           final data = doc.data();
-          if (data['onboardingStep'] == 'PAYMENT_PENDING' ||
-              data['paymentStatus'] == 'PENDING') {
+          final plan = (data['subscriptionPlan'] ?? '').toString().trim();
+          final step = (data['onboardingStep'] ?? '').toString().trim();
+          final isSubActive = data['isSubscriptionActive'] == true;
+
+          if (!isSubActive &&
+              (step == 'PAYMENT_PENDING' ||
+                  plan == 'Pending Selection' ||
+                  (plan.isEmpty && step != 'COMPLETED' && data['paymentStatus'] == 'PENDING'))) {
             isPendingPayment = true;
             pendingData = data;
             pendingOrgId = doc.reference.parent.parent?.id;

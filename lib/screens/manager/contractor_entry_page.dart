@@ -474,7 +474,11 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
   Future<void> _handleLogout() async {
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed('/');
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/landing',
+      (route) => false,
+    );
   }
 
   Future<void> _saveToFirestore() async {

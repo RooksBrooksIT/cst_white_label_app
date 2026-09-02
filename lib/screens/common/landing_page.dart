@@ -207,18 +207,39 @@ class _LandingPageState extends State<LandingPage> {
     // Check payment pending state
     bool isPaymentPending = false;
     try {
-      final subDoc = await FirebaseFirestore.instance
+      var subDoc = await FirebaseFirestore.instance
           .collection('organisation')
           .doc(dynamicPath)
           .collection('data')
           .doc('subscription')
           .get();
+      if (!subDoc.exists) {
+        subDoc = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(dynamicPath)
+            .get();
+      }
       final subData = subDoc.data();
-      if (subData != null &&
-          subData['isSubscriptionActive'] != true &&
-          (subData['onboardingStep'] == 'PAYMENT_PENDING' ||
-              subData['subscriptionPlan'] == 'Pending Selection')) {
-        isPaymentPending = true;
+      if (subData != null) {
+        final plan = (subData['subscriptionPlan'] ?? '').toString().trim();
+        final onboardingStep = (subData['onboardingStep'] ??
+                userData['onboardingStep'] ??
+                '')
+            .toString()
+            .trim();
+        final paymentStatus = (subData['paymentStatus'] ??
+                userData['paymentStatus'] ??
+                '')
+            .toString()
+            .trim();
+        final isSubActive = subData['isSubscriptionActive'] == true;
+
+        if (!isSubActive &&
+            (onboardingStep == 'PAYMENT_PENDING' ||
+                plan == 'Pending Selection' ||
+                (plan.isEmpty && onboardingStep != 'COMPLETED' && paymentStatus == 'PENDING'))) {
+          isPaymentPending = true;
+        }
       }
     } catch (_) {}
 

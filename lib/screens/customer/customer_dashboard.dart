@@ -172,7 +172,7 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
                   context,
-                  '/authSelection',
+                  '/landing',
                   (route) => false,
                 );
               }
