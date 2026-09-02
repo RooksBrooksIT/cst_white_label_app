@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/manager/project_setup_wizard.dart';
-import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
+import 'package:demo_cst/screens/organization/site_financial_details_page.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/widgets/bottom_nav.dart';
@@ -405,240 +405,301 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                         ),
                       ),
 
-                      // 3. Status Tabs (All, Planning, In Progress, On Hold)
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Row(
-                          children: _statusTabs.map((status) {
-                            final isSelected = _selectedStatus.toLowerCase() ==
-                                status.toLowerCase();
-
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: InkWell(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  setState(() => _selectedStatus = status);
-                                },
-                                borderRadius: BorderRadius.circular(14),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: isSelected
-                                        ? LinearGradient(
-                                            colors: [primaryColor, darkAccent],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          )
-                                        : null,
-                                    color: isSelected ? null : Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: isSelected
-                                        ? null
-                                        : Border.all(color: const Color(0xFFE2E8F0)),
-                                    boxShadow: isSelected
-                                        ? [
-                                            BoxShadow(
-                                              color: primaryColor.withValues(alpha: 0.3),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                          ]
-                                        : [
-                                            BoxShadow(
-                                              color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 1),
-                                            ),
-                                          ],
-                                  ),
-                                  child: Text(
-                                    status,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w800
-                                          : FontWeight.w600,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-
-                      // 4. Scrollable List of Site Cards
+                      // 3. Dynamic Status Tabs & 4. Scrollable List of Site Cards
                       Expanded(
                         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: FirestoreService.projects.snapshots(),
-                          builder: (context, projSnap) {
-                            if (projSnap.connectionState == ConnectionState.waiting) {
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            }
-
-                            final rawDocs = projSnap.hasData ? projSnap.data!.docs : [];
-
+                          stream: FirestoreService.getCollection('Site').snapshots(),
+                          builder: (context, siteSnap) {
                             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                              stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
-                              builder: (context, mapSnap) {
-                                final supervisorMap = <String, String>{};
-                                if (mapSnap.hasData) {
-                                  for (var d in mapSnap.data!.docs) {
-                                    final data = d.data();
-                                    final sName = data['supervisor'] ?? data['supervisorName'];
-                                    final sId = data['siteId'] ?? data['site'];
-                                    if (sId != null && sName != null) {
-                                      supervisorMap[sId.toString()] = sName.toString();
-                                    }
-                                  }
-                                }
-
-                                // Filter by Search Query & Selected Status Tab
-                                final q = _searchQuery.trim().toLowerCase();
-                                final filteredDocs = rawDocs.where((doc) {
-                                  final data = doc.data();
-                                  final name = (data['siteName'] ?? data['projectName'] ?? '').toString();
-                                  final siteId = (data['siteId'] ?? doc.id).toString();
-                                  final projectType = (data['projectType'] ?? data['projectCategory'] ?? data['projectSubCategory'] ?? '').toString();
-                                  final supervisor = (data['supervisor'] ?? data['supervisorName'] ?? supervisorMap[siteId] ?? '').toString();
-                                  final status = (data['currentStatus'] ?? data['status'] ?? 'Ongoing').toString();
-
-                                  // Search Query match
-                                  final matchesQuery = q.isEmpty ||
-                                      name.toLowerCase().contains(q) ||
-                                      siteId.toLowerCase().contains(q) ||
-                                      projectType.toLowerCase().contains(q) ||
-                                      supervisor.toLowerCase().contains(q) ||
-                                      status.toLowerCase().contains(q);
-
-                                  // Status Tab match
-                                  bool matchesStatus = true;
-                                  final statusLower = status.toLowerCase();
-                                  if (_selectedStatus == 'Planning') {
-                                    matchesStatus = statusLower.contains('plan') ||
-                                        statusLower.contains('draft') ||
-                                        statusLower.contains('setup') ||
-                                        statusLower.contains('upcoming');
-                                  } else if (_selectedStatus == 'In Progress') {
-                                    matchesStatus = statusLower.contains('progress') ||
-                                        statusLower.contains('ongoing') ||
-                                        statusLower.contains('active') ||
-                                        statusLower.contains('execution');
-                                  } else if (_selectedStatus == 'On Hold') {
-                                    matchesStatus = statusLower.contains('hold') ||
-                                        statusLower.contains('delay') ||
-                                        statusLower.contains('overdue') ||
-                                        statusLower.contains('pause') ||
-                                        statusLower.contains('suspend');
-                                  }
-
-                                  return matchesQuery && matchesStatus;
-                                }).toList();
-
-                                // Apply Sorting
-                                if (_sortBy == 'Name') {
-                                  filteredDocs.sort((a, b) {
-                                    final aName = (a.data()['siteName'] ?? a.data()['projectName'] ?? '').toString().toLowerCase();
-                                    final bName = (b.data()['siteName'] ?? b.data()['projectName'] ?? '').toString().toLowerCase();
-                                    return aName.compareTo(bName);
-                                  });
-                                } else if (_sortBy == 'Budget') {
-                                  filteredDocs.sort((a, b) {
-                                    final aB = (a.data()['projectBudget'] is num ? (a.data()['projectBudget'] as num).toDouble() : 0.0);
-                                    final bB = (b.data()['projectBudget'] is num ? (b.data()['projectBudget'] as num).toDouble() : 0.0);
-                                    return bB.compareTo(aB); // Descending
-                                  });
-                                } else if (_sortBy == 'Progress') {
-                                  filteredDocs.sort((a, b) {
-                                    final aP = _calculateProgress(a.data());
-                                    final bP = _calculateProgress(b.data());
-                                    return bP.compareTo(aP); // Descending
-                                  });
-                                }
-
-                                if (filteredDocs.isEmpty) {
-                                  return Center(
-                                    child: SingleChildScrollView(
-                                      padding: const EdgeInsets.all(32),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(18),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: const Color(0xFF0F172A).withValues(alpha: 0.06),
-                                                  blurRadius: 12,
-                                                ),
-                                              ],
-                                            ),
-                                            child: Icon(
-                                              Icons.domain_disabled_rounded,
-                                              size: 48,
-                                              color: primaryColor.withValues(alpha: 0.6),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          const Text(
-                                            'No Sites Found',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w800,
-                                              color: Color(0xFF0F172A),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            _searchQuery.isNotEmpty
-                                                ? 'No projects matching "$_searchQuery"'
-                                                : 'No projects available under $_selectedStatus.',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Color(0xFF64748B),
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                          const SizedBox(height: 90),
-                                        ],
-                                      ),
-                                    ),
+                              stream: FirestoreService.projects.snapshots(),
+                              builder: (context, projSnap) {
+                                if (siteSnap.connectionState == ConnectionState.waiting && projSnap.connectionState == ConnectionState.waiting) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
                                   );
                                 }
 
-                                return ListView.builder(
-                                  controller: _scrollController,
-                                  physics: const AlwaysScrollableScrollPhysics(
-                                    parent: BouncingScrollPhysics(),
-                                  ),
-                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 95),
-                                  itemCount: filteredDocs.length,
-                                  itemBuilder: (context, index) {
-                                    final doc = filteredDocs[index];
-                                    final data = doc.data();
-                                    final siteDocId = doc.id;
+                                final siteDocs = siteSnap.hasData ? siteSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                                final projectDocs = projSnap.hasData ? projSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-                                    return _buildSiteCard(
-                                      context: context,
-                                      data: data,
-                                      siteDocId: siteDocId,
-                                      supervisorMap: supervisorMap,
-                                      primaryColor: primaryColor,
-                                      darkAccent: darkAccent,
+                                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                  stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
+                                  builder: (context, mapSnap) {
+                                    final supervisorDocs = mapSnap.hasData ? mapSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+                                    final supervisorMap = <String, String>{};
+                                    for (var d in supervisorDocs) {
+                                      final data = d.data();
+                                      final sName = data['supervisor'] ?? data['supervisorName'];
+                                      final sId = (data['siteId'] ?? data['site'] ?? d.id).toString();
+                                      if (sName != null) {
+                                        supervisorMap[sId] = sName.toString();
+                                      }
+                                    }
+
+                                    final unifiedMap = _buildUnifiedSiteDocs(
+                                      siteDocs: siteDocs,
+                                      projectDocs: projectDocs,
+                                      supervisorDocs: supervisorDocs,
+                                    );
+
+                                    final rawDocs = unifiedMap.entries
+                                        .map((e) => _SiteEntry(docId: e.key, data: e.value))
+                                        .toList();
+
+                                    // Compute Dynamic Tab Counts from Actual Backend Documents
+                                    int allCount = rawDocs.length;
+                                    int liveCount = 0;
+                                    int inProgressCount = 0;
+                                    int planningCount = 0;
+                                    int completedCount = 0;
+                                    int onHoldCount = 0;
+
+                                    for (final entry in rawDocs) {
+                                      final data = entry.data;
+                                      if (_isCompleted(data)) {
+                                        completedCount++;
+                                      } else if (_isPlanning(data)) {
+                                        planningCount++;
+                                      } else if (_isOnHold(data)) {
+                                        onHoldCount++;
+                                        liveCount++;
+                                      } else if (_isInProgress(data)) {
+                                        inProgressCount++;
+                                        liveCount++;
+                                      } else {
+                                        inProgressCount++;
+                                        liveCount++;
+                                      }
+                                    }
+
+                                    // Filter by Search Query & Selected Status Tab
+                                    final q = _searchQuery.trim().toLowerCase();
+                                    final filteredDocs = rawDocs.where((entry) {
+                                      final data = entry.data;
+                                      final name = (data['siteName'] ?? data['projectName'] ?? '').toString();
+                                      final siteId = (data['siteId'] ?? entry.docId).toString();
+                                      final projectType = (data['projectType'] ?? data['projectCategory'] ?? data['projectSubCategory'] ?? '').toString();
+                                      final supervisor = (data['supervisor'] ?? data['supervisorName'] ?? supervisorMap[siteId] ?? '').toString();
+                                      final status = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
+
+                                      // Search Query match
+                                      final matchesQuery = q.isEmpty ||
+                                          name.toLowerCase().contains(q) ||
+                                          siteId.toLowerCase().contains(q) ||
+                                          projectType.toLowerCase().contains(q) ||
+                                          supervisor.toLowerCase().contains(q) ||
+                                          status.toLowerCase().contains(q);
+
+                                      // Status Tab match
+                                      bool matchesStatus = true;
+                                      if (_selectedStatus == 'Live') {
+                                        matchesStatus = _isLive(data);
+                                      } else if (_selectedStatus == 'In Progress') {
+                                        matchesStatus = _isInProgress(data);
+                                      } else if (_selectedStatus == 'Planning') {
+                                        matchesStatus = _isPlanning(data);
+                                      } else if (_selectedStatus == 'Completed') {
+                                        matchesStatus = _isCompleted(data);
+                                      } else if (_selectedStatus == 'On Hold') {
+                                        matchesStatus = _isOnHold(data);
+                                      }
+
+                                      return matchesQuery && matchesStatus;
+                                    }).toList();
+
+                                    // Apply Sorting
+                                    if (_sortBy == 'Name') {
+                                      filteredDocs.sort((a, b) {
+                                        final aName = (a.data['siteName'] ?? a.data['projectName'] ?? '').toString().toLowerCase();
+                                        final bName = (b.data['siteName'] ?? b.data['projectName'] ?? '').toString().toLowerCase();
+                                        return aName.compareTo(bName);
+                                      });
+                                    } else if (_sortBy == 'Budget') {
+                                      filteredDocs.sort((a, b) {
+                                        final aB = (a.data['projectBudget'] is num ? (a.data['projectBudget'] as num).toDouble() : (a.data['budget'] is num ? (a.data['budget'] as num).toDouble() : 0.0));
+                                        final bB = (b.data['projectBudget'] is num ? (b.data['projectBudget'] as num).toDouble() : (b.data['budget'] is num ? (b.data['budget'] as num).toDouble() : 0.0));
+                                        return bB.compareTo(aB); // Descending
+                                      });
+                                    } else if (_sortBy == 'Progress') {
+                                      filteredDocs.sort((a, b) {
+                                        final aP = _calculateProgress(a.data);
+                                        final bP = _calculateProgress(b.data);
+                                        return bP.compareTo(aP); // Descending
+                                      });
+                                    }
+
+                                    return Column(
+                                      children: [
+                                        // Dynamic Status Tabs with Live Counters
+                                        SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          physics: const BouncingScrollPhysics(),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                          child: Row(
+                                            children: _statusTabs.map((status) {
+                                              final isSelected = _selectedStatus.toLowerCase() == status.toLowerCase();
+                                              final tabCount = _getCountForTab(
+                                                status,
+                                                all: allCount,
+                                                live: liveCount,
+                                                inProgress: inProgressCount,
+                                                planning: planningCount,
+                                                completed: completedCount,
+                                                onHold: onHoldCount,
+                                              );
+
+                                              return Padding(
+                                                padding: const EdgeInsets.only(right: 8),
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    HapticFeedback.lightImpact();
+                                                    setState(() => _selectedStatus = status);
+                                                  },
+                                                  borderRadius: BorderRadius.circular(14),
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(milliseconds: 200),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                                    decoration: BoxDecoration(
+                                                      gradient: isSelected
+                                                          ? LinearGradient(
+                                                              colors: [primaryColor, darkAccent],
+                                                              begin: Alignment.topLeft,
+                                                              end: Alignment.bottomRight,
+                                                            )
+                                                          : null,
+                                                      color: isSelected ? null : Colors.white,
+                                                      borderRadius: BorderRadius.circular(14),
+                                                      border: isSelected ? null : Border.all(color: const Color(0xFFE2E8F0)),
+                                                      boxShadow: isSelected
+                                                          ? [
+                                                              BoxShadow(
+                                                                color: primaryColor.withValues(alpha: 0.3),
+                                                                blurRadius: 8,
+                                                                offset: const Offset(0, 3),
+                                                              ),
+                                                            ]
+                                                          : [
+                                                              BoxShadow(
+                                                                color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                                                                blurRadius: 4,
+                                                                offset: const Offset(0, 1),
+                                                              ),
+                                                            ],
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          status,
+                                                          style: TextStyle(
+                                                            fontSize: 13,
+                                                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                                            color: isSelected ? Colors.white : const Color(0xFF64748B),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 6),
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                          decoration: BoxDecoration(
+                                                            color: isSelected
+                                                                ? Colors.white.withValues(alpha: 0.25)
+                                                                : const Color(0xFFF1F5F9),
+                                                            borderRadius: BorderRadius.circular(10),
+                                                          ),
+                                                          child: Text(
+                                                            '$tabCount',
+                                                            style: TextStyle(
+                                                              fontSize: 11,
+                                                              fontWeight: FontWeight.w800,
+                                                              color: isSelected ? Colors.white : const Color(0xFF475569),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+
+                                        // Site Cards List
+                                        Expanded(
+                                          child: filteredDocs.isEmpty
+                                              ? Center(
+                                                  child: SingleChildScrollView(
+                                                    child: Column(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        Container(
+                                                          padding: const EdgeInsets.all(24),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white,
+                                                            shape: BoxShape.circle,
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+                                                                blurRadius: 12,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          child: Icon(
+                                                            Icons.domain_disabled_rounded,
+                                                            size: 48,
+                                                            color: primaryColor.withValues(alpha: 0.6),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 16),
+                                                        const Text(
+                                                          'No Sites Found',
+                                                          style: TextStyle(
+                                                            fontSize: 18,
+                                                            fontWeight: FontWeight.w800,
+                                                            color: Color(0xFF0F172A),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 6),
+                                                        Text(
+                                                          _searchQuery.isNotEmpty
+                                                              ? 'No projects matching "$_searchQuery"'
+                                                              : 'No projects available under $_selectedStatus.',
+                                                          style: const TextStyle(
+                                                            fontSize: 13,
+                                                            color: Color(0xFF64748B),
+                                                          ),
+                                                          textAlign: TextAlign.center,
+                                                        ),
+                                                        const SizedBox(height: 90),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                )
+                                              : ListView.builder(
+                                                  controller: _scrollController,
+                                                  physics: const AlwaysScrollableScrollPhysics(
+                                                    parent: BouncingScrollPhysics(),
+                                                  ),
+                                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 95),
+                                                  itemCount: filteredDocs.length,
+                                                  itemBuilder: (context, index) {
+                                                    final entry = filteredDocs[index];
+                                                    final data = entry.data;
+                                                    final siteDocId = entry.docId;
+
+                                                    return _buildSiteCard(
+                                                      context: context,
+                                                      data: data,
+                                                      siteDocId: siteDocId,
+                                                      supervisorMap: supervisorMap,
+                                                      primaryColor: primaryColor,
+                                                      darkAccent: darkAccent,
+                                                    );
+                                                  },
+                                                ),
+                                        ),
+                                      ],
                                     );
                                   },
                                 );
@@ -685,24 +746,24 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
   }) {
     final siteName = (data['siteName'] ?? data['projectName'] ?? 'Unnamed Site').toString();
     final siteId = (data['siteId'] ?? siteDocId).toString();
-    final projectType = (data['projectType'] ??
-            data['projectCategory'] ??
-            data['projectSubCategory'] ??
-            'General Project')
-        .toString();
+    final category = (data['projectCategory'] ?? data['projectType'] ?? '').toString().trim();
+    final subCategory = (data['projectSubCategory'] ?? '').toString().trim();
+    final projectType = (category.isNotEmpty && subCategory.isNotEmpty)
+        ? '$category • $subCategory'
+        : (category.isNotEmpty ? category : (subCategory.isNotEmpty ? subCategory : 'General Project'));
 
     final supervisor = (data['supervisor'] ??
             data['supervisorName'] ??
-            data['ownerName'] ??
+            (data['ownerName'] != null && data['ownerName'].toString().trim().isNotEmpty ? 'Owner: ${data['ownerName']}' : null) ??
             supervisorMap[siteId] ??
             'Not Assigned')
         .toString();
 
-    final rawStatus = (data['currentStatus'] ?? data['status'] ?? 'Ongoing').toString();
-    final statusBadge = _getStatusBadge(rawStatus);
+    final rawStatus = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
+    final statusBadge = _getStatusBadge(rawStatus, data);
 
-    final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : 0.0);
-    final balance = (data['amountBalance'] is num ? (data['amountBalance'] as num).toDouble() : budget);
+    final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : (data['budget'] is num ? (data['budget'] as num).toDouble() : (double.tryParse(data['projectBudget']?.toString() ?? '') ?? 0.0)));
+    final balance = (data['amountBalance'] is num ? (data['amountBalance'] as num).toDouble() : (data['balance'] is num ? (data['balance'] as num).toDouble() : (data['amountPaid'] is num ? (data['amountPaid'] as num).toDouble() : budget)));
     final progress = _calculateProgress(data);
 
     return Container(
@@ -728,7 +789,13 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const SitePaymentScreen(),
+                builder: (context) => SiteFinancialDetailsPage(
+                  siteId: siteId,
+                  siteName: siteName,
+                  projectName: (data['projectName'] ?? siteName).toString(),
+                  ownerName: (data['ownerName'] ?? '').toString(),
+                  initialData: data,
+                ),
               ),
             );
           },
@@ -918,40 +985,189 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
     );
   }
 
-  _StatusBadgeData _getStatusBadge(String rawStatus) {
-    final s = rawStatus.toLowerCase();
-    if (s.contains('progress') || s.contains('ongoing') || s.contains('active')) {
+  bool _isCompleted(Map<String, dynamic> data) {
+    final s = (data['currentStatus'] ?? data['status'] ?? '').toString().toLowerCase();
+    return s.contains('complete') || s.contains('finish') || s.contains('closed') || s.contains('done');
+  }
+
+  bool _isPlanning(Map<String, dynamic> data) {
+    if (_isCompleted(data)) return false;
+    final s = (data['currentStatus'] ?? data['status'] ?? '').toString().toLowerCase();
+    return s.contains('plan') || s.contains('draft') || s.contains('setup') || s.contains('upcoming');
+  }
+
+  bool _isOnHold(Map<String, dynamic> data) {
+    if (_isCompleted(data)) return false;
+    final s = (data['currentStatus'] ?? data['status'] ?? '').toString().toLowerCase();
+    return s.contains('hold') || s.contains('delay') || s.contains('overdue') || s.contains('pause') || s.contains('suspend');
+  }
+
+  bool _isInProgress(Map<String, dynamic> data) {
+    if (_isCompleted(data) || _isPlanning(data) || _isOnHold(data)) return false;
+    final s = (data['currentStatus'] ?? data['status'] ?? '').toString().toLowerCase();
+    return s.contains('progress') || s.contains('ongoing') || s.contains('execution') || s.contains('active') || s.isEmpty;
+  }
+
+  bool _isLive(Map<String, dynamic> data) {
+    if (_isCompleted(data) || _isPlanning(data)) return false;
+    final s = (data['currentStatus'] ?? data['status'] ?? '').toString().toLowerCase();
+    return s.contains('live') || s.contains('active') || _isInProgress(data) || _isOnHold(data) || s.isEmpty;
+  }
+
+  int _getCountForTab(
+    String status, {
+    required int all,
+    required int live,
+    required int inProgress,
+    required int planning,
+    required int completed,
+    required int onHold,
+  }) {
+    switch (status.toLowerCase()) {
+      case 'all':
+        return all;
+      case 'live':
+        return live;
+      case 'in progress':
+        return inProgress;
+      case 'planning':
+        return planning;
+      case 'completed':
+        return completed;
+      case 'on hold':
+        return onHold;
+      default:
+        return 0;
+    }
+  }
+
+  _StatusBadgeData _getStatusBadge(String rawStatus, Map<String, dynamic> data) {
+    if (_isCompleted(data)) {
       return _StatusBadgeData(
-        label: 'In Progress',
+        label: 'Completed',
         bgColor: const Color(0xFFDCFCE7),
         textColor: const Color(0xFF16A34A),
       );
-    } else if (s.contains('plan') || s.contains('draft') || s.contains('setup')) {
+    } else if (_isPlanning(data)) {
       return _StatusBadgeData(
         label: 'Planning',
         bgColor: const Color(0xFFFEF3C7),
         textColor: const Color(0xFFD97706),
       );
-    } else if (s.contains('hold') || s.contains('delay') || s.contains('overdue')) {
+    } else if (_isOnHold(data)) {
       return _StatusBadgeData(
         label: 'On Hold',
-        bgColor: const Color(0xFFEDE9FE),
-        textColor: const Color(0xFF7C3AED),
+        bgColor: const Color(0xFFFEE2E2),
+        textColor: const Color(0xFFDC2626),
       );
-    } else if (s.contains('complete') || s.contains('finish')) {
+    } else if (_isInProgress(data)) {
       return _StatusBadgeData(
-        label: 'Completed',
-        bgColor: const Color(0xFFDBEAFE),
+        label: 'In Progress',
+        bgColor: const Color(0xFFEFF6FF),
         textColor: const Color(0xFF2563EB),
+      );
+    } else if (_isLive(data)) {
+      return _StatusBadgeData(
+        label: 'Live',
+        bgColor: const Color(0xFFECFDF5),
+        textColor: const Color(0xFF059669),
       );
     }
     return _StatusBadgeData(
-      label: rawStatus.isNotEmpty ? rawStatus : 'Planning',
-      bgColor: const Color(0xFFFEF3C7),
-      textColor: const Color(0xFFD97706),
+      label: rawStatus.isNotEmpty ? rawStatus : 'Live',
+      bgColor: const Color(0xFFECFDF5),
+      textColor: const Color(0xFF059669),
     );
   }
 
+  Map<String, Map<String, dynamic>> _buildUnifiedSiteDocs({
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> siteDocs,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> projectDocs,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> supervisorDocs,
+  }) {
+    final unifiedMap = <String, Map<String, dynamic>>{};
+
+    String? findMatchingKey(String siteId, String docId, String siteName) {
+      final cleanSiteId = siteId.trim().toLowerCase();
+      final cleanDocId = docId.trim().toLowerCase();
+      final cleanName = siteName.trim().toLowerCase();
+
+      for (var key in unifiedMap.keys) {
+        final k = key.trim().toLowerCase();
+        final data = unifiedMap[key]!;
+        final sId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+        final sName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim().toLowerCase();
+
+        if (k == cleanDocId || k == cleanSiteId) return key;
+        if (cleanSiteId.isNotEmpty && (sId == cleanSiteId || k.startsWith(cleanSiteId) || cleanDocId.startsWith(sId))) return key;
+        if (cleanDocId.isNotEmpty && (cleanDocId == k || cleanDocId.contains(k) || k.contains(cleanDocId))) return key;
+        if (cleanName.isNotEmpty && sName.isNotEmpty && cleanName == sName) return key;
+      }
+      return null;
+    }
+
+    // 1. Ingest Site collection docs (Primary created via Wizard)
+    for (var doc in siteDocs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['docId'] = doc.id;
+      final sId = (data['siteId'] ?? '').toString();
+      final sName = (data['siteName'] ?? '').toString();
+      final existingKey = findMatchingKey(sId, doc.id, sName);
+      if (existingKey != null) {
+        unifiedMap[existingKey]!.addAll(data);
+      } else {
+        unifiedMap[doc.id] = data;
+      }
+    }
+
+    // 2. Ingest / Merge projects collection docs
+    for (var doc in projectDocs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['projectDocId'] = doc.id;
+      final sId = (data['siteId'] ?? data['site'] ?? '').toString();
+      final sName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+      final existingKey = findMatchingKey(sId, doc.id, sName);
+      if (existingKey != null) {
+        data.forEach((k, v) {
+          if (v != null) {
+            unifiedMap[existingKey]![k] = v;
+          }
+        });
+      } else {
+        unifiedMap[sId.isNotEmpty ? sId : doc.id] = data;
+      }
+    }
+
+    // 3. Ingest / Merge siteSupervisorMap collection docs
+    for (var doc in supervisorDocs) {
+      final data = doc.data();
+      final sId = (data['siteId'] ?? data['site'] ?? '').toString();
+      final sName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+      final existingKey = findMatchingKey(sId, doc.id, sName);
+      final target = existingKey != null ? unifiedMap[existingKey] : null;
+
+      if (target != null) {
+        final sSupervisor = data['supervisor'] ?? data['supervisorName'];
+        if (sSupervisor != null && target['supervisor'] == null) {
+          target['supervisor'] = sSupervisor;
+        }
+        if (data['projectBudget'] != null && (target['projectBudget'] == null || target['projectBudget'] == 0)) {
+          target['projectBudget'] = data['projectBudget'];
+        }
+        if (data['amountSpent'] != null && target['amountSpent'] == null) {
+          target['amountSpent'] = data['amountSpent'];
+        }
+        if (data['amountPaid'] != null && (target['amountPaid'] == null || target['amountPaid'] == 0)) {
+          target['amountPaid'] = data['amountPaid'];
+        }
+        if (data['amountBalance'] != null && target['amountBalance'] == null) {
+          target['amountBalance'] = data['amountBalance'];
+        }
+      }
+    }
+
+    return unifiedMap;
+  }
 }
 
 class _StatusBadgeData {
@@ -965,3 +1181,14 @@ class _StatusBadgeData {
     required this.textColor,
   });
 }
+
+class _SiteEntry {
+  final String docId;
+  final Map<String, dynamic> data;
+
+  _SiteEntry({
+    required this.docId,
+    required this.data,
+  });
+}
+

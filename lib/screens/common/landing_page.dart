@@ -47,20 +47,34 @@ class _LandingPageState extends State<LandingPage> {
     final password = _passwordController.text.trim();
 
     try {
+      // Fetch all organisation documents (single roundtrip, no composite index needed)
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs = [];
+      try {
+        final orgsSnapshot =
+            await FirebaseFirestore.instance.collection('organisation').get();
+        orgDocs = orgsSnapshot.docs;
+      } catch (e) {
+        debugPrint('LandingPage: Root organisation fetch note: $e');
+      }
+
       // 1. Check if user is an Organization Admin
-      final bool isOrg = await _tryOrganizationLogin(username, password);
+      final bool isOrg =
+          await _tryOrganizationLogin(username, password, orgDocs);
       if (isOrg) return;
 
       // 2. Check if user is a Manager
-      final bool isManager = await _tryManagerLogin(username, password);
+      final bool isManager =
+          await _tryManagerLogin(username, password, orgDocs);
       if (isManager) return;
 
       // 3. Check if user is a Supervisor / Contractor
-      final bool isSupervisor = await _trySupervisorLogin(username, password);
+      final bool isSupervisor =
+          await _trySupervisorLogin(username, password, orgDocs);
       if (isSupervisor) return;
 
       // 4. Check if user is a Customer / Client
-      final bool isCustomer = await _tryCustomerLogin(username, password);
+      final bool isCustomer =
+          await _tryCustomerLogin(username, password, orgDocs);
       if (isCustomer) return;
 
       // If no matching account found across any role:
@@ -80,100 +94,158 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   // 1. Organization Login Check
-  Future<bool> _tryOrganizationLogin(String username, String password) async {
+  Future<bool> _tryOrganizationLogin(
+    String username,
+    String password,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs,
+  ) async {
+    final cleanInput = username.trim();
+    final cleanLower = cleanInput.toLowerCase();
+    final cleanPass = password.trim();
+
     try {
-      QuerySnapshot<Map<String, dynamic>>? userQuery;
-
-      // Check 'admin' collection group
-      userQuery = await FirebaseFirestore.instance
-          .collectionGroup('admin')
-          .where('username', isEqualTo: username)
-          .get();
-
-      QueryDocumentSnapshot<Map<String, dynamic>>? dataDoc;
-
-      if (userQuery.docs.isNotEmpty) {
-        for (var doc in userQuery.docs) {
-          if (doc.id == 'data' || doc.id == 'admin') {
-            final data = doc.data();
-            final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-            final orgDocId = doc.reference.parent.parent?.id ?? '';
-            if (appId == FirestoreService.cstAppId ||
-                FirestoreService.isCstOrgId(orgDocId) ||
-                data['is_cst_app'] == true) {
-              dataDoc = doc;
-              break;
-            }
-          }
-        }
-      }
-
-      // Check 'data' collection group
-      if (dataDoc == null) {
-        userQuery = await FirebaseFirestore.instance
-            .collectionGroup('data')
-            .where('username', isEqualTo: username)
-            .get();
-
-        if (userQuery.docs.isNotEmpty) {
-          for (var doc in userQuery.docs) {
-            if (doc.id == 'admin' || doc.id == 'data') {
-              final data = doc.data();
-              final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-              final orgDocId = doc.reference.parent.parent?.id ?? '';
-              if (appId == FirestoreService.cstAppId ||
-                  FirestoreService.isCstOrgId(orgDocId) ||
-                  data['is_cst_app'] == true) {
-                dataDoc = doc;
-                break;
-              }
-            }
-          }
-        }
-      }
-
       Map<String, dynamic>? userData;
       String? dynamicPath;
       String? fullConfigPath;
 
-      if (dataDoc != null) {
-        userData = dataDoc.data();
-        dynamicPath = dataDoc.reference.parent.parent?.id ?? 'uninitialized';
-        fullConfigPath = dataDoc.reference.path;
-      } else {
-        // Fallback check root organisation collection
-        final legacyQuery = await FirebaseFirestore.instance
-            .collection('organisation')
-            .where('username', isEqualTo: username)
-            .get();
+      // Strategy A: Check in fetched orgDocs (Instant, zero index needed)
+      for (var doc in orgDocs) {
+        final data = doc.data();
+        final docEmail = (data['email'] ?? data['Email'] ?? data['emailId'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final docUser = (data['username'] ?? data['UserName'] ?? data['userName'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final docPhone = (data['phone'] ??
+                data['MobileNumber'] ??
+                data['phone_number'] ??
+                data['phoneNumber'] ??
+                '')
+            .toString()
+            .trim();
+        final docOrgName = (data['org_name'] ?? data['orgName'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final docId = doc.id.toLowerCase();
 
-        for (var legacyDoc in legacyQuery.docs) {
-          final data = legacyDoc.data();
-          final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-          if (appId == FirestoreService.cstAppId ||
-              FirestoreService.isCstOrgId(legacyDoc.id) ||
-              data['is_cst_app'] == true) {
-            userData = data;
-            dynamicPath = legacyDoc.id;
-            fullConfigPath = legacyDoc.reference.path;
-            break;
-          }
+        if (docEmail == cleanLower ||
+            docUser == cleanLower ||
+            docUser == cleanInput ||
+            docPhone == cleanInput ||
+            docId == cleanLower ||
+            docId == 'cst_$cleanLower' ||
+            (cleanLower.isNotEmpty && docOrgName == cleanLower)) {
+          userData = data;
+          dynamicPath = doc.id;
+          fullConfigPath = doc.reference.path;
+          break;
         }
+      }
+
+      // Strategy B: If matched org root or need to check data/admin & organizationUser
+      if (userData != null && dynamicPath != null) {
+        try {
+          final adminDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(dynamicPath)
+              .collection('data')
+              .doc('admin')
+              .get();
+          if (adminDoc.exists && adminDoc.data() != null) {
+            userData = {...userData, ...adminDoc.data()!};
+            fullConfigPath = adminDoc.reference.path;
+          }
+        } catch (_) {}
+      } else {
+        // Deep search inside each organisation subcollection
+        for (var doc in orgDocs) {
+          try {
+            final adminDoc =
+                await doc.reference.collection('data').doc('admin').get();
+            if (adminDoc.exists && adminDoc.data() != null) {
+              final aData = adminDoc.data()!;
+              final aEmail = (aData['email'] ?? '').toString().trim().toLowerCase();
+              final aUser = (aData['username'] ?? '').toString().trim().toLowerCase();
+              final aPhone =
+                  (aData['phone'] ?? aData['MobileNumber'] ?? '').toString().trim();
+              if (aEmail == cleanLower || aUser == cleanLower || aPhone == cleanInput) {
+                userData = aData;
+                dynamicPath = doc.id;
+                fullConfigPath = adminDoc.reference.path;
+                break;
+              }
+            }
+
+            final userDoc =
+                await doc.reference.collection('organizationUser').doc(cleanLower).get();
+            if (userDoc.exists && userDoc.data() != null) {
+              userData = userDoc.data();
+              dynamicPath = doc.id;
+              fullConfigPath = userDoc.reference.path;
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // Strategy C: Direct doc ID fallback
+      if (userData == null) {
+        try {
+          final directDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(cleanInput)
+              .get();
+          if (directDoc.exists && directDoc.data() != null) {
+            userData = directDoc.data();
+            dynamicPath = directDoc.id;
+            fullConfigPath = directDoc.reference.path;
+          } else {
+            final cstDoc = await FirebaseFirestore.instance
+                .collection('organisation')
+                .doc('cst_$cleanInput')
+                .get();
+            if (cstDoc.exists && cstDoc.data() != null) {
+              userData = cstDoc.data();
+              dynamicPath = cstDoc.id;
+              fullConfigPath = cstDoc.reference.path;
+            }
+          }
+        } catch (_) {}
       }
 
       if (userData == null) return false;
 
-      final String email = (userData['email'] ?? '').toString();
+      final String storedPassword =
+          (userData['password'] ?? userData['Password'] ?? '').toString().trim();
+      final String email =
+          (userData['email'] ?? userData['Email'] ?? '').toString().trim();
+      final String actualUsername =
+          (userData['username'] ?? userData['UserName'] ?? cleanInput).toString().trim();
       final String? storedOrgName =
           (userData['org_name'] ?? userData['orgName']) as String?;
 
+      bool isPasswordValid = false;
+
+      // 1. Direct Password Match (Primary for all registered accounts)
+      if (storedPassword.isNotEmpty && storedPassword == cleanPass) {
+        isPasswordValid = true;
+      }
+
+      // 2. Firebase Auth login attempt
       if (email.isNotEmpty) {
         try {
-          await AuthService().loginWithEmail(email, password);
-          if (userData['password'] != password && fullConfigPath != null) {
+          await AuthService().loginWithEmail(email, cleanPass);
+          isPasswordValid = true;
+
+          // Sync password if updated
+          if (storedPassword != cleanPass && fullConfigPath != null) {
             final WriteBatch batch = FirebaseFirestore.instance.batch();
             batch.update(FirebaseFirestore.instance.doc(fullConfigPath), {
-              'password': password,
+              'password': cleanPass,
             });
             if (dynamicPath != null && dynamicPath != 'uninitialized') {
               batch.update(
@@ -181,39 +253,48 @@ class _LandingPageState extends State<LandingPage> {
                     .collection('organisation')
                     .doc(dynamicPath)
                     .collection('organizationUser')
-                    .doc(username),
-                {'password': password},
+                    .doc(actualUsername),
+                {'password': cleanPass},
+              );
+              batch.update(
+                FirebaseFirestore.instance
+                    .collection('organisation')
+                    .doc(dynamicPath),
+                {'password': cleanPass},
               );
             }
-            await batch.commit();
+            await batch.commit().catchError((_) {});
           }
-        } catch (_) {
-          // If Firebase Auth fails, compare direct password as fallback
-          if (userData['password'] != password) {
-            return false;
-          }
-        }
-      } else {
-        if (userData['password'] != password) {
-          return false;
+        } catch (authErr) {
+          debugPrint('LandingPage: Firebase Auth note: $authErr');
         }
       }
 
+      if (!isPasswordValid) return false;
+
+      final String? referralCode = userData['referralCode']?.toString() ??
+          userData['orgReferralCode']?.toString();
+
       // Set org path and sync branding
       FirestoreService.setOrgPath(dynamicPath ?? '');
-      await AppTheme.syncWithFirestore(dynamicPath ?? '');
+      if (dynamicPath != null && dynamicPath != 'uninitialized') {
+        try {
+          await AppTheme.syncWithFirestore(dynamicPath);
+        } catch (_) {}
+      }
 
       await AuthService().login(UserRole.organization, {
-        'username': username,
+        'username': actualUsername,
         'dynamicPath': dynamicPath,
         'org_name': storedOrgName,
         'org_doc_path': fullConfigPath,
+        if (referralCode != null && referralCode.isNotEmpty) 'referral_code': referralCode,
       });
 
       await NotificationService.saveToken(
-        userId: username,
+        userId: actualUsername,
         userType: 'organisation',
-        userName: username,
+        userName: actualUsername,
       );
 
       if (mounted) {
@@ -233,220 +314,436 @@ class _LandingPageState extends State<LandingPage> {
         );
       }
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('LandingPage: _tryOrganizationLogin error: $e');
       return false;
     }
   }
 
   // 2. Manager Login Check
-  Future<bool> _tryManagerLogin(String username, String password) async {
+  Future<bool> _tryManagerLogin(
+    String username,
+    String password,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs,
+  ) async {
+    final cleanInput = username.trim();
+    final cleanLower = cleanInput.toLowerCase();
+    final cleanPass = password.trim();
+
     try {
-      QuerySnapshot<Map<String, dynamic>>? querySnapshot;
+      // 1. Direct subcollection check under each org (zero index dependency)
+      for (var orgDoc in orgDocs) {
+        final orgId = orgDoc.id;
+        try {
+          final managerSnap = await orgDoc.reference.collection('manager').get();
+          for (var doc in managerSnap.docs) {
+            final docData = doc.data();
+            final docUser = (docData['UserName'] ?? docData['username'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase();
+            final docEmail =
+                (docData['email'] ?? '').toString().trim().toLowerCase();
+            final docPhone =
+                (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
+            final storedPass =
+                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
 
-      // Check 'manager' collection group
-      querySnapshot = await FirebaseFirestore.instance
-          .collectionGroup('manager')
-          .where('UserName', isEqualTo: username)
-          .where('Password', isEqualTo: password)
-          .get();
+            if ((docUser == cleanLower ||
+                    docUser == cleanInput ||
+                    docEmail == cleanLower ||
+                    docPhone == cleanInput ||
+                    doc.id.toLowerCase() == cleanLower) &&
+                storedPass == cleanPass) {
+              return await _completeManagerLogin(
+                  doc.id, orgId, docData, cleanInput, cleanPass);
+            }
+          }
 
-      // Check 'configUsers' collection group
-      if (querySnapshot.docs.isEmpty) {
-        querySnapshot = await FirebaseFirestore.instance
-            .collectionGroup('configUsers')
-            .where('UserName', isEqualTo: username)
-            .where('Password', isEqualTo: password)
-            .get();
+          final configUsersSnap =
+              await orgDoc.reference.collection('configUsers').get();
+          for (var doc in configUsersSnap.docs) {
+            final docData = doc.data();
+            final docUser = (docData['UserName'] ?? docData['username'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase();
+            final docEmail =
+                (docData['email'] ?? '').toString().trim().toLowerCase();
+            final docPhone =
+                (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
+            final storedPass =
+                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
+
+            if ((docUser == cleanLower ||
+                    docUser == cleanInput ||
+                    docEmail == cleanLower ||
+                    docPhone == cleanInput) &&
+                storedPass == cleanPass) {
+              return await _completeManagerLogin(
+                  doc.id, orgId, docData, cleanInput, cleanPass);
+            }
+          }
+        } catch (_) {}
       }
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
-        final docData = doc.data();
+      // 2. Safe collectionGroup fallback with isolated error handling
+      try {
+        final cgSnap =
+            await FirebaseFirestore.instance.collectionGroup('manager').get();
+        for (var doc in cgSnap.docs) {
+          final docData = doc.data();
+          final docUser = (docData['UserName'] ?? docData['username'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final docEmail =
+              (docData['email'] ?? '').toString().trim().toLowerCase();
+          final docPhone =
+              (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
+          final storedPass =
+              (docData['Password'] ?? docData['password'] ?? '').toString().trim();
 
-        // Extract orgId from document path (organisation/{orgId}/...)
-        String orgId = '';
-        final segments = doc.reference.path.split('/');
-        final orgIndex = segments.indexOf('organisation');
-        if (orgIndex != -1 && orgIndex + 1 < segments.length) {
-          orgId = segments[orgIndex + 1];
+          if ((docUser == cleanLower ||
+                  docUser == cleanInput ||
+                  docEmail == cleanLower ||
+                  docPhone == cleanInput) &&
+              storedPass == cleanPass) {
+            String orgId = '';
+            final segments = doc.reference.path.split('/');
+            final orgIndex = segments.indexOf('organisation');
+            if (orgIndex != -1 && orgIndex + 1 < segments.length) {
+              orgId = segments[orgIndex + 1];
+            }
+            return await _completeManagerLogin(
+                doc.id, orgId, docData, cleanInput, cleanPass);
+          }
         }
+      } catch (_) {}
 
-        final prefs = await SharedPreferences.getInstance();
-        if (orgId.isNotEmpty) {
-          await prefs.setString('config_org_path', orgId);
-          final String resolvedPath = 'organisation/$orgId/data/admin';
-          await prefs.setString('config_org_doc_path', resolvedPath);
-          FirestoreService.setOrgPath(orgId);
-          await FirestoreService.initialize();
-          await AppTheme.syncWithFirestore(orgId);
-        }
-
-        final Map<String, dynamic> data = {
-          'username': username,
-          'password': password,
-          'orgId': orgId,
-          'config_org_doc_path': 'organisation/$orgId/data/admin',
-          ...docData,
-        };
-        await AuthService().login(UserRole.manager, data);
-
-        await NotificationService.saveToken(
-          userId: username,
-          userType: 'manager',
-          userName: username,
-        );
-
-        if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  const PortalLoadingScreen(
-                expectedRole: UserRole.manager,
-                initialStatusMessage: 'Loading manager portal…',
-              ),
-              transitionDuration: const Duration(milliseconds: 300),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-                  FadeTransition(opacity: animation, child: child),
-            ),
-            (route) => false,
-          );
-        }
-        return true;
-      }
       return false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('LandingPage: _tryManagerLogin error: $e');
       return false;
     }
+  }
+
+  Future<bool> _completeManagerLogin(
+    String docId,
+    String orgId,
+    Map<String, dynamic> docData,
+    String cleanInput,
+    String cleanPass,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (orgId.isNotEmpty) {
+      await prefs.setString('config_org_path', orgId);
+      final String resolvedPath = 'organisation/$orgId/data/admin';
+      await prefs.setString('config_org_doc_path', resolvedPath);
+      FirestoreService.setOrgPath(orgId);
+      await FirestoreService.initialize();
+      await AppTheme.syncWithFirestore(orgId);
+    }
+
+    final Map<String, dynamic> data = {
+      'username': docData['UserName'] ?? docData['username'] ?? cleanInput,
+      'password': cleanPass,
+      'orgId': orgId,
+      'config_org_doc_path': 'organisation/$orgId/data/admin',
+      ...docData,
+    };
+    await AuthService().login(UserRole.manager, data);
+
+    await NotificationService.saveToken(
+      userId: docId,
+      userType: 'manager',
+      userName: data['username'] ?? cleanInput,
+    );
+
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const PortalLoadingScreen(
+            expectedRole: UserRole.manager,
+            initialStatusMessage: 'Loading manager portal…',
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+        (route) => false,
+      );
+    }
+    return true;
   }
 
   // 3. Supervisor Login Check
-  Future<bool> _trySupervisorLogin(String username, String password) async {
+  Future<bool> _trySupervisorLogin(
+    String username,
+    String password,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs,
+  ) async {
+    final cleanInput = username.trim();
+    final cleanLower = cleanInput.toLowerCase();
+    final cleanPass = password.trim();
+
     try {
-      QuerySnapshot<Map<String, dynamic>>? querySnapshot;
+      // 1. Direct subcollection search under each org (zero index dependency)
+      for (var orgDoc in orgDocs) {
+        final orgId = orgDoc.id;
+        try {
+          final supSnap = await orgDoc.reference.collection('supervisor').get();
+          for (var doc in supSnap.docs) {
+            final docData = doc.data();
+            final docUser = (docData['UserName'] ??
+                    docData['username'] ??
+                    docData['Name'] ??
+                    '')
+                .toString()
+                .trim()
+                .toLowerCase();
+            final docEmail =
+                (docData['email'] ?? '').toString().trim().toLowerCase();
+            final docPhone =
+                (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
+            final storedPass =
+                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
 
-      querySnapshot = await FirebaseFirestore.instance
-          .collectionGroup('supervisor')
-          .where('UserName', isEqualTo: username)
-          .where('Password', isEqualTo: password)
-          .limit(1)
-          .get();
+            if ((docUser == cleanLower ||
+                    docUser == cleanInput ||
+                    docEmail == cleanLower ||
+                    docPhone == cleanInput ||
+                    doc.id.toLowerCase() == cleanLower) &&
+                storedPass == cleanPass) {
+              return await _completeSupervisorLogin(
+                  doc.id, orgId, docData, cleanInput);
+            }
+          }
 
-      if (querySnapshot.docs.isEmpty) {
-        querySnapshot = await FirebaseFirestore.instance
-            .collectionGroup('supervisors')
-            .where('UserName', isEqualTo: username)
-            .where('Password', isEqualTo: password)
-            .limit(1)
-            .get();
+          final supsSnap =
+              await orgDoc.reference.collection('supervisors').get();
+          for (var doc in supsSnap.docs) {
+            final docData = doc.data();
+            final docUser = (docData['UserName'] ??
+                    docData['username'] ??
+                    docData['Name'] ??
+                    '')
+                .toString()
+                .trim()
+                .toLowerCase();
+            final docEmail =
+                (docData['email'] ?? '').toString().trim().toLowerCase();
+            final docPhone =
+                (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
+            final storedPass =
+                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
+
+            if ((docUser == cleanLower ||
+                    docUser == cleanInput ||
+                    docEmail == cleanLower ||
+                    docPhone == cleanInput) &&
+                storedPass == cleanPass) {
+              return await _completeSupervisorLogin(
+                  doc.id, orgId, docData, cleanInput);
+            }
+          }
+        } catch (_) {}
       }
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
-        final supervisorId = doc.id;
-        final supervisorName =
-            doc.data()['Name'] ?? doc.data()['supervisorName'] ?? username;
+      // 2. Safe collectionGroup fallback
+      try {
+        final cgSnap =
+            await FirebaseFirestore.instance.collectionGroup('supervisor').get();
+        for (var doc in cgSnap.docs) {
+          final docData = doc.data();
+          final docUser = (docData['UserName'] ??
+                  docData['username'] ??
+                  docData['Name'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final docEmail =
+              (docData['email'] ?? '').toString().trim().toLowerCase();
+          final docPhone =
+              (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
+          final storedPass =
+              (docData['Password'] ?? docData['password'] ?? '').toString().trim();
 
-        // Extract orgId from document path (organisation/{orgId}/...)
-        String orgId = '';
-        final segments = doc.reference.path.split('/');
-        final orgIndex = segments.indexOf('organisation');
-        if (orgIndex != -1 && orgIndex + 1 < segments.length) {
-          orgId = segments[orgIndex + 1];
+          if ((docUser == cleanLower ||
+                  docUser == cleanInput ||
+                  docEmail == cleanLower ||
+                  docPhone == cleanInput) &&
+              storedPass == cleanPass) {
+            String orgId = '';
+            final segments = doc.reference.path.split('/');
+            final orgIndex = segments.indexOf('organisation');
+            if (orgIndex != -1 && orgIndex + 1 < segments.length) {
+              orgId = segments[orgIndex + 1];
+            }
+            return await _completeSupervisorLogin(
+                doc.id, orgId, docData, cleanInput);
+          }
         }
+      } catch (_) {}
 
-        final prefs = await SharedPreferences.getInstance();
-        if (orgId.isNotEmpty) {
-          await prefs.setString('sup_org_path', orgId);
-          final String resolvedPath = 'organisation/$orgId/data/admin';
-          await prefs.setString('sup_org_doc_path', resolvedPath);
-          FirestoreService.setOrgPath(orgId);
-          await FirestoreService.initialize();
-          await AppTheme.syncWithFirestore(orgId);
-        }
-
-        await AuthService().login(UserRole.supervisor, {
-          'username': username,
-          'supervisorId': supervisorId,
-          'supervisorName': supervisorName,
-          'isContractor': false,
-          'userType': 'supervisor',
-          'orgId': orgId,
-          'sup_org_doc_path': 'organisation/$orgId/data/admin',
-        });
-
-        await NotificationService.saveToken(
-          userId: supervisorId,
-          userType: 'supervisor',
-          userName: supervisorName,
-        );
-
-        if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  const PortalLoadingScreen(
-                expectedRole: UserRole.supervisor,
-                initialStatusMessage: 'Loading supervisor portal…',
-              ),
-              transitionDuration: const Duration(milliseconds: 300),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-                  FadeTransition(opacity: animation, child: child),
-            ),
-            (route) => false,
-          );
-        }
-        return true;
-      }
       return false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('LandingPage: _trySupervisorLogin error: $e');
       return false;
     }
   }
 
+  Future<bool> _completeSupervisorLogin(
+    String supervisorId,
+    String orgId,
+    Map<String, dynamic> docData,
+    String cleanInput,
+  ) async {
+    final supervisorName = (docData['Name'] ??
+            docData['supervisorName'] ??
+            docData['UserName'] ??
+            cleanInput)
+        .toString();
+
+    final prefs = await SharedPreferences.getInstance();
+    if (orgId.isNotEmpty) {
+      await prefs.setString('sup_org_path', orgId);
+      final String resolvedPath = 'organisation/$orgId/data/admin';
+      await prefs.setString('sup_org_doc_path', resolvedPath);
+      FirestoreService.setOrgPath(orgId);
+      await FirestoreService.initialize();
+      await AppTheme.syncWithFirestore(orgId);
+    }
+
+    await AuthService().login(UserRole.supervisor, {
+      'username': docData['UserName'] ?? docData['username'] ?? cleanInput,
+      'supervisorId': supervisorId,
+      'supervisorName': supervisorName,
+      'isContractor':
+          docData['isContractor'] == true || docData['userType'] == 'contractor',
+      'userType': docData['userType'] ?? 'supervisor',
+      'orgId': orgId,
+      'sup_org_doc_path': 'organisation/$orgId/data/admin',
+    });
+
+    await NotificationService.saveToken(
+      userId: supervisorId,
+      userType: 'supervisor',
+      userName: supervisorName,
+    );
+
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const PortalLoadingScreen(
+            expectedRole: UserRole.supervisor,
+            initialStatusMessage: 'Loading supervisor portal…',
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+        (route) => false,
+      );
+    }
+    return true;
+  }
+
   // 4. Customer Login Check
-  Future<bool> _tryCustomerLogin(String username, String password) async {
+  Future<bool> _tryCustomerLogin(
+    String username,
+    String password,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs,
+  ) async {
+    final cleanInput = username.trim();
+    final cleanLower = cleanInput.toLowerCase();
+    final cleanPass = password.trim();
+
     try {
-      QuerySnapshot<Map<String, dynamic>> querySnapshot =
-          await FirebaseFirestore.instance
-              .collectionGroup('customers')
-              .where('ownerPhoneNumber', isEqualTo: username)
-              .limit(1)
-              .get();
+      // 1. Direct subcollection search under each org (zero index dependency)
+      for (var orgDoc in orgDocs) {
+        try {
+          final custSnap =
+              await orgDoc.reference.collection('customers').get();
+          for (var doc in custSnap.docs) {
+            final data = doc.data();
+            final phone =
+                (data['ownerPhoneNumber'] ?? data['phone'] ?? '').toString().trim();
+            final user =
+                (data['username'] ?? data['ownerName'] ?? '').toString().trim().toLowerCase();
+            final storedPass =
+                (data['password'] ?? data['pin'] ?? '').toString().trim();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
-        final data = doc.data();
-
-        await AuthService().login(UserRole.customer, {
-          'ownerName': data['ownerName'] ?? username,
-          'ownerPhoneNumber': data['ownerPhoneNumber'] ?? username,
-          'siteId': data['siteId'] ?? '',
-        });
-
-        if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  const PortalLoadingScreen(
-                expectedRole: UserRole.customer,
-                initialStatusMessage: 'Loading client portal…',
-              ),
-              transitionDuration: const Duration(milliseconds: 300),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-                  FadeTransition(opacity: animation, child: child),
-            ),
-            (route) => false,
-          );
-        }
-        return true;
+            if ((phone == cleanInput ||
+                    user == cleanLower ||
+                    user == cleanInput ||
+                    doc.id.toLowerCase() == cleanLower) &&
+                (storedPass.isEmpty || storedPass == cleanPass)) {
+              return await _completeCustomerLogin(data, cleanInput);
+            }
+          }
+        } catch (_) {}
       }
+
+      // 2. Safe collectionGroup fallback
+      try {
+        final cgSnap =
+            await FirebaseFirestore.instance.collectionGroup('customers').get();
+        for (var doc in cgSnap.docs) {
+          final data = doc.data();
+          final phone =
+              (data['ownerPhoneNumber'] ?? data['phone'] ?? '').toString().trim();
+          final user =
+              (data['username'] ?? data['ownerName'] ?? '').toString().trim().toLowerCase();
+          final storedPass =
+              (data['password'] ?? data['pin'] ?? '').toString().trim();
+
+          if ((phone == cleanInput ||
+                  user == cleanLower ||
+                  user == cleanInput) &&
+              (storedPass.isEmpty || storedPass == cleanPass)) {
+            return await _completeCustomerLogin(data, cleanInput);
+          }
+        }
+      } catch (_) {}
+
       return false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('LandingPage: _tryCustomerLogin error: $e');
       return false;
     }
+  }
+
+  Future<bool> _completeCustomerLogin(
+      Map<String, dynamic> data, String cleanInput) async {
+    await AuthService().login(UserRole.customer, {
+      'ownerName': data['ownerName'] ?? cleanInput,
+      'ownerPhoneNumber': data['ownerPhoneNumber'] ?? cleanInput,
+      'siteId': data['siteId'] ?? '',
+    });
+
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const PortalLoadingScreen(
+            expectedRole: UserRole.customer,
+            initialStatusMessage: 'Loading client portal…',
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+        (route) => false,
+      );
+    }
+    return true;
   }
 
   // -------------------- UI BUILD --------------------

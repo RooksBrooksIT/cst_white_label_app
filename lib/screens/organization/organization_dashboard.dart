@@ -6,12 +6,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
-import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
+import 'package:demo_cst/screens/organization/org_site_payment_menu_page.dart';
+import 'package:demo_cst/screens/organization/org_supervisor_in_site_page.dart';
 import 'package:demo_cst/screens/organization/organization_expenses.dart';
-import 'package:demo_cst/screens/manager/manager_approval_screen.dart';
-import 'package:demo_cst/screens/manager/config_material_information.dart';
-import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
+import 'package:demo_cst/screens/organization/org_approvals_menu_page.dart';
+import 'package:demo_cst/screens/organization/org_materials_tools_inventory_page.dart';
 import 'package:demo_cst/screens/organization/org_notification_page.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/responsive.dart';
@@ -43,11 +42,16 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
   // Cached Stream handles to avoid repeated subscriptions on rebuilds
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _notificationsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _sitesStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _projectsStream;
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _materialRequestsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _siteSupervisorMapStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>>
+  _materialRequestsStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _siteScheduleStream;
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _supervisorRequestsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>>
+  _supervisorRequestsStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _expensesStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _supervisorEntriesStream;
 
   @override
   void initState() {
@@ -58,12 +62,28 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   }
 
   void _initStreams() {
-    _notificationsStream = FirestoreService.getCollection('notifications').snapshots();
+    _notificationsStream = FirestoreService.getCollection(
+      'notifications',
+    ).snapshots();
+    _sitesStream = FirestoreService.getCollection(
+      'Site',
+    ).snapshots();
     _projectsStream = FirestoreService.projects.snapshots();
-    _materialRequestsStream = FirestoreService.getCollection('materialRequests').snapshots();
-    _siteScheduleStream = FirestoreService.siteSupervisorProjectStageSchedule.snapshots();
-    _supervisorRequestsStream = FirestoreService.getCollection('supervisor_requests').snapshots();
-    _expensesStream = FirestoreService.getCollection('totalSiteExpensesPerDay').snapshots();
+    _siteSupervisorMapStream = FirestoreService.getCollection(
+      'siteSupervisorMap',
+    ).snapshots();
+    _materialRequestsStream = FirestoreService.getCollection(
+      'materialRequests',
+    ).snapshots();
+    _siteScheduleStream = FirestoreService.siteSupervisorProjectStageSchedule
+        .snapshots();
+    _supervisorRequestsStream = FirestoreService.getCollection(
+      'supervisor_requests',
+    ).snapshots();
+    _expensesStream = FirestoreService.getCollection(
+      'totalSiteExpensesPerDay',
+    ).snapshots();
+    _supervisorEntriesStream = FirestoreService.siteSupervisorEntries.snapshots();
   }
 
   void _startAutoPlayCarousel() {
@@ -91,28 +111,30 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   Future<void> _loadUserData() async {
     final userData = AuthService().userData;
     final fbUser = FirebaseAuth.instance.currentUser;
-    String name = (userData['username'] ??
-            userData['name'] ??
-            userData['userName'] ??
-            fbUser?.displayName ??
-            userData['org_name'] ??
-            userData['orgName'] ??
-            '')
-        .toString()
-        .trim();
+    String name =
+        (userData['username'] ??
+                userData['name'] ??
+                userData['userName'] ??
+                fbUser?.displayName ??
+                userData['org_name'] ??
+                userData['orgName'] ??
+                '')
+            .toString()
+            .trim();
 
     if (name.isEmpty) {
       try {
         final adminDoc = await FirestoreService.orgDataDoc.get();
         if (adminDoc.exists) {
           final data = adminDoc.data();
-          name = (data?['username'] ??
-                  data?['name'] ??
-                  data?['userName'] ??
-                  data?['org_name'] ??
-                  '')
-              .toString()
-              .trim();
+          name =
+              (data?['username'] ??
+                      data?['name'] ??
+                      data?['userName'] ??
+                      data?['org_name'] ??
+                      '')
+                  .toString()
+                  .trim();
         }
       } catch (_) {}
     }
@@ -209,8 +231,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         valueListenable: AppTheme.primaryColor,
         builder: (context, primaryColor, _) {
           final darkAccent = AppTheme.getDarkAccent(primaryColor);
-          final dynamicGradientColors =
-              AppTheme.getBackgroundGradientColors(primaryColor);
+          final dynamicGradientColors = AppTheme.getBackgroundGradientColors(
+            primaryColor,
+          );
 
           return Theme(
             data: AppTheme.getTheme(primaryColor),
@@ -263,9 +286,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                             ),
                           ),
 
-                          const SliverToBoxAdapter(
-                            child: SizedBox(height: 80),
-                          ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 80)),
                         ],
                       ),
                     ),
@@ -352,7 +373,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _notificationsStream,
                 builder: (context, snapshot) {
-                  final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                  final count = snapshot.hasData
+                      ? snapshot.data!.docs.length
+                      : 0;
 
                   return Stack(
                     clipBehavior: Clip.none,
@@ -369,7 +392,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                              color: const Color(
+                                0xFF0F172A,
+                              ).withValues(alpha: 0.04),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -443,7 +468,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [primaryColor, AppTheme.getDarkAccent(primaryColor)],
+                      colors: [
+                        primaryColor,
+                        AppTheme.getDarkAccent(primaryColor),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -568,367 +596,382 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ),
                 itemBuilder: (context) => [
                   const PopupMenuItem(value: 'Today', child: Text('Today')),
-                  const PopupMenuItem(value: 'This Week', child: Text('This Week')),
-                  const PopupMenuItem(value: 'This Month', child: Text('This Month')),
-                  const PopupMenuItem(value: 'All Time', child: Text('All Time')),
+                  const PopupMenuItem(
+                    value: 'This Week',
+                    child: Text('This Week'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'This Month',
+                    child: Text('This Month'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'All Time',
+                    child: Text('All Time'),
+                  ),
                 ],
               ),
             ],
           ),
         ),
 
-        // Real-time Streams (using cached stream subscriptions)
+        // Real-time Streams (using cached stream subscriptions across Site, projects, and mapping)
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _projectsStream,
-          builder: (context, projSnap) {
-            final projDocs = projSnap.hasData ? projSnap.data!.docs : [];
-            int activeSitesCount = 0;
-            int projectsInProgressCount = 0;
-            int planningCount = 0;
-            int overdueCount = 0;
-            int pendingSitesCount = 0;
-            double totalAmountSpent = 0.0;
-            double totalAmountBalance = 0.0;
-            double totalAmountPaid = 0.0;
-
-            final now = DateTime.now();
-            for (var doc in projDocs) {
-              final data = doc.data();
-              final s =
-                  (data['currentStatus'] ?? data['status'] ?? 'Ongoing')
-                      .toString()
-                      .toLowerCase();
-
-              DateTime? endDate;
-              if (data['endDate'] is Timestamp) {
-                endDate = (data['endDate'] as Timestamp).toDate();
-              } else if (data['expectedCompletionDate'] is Timestamp) {
-                endDate = (data['expectedCompletionDate'] as Timestamp).toDate();
-              }
-
-              final isDelayed = s.contains('delay') ||
-                  s.contains('overdue') ||
-                  (endDate != null && endDate.isBefore(now) && !s.contains('complete') && !s.contains('finish'));
-
-              if (isDelayed) {
-                overdueCount++;
-              } else if (s.contains('plan') || s.contains('draft') || s.contains('upcoming') || s.contains('setup')) {
-                planningCount++;
-              } else if (s.contains('progress') || s.contains('ongoing') || s.contains('active') || s.contains('execution')) {
-                projectsInProgressCount++;
-              } else if (s.contains('hold') || s.contains('pending') || s.contains('pause') || s.contains('suspend')) {
-                pendingSitesCount++;
-              } else if (!s.contains('complete') && !s.contains('finish')) {
-                projectsInProgressCount++;
-              }
-
-              if (s.contains('ongoing') ||
-                  s.contains('active') ||
-                  s.contains('progress') ||
-                  s.contains('execution') ||
-                  (!s.contains('complete') && !s.contains('finish') && !s.contains('closed'))) {
-                activeSitesCount++;
-              }
-
-              if (data['amountSpent'] is num) {
-                totalAmountSpent += (data['amountSpent'] as num).toDouble();
-              }
-              if (data['amountBalance'] is num) {
-                totalAmountBalance += (data['amountBalance'] as num).toDouble();
-              }
-              if (data['amountPaid'] is num) {
-                totalAmountPaid += (data['amountPaid'] as num).toDouble();
-              }
-            }
-
-            final displayActiveSites = activeSitesCount < 10
-                ? '0$activeSitesCount'
-                : '$activeSitesCount';
-            final displayProjects = projectsInProgressCount < 10
-                ? '0$projectsInProgressCount'
-                : '$projectsInProgressCount';
-            final displayPlanning = planningCount < 10
-                ? '0$planningCount'
-                : '$planningCount';
-            final displayOverdue = overdueCount < 10
-                ? '0$overdueCount'
-                : '$overdueCount';
-            final displayPendingSites = pendingSitesCount < 10
-                ? '0$pendingSitesCount'
-                : '$pendingSitesCount';
-
+          stream: _sitesStream,
+          builder: (context, siteSnap) {
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _materialRequestsStream,
-              builder: (context, matSnap) {
+              stream: _projectsStream,
+              builder: (context, projSnap) {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: _siteScheduleStream,
-                  builder: (context, wsSnap) {
+                  stream: _siteSupervisorMapStream,
+                  builder: (context, mapSnap) {
+                    final siteDocs = siteSnap.hasData ? siteSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    final projectDocs = projSnap.hasData ? projSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    final supervisorDocs = mapSnap.hasData ? mapSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+                    final allSiteDocsMap = _buildUnifiedSiteDocs(
+                      siteDocs: siteDocs,
+                      projectDocs: projectDocs,
+                      supervisorDocs: supervisorDocs,
+                    );
+
+                    int totalSitesCount = allSiteDocsMap.length;
+                    int projectsInProgressCount = 0;
+                    int planningCount = 0;
+                    int overdueCount = 0;
+                    int pendingSitesCount = 0;
+                    double totalAmountSpent = 0.0;
+                    double totalAmountBalance = 0.0;
+                    double totalAmountPaid = 0.0;
+                    double totalBudget = 0.0;
+
+                    final now = DateTime.now();
+                    for (var entry in allSiteDocsMap.entries) {
+                      final data = entry.value;
+                      final s = (data['currentStatus'] ?? data['status'] ?? 'OnProgress')
+                          .toString()
+                          .trim()
+                          .toLowerCase();
+
+                      final endDate = _parseFlexibleDate(
+                        data['actualEndDate'] ?? data['plannedEndDate'] ?? data['endDate'] ?? data['expectedCompletionDate'] ?? data['contractEndDate'],
+                      );
+
+                      final isCompleted = s.contains('complete') || s.contains('finish') || s.contains('closed') || s.contains('done');
+                      final isPlanning = !isCompleted && (s.contains('plan') || s.contains('draft') || s.contains('upcoming') || s.contains('setup'));
+                      final isOnHold = !isCompleted && (s.contains('hold') || s.contains('pending') || s.contains('pause') || s.contains('suspend'));
+                      final isOverdue = !isCompleted && (s.contains('delay') || s.contains('overdue') || (endDate != null && endDate.isBefore(now) && !isCompleted));
+
+                      if (isCompleted) {
+                        // Completed site
+                      } else if (isOverdue) {
+                        overdueCount++;
+                      } else if (isPlanning) {
+                        planningCount++;
+                      } else if (isOnHold) {
+                        pendingSitesCount++;
+                      } else {
+                        projectsInProgressCount++;
+                      }
+
+                      final b = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : (data['budget'] is num ? (data['budget'] as num).toDouble() : (double.tryParse(data['projectBudget']?.toString() ?? '') ?? 0.0)));
+                      final sp = (data['amountSpent'] is num ? (data['amountSpent'] as num).toDouble() : (data['spent'] is num ? (data['spent'] as num).toDouble() : (double.tryParse(data['amountSpent']?.toString() ?? '') ?? 0.0)));
+                      final pd = (data['amountPaid'] is num ? (data['amountPaid'] as num).toDouble() : (data['paid'] is num ? (data['paid'] as num).toDouble() : (double.tryParse(data['amountPaid']?.toString() ?? '') ?? 0.0)));
+                      final bal = (data['amountBalance'] is num ? (data['amountBalance'] as num).toDouble() : (data['balance'] is num ? (data['balance'] as num).toDouble() : (b > 0 ? (b - sp) : 0.0)));
+
+                      totalBudget += b;
+                      totalAmountSpent += sp;
+                      totalAmountPaid += pd;
+                      totalAmountBalance += bal;
+                    }
+
+                    final displayTotalSites = totalSitesCount < 10
+                        ? '0$totalSitesCount'
+                        : '$totalSitesCount';
+                    final displayProjects = projectsInProgressCount < 10
+                        ? '0$projectsInProgressCount'
+                        : '$projectsInProgressCount';
+                    final displayPlanning = planningCount < 10
+                        ? '0$planningCount'
+                        : '$planningCount';
+                    final displayOverdue = overdueCount < 10
+                        ? '0$overdueCount'
+                        : '$overdueCount';
+                    final displayPendingSites = pendingSitesCount < 10
+                        ? '0$pendingSitesCount'
+                        : '$pendingSitesCount';
+
                     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: _supervisorRequestsStream,
-                      builder: (context, supSnap) {
-                        int pendingApprovalsCount = 0;
-                        if (matSnap.hasData) {
-                          pendingApprovalsCount += matSnap.data!.docs.where((d) {
-                            final s = (d.data()['status'] ?? 'Processing').toString().toLowerCase();
-                            return s.contains('pending') || s.contains('processing');
-                          }).length;
-                        }
-                        if (wsSnap.hasData) {
-                          pendingApprovalsCount += wsSnap.data!.docs.where((d) {
-                            final s = (d.data()['approvalStatus'] ?? d.data()['status'] ?? 'Pending').toString().toLowerCase();
-                            return s.contains('pending') || s.contains('processing');
-                          }).length;
-                        }
-                        if (supSnap.hasData) {
-                          pendingApprovalsCount += supSnap.data!.docs.where((d) {
-                            final s = (d.data()['status'] ?? 'Pending').toString().toLowerCase();
-                            return s.contains('pending') || s.contains('processing');
-                          }).length;
-                        }
-
-                        final displayPending = pendingApprovalsCount < 10
-                            ? '0$pendingApprovalsCount'
-                            : '$pendingApprovalsCount';
-
+                      stream: _materialRequestsStream,
+                      builder: (context, matSnap) {
                         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: _expensesStream,
-                          builder: (context, expSnap) {
-                            double computedExpenses = 0.0;
-                            final now = DateTime.now();
-                            final todayStr1 = DateFormat('yyyy-MM-dd').format(now);
-                            final todayStr2 = DateFormat('dd-MM-yyyy').format(now);
-                            final todayStr3 = DateFormat('d-M-yyyy').format(now);
-                            final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-                            final startOfMonth = DateTime(now.year, now.month, 1);
-
-                            if (expSnap.hasData) {
-                              for (var doc in expSnap.data!.docs) {
-                                final data = doc.data();
-                                double amount = 0.0;
-                                if (data['totalAllExpenses'] is num) {
-                                  amount = (data['totalAllExpenses'] as num).toDouble();
-                                } else {
-                                  final sExp = (data['totalSiteExpense'] is num ? (data['totalSiteExpense'] as num).toDouble() : 0.0);
-                                  final mExp = (data['totalMgrExpense'] is num ? (data['totalMgrExpense'] as num).toDouble() : 0.0);
-                                  final oExp = (data['totalOrgExpense'] is num ? (data['totalOrgExpense'] as num).toDouble() : 0.0);
-                                  final cExp = (data['totalContractorExpense'] is num ? (data['totalContractorExpense'] as num).toDouble() : 0.0);
-                                  final iExp = (data['totalIncentiveExpenses'] is num ? (data['totalIncentiveExpenses'] as num).toDouble() : 0.0);
-                                  amount = sExp + mExp + oExp + cExp + iExp;
+                          stream: _siteScheduleStream,
+                          builder: (context, wsSnap) {
+                            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                              stream: _supervisorRequestsStream,
+                              builder: (context, supSnap) {
+                                int pendingApprovalsCount = 0;
+                                if (matSnap.hasData) {
+                                  pendingApprovalsCount += matSnap.data!.docs.where((d) {
+                                    final s = (d.data()['status'] ?? 'Processing').toString().toLowerCase();
+                                    return s.contains('pending') || s.contains('processing');
+                                  }).length;
+                                }
+                                if (wsSnap.hasData) {
+                                  pendingApprovalsCount += wsSnap.data!.docs.where((d) {
+                                    final s = (d.data()['approvalStatus'] ?? d.data()['status'] ?? 'Pending').toString().toLowerCase();
+                                    return s.contains('pending') || s.contains('processing');
+                                  }).length;
+                                }
+                                if (supSnap.hasData) {
+                                  pendingApprovalsCount += supSnap.data!.docs.where((d) {
+                                    final s = (d.data()['status'] ?? 'Pending').toString().toLowerCase();
+                                    return s.contains('pending') || s.contains('processing');
+                                  }).length;
                                 }
 
-                                final docDateStr = (data['date'] ?? '').toString();
-                                DateTime? docDate;
-                                if (data['updatedAt'] is Timestamp) {
-                                  docDate = (data['updatedAt'] as Timestamp).toDate();
-                                } else if (data['timestamp'] is Timestamp) {
-                                  docDate = (data['timestamp'] as Timestamp).toDate();
-                                } else if (docDateStr.isNotEmpty) {
-                                  try {
-                                    docDate = DateTime.tryParse(docDateStr);
-                                  } catch (_) {}
-                                }
+                                final displayPending = pendingApprovalsCount < 10
+                                    ? '0$pendingApprovalsCount'
+                                    : '$pendingApprovalsCount';
 
-                                if (_selectedKpiPeriod == 'Today') {
-                                  if (docDateStr == todayStr1 ||
-                                      docDateStr == todayStr2 ||
-                                      docDateStr == todayStr3 ||
-                                      (docDate != null &&
-                                          docDate.year == now.year &&
-                                          docDate.month == now.month &&
-                                          docDate.day == now.day)) {
-                                    computedExpenses += amount;
-                                  }
-                                } else if (_selectedKpiPeriod == 'This Week') {
-                                  if (docDate != null && docDate.isAfter(startOfWeek.subtract(const Duration(days: 1)))) {
-                                    computedExpenses += amount;
-                                  } else if (docDate == null) {
-                                    computedExpenses += amount;
-                                  }
-                                } else if (_selectedKpiPeriod == 'This Month') {
-                                  if (docDate != null && docDate.isAfter(startOfMonth.subtract(const Duration(days: 1)))) {
-                                    computedExpenses += amount;
-                                  } else if (docDate == null) {
-                                    computedExpenses += amount;
-                                  }
-                                } else {
-                                  computedExpenses += amount;
-                                }
-                              }
-                            }
+                                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                  stream: _supervisorEntriesStream,
+                                  builder: (context, entrySnap) {
+                                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                      stream: _expensesStream,
+                                      builder: (context, expSnap) {
+                                        double computedExpenses = 0.0;
 
-                            if (computedExpenses == 0.0 && _selectedKpiPeriod == 'All Time') {
-                              computedExpenses = totalAmountSpent;
-                            }
+                                        // 1. Ingest detailed daily supervisor & site entries
+                                        if (entrySnap.hasData && entrySnap.data!.docs.isNotEmpty) {
+                                          for (var doc in entrySnap.data!.docs) {
+                                            final data = doc.data();
+                                            double amount = 0.0;
+                                            if (data['totalAmount'] is num) {
+                                              amount = (data['totalAmount'] as num).toDouble();
+                                            } else if (data['amount'] is num) {
+                                              amount = (data['amount'] as num).toDouble();
+                                            } else {
+                                              amount = double.tryParse(data['totalAmount']?.toString() ?? '') ??
+                                                  (double.tryParse(data['amount']?.toString() ?? '') ?? 0.0);
+                                            }
 
-                            double availableBalance = totalAmountBalance;
-                            if (availableBalance <= 0.0 && totalAmountPaid > 0.0) {
-                              availableBalance = totalAmountPaid - totalAmountSpent;
-                            }
-
-                            final expenseLabel = _selectedKpiPeriod == 'Today'
-                                ? "Today's Expenses"
-                                : (_selectedKpiPeriod == 'This Week'
-                                    ? "This Week's Expenses"
-                                    : (_selectedKpiPeriod == 'This Month'
-                                        ? "Monthly Expenses"
-                                        : "Total Expenses"));
-
-                            final displayExpenses = _formatCurrency(computedExpenses);
-                            final displayBalance = _formatCurrency(availableBalance);
-
-                            // Build Carousel Slides
-                            final slides = [
-                              // Slide 1: Financial Overview (Hero Gradient Card)
-                              _buildHeroBalanceSlide(
-                                context,
-                                balance: displayBalance,
-                                expenses: displayExpenses,
-                                expenseLabel: expenseLabel,
-                                primaryColor: primaryColor,
-                                darkAccent: darkAccent,
-                              ),
-
-                              // Slide 2: Site Status & Progress (All Site Statuses)
-                              _buildSiteStatusSlide(
-                                context,
-                                activeSites: displayActiveSites,
-                                planning: displayPlanning,
-                                inProgress: displayProjects,
-                                overdue: displayOverdue,
-                                pending: displayPendingSites,
-                                primaryColor: primaryColor,
-                              ),
-
-                              // Slide 3: Approvals & Tasks
-                              _buildApprovalsSlide(
-                                context,
-                                pendingCount: displayPending,
-                                primaryColor: primaryColor,
-                              ),
-
-                              // Slide 4: Expense Breakdown
-                              _buildExpensesSlide(
-                                context,
-                                expenses: displayExpenses,
-                                expenseLabel: expenseLabel,
-                                period: _selectedKpiPeriod,
-                                primaryColor: primaryColor,
-                              ),
-                            ];
-
-                            return Column(
-                              children: [
-                                SizedBox(
-                                  height: 196,
-                                  child: PageView.builder(
-                                    controller: _kpiPageController,
-                                    onPageChanged: (index) {
-                                      _currentKpiPageNotifier.value = index % slides.length;
-                                      _startAutoPlayCarousel();
-                                    },
-                                    itemBuilder: (context, index) {
-                                      final slideIndex = index % slides.length;
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 4,
-                                        ),
-                                        child: slides[slideIndex],
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                // Modern Interactive Segmented Pill Indicator
-                                ValueListenableBuilder<int>(
-                                  valueListenable: _currentKpiPageNotifier,
-                                  builder: (context, activeIndex, _) {
-                                    final titles = ['Treasury', 'Operations', 'Approvals', 'Expenses'];
-                                    return Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: List.generate(
-                                        slides.length,
-                                        (index) {
-                                          final isSelected = activeIndex == index;
-                                          return GestureDetector(
-                                            onTap: () {
-                                              HapticFeedback.selectionClick();
-                                              if (_kpiPageController.hasClients) {
-                                                final currentTotalPage = (_kpiPageController.page ?? 400).round();
-                                                final currentMod = currentTotalPage % slides.length;
-                                                final targetPage = currentTotalPage + (index - currentMod);
-                                                _kpiPageController.animateToPage(
-                                                  targetPage,
-                                                  duration: const Duration(milliseconds: 450),
-                                                  curve: Curves.easeInOutCubic,
-                                                );
+                                            if (amount > 0) {
+                                              final docDateStr = (data['date'] ?? '').toString();
+                                              final docDate = _parseFlexibleDate(
+                                                data['updatedAt'] ?? data['createdAt'] ?? data['timestamp'] ?? docDateStr,
+                                              );
+                                              if (_isDateInPeriod(docDate, docDateStr, _selectedKpiPeriod)) {
+                                                computedExpenses += amount;
                                               }
-                                              _startAutoPlayCarousel();
-                                            },
-                                            child: AnimatedContainer(
-                                              duration: const Duration(milliseconds: 280),
-                                              curve: Curves.easeOutCubic,
-                                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: isSelected ? 12 : 6,
-                                                vertical: 5,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: isSelected
-                                                    ? primaryColor
-                                                    : Colors.white.withValues(alpha: 0.6),
-                                                borderRadius: BorderRadius.circular(20),
-                                                border: Border.all(
-                                                  color: isSelected
-                                                      ? primaryColor
-                                                      : const Color(0xFFE2E8F0),
-                                                  width: 1,
-                                                ),
-                                                boxShadow: isSelected
-                                                    ? [
-                                                        BoxShadow(
-                                                          color: primaryColor.withValues(alpha: 0.25),
-                                                          blurRadius: 6,
-                                                          offset: const Offset(0, 2),
-                                                        ),
-                                                      ]
-                                                    : null,
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Container(
-                                                    width: 6,
-                                                    height: 6,
-                                                    decoration: BoxDecoration(
-                                                      shape: BoxShape.circle,
-                                                      color: isSelected
-                                                          ? Colors.white
-                                                          : const Color(0xFF94A3B8),
-                                                    ),
-                                                  ),
-                                                  if (isSelected) ...[
-                                                    const SizedBox(width: 5),
-                                                    Text(
-                                                      titles[index],
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w800,
-                                                        letterSpacing: 0.2,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
+                                            }
+                                          }
+                                        }
+
+                                        // 2. Ingest totalSiteExpensesPerDay summaries
+                                        if (expSnap.hasData && expSnap.data!.docs.isNotEmpty) {
+                                          for (var doc in expSnap.data!.docs) {
+                                            final data = doc.data();
+                                            double amount = 0.0;
+                                            if (data['totalAllExpenses'] is num) {
+                                              amount = (data['totalAllExpenses'] as num).toDouble();
+                                            } else {
+                                              final sExp = (data['totalSiteExpense'] is num ? (data['totalSiteExpense'] as num).toDouble() : (double.tryParse(data['totalSiteExpense']?.toString() ?? '') ?? 0.0));
+                                              final mExp = (data['totalMgrExpense'] is num ? (data['totalMgrExpense'] as num).toDouble() : (double.tryParse(data['totalMgrExpense']?.toString() ?? '') ?? 0.0));
+                                              final oExp = (data['totalOrgExpense'] is num ? (data['totalOrgExpense'] as num).toDouble() : (double.tryParse(data['totalOrgExpense']?.toString() ?? '') ?? 0.0));
+                                              final cExp = (data['totalContractorExpense'] is num ? (data['totalContractorExpense'] as num).toDouble() : (double.tryParse(data['totalContractorExpense']?.toString() ?? '') ?? 0.0));
+                                              final iExp = (data['totalIncentiveExpenses'] is num ? (data['totalIncentiveExpenses'] as num).toDouble() : (double.tryParse(data['totalIncentiveExpenses']?.toString() ?? '') ?? 0.0));
+                                              amount = sExp + mExp + oExp + cExp + iExp;
+                                            }
+
+                                            if (amount > 0) {
+                                              final docDateStr = (data['date'] ?? '').toString();
+                                              final docDate = _parseFlexibleDate(
+                                                data['updatedAt'] ?? data['createdAt'] ?? data['timestamp'] ?? docDateStr,
+                                              );
+                                              if (_isDateInPeriod(docDate, docDateStr, _selectedKpiPeriod)) {
+                                                if (computedExpenses == 0.0) {
+                                                  computedExpenses += amount;
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+
+                                        if (computedExpenses == 0.0 && _selectedKpiPeriod == 'All Time') {
+                                          computedExpenses = totalAmountSpent;
+                                        }
+
+                                        double availableBalance = totalAmountBalance;
+                                        if (availableBalance <= 0.0 && totalAmountPaid > 0.0) {
+                                          availableBalance = totalAmountPaid - totalAmountSpent;
+                                        } else if (availableBalance <= 0.0 && totalBudget > 0.0) {
+                                          availableBalance = totalBudget - totalAmountSpent;
+                                        }
+
+                                        final expenseLabel = _selectedKpiPeriod == 'Today'
+                                            ? "Today's Expenses"
+                                            : (_selectedKpiPeriod == 'This Week'
+                                                ? "This Week's Expenses"
+                                                : (_selectedKpiPeriod == 'This Month'
+                                                    ? "Monthly Expenses"
+                                                    : "Total Expenses"));
+
+                                        final displayExpenses = _formatCurrency(computedExpenses);
+                                        final displayBalance = _formatCurrency(availableBalance);
+
+                                        // Build Carousel Slides
+                                        final slides = [
+                                          // Slide 1: Financial Overview (Hero Gradient Card)
+                                          _buildHeroBalanceSlide(
+                                            context,
+                                            balance: displayBalance,
+                                            expenses: displayExpenses,
+                                            expenseLabel: expenseLabel,
+                                            primaryColor: primaryColor,
+                                            darkAccent: darkAccent,
+                                          ),
+
+                                          // Slide 2: Site Status & Progress (All Site Statuses)
+                                          _buildSiteStatusSlide(
+                                            context,
+                                            totalSites: displayTotalSites,
+                                            planning: displayPlanning,
+                                            inProgress: displayProjects,
+                                            overdue: displayOverdue,
+                                            pending: displayPendingSites,
+                                            primaryColor: primaryColor,
+                                          ),
+
+                                          // Slide 3: Approvals & Tasks
+                                          _buildApprovalsSlide(
+                                            context,
+                                            pendingCount: displayPending,
+                                            primaryColor: primaryColor,
+                                          ),
+
+                                          // Slide 4: Expense Breakdown
+                                          _buildExpensesSlide(
+                                            context,
+                                            expenses: displayExpenses,
+                                            expenseLabel: expenseLabel,
+                                            period: _selectedKpiPeriod,
+                                            primaryColor: primaryColor,
+                                          ),
+                                        ];
+
+                                        return Column(
+                                          children: [
+                                            SizedBox(
+                                              height: 196,
+                                              child: PageView.builder(
+                                                controller: _kpiPageController,
+                                                onPageChanged: (index) {
+                                                  _currentKpiPageNotifier.value = index % slides.length;
+                                                  _startAutoPlayCarousel();
+                                                },
+                                                itemBuilder: (context, index) {
+                                                  final slideIndex = index % slides.length;
+                                                  return Padding(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                    child: slides[slideIndex],
+                                                  );
+                                                },
                                               ),
                                             ),
-                                          );
-                                        },
-                                      ),
+                                            const SizedBox(height: 12),
+                                            // Modern Interactive Segmented Pill Indicator
+                                            ValueListenableBuilder<int>(
+                                              valueListenable: _currentKpiPageNotifier,
+                                              builder: (context, activeIndex, _) {
+                                                final titles = [
+                                                  'Treasury',
+                                                  'Operations',
+                                                  'Approvals',
+                                                  'Expenses',
+                                                ];
+                                                return Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: List.generate(slides.length, (index) {
+                                                    final isSelected = activeIndex == index;
+                                                    return GestureDetector(
+                                                      onTap: () {
+                                                        HapticFeedback.selectionClick();
+                                                        if (_kpiPageController.hasClients) {
+                                                          final currentTotalPage = (_kpiPageController.page ?? 400).round();
+                                                          final currentMod = currentTotalPage % slides.length;
+                                                          final targetPage = currentTotalPage + (index - currentMod);
+                                                          _kpiPageController.animateToPage(
+                                                            targetPage,
+                                                            duration: const Duration(milliseconds: 450),
+                                                            curve: Curves.easeInOutCubic,
+                                                          );
+                                                        }
+                                                        _startAutoPlayCarousel();
+                                                      },
+                                                      child: AnimatedContainer(
+                                                        duration: const Duration(milliseconds: 280),
+                                                        curve: Curves.easeOutCubic,
+                                                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                                                        padding: EdgeInsets.symmetric(
+                                                          horizontal: isSelected ? 12 : 6,
+                                                          vertical: 5,
+                                                        ),
+                                                        decoration: BoxDecoration(
+                                                          color: isSelected ? primaryColor : Colors.white.withValues(alpha: 0.6),
+                                                          borderRadius: BorderRadius.circular(20),
+                                                          border: Border.all(
+                                                            color: isSelected ? primaryColor : const Color(0xFFE2E8F0),
+                                                            width: 1,
+                                                          ),
+                                                          boxShadow: isSelected
+                                                              ? [
+                                                                  BoxShadow(
+                                                                    color: primaryColor.withValues(alpha: 0.25),
+                                                                    blurRadius: 6,
+                                                                    offset: const Offset(0, 2),
+                                                                  ),
+                                                                ]
+                                                              : null,
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Container(
+                                                              width: 6,
+                                                              height: 6,
+                                                              decoration: BoxDecoration(
+                                                                shape: BoxShape.circle,
+                                                                color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                                                              ),
+                                                            ),
+                                                            if (isSelected) ...[
+                                                              const SizedBox(width: 5),
+                                                              Text(
+                                                                titles[index],
+                                                                style: const TextStyle(
+                                                                  color: Colors.white,
+                                                                  fontSize: 11,
+                                                                  fontWeight: FontWeight.w800,
+                                                                  letterSpacing: 0.2,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }),
+                                                );
+                                              },
+                                            ),
+                                            const SizedBox(height: 16),
+                                          ],
+                                        );
+                                      },
                                     );
                                   },
-                                ),
-                                const SizedBox(height: 16),
-                              ],
+                                );
+                              },
                             );
                           },
                         );
@@ -956,7 +999,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     return InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
-        _navigateToSitePaymentEntry(context);
+        _navigateToSitePaymentMenu(context);
       },
       borderRadius: BorderRadius.circular(22),
       child: Container(
@@ -1008,7 +1051,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: primaryColor,
                     borderRadius: BorderRadius.circular(20),
@@ -1072,7 +1118,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEF2F2),
                     borderRadius: BorderRadius.circular(12),
@@ -1156,7 +1205,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   // Slide 2: Operations Center Modal (2x2 Matrix)
   Widget _buildSiteStatusSlide(
     BuildContext context, {
-    required String activeSites,
+    required String totalSites,
     required String planning,
     required String inProgress,
     required String overdue,
@@ -1210,14 +1259,17 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFDBEAFE)),
                     ),
                     child: Text(
-                      'Total: $activeSites',
+                      'Total: $totalSites',
                       style: const TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
@@ -1231,7 +1283,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 onTap: () => _navigateToSitesList(context, 'All'),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(20),
@@ -1277,7 +1332,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                           accentColor: const Color(0xFF2563EB),
                           bgColor: const Color(0xFFEFF6FF),
                           borderColor: const Color(0xFFDBEAFE),
-                          onTap: () => _navigateToSitesList(context, 'Planning'),
+                          onTap: () =>
+                              _navigateToSitesList(context, 'Planning'),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1289,7 +1345,8 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                           accentColor: const Color(0xFF16A34A),
                           bgColor: const Color(0xFFF0FDF4),
                           borderColor: const Color(0xFFDCFCE7),
-                          onTap: () => _navigateToSitesList(context, 'In Progress'),
+                          onTap: () =>
+                              _navigateToSitesList(context, 'In Progress'),
                         ),
                       ),
                     ],
@@ -1372,9 +1429,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ),
                 ],
               ),
-              child: Center(
-                child: Icon(icon, color: accentColor, size: 17),
-              ),
+              child: Center(child: Icon(icon, color: accentColor, size: 17)),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1427,7 +1482,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     return InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
-        _showApprovalsSelectionSheet(context, primaryColor);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const OrgApprovalsMenuPage()),
+        );
       },
       borderRadius: BorderRadius.circular(22),
       child: Container(
@@ -1479,7 +1537,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFD97706),
                     borderRadius: BorderRadius.circular(20),
@@ -1523,7 +1584,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFFBEB),
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFFEF3C7), width: 2),
+                    border: Border.all(
+                      color: const Color(0xFFFEF3C7),
+                      width: 2,
+                    ),
                   ),
                   child: Center(
                     child: Text(
@@ -1663,7 +1727,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFDC2626),
                     borderRadius: BorderRadius.circular(20),
@@ -1822,7 +1889,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.8)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1855,7 +1924,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             children: [
               // 1. Record Expense
               _buildConstructionActionCard(
-                title: 'Record Expense',
+                title: 'Expense Entry',
                 subtitle: 'Bills & site expenses',
                 icon: Icons.receipt_long_rounded,
                 accentColor: const Color(0xFFEF4444),
@@ -1865,10 +1934,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               // 2. Site Payment
               _buildConstructionActionCard(
                 title: 'Site Payment',
-                subtitle: 'Vendor & worker pay',
+                subtitle: 'Entry & reports',
                 icon: Icons.payments_rounded,
                 accentColor: const Color(0xFF2563EB),
-                onTap: () => _navigateToSitePaymentEntry(context),
+                onTap: () => _navigateToSitePaymentMenu(context),
               ),
 
               // 3. Approvals
@@ -1877,30 +1946,40 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 subtitle: 'Materials, tools & payments',
                 icon: Icons.fact_check_rounded,
                 accentColor: const Color(0xFFD97706),
-                onTap: () => _showApprovalsSelectionSheet(context, primaryColor),
-              ),
-
-              // 4. Material Req.
-              _buildConstructionActionCard(
-                title: 'Material Req.',
-                subtitle: 'Site supply orders',
-                icon: Icons.inventory_2_rounded,
-                accentColor: const Color(0xFFE11D48),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ManagerMaterialApprovalScreen(),
+                    builder: (context) => const OrgApprovalsMenuPage(),
                   ),
                 ),
               ),
 
-              // 5. Materials & Tools Movement
+              // 4. Supervisor in Site
               _buildConstructionActionCard(
-                title: 'Materials & Tools Movement',
-                subtitle: 'Material & tool transfers',
-                icon: Icons.swap_horiz_rounded,
+                title: 'Supervisor in Site',
+                subtitle: 'Staff & site allocations',
+                icon: Icons.engineering_rounded,
+                accentColor: const Color(0xFFE11D48),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OrgSupervisorInSitePage(),
+                  ),
+                ),
+              ),
+
+              // 5. Materials & Tools Inventory
+              _buildConstructionActionCard(
+                title: 'Materials & Tools Inventory',
+                subtitle: 'Stock levels & equipment',
+                icon: Icons.warehouse_rounded,
                 accentColor: const Color(0xFF0D9488),
-                onTap: () => _showMovementSelectionSheet(context, primaryColor),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OrgMaterialsToolsInventoryPage(),
+                  ),
+                ),
               ),
 
               // 6. Manager Config
@@ -1941,10 +2020,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: const Color(0xFFE2E8F0),
-            width: 1.2,
-          ),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF0F172A).withValues(alpha: 0.04),
@@ -1989,11 +2065,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     ),
                   ),
                   child: Center(
-                    child: Icon(
-                      icon,
-                      color: accentColor,
-                      size: 23,
-                    ),
+                    child: Icon(icon, color: accentColor, size: 23),
                   ),
                 ),
 
@@ -2056,350 +2128,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  // -------------------- ACTION MODAL BOTTOM SHEETS --------------------
-
-  void _showApprovalsSelectionSheet(BuildContext context, Color primaryColor) {
-    HapticFeedback.mediumImpact();
-    _showActionOptionsBottomSheet(
-      context: context,
-      title: 'Approvals',
-      badgeIcon: Icons.fact_check_rounded,
-      badgeColor: const Color(0xFFD97706),
-      subtitle: 'Select an approval workflow to manage',
-      options: [
-        _ActionOptionItem(
-          title: 'Material Approvals',
-          subtitle: 'Review & authorize site material requests',
-          icon: Icons.inventory_2_rounded,
-          accentColor: const Color(0xFFE11D48),
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ManagerMaterialApprovalScreen(),
-              ),
-            );
-          },
-        ),
-        _ActionOptionItem(
-          title: 'Tools Approvals',
-          subtitle: 'Review & approve site tool allocations & schedules',
-          icon: Icons.construction_rounded,
-          accentColor: const Color(0xFFD97706),
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ManagerApprovalScreen(),
-              ),
-            );
-          },
-        ),
-        _ActionOptionItem(
-          title: 'Site Payment Approvals',
-          subtitle: 'Authorize contractor, vendor & worker payments',
-          icon: Icons.payments_rounded,
-          accentColor: const Color(0xFF2563EB),
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SitePaymentScreen(),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  void _showMovementSelectionSheet(BuildContext context, Color primaryColor) {
-    HapticFeedback.mediumImpact();
-    _showActionOptionsBottomSheet(
-      context: context,
-      title: 'Materials & Tools Movement',
-      badgeIcon: Icons.swap_horiz_rounded,
-      badgeColor: const Color(0xFF0D9488),
-      subtitle: 'Track and transfer materials & tools between sites',
-      options: [
-        _ActionOptionItem(
-          title: 'Materials Movement',
-          subtitle: 'Company to site, site to site & return transfers',
-          icon: Icons.swap_horiz_rounded,
-          accentColor: const Color(0xFF7C3AED),
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MaterialInfoScreen(),
-              ),
-            );
-          },
-        ),
-        _ActionOptionItem(
-          title: 'Tools Movement',
-          subtitle: 'Dispatch & return tools across active construction sites',
-          icon: Icons.handyman_rounded,
-          accentColor: const Color(0xFF0D9488),
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ToolsMovementPage(),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  void _showActionOptionsBottomSheet({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required IconData badgeIcon,
-    required Color badgeColor,
-    required List<_ActionOptionItem> options,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) {
-        final screenWidth = MediaQuery.of(modalContext).size.width;
-        final isMobile = screenWidth < 600;
-
-        return Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: isMobile ? double.infinity : 520,
-            ),
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x29000000),
-                    blurRadius: 30,
-                    offset: Offset(0, -6),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Top Drag Handle
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 4.5,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Header Row
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              badgeColor.withValues(alpha: 0.18),
-                              badgeColor.withValues(alpha: 0.08),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: badgeColor.withValues(alpha: 0.25),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(badgeIcon, color: badgeColor, size: 22),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
-                                letterSpacing: -0.4,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              subtitle,
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => Navigator.pop(modalContext),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            size: 18,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Options List
-                  ...options.map((option) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          option.onTap();
-                        },
-                        borderRadius: BorderRadius.circular(18),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 13,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFAFAFC),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: const Color(0xFFE2E8F0),
-                              width: 1.1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF0F172A).withValues(alpha: 0.02),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      option.accentColor.withValues(alpha: 0.16),
-                                      option.accentColor.withValues(alpha: 0.06),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(13),
-                                  border: Border.all(
-                                    color: option.accentColor.withValues(alpha: 0.22),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    option.icon,
-                                    color: option.accentColor,
-                                    size: 22,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      option.title,
-                                      style: const TextStyle(
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFF0F172A),
-                                        letterSpacing: -0.2,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2.5),
-                                    Text(
-                                      option.subtitle,
-                                      style: const TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF64748B),
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(9),
-                                  border: Border.all(
-                                    color: const Color(0xFFE2E8F0),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: option.accentColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   // -------------------- NAVIGATION HELPERS --------------------
 
   void _navigateToSitesList(BuildContext context, [String filter = 'All']) {
@@ -2412,10 +2140,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-
-  void _navigateToSitePaymentEntry(BuildContext context) => Navigator.push(
+  void _navigateToSitePaymentMenu(BuildContext context) => Navigator.push(
     context,
-    MaterialPageRoute(builder: (context) => SitePaymentScreen()),
+    MaterialPageRoute(builder: (context) => const OrgSitePaymentMenuPage()),
   );
 
   void _navigateToOrganizationExpenses(BuildContext context) => Navigator.push(
@@ -2429,21 +2156,159 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       builder: (context) => const OrgMenuScreen(standalone: true),
     ),
   );
-}
 
-class _ActionOptionItem {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accentColor;
-  final VoidCallback onTap;
+  Map<String, Map<String, dynamic>> _buildUnifiedSiteDocs({
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> siteDocs,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> projectDocs,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> supervisorDocs,
+  }) {
+    final unifiedMap = <String, Map<String, dynamic>>{};
 
-  const _ActionOptionItem({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accentColor,
-    required this.onTap,
-  });
+    String? findMatchingKey(String siteId, String docId, String siteName) {
+      final cleanSiteId = siteId.trim().toLowerCase();
+      final cleanDocId = docId.trim().toLowerCase();
+      final cleanName = siteName.trim().toLowerCase();
+
+      for (var key in unifiedMap.keys) {
+        final k = key.trim().toLowerCase();
+        final data = unifiedMap[key]!;
+        final sId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+        final sName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim().toLowerCase();
+
+        if (k == cleanDocId || k == cleanSiteId) return key;
+        if (cleanSiteId.isNotEmpty && (sId == cleanSiteId || k.startsWith(cleanSiteId) || cleanDocId.startsWith(sId))) return key;
+        if (cleanDocId.isNotEmpty && (cleanDocId == k || cleanDocId.contains(k) || k.contains(cleanDocId))) return key;
+        if (cleanName.isNotEmpty && sName.isNotEmpty && cleanName == sName) return key;
+      }
+      return null;
+    }
+
+    // 1. Ingest Site collection docs (Primary created via Wizard)
+    for (var doc in siteDocs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['docId'] = doc.id;
+      final sId = (data['siteId'] ?? '').toString();
+      final sName = (data['siteName'] ?? '').toString();
+      final existingKey = findMatchingKey(sId, doc.id, sName);
+      if (existingKey != null) {
+        unifiedMap[existingKey]!.addAll(data);
+      } else {
+        unifiedMap[doc.id] = data;
+      }
+    }
+
+    // 2. Ingest / Merge projects collection docs
+    for (var doc in projectDocs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['projectDocId'] = doc.id;
+      final sId = (data['siteId'] ?? data['site'] ?? '').toString();
+      final sName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+      final existingKey = findMatchingKey(sId, doc.id, sName);
+      if (existingKey != null) {
+        data.forEach((k, v) {
+          if (v != null) {
+            unifiedMap[existingKey]![k] = v;
+          }
+        });
+      } else {
+        unifiedMap[sId.isNotEmpty ? sId : doc.id] = data;
+      }
+    }
+
+    // 3. Ingest / Merge siteSupervisorMap collection docs
+    for (var doc in supervisorDocs) {
+      final data = doc.data();
+      final sId = (data['siteId'] ?? data['site'] ?? '').toString();
+      final sName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+      final existingKey = findMatchingKey(sId, doc.id, sName);
+      final target = existingKey != null ? unifiedMap[existingKey] : null;
+
+      if (target != null) {
+        final sSupervisor = data['supervisor'] ?? data['supervisorName'];
+        if (sSupervisor != null && target['supervisor'] == null) {
+          target['supervisor'] = sSupervisor;
+        }
+        if (data['projectBudget'] != null && (target['projectBudget'] == null || target['projectBudget'] == 0)) {
+          target['projectBudget'] = data['projectBudget'];
+        }
+        if (data['amountSpent'] != null && target['amountSpent'] == null) {
+          target['amountSpent'] = data['amountSpent'];
+        }
+        if (data['amountPaid'] != null && (target['amountPaid'] == null || target['amountPaid'] == 0)) {
+          target['amountPaid'] = data['amountPaid'];
+        }
+        if (data['amountBalance'] != null && target['amountBalance'] == null) {
+          target['amountBalance'] = data['amountBalance'];
+        }
+      }
+    }
+
+    return unifiedMap;
+  }
+
+  DateTime? _parseFlexibleDate(dynamic val) {
+    if (val == null) return null;
+    if (val is Timestamp) return val.toDate();
+    if (val is DateTime) return val;
+    if (val is String && val.trim().isNotEmpty) {
+      final s = val.trim();
+      final parsed = DateTime.tryParse(s);
+      if (parsed != null) return parsed;
+      try {
+        return DateFormat('yyyy-MM-dd').parseLoose(s);
+      } catch (_) {}
+      try {
+        return DateFormat('dd-MM-yyyy').parseLoose(s);
+      } catch (_) {}
+      try {
+        return DateFormat('dd/MM/yyyy').parseLoose(s);
+      } catch (_) {}
+      try {
+        return DateFormat('d-M-yyyy').parseLoose(s);
+      } catch (_) {}
+      try {
+        return DateFormat('d/M/yyyy').parseLoose(s);
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  bool _isDateInPeriod(DateTime? docDate, String docDateStr, String period) {
+    final now = DateTime.now();
+    final todayStr1 = DateFormat('yyyy-MM-dd').format(now);
+    final todayStr2 = DateFormat('dd-MM-yyyy').format(now);
+    final todayStr3 = DateFormat('d-M-yyyy').format(now);
+    final todayStr4 = DateFormat('dd/MM/yyyy').format(now);
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final startOfMonth = DateTime(now.year, now.month, 1);
+
+    DateTime? effectiveDate = docDate ?? _parseFlexibleDate(docDateStr);
+
+    if (period == 'Today') {
+      if (docDateStr == todayStr1 ||
+          docDateStr == todayStr2 ||
+          docDateStr == todayStr3 ||
+          docDateStr == todayStr4) {
+        return true;
+      }
+      if (effectiveDate != null) {
+        return effectiveDate.year == now.year &&
+            effectiveDate.month == now.month &&
+            effectiveDate.day == now.day;
+      }
+      return false;
+    } else if (period == 'This Week') {
+      if (effectiveDate != null) {
+        return effectiveDate.isAfter(startOfWeek.subtract(const Duration(seconds: 1)));
+      }
+      return true;
+    } else if (period == 'This Month') {
+      if (effectiveDate != null) {
+        return effectiveDate.isAfter(startOfMonth.subtract(const Duration(seconds: 1)));
+      }
+      return true;
+    }
+    return true; // 'All Time'
+  }
 }
 

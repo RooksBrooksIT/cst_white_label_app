@@ -5,6 +5,7 @@ import 'package:demo_cst/screens/organization/organization_insights_screen.dart'
 import 'package:demo_cst/screens/reports/project_financial_status_report_page.dart';
 import 'package:demo_cst/screens/reports/site_status_report.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/widgets/bottom_nav.dart';
 
 class InsightsDashboard extends StatelessWidget {
   const InsightsDashboard({super.key});
@@ -22,6 +23,8 @@ class InsightsDashboard extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
+      extendBody: true,
+      bottomNavigationBar: const BottomNav(currentIndex: 3),
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
@@ -51,6 +54,7 @@ class InsightsDashboard extends StatelessWidget {
         ),
       ),
       body: SafeArea(
+        bottom: false,
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
@@ -59,9 +63,11 @@ class InsightsDashboard extends StatelessWidget {
             ),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: isMobile ? 16 : 24,
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                isMobile ? 16 : 24,
+                horizontalPadding,
+                100,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -76,177 +76,239 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      final username = _usernameController.text.trim();
-      final password = _passwordController.text.trim();
+      final cleanInput = _usernameController.text.trim();
+      final cleanLower = cleanInput.toLowerCase();
+      final cleanPass = _passwordController.text.trim();
 
-      // 1. Search for organization credentials in 'admin' or 'data' collections
-      // Strictly filtered to documents belonging to the CST White Label application
-      QuerySnapshot<Map<String, dynamic>>? userQuery;
-
-      // Try 'admin' collection group first
-      userQuery = await FirebaseFirestore.instance
-          .collectionGroup('admin')
-          .where('username', isEqualTo: username)
-          .get();
-
-      QueryDocumentSnapshot<Map<String, dynamic>>? dataDoc;
-
-      if (userQuery.docs.isNotEmpty) {
-        for (var doc in userQuery.docs) {
-          if (doc.id == 'data' || doc.id == 'admin') {
-            final data = doc.data();
-            final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-            final orgDocId = doc.reference.parent.parent?.id ?? '';
-            if (appId == FirestoreService.cstAppId || FirestoreService.isCstOrgId(orgDocId) || data['is_cst_app'] == true) {
-              dataDoc = doc;
-              break;
-            }
-          }
-        }
-      }
-
-      // If not found, try 'data' collection group
-      if (dataDoc == null) {
-        userQuery = await FirebaseFirestore.instance
-            .collectionGroup('data')
-            .where('username', isEqualTo: username)
-            .get();
-
-        if (userQuery.docs.isNotEmpty) {
-          for (var doc in userQuery.docs) {
-            if (doc.id == 'admin' || doc.id == 'data') {
-              final data = doc.data();
-              final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-              final orgDocId = doc.reference.parent.parent?.id ?? '';
-              if (appId == FirestoreService.cstAppId || FirestoreService.isCstOrgId(orgDocId) || data['is_cst_app'] == true) {
-                dataDoc = doc;
-                break;
-              }
-            }
-          }
-        }
+      // Fetch all organisation documents (single roundtrip, no composite index needed)
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs = [];
+      try {
+        final orgsSnapshot =
+            await FirebaseFirestore.instance.collection('organisation').get();
+        orgDocs = orgsSnapshot.docs;
+      } catch (e) {
+        debugPrint('Organisation_LoginPage: Root fetch note: $e');
       }
 
       Map<String, dynamic>? userData;
       String? dynamicPath;
       String? fullConfigPath;
 
-      if (dataDoc != null) {
-        userData = dataDoc.data();
-        dynamicPath = dataDoc.reference.parent.parent?.id ?? 'uninitialized';
-        fullConfigPath = dataDoc.reference.path;
-      } else {
-        // FALLBACK: Check root organisation collection for CST accounts
-        final legacyQuery = await FirebaseFirestore.instance
-            .collection('organisation')
-            .where('username', isEqualTo: username)
-            .get();
+      // Strategy A: Check in fetched orgDocs (Instant, zero index needed)
+      for (var doc in orgDocs) {
+        final data = doc.data();
+        final docEmail = (data['email'] ?? data['Email'] ?? data['emailId'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final docUser = (data['username'] ?? data['UserName'] ?? data['userName'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final docPhone = (data['phone'] ??
+                data['MobileNumber'] ??
+                data['phone_number'] ??
+                data['phoneNumber'] ??
+                '')
+            .toString()
+            .trim();
+        final docOrgName = (data['org_name'] ?? data['orgName'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final docId = doc.id.toLowerCase();
 
-        for (var legacyDoc in legacyQuery.docs) {
-          final data = legacyDoc.data();
-          final appId = (data['app_id'] ?? data['appId'] ?? '').toString();
-          if (appId == FirestoreService.cstAppId || FirestoreService.isCstOrgId(legacyDoc.id) || data['is_cst_app'] == true) {
-            userData = data;
-            dynamicPath = legacyDoc.id;
-            fullConfigPath = legacyDoc.reference.path;
-            debugPrint(
-              'Organisation_LoginPage: Logged in via CST root fallback for $username',
-            );
-            break;
-          }
+        if (docEmail == cleanLower ||
+            docUser == cleanLower ||
+            docUser == cleanInput ||
+            docPhone == cleanInput ||
+            docId == cleanLower ||
+            docId == 'cst_$cleanLower' ||
+            (cleanLower.isNotEmpty && docOrgName == cleanLower)) {
+          userData = data;
+          dynamicPath = doc.id;
+          fullConfigPath = doc.reference.path;
+          break;
         }
       }
 
-      if (userData != null) {
-        final String email = (userData['email'] ?? '').toString();
-        final String? storedOrgName = (userData['org_name'] ?? userData['orgName']) as String?;
-
-        if (email != null && email.isNotEmpty) {
-          // Authenticate with Firebase Authentication
+      // Strategy B: If matched org root or need to check data/admin & organizationUser
+      if (userData != null && dynamicPath != null) {
+        try {
+          final adminDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(dynamicPath)
+              .collection('data')
+              .doc('admin')
+              .get();
+          if (adminDoc.exists && adminDoc.data() != null) {
+            userData = {...userData, ...adminDoc.data()!};
+            fullConfigPath = adminDoc.reference.path;
+          }
+        } catch (_) {}
+      } else {
+        // Deep search inside each organisation subcollection
+        for (var doc in orgDocs) {
           try {
-            await AuthService().loginWithEmail(email, password);
+            final adminDoc =
+                await doc.reference.collection('data').doc('admin').get();
+            if (adminDoc.exists && adminDoc.data() != null) {
+              final aData = adminDoc.data()!;
+              final aEmail = (aData['email'] ?? '').toString().trim().toLowerCase();
+              final aUser = (aData['username'] ?? '').toString().trim().toLowerCase();
+              final aPhone =
+                  (aData['phone'] ?? aData['MobileNumber'] ?? '').toString().trim();
+              if (aEmail == cleanLower || aUser == cleanLower || aPhone == cleanInput) {
+                userData = aData;
+                dynamicPath = doc.id;
+                fullConfigPath = adminDoc.reference.path;
+                break;
+              }
+            }
 
-            // Sync password in Firestore if it was reset via email
-            if (userData['password'] != password) {
-              final WriteBatch batch = FirebaseFirestore.instance.batch();
+            final userDoc =
+                await doc.reference.collection('organizationUser').doc(cleanLower).get();
+            if (userDoc.exists && userDoc.data() != null) {
+              userData = userDoc.data();
+              dynamicPath = doc.id;
+              fullConfigPath = userDoc.reference.path;
+              break;
+            }
+          } catch (_) {}
+        }
+      }
 
-              // Update the admin/data or data/admin document
-              batch.update(FirebaseFirestore.instance.doc(fullConfigPath!), {
-                'password': password,
-              });
+      // Strategy C: Direct doc ID fallback
+      if (userData == null) {
+        try {
+          final directDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(cleanInput)
+              .get();
+          if (directDoc.exists && directDoc.data() != null) {
+            userData = directDoc.data();
+            dynamicPath = directDoc.id;
+            fullConfigPath = directDoc.reference.path;
+          } else {
+            final cstDoc = await FirebaseFirestore.instance
+                .collection('organisation')
+                .doc('cst_$cleanInput')
+                .get();
+            if (cstDoc.exists && cstDoc.data() != null) {
+              userData = cstDoc.data();
+              dynamicPath = cstDoc.id;
+              fullConfigPath = cstDoc.reference.path;
+            }
+          }
+        } catch (_) {}
+      }
 
-              // Also update the organizationUser collection entry for this admin
-              if (dynamicPath != null && dynamicPath != 'uninitialized') {
-                final userDocRef = FirebaseFirestore.instance
+      if (userData == null) {
+        _showError('No account found for "$cleanInput". Please check your credentials.');
+        return;
+      }
+
+      final String storedPassword =
+          (userData['password'] ?? userData['Password'] ?? '').toString().trim();
+      final String email =
+          (userData['email'] ?? userData['Email'] ?? '').toString().trim();
+      final String actualUsername =
+          (userData['username'] ?? userData['UserName'] ?? cleanInput).toString().trim();
+      final String? storedOrgName =
+          (userData['org_name'] ?? userData['orgName']) as String?;
+
+      bool isPasswordValid = false;
+
+      // 1. Direct Password Match (Primary)
+      if (storedPassword.isNotEmpty && storedPassword == cleanPass) {
+        isPasswordValid = true;
+      }
+
+      // 2. Firebase Auth login attempt
+      if (email.isNotEmpty) {
+        try {
+          await AuthService().loginWithEmail(email, cleanPass);
+          isPasswordValid = true;
+
+          // Sync password in Firestore if it was changed
+          if (storedPassword != cleanPass && fullConfigPath != null) {
+            final WriteBatch batch = FirebaseFirestore.instance.batch();
+            batch.update(FirebaseFirestore.instance.doc(fullConfigPath), {
+              'password': cleanPass,
+            });
+            if (dynamicPath != null && dynamicPath != 'uninitialized') {
+              batch.update(
+                FirebaseFirestore.instance
                     .collection('organisation')
                     .doc(dynamicPath)
                     .collection('organizationUser')
-                    .doc(username);
-
-                batch.update(userDocRef, {'password': password});
-              }
-
-              await batch.commit();
-              debugPrint(
-                'Firestore passwords synced with Firebase Auth in both locations',
+                    .doc(actualUsername),
+                {'password': cleanPass},
+              );
+              batch.update(
+                FirebaseFirestore.instance
+                    .collection('organisation')
+                    .doc(dynamicPath),
+                {'password': cleanPass},
               );
             }
-          } catch (e) {
-            _showError('The username or password you entered is incorrect');
-            return;
+            await batch.commit().catchError((_) {});
           }
-        } else {
-          // FALLBACK: If email is missing (legacy accounts), validate password manually
-          if (userData['password'] != password) {
-            _showError('Invalid username or password');
-            return;
-          }
+        } catch (authErr) {
+          debugPrint('Organisation_LoginPage: Firebase Auth note: $authErr');
         }
+      }
 
-        final String? referralCode = userData['referralCode']?.toString() ??
-            userData['orgReferralCode']?.toString();
+      if (!isPasswordValid) {
+        _showError('The password you entered is incorrect');
+        return;
+      }
 
-        // Write organization info to AuthService
-        await AuthService().login(UserRole.organization, {
-          'username': username,
-          'dynamicPath': dynamicPath,
-          'org_name': storedOrgName,
-          'org_doc_path': fullConfigPath,
-          if (referralCode != null && referralCode.isNotEmpty) 'referral_code': referralCode,
-        });
+      final String? referralCode = userData['referralCode']?.toString() ??
+          userData['orgReferralCode']?.toString();
 
-        // Refresh FirestoreService cache
-        await FirestoreService.initialize();
+      // Write organization info to AuthService
+      await AuthService().login(UserRole.organization, {
+        'username': actualUsername,
+        'dynamicPath': dynamicPath,
+        'org_name': storedOrgName,
+        'org_doc_path': fullConfigPath,
+        if (referralCode != null && referralCode.isNotEmpty) 'referral_code': referralCode,
+      });
 
-        // Synchronize branding details
-        await AppTheme.syncWithFirestore(dynamicPath ?? 'uninitialized');
+      // Refresh FirestoreService cache
+      await FirestoreService.initialize();
 
-        // Save FCM token for push notifications
-        await NotificationService.saveToken(
-          userId: username,
-          userType: 'organisation',
-          userName: username,
-        );
+      // Synchronize branding details
+      if (dynamicPath != null && dynamicPath != 'uninitialized') {
+        try {
+          await AppTheme.syncWithFirestore(dynamicPath);
+        } catch (_) {}
+      }
 
-        if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  const PortalLoadingScreen(
-                expectedRole: UserRole.organization,
-                initialStatusMessage: 'Loading your dashboard…',
-              ),
-              transitionDuration: const Duration(milliseconds: 300),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
+      // Save FCM token for push notifications
+      await NotificationService.saveToken(
+        userId: actualUsername,
+        userType: 'organisation',
+        userName: actualUsername,
+      );
+
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const PortalLoadingScreen(
+              expectedRole: UserRole.organization,
+              initialStatusMessage: 'Loading your dashboard…',
             ),
-            (route) => false,
-          );
-        }
-      } else {
-        _showError('Invalid username or password');
+            transitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
+          (route) => false,
+        );
       }
     } catch (e) {
       debugPrint('Login error: $e');

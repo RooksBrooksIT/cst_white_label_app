@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/organization/org_sites_list_page.dart';
-import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
+import 'package:demo_cst/screens/organization/org_finance_page.dart';
 import 'package:demo_cst/screens/reports/insights_dashboard.dart';
 import 'package:demo_cst/screens/organization/org_menu_screen.dart';
 
@@ -62,7 +62,7 @@ class BottomNav extends StatelessWidget {
         destinationPage = const OrgSitesListPage();
         break;
       case 2:
-        destinationPage = const SitePaymentScreen();
+        destinationPage = const OrgFinancePage();
         break;
       case 3:
         destinationPage = InsightsDashboard();
