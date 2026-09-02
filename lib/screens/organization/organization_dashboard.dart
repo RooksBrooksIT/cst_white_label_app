@@ -9,8 +9,9 @@ import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
 import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
 import 'package:demo_cst/screens/organization/organization_expenses.dart';
-import 'package:demo_cst/screens/reports/tools_inventory_report.dart';
 import 'package:demo_cst/screens/manager/manager_approval_screen.dart';
+import 'package:demo_cst/screens/manager/config_material_information.dart';
+import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
 import 'package:demo_cst/screens/organization/org_notification_page.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/responsive.dart';
@@ -90,15 +91,38 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   Future<void> _loadUserData() async {
     final userData = AuthService().userData;
     final fbUser = FirebaseAuth.instance.currentUser;
-    setState(() {
-      final name = userData['org_name'] ??
-          userData['username'] ??
-          userData['name'] ??
-          fbUser?.displayName ??
-          '';
-      _userName = name.toString();
-      _userRole = userData['role'] ?? 'Organization Head';
-    });
+    String name = (userData['username'] ??
+            userData['name'] ??
+            userData['userName'] ??
+            fbUser?.displayName ??
+            userData['org_name'] ??
+            userData['orgName'] ??
+            '')
+        .toString()
+        .trim();
+
+    if (name.isEmpty) {
+      try {
+        final adminDoc = await FirestoreService.orgDataDoc.get();
+        if (adminDoc.exists) {
+          final data = adminDoc.data();
+          name = (data?['username'] ??
+                  data?['name'] ??
+                  data?['userName'] ??
+                  data?['org_name'] ??
+                  '')
+              .toString()
+              .trim();
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() {
+        _userName = name.isNotEmpty ? name : 'User';
+        _userRole = userData['role'] ?? 'Organization Head';
+      });
+    }
   }
 
   String _formatCurrency(num value) {
@@ -306,7 +330,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  _userName.isNotEmpty ? _userName : 'Organization',
+                  _userName.isNotEmpty ? _userName : 'User',
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
@@ -434,7 +458,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ),
                   child: Center(
                     child: Text(
-                      _userName.isNotEmpty ? _userName[0].toUpperCase() : 'O',
+                      _userName.isNotEmpty ? _userName[0].toUpperCase() : 'U',
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
@@ -1403,12 +1427,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     return InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const ManagerApprovalScreen(),
-          ),
-        );
+        _showApprovalsSelectionSheet(context, primaryColor);
       },
       borderRadius: BorderRadius.circular(22),
       child: Container(
@@ -1855,15 +1874,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               // 3. Approvals
               _buildConstructionActionCard(
                 title: 'Approvals',
-                subtitle: 'Stage authorizations',
+                subtitle: 'Materials, tools & payments',
                 icon: Icons.fact_check_rounded,
                 accentColor: const Color(0xFFD97706),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ManagerApprovalScreen(),
-                  ),
-                ),
+                onTap: () => _showApprovalsSelectionSheet(context, primaryColor),
               ),
 
               // 4. Material Req.
@@ -1880,13 +1894,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ),
               ),
 
-              // 5. Tool Movement
+              // 5. Materials & Tools Movement
               _buildConstructionActionCard(
-                title: 'Tool Movement',
-                subtitle: 'Equipment & inventory',
-                icon: Icons.construction_rounded,
+                title: 'Materials & Tools Movement',
+                subtitle: 'Material & tool transfers',
+                icon: Icons.swap_horiz_rounded,
                 accentColor: const Color(0xFF0D9488),
-                onTap: () => _navigateToToolsInventory(context),
+                onTap: () => _showMovementSelectionSheet(context, primaryColor),
               ),
 
               // 6. Manager Config
@@ -2013,13 +2027,13 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 14.5,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF0F172A),
                     letterSpacing: -0.3,
-                    height: 1.2,
+                    height: 1.15,
                   ),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
@@ -2039,6 +2053,350 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
           ],
         ),
       ),
+    );
+  }
+
+  // -------------------- ACTION MODAL BOTTOM SHEETS --------------------
+
+  void _showApprovalsSelectionSheet(BuildContext context, Color primaryColor) {
+    HapticFeedback.mediumImpact();
+    _showActionOptionsBottomSheet(
+      context: context,
+      title: 'Approvals',
+      badgeIcon: Icons.fact_check_rounded,
+      badgeColor: const Color(0xFFD97706),
+      subtitle: 'Select an approval workflow to manage',
+      options: [
+        _ActionOptionItem(
+          title: 'Material Approvals',
+          subtitle: 'Review & authorize site material requests',
+          icon: Icons.inventory_2_rounded,
+          accentColor: const Color(0xFFE11D48),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ManagerMaterialApprovalScreen(),
+              ),
+            );
+          },
+        ),
+        _ActionOptionItem(
+          title: 'Tools Approvals',
+          subtitle: 'Review & approve site tool allocations & schedules',
+          icon: Icons.construction_rounded,
+          accentColor: const Color(0xFFD97706),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ManagerApprovalScreen(),
+              ),
+            );
+          },
+        ),
+        _ActionOptionItem(
+          title: 'Site Payment Approvals',
+          subtitle: 'Authorize contractor, vendor & worker payments',
+          icon: Icons.payments_rounded,
+          accentColor: const Color(0xFF2563EB),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const SitePaymentScreen(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _showMovementSelectionSheet(BuildContext context, Color primaryColor) {
+    HapticFeedback.mediumImpact();
+    _showActionOptionsBottomSheet(
+      context: context,
+      title: 'Materials & Tools Movement',
+      badgeIcon: Icons.swap_horiz_rounded,
+      badgeColor: const Color(0xFF0D9488),
+      subtitle: 'Track and transfer materials & tools between sites',
+      options: [
+        _ActionOptionItem(
+          title: 'Materials Movement',
+          subtitle: 'Company to site, site to site & return transfers',
+          icon: Icons.swap_horiz_rounded,
+          accentColor: const Color(0xFF7C3AED),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MaterialInfoScreen(),
+              ),
+            );
+          },
+        ),
+        _ActionOptionItem(
+          title: 'Tools Movement',
+          subtitle: 'Dispatch & return tools across active construction sites',
+          icon: Icons.handyman_rounded,
+          accentColor: const Color(0xFF0D9488),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ToolsMovementPage(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _showActionOptionsBottomSheet({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData badgeIcon,
+    required Color badgeColor,
+    required List<_ActionOptionItem> options,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalContext) {
+        final screenWidth = MediaQuery.of(modalContext).size.width;
+        final isMobile = screenWidth < 600;
+
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? double.infinity : 520,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x29000000),
+                    blurRadius: 30,
+                    offset: Offset(0, -6),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top Drag Handle
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4.5,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Header Row
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              badgeColor.withValues(alpha: 0.18),
+                              badgeColor.withValues(alpha: 0.08),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: badgeColor.withValues(alpha: 0.25),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(badgeIcon, color: badgeColor, size: 22),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => Navigator.pop(modalContext),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Options List
+                  ...options.map((option) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          option.onTap();
+                        },
+                        borderRadius: BorderRadius.circular(18),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 13,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFAFAFC),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: const Color(0xFFE2E8F0),
+                              width: 1.1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      option.accentColor.withValues(alpha: 0.16),
+                                      option.accentColor.withValues(alpha: 0.06),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(13),
+                                  border: Border.all(
+                                    color: option.accentColor.withValues(alpha: 0.22),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    option.icon,
+                                    color: option.accentColor,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      option.title,
+                                      style: const TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0F172A),
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2.5),
+                                    Text(
+                                      option.subtitle,
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF64748B),
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(9),
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
+                                  color: option.accentColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2065,12 +2423,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     MaterialPageRoute(builder: (context) => OrganizationExpenses()),
   );
 
-  void _navigateToToolsInventory(BuildContext context) => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => const ToolsInventoryPage()),
-  );
-
-
   void _navigateToOrgMenu(BuildContext context) => Navigator.push(
     context,
     MaterialPageRoute(
@@ -2078,3 +2430,20 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     ),
   );
 }
+
+class _ActionOptionItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  const _ActionOptionItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.accentColor,
+    required this.onTap,
+  });
+}
+
