@@ -8,6 +8,7 @@ import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/firestore_error_handler.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/screens/common/portal_loading_screen.dart';
 
 class SupervisorLoginPage extends StatefulWidget {
   const SupervisorLoginPage({super.key});
@@ -241,15 +242,15 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(
-                builder: (context) => ContractorEntryPage(
-                  userName: _usernameController.text.trim(),
-                  userDetails: {
-                    'supervisorId': supervisorId,
-                    'contractorName': _selectedSupervisorName!,
-                    'contractorField': contractorField ?? '',
-                  },
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    const PortalLoadingScreen(
+                  expectedRole: UserRole.supervisor,
+                  initialStatusMessage: 'Loading contractor portal…',
                 ),
+                transitionDuration: const Duration(milliseconds: 300),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+                    FadeTransition(opacity: animation, child: child),
               ),
               (route) => false,
             );
@@ -275,12 +276,15 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(
-                builder: (context) => SupervisorDashboard(
-                  supervisorId: supervisorId,
-                  supervisorName: supervisorName,
-                  username: _usernameController.text.trim(),
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    const PortalLoadingScreen(
+                  expectedRole: UserRole.supervisor,
+                  initialStatusMessage: 'Loading supervisor portal…',
                 ),
+                transitionDuration: const Duration(milliseconds: 300),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+                    FadeTransition(opacity: animation, child: child),
               ),
               (route) => false,
             );

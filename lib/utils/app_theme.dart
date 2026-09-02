@@ -17,6 +17,9 @@ class AppTheme {
   // ValueNotifier to broadcast app name changes
   static final ValueNotifier<String> appName = ValueNotifier(defaultAppName);
 
+  // ValueNotifier to broadcast logo URL changes
+  static final ValueNotifier<String> logoUrl = ValueNotifier('');
+
   // Dummy ValueNotifier for backward compatibility
   static final ValueNotifier<ThemeMode> themeMode = ValueNotifier(
     ThemeMode.light,
@@ -124,6 +127,11 @@ class AppTheme {
     if (storedAppName != null && storedAppName.isNotEmpty) {
       appName.value = storedAppName;
     }
+
+    final storedLogoUrl = prefs.getString('logo_url');
+    if (storedLogoUrl != null && storedLogoUrl.isNotEmpty) {
+      logoUrl.value = storedLogoUrl;
+    }
   }
 
   /// Synchronizes branding from Firestore for a given organization.
@@ -153,6 +161,7 @@ class AppTheme {
         final data = finalDoc.data()!;
         final String? newAppName = data['appName'] as String?;
         final String? newColorHex = data['primaryColor'] as String?;
+        final String? newLogoUrl = (data['logoUrl'] ?? data['logo_url']) as String?;
 
         if (newAppName != null && newAppName.isNotEmpty) {
           await updateAppName(newAppName);
@@ -161,6 +170,12 @@ class AppTheme {
         if (newColorHex != null && newColorHex.isNotEmpty) {
           final color = hexToColor(newColorHex);
           await updateTheme(color);
+        }
+
+        if (newLogoUrl != null && newLogoUrl.isNotEmpty) {
+          logoUrl.value = newLogoUrl;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('logo_url', newLogoUrl);
         }
 
         debugPrint(

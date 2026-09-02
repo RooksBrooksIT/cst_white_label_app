@@ -7,11 +7,9 @@ import 'package:demo_cst/screens/common/reset_password_screen.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/screens/organization/organization_dashboard.dart';
-import 'package:demo_cst/screens/organization/org_subscription_page.dart';
-import 'package:demo_cst/screens/organization/pricing_screen.dart';
 import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/utils/firestore_error_handler.dart';
+import 'package:demo_cst/screens/common/portal_loading_screen.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
   const Organisation_LoginPage({super.key});
@@ -48,15 +46,13 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
   Future<void> _checkLoginStatus() async {
     final auth = AuthService();
     if (auth.isLoggedIn && auth.userRole == UserRole.organization) {
-      final orgId = auth.userData['dynamicPath'];
-      if (orgId != null && orgId.toString().isNotEmpty) {
-        await AppTheme.syncWithFirestore(orgId.toString());
-      }
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const OrganizationDashboard(),
+            builder: (context) => const PortalLoadingScreen(
+              expectedRole: UserRole.organization,
+            ),
           ),
         );
       }
@@ -232,23 +228,22 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           userName: username,
         );
 
-        final isSubscriptionValid = await AuthService().checkSubscriptionStatus();
         if (mounted) {
-          if (isSubscriptionValid) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/orgDashboard',
-              (route) => false,
-            );
-          } else {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrganizationSubscriptionPage(),
+          Navigator.pushAndRemoveUntil(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const PortalLoadingScreen(
+                expectedRole: UserRole.organization,
+                initialStatusMessage: 'Loading your dashboard…',
               ),
-              (route) => false,
-            );
-          }
+              transitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+            ),
+            (route) => false,
+          );
         }
       } else {
         _showError('Invalid username or password');
