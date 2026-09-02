@@ -119,80 +119,12 @@ class _SplashScreenState extends State<SplashScreen>
       final data = auth.userData;
       switch (auth.userRole) {
         case UserRole.organization:
-          final orgId = data['dynamicPath'] ?? data['orgId'];
-          bool isPaymentPending = false;
-          if (orgId != null && orgId.toString().isNotEmpty) {
-            try {
-              final subDoc = await FirebaseFirestore.instance
-                  .collection('organisation')
-                  .doc(orgId.toString())
-                  .collection('data')
-                  .doc('subscription')
-                  .get();
-              final subData = subDoc.data();
-              if (subData != null &&
-                  subData['isSubscriptionActive'] != true &&
-                  (subData['onboardingStep'] == 'PAYMENT_PENDING' ||
-                      subData['subscriptionPlan'] == 'Pending Selection')) {
-                isPaymentPending = true;
-              }
-            } catch (_) {}
-          }
-
-          if (isPaymentPending) {
-            final rootDoc = await FirebaseFirestore.instance
-                .collection('organisation')
-                .doc(orgId.toString())
-                .get();
-            final rootData = rootDoc.data() ?? {};
-            final String effectiveOrgName =
-                rootData['org_name'] ?? data['org_name'] ?? '';
-            final String effectiveAppName =
-                rootData['app_name'] ?? effectiveOrgName;
-            final String themeHex = rootData['theme_color'] ?? '#00A86B';
-            final Color primaryColor = AppTheme.hexToColor(themeHex);
-
-            String dateStr = '';
-            if (orgId != null && orgId.toString().contains('_')) {
-              dateStr = orgId.toString().split('_').last;
-            }
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => PricingScreen(
-                  orgName: effectiveOrgName,
-                  email: (rootData['email'] ?? data['email'] ?? '').toString(),
-                  phone: (rootData['phone'] ?? data['phone'] ?? '').toString(),
-                  username:
-                      (rootData['username'] ?? data['username'] ?? '').toString(),
-                  password:
-                      (rootData['password'] ?? data['password'] ?? '').toString(),
-                  dateStr: dateStr,
-                  appName: effectiveAppName,
-                  selectedColor: primaryColor,
-                ),
-              ),
-            );
-            return;
-          }
-
-          final isSubscriptionValid = await auth.checkSubscriptionStatus();
-          if (isSubscriptionValid) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrganizationDashboard(),
-              ),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrganizationSubscriptionPage(),
-              ),
-            );
-          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const OrganizationDashboard(),
+            ),
+          );
           break;
         case UserRole.manager:
           Navigator.pushReplacement(

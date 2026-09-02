@@ -962,7 +962,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
             children: [
               PdfTemplates.buildMetaBox(
                 'Budget',
-                '₹' NumberFormat('#,##,###').format(budget),
+                '₹${NumberFormat('#,##,###').format(budget)}',
                 pdfPrimaryColor,
               ),
               PdfTemplates.buildMetaBox(

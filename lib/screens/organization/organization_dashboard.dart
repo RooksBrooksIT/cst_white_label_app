@@ -41,8 +41,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   void initState() {
     super.initState();
     _loadUserData();
-    _checkSubscription();
-    _startSubscriptionListener();
   }
 
   String _getGreeting() {
@@ -68,44 +66,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       _userName = name.toString();
       _userRole = userData['role'] ?? 'Organization Head';
     });
-  }
-
-  void _startSubscriptionListener() {
-    _subscriptionListener = FirestoreService.subscriptionDoc.snapshots().listen(
-      (snapshot) {
-        if (snapshot.exists && mounted) {
-          final data = snapshot.data()!;
-          final isActive = data['isSubscriptionActive'] as bool? ?? true;
-          final endDate = data['subscriptionEndDate'] as Timestamp?;
-          bool isExpired = false;
-          if (endDate != null) {
-            isExpired = DateTime.now().isAfter(
-              endDate.toDate().add(const Duration(hours: 1)),
-            );
-          }
-          if (!isActive || isExpired) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OrganizationSubscriptionPage(),
-              ),
-            );
-          }
-        }
-      },
-    );
-  }
-
-  Future<void> _checkSubscription() async {
-    final isValid = await AuthService().checkSubscriptionStatus();
-    if (!isValid && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const OrganizationSubscriptionPage(),
-        ),
-      );
-    }
   }
 
   String _formatCurrency(num value) {
