@@ -14,6 +14,7 @@ import 'package:demo_cst/screens/supervisor/supervisor_work_schedule_page.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_view_request_screen.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_worker_att_page.dart';
 import 'package:demo_cst/screens/supervisor/material_at_site_entry_page.dart';
+import 'package:demo_cst/screens/supervisor/tools_at_site_page.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_material_information.dart';
 import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
 import 'package:demo_cst/screens/common/construction_documents.dart';
@@ -1227,6 +1228,21 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               context,
               MaterialPageRoute(
                 builder: (context) => MaterialAtSiteEntryPage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Tools at Site',
+            subtitle: 'Live tool stock available at site',
+            icon: Icons.home_repair_service_rounded,
+            color: const Color(0xFF06B6D4),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ToolsAtSitePage(
                   supervisorId: widget.supervisorId,
                   supervisorName: widget.supervisorName,
                 ),

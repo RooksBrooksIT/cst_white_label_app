@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/material_inventory_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/screens/manager/material_inventory_details.dart';
 
@@ -94,288 +93,21 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
   Future<void> _loadInventoryData() async {
     setState(() => _dataState = DataState.loading);
     try {
-      if (!FirestoreService.isReady) {
-        await FirestoreService.initialize();
-      }
+      final items = await MaterialInventoryService.fetchAllMaterialsInventory();
 
-      // 1. Fetch materials, availability, company, and site collections in parallel
-      final results = await Future.wait([
-        FirestoreService.getCollection('materials').get(),
-        FirestoreService.materialCategories.get(),
-        FirestoreService.getCollection('materialsavailablity').get(),
-        FirestoreService.getCollection('materialsavailability').get(),
-        FirestoreService.getCollection('materialsAtCompany').get(),
-        FirestoreService.getCollection('materialatsite').get(),
-        FirestoreService.getCollection('materialsAtSite').get(),
-        FirestoreService.getCollection('materialsInventory').get(),
-        FirestoreService.getCollection('Site').get(),
-        FirestoreService.projects.get(),
-      ]);
-
-      final masterDocs = results[0].docs;
-      final catDocs = results[1].docs;
-      final availDocs1 = results[2].docs;
-      final availDocs2 = results[3].docs;
-      final compDocs = results[4].docs;
-      final matAtSiteDocs = results[5].docs;
-      final atSiteDocs = results[6].docs;
-      final invDocs = results[7].docs;
-      final siteDocs = results[8].docs;
-
-      // Fetch siteMaterials subcollections in parallel for all sites
-      List<QuerySnapshot<Map<String, dynamic>>> siteMaterialsSnaps = [];
-      try {
-        siteMaterialsSnaps = await Future.wait(
-          siteDocs.map((s) => FirestoreService.getCollection('siteMaterials').doc(s.id).collection('materials').get()),
+      final list = items.map((item) {
+        return MaterialInventorySummary(
+          materialName: item.displayName.isNotEmpty ? item.displayName : item.materialName,
+          category: item.category,
+          subCategory: item.subCategory,
+          unit: item.unit,
+          code: item.materialId.isNotEmpty ? item.materialId : item.docId,
+          price: item.unitPrice,
+          atCompany: item.companyAvailableCount.toDouble(),
+          atSite: item.totalSiteStock.toDouble(),
+          siteBreakdown: item.siteBreakdownMap,
         );
-      } catch (e) {
-        debugPrint('Error fetching siteMaterials subcollections: $e');
-      }
-
-      final Map<String, MaterialInventorySummary> summaryMap = {};
-
-      String normalize(String s) => s.trim().toLowerCase();
-
-      // 1. Ingest Master Materials from 'materials' collection
-      for (var doc in masterDocs) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['matName'] ?? data['name'] ?? doc.id).toString().trim();
-        if (name.isEmpty) continue;
-
-        final key = normalize(name);
-        final cat = (data['materialCategory'] ?? data['matCategory'] ?? data['category'] ?? 'Raw Material').toString().trim();
-        final subCat = (data['materialSubCategory'] ?? data['matSubCategory'] ?? data['subCategory'] ?? '').toString().trim();
-        final unit = (data['materialUnit'] ?? data['matUnit'] ?? data['unit'] ?? 'Units').toString().trim();
-        final code = (data['materialId'] ?? data['code'] ?? doc.id).toString().trim();
-        final price = _parseNum(data['unitPrice'] ?? data['materialPrice'] ?? data['price']);
-        final directCount = _parseNum(data['availableCount'] ?? data['count']);
-
-        summaryMap[key] = MaterialInventorySummary(
-          materialName: name,
-          category: cat.isNotEmpty ? cat : 'Raw Material',
-          subCategory: subCat,
-          unit: unit.isNotEmpty ? unit : 'Units',
-          code: code,
-          price: price,
-          atCompany: directCount,
-          atSite: 0.0,
-          siteBreakdown: {},
-        );
-      }
-
-      // 2. Ingest Categories from 'materialCategories' (fallback)
-      for (var doc in catDocs) {
-        final data = doc.data();
-        final name = (data['matCategory'] ?? data['materialName'] ?? doc.id).toString().trim();
-        if (name.isEmpty) continue;
-        final key = normalize(name);
-        if (!summaryMap.containsKey(key)) {
-          summaryMap[key] = MaterialInventorySummary(
-            materialName: name,
-            category: (data['categoryGroup'] ?? data['category'] ?? name).toString().trim(),
-            subCategory: '',
-            unit: (data['unit'] ?? 'Units').toString().trim(),
-            code: doc.id,
-            price: 0.0,
-            atCompany: 0.0,
-            atSite: 0.0,
-            siteBreakdown: {},
-          );
-        }
-      }
-
-      // Helper to find or create matching item in summaryMap
-      MaterialInventorySummary getOrCreateItem(String rawName, String fallbackDocId) {
-        final norm = normalize(rawName);
-        if (summaryMap.containsKey(norm)) return summaryMap[norm]!;
-
-        for (var existingKey in summaryMap.keys) {
-          if (norm == existingKey ||
-              norm.startsWith('${existingKey}_') ||
-              existingKey.startsWith('${norm}_')) {
-            return summaryMap[existingKey]!;
-          }
-        }
-
-        final newItem = MaterialInventorySummary(
-          materialName: rawName,
-          category: 'General Material',
-          subCategory: '',
-          unit: 'Units',
-          code: fallbackDocId,
-          price: 0.0,
-          atCompany: 0.0,
-          atSite: 0.0,
-          siteBreakdown: {},
-        );
-        summaryMap[norm] = newItem;
-        return newItem;
-      }
-
-      // 3. Ingest Company Stock from 'materialsavailablity' & 'materialsavailability'
-      final allAvailDocs = [...availDocs1, ...availDocs2];
-      final Map<String, Map<String, dynamic>> latestAvailMap = {};
-
-      for (var doc in allAvailDocs) {
-        final data = doc.data();
-        String matName = (data['materialName'] ?? data['materialname'] ?? data['matName'] ?? data['name'] ?? '').toString().trim();
-
-        if (matName.isEmpty) {
-          final idParts = doc.id.split('_');
-          if (idParts.length >= 2 && idParts.last.contains('-')) {
-            matName = idParts.sublist(0, idParts.length - 1).join('_');
-          } else {
-            matName = doc.id;
-          }
-        }
-
-        final count = _parseNum(data['count'] ?? data['availableCount'] ?? data['quantity']);
-        final tsMs = _extractMillis(data['lastupdated'] ?? data['lastUpdated'] ?? data['updatedAt'] ?? data['createdAt'] ?? data['timestamp']);
-
-        final item = getOrCreateItem(matName, doc.id);
-        final itemKey = normalize(item.materialName);
-
-        if (!latestAvailMap.containsKey(itemKey) || tsMs >= (latestAvailMap[itemKey]!['ts'] as int)) {
-          latestAvailMap[itemKey] = {
-            'count': count,
-            'ts': tsMs,
-          };
-        }
-      }
-
-      // Apply latest availability counts
-      latestAvailMap.forEach((key, val) {
-        if (summaryMap.containsKey(key)) {
-          final current = summaryMap[key]!;
-          final count = (val['count'] as num).toDouble();
-          summaryMap[key] = current.copyWith(
-            atCompany: count > 0 ? count : current.atCompany,
-          );
-        }
-      });
-
-      // 4. Ingest fallback 'materialsAtCompany'
-      for (var doc in compDocs) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['name'] ?? doc.id).toString().trim();
-        if (name.isNotEmpty) {
-          final item = getOrCreateItem(name, doc.id);
-          final key = normalize(item.materialName);
-          final qty = _parseNum(data['quantity'] ?? data['availableCount']);
-          if (qty > 0 && (summaryMap[key]?.atCompany ?? 0) == 0) {
-            summaryMap[key] = summaryMap[key]!.copyWith(atCompany: qty);
-          }
-        }
-      }
-
-      // 5. Ingest Site Stock from 'materialatsite'
-      for (var doc in matAtSiteDocs) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['materialname'] ?? data['name'] ?? '').toString().trim();
-        final sId = (data['siteid'] ?? data['siteId'] ?? data['site'] ?? '').toString().trim();
-        final qty = _parseNum(data['count'] ?? data['availableCount'] ?? data['quantity']);
-
-        if (name.isNotEmpty && qty > 0) {
-          final item = getOrCreateItem(name, doc.id);
-          final key = normalize(item.materialName);
-          final current = summaryMap[key]!;
-          final breakdown = Map<String, double>.from(current.siteBreakdown);
-          final targetSiteId = sId.isNotEmpty ? sId : 'Site';
-          breakdown.update(targetSiteId, (prev) => prev + qty, ifAbsent: () => qty);
-
-          summaryMap[key] = current.copyWith(
-            atSite: breakdown.values.fold<double>(0.0, (acc, q) => acc + q),
-            siteBreakdown: breakdown,
-          );
-        }
-      }
-
-      // 6. Ingest Site Stock from 'materialsAtSite'
-      for (var doc in atSiteDocs) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['name'] ?? '').toString().trim();
-        final sId = (data['siteId'] ?? data['siteid'] ?? data['site'] ?? '').toString().trim();
-        final qty = _parseNum(data['quantity'] ?? data['availableCount'] ?? data['materialQty'] ?? data['count']);
-
-        if (name.isNotEmpty && qty > 0) {
-          final item = getOrCreateItem(name, doc.id);
-          final key = normalize(item.materialName);
-          final current = summaryMap[key]!;
-          final breakdown = Map<String, double>.from(current.siteBreakdown);
-          final targetSiteId = sId.isNotEmpty ? sId : 'Site';
-          final existing = breakdown[targetSiteId] ?? 0.0;
-          if (qty > existing) {
-            breakdown[targetSiteId] = qty;
-            summaryMap[key] = current.copyWith(
-              atSite: breakdown.values.fold<double>(0.0, (acc, q) => acc + q),
-              siteBreakdown: breakdown,
-            );
-          }
-        }
-      }
-
-      // 7. Ingest Site Stock from 'materialsInventory'
-      for (var doc in invDocs) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['name'] ?? doc.id).toString().trim();
-        if (name.isEmpty) continue;
-
-        final item = getOrCreateItem(name, doc.id);
-        final key = normalize(item.materialName);
-        final current = summaryMap[key]!;
-        final breakdown = Map<String, double>.from(current.siteBreakdown);
-
-        final sites = data['sites'];
-        if (sites is List) {
-          for (var s in sites) {
-            if (s is Map<String, dynamic>) {
-              final sId = (s['siteId'] ?? s['siteid'] ?? '').toString().trim();
-              if (sId.isEmpty) continue;
-              final qty = _parseNum(s['materialQty'] ?? s['quantity']);
-              final existing = breakdown[sId] ?? 0.0;
-              if (qty > existing) {
-                breakdown[sId] = qty;
-              }
-            }
-          }
-        }
-
-        summaryMap[key] = current.copyWith(
-          atSite: breakdown.values.fold<double>(0.0, (acc, q) => acc + q),
-          siteBreakdown: breakdown,
-        );
-      }
-
-      // 8. Ingest Site Stock from 'siteMaterials/{siteId}/materials' subcollections
-      for (int i = 0; i < siteDocs.length; i++) {
-        final siteDoc = siteDocs[i];
-        final sId = (siteDoc.data()['siteId'] ?? siteDoc.id).toString().trim();
-        if (i < siteMaterialsSnaps.length) {
-          for (var doc in siteMaterialsSnaps[i].docs) {
-            final data = doc.data();
-            final name = (data['materialName'] ?? data['materialname'] ?? data['displayName'] ?? doc.id).toString().trim();
-            final qty = _parseNum(data['count'] ?? data['availableCount'] ?? data['quantity']);
-            if (name.isNotEmpty && qty > 0) {
-              final item = getOrCreateItem(name, doc.id);
-              final key = normalize(item.materialName);
-              final current = summaryMap[key]!;
-              final breakdown = Map<String, double>.from(current.siteBreakdown);
-              final targetSiteId = sId.isNotEmpty ? sId : 'Site';
-              final existingQty = breakdown[targetSiteId] ?? 0.0;
-              if (qty > existingQty) {
-                breakdown[targetSiteId] = qty;
-                summaryMap[key] = current.copyWith(
-                  atSite: breakdown.values.fold<double>(0.0, (acc, q) => acc + q),
-                  siteBreakdown: breakdown,
-                );
-              }
-            }
-          }
-        }
-      }
-
-      final list = summaryMap.values.toList();
-      list.sort((a, b) => a.materialName.toLowerCase().compareTo(b.materialName.toLowerCase()));
+      }).toList();
 
       if (mounted) {
         setState(() {
@@ -391,27 +123,6 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
         });
       }
     }
-  }
-
-  int _extractMillis(dynamic ts) {
-    if (ts == null) return 0;
-    if (ts is Timestamp) return ts.millisecondsSinceEpoch;
-    if (ts is DateTime) return ts.millisecondsSinceEpoch;
-    if (ts is num) return ts.toInt();
-    if (ts is String) {
-      final parsed = DateTime.tryParse(ts);
-      if (parsed != null) return parsed.millisecondsSinceEpoch;
-    }
-    return 0;
-  }
-
-  double _parseNum(dynamic v) {
-    if (v == null) return 0.0;
-    if (v is num) return v.toDouble();
-    if (v is String) {
-      return double.tryParse(v.replaceAll(RegExp(r'[^0-9.+-]'), '')) ?? 0.0;
-    }
-    return 0.0;
   }
 
   String _formatQty(double val) {

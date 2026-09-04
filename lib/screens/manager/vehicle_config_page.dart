@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/material_inventory_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 import 'package:demo_cst/utils/responsive.dart';
@@ -192,28 +193,16 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   Future<void> _loadMaterials() async {
     try {
-      final snapshot =
-          await FirestoreService.getCollection('materialsavailablity').get();
-      final materials = snapshot.docs.map((doc) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
-        final unit = (data['unit'] ?? '').toString().trim();
+      final items = await MaterialInventoryService.fetchAllMaterialsInventory();
+      final materials = items.map((item) {
         return {
-          'materialName': name,
-          'unit': unit,
+          'materialName': item.displayName.isNotEmpty ? item.displayName : item.materialName,
+          'unit': item.unit,
         };
-      }).where((m) => (m['materialName'] as String).isNotEmpty).toList();
-
-      final unique = <String, Map<String, dynamic>>{};
-      for (final m in materials) {
-        final key = (m['materialName'] as String).toLowerCase();
-        if (!unique.containsKey(key)) {
-          unique[key] = m;
-        }
-      }
+      }).toList();
 
       setState(() {
-        _materials = unique.values.toList();
+        _materials = materials;
       });
     } catch (e) {
       debugPrint('Error loading materials: $e');
@@ -268,25 +257,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       return;
     }
     try {
-      final snap = await FirestoreService.getCollection('materialsavailablity').get();
-      int count = 0;
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
-        if (name.toLowerCase() == materialName.trim().toLowerCase()) {
-          final c = data['count'] ?? data['availableCount'];
-          if (c is int) {
-            count = c;
-          } else if (c is double) {
-            count = c.toInt();
-          } else if (c is String) {
-            count = int.tryParse(c) ?? 0;
-          }
-          break;
-        }
-      }
+      final item = await MaterialInventoryService.fetchMaterialInventory(materialName);
       if (mounted) {
-        setState(() => _materialAvailableCount = count);
+        setState(() => _materialAvailableCount = item?.companyAvailableCount ?? 0);
       }
     } catch (_) {
       if (mounted) {

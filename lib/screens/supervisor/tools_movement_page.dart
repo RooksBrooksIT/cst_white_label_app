@@ -255,6 +255,25 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     }
   }
 
+  /// Safely extracts the clean Site ID (e.g. ST001_shek) from document data, ignoring physical location/address strings
+  String _extractCleanSiteId(Map<String, dynamic> data, String docId) {
+    final location = (data['location'] ?? '').toString().trim();
+    final site = (data['site'] ?? '').toString().trim();
+    final siteId = (data['siteId'] ?? '').toString().trim();
+
+    // Prefer 'site' or 'siteId' if it does not match the full address/location
+    if (site.isNotEmpty && site != location) {
+      return site;
+    }
+    if (siteId.isNotEmpty && siteId != location) {
+      return siteId;
+    }
+    if (docId.isNotEmpty && docId != location) {
+      return docId.trim();
+    }
+    return site.isNotEmpty ? site : (siteId.isNotEmpty ? siteId : docId);
+  }
+
   Future<void> _fetchSitesData() async {
     try {
       final snapshot = await FirestoreService.getCollection('siteSupervisorMap').get();
@@ -263,12 +282,12 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final site = (data['site'] ?? doc.id).toString().trim();
-        if (site.isNotEmpty) {
-          ids.add(site);
-          siteMap[site] = {
+        final sId = _extractCleanSiteId(data, doc.id);
+        if (sId.isNotEmpty) {
+          ids.add(sId);
+          siteMap[sId] = {
             'projectName': (data['projectName'] ?? '').toString(),
-            'supervisor': (data['supervisor'] ?? '').toString(),
+            'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? '').toString(),
           };
         }
       }
@@ -277,20 +296,55 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         final sitesSnapshot = await FirestoreService.getCollection('Site').get();
         for (var doc in sitesSnapshot.docs) {
           final sId = doc.id.trim();
-          if (sId.isNotEmpty && !siteMap.containsKey(sId)) {
+          if (sId.isNotEmpty) {
             final data = doc.data();
-            ids.add(sId);
-            siteMap[sId] = {
-              'projectName': (data['projectName'] ?? data['siteName'] ?? '').toString(),
-              'supervisor': (data['supervisorName'] ?? '').toString(),
-            };
+            final pName = (data['projectName'] ?? data['siteName'] ?? '').toString();
+            final sup = (data['supervisorName'] ?? data['supervisor'] ?? '').toString();
+
+            if (siteMap.containsKey(sId)) {
+              if (siteMap[sId]!['projectName']!.isEmpty && pName.isNotEmpty) {
+                siteMap[sId]!['projectName'] = pName;
+              }
+              if (siteMap[sId]!['supervisor']!.isEmpty && sup.isNotEmpty) {
+                siteMap[sId]!['supervisor'] = sup;
+              }
+            } else {
+              final existingMatch = ids.firstWhere(
+                (existing) => existing == sId || existing.startsWith('${sId}_') || sId.startsWith('${existing}_'),
+                orElse: () => '',
+              );
+              if (existingMatch.isNotEmpty) {
+                if (siteMap[existingMatch]!['projectName']!.isEmpty && pName.isNotEmpty) {
+                  siteMap[existingMatch]!['projectName'] = pName;
+                }
+                if (siteMap[existingMatch]!['supervisor']!.isEmpty && sup.isNotEmpty) {
+                  siteMap[existingMatch]!['supervisor'] = sup;
+                }
+              } else {
+                ids.add(sId);
+                siteMap[sId] = {
+                  'projectName': pName,
+                  'supervisor': sup,
+                };
+              }
+            }
           }
         }
       } catch (_) {}
 
+      // Deduplicate so shorter prefixes like 'ST001' don't duplicate 'ST001_shek'
+      final List<String> rawList = ids.toList();
+      final Set<String> cleanSet = {};
+      for (final id in rawList) {
+        bool hasMoreSpecific = rawList.any((other) => other != id && other.startsWith('${id}_'));
+        if (!hasMoreSpecific) {
+          cleanSet.add(id);
+        }
+      }
+
       if (mounted) {
         setState(() {
-          _siteIds = ids.toList()..sort();
+          _siteIds = cleanSet.toList()..sort();
           _siteDetailsMap = siteMap;
         });
       }
@@ -391,8 +445,22 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
   void _onSiteSelected(String? siteId, bool isReturn) {
     if (siteId == null) return;
     final info = _siteDetailsMap[siteId] ?? {};
-    final projectName = info['projectName'] ?? '';
-    final supervisor = info['supervisor'] ?? '';
+    var projectName = info['projectName'] ?? '';
+    var supervisor = info['supervisor'] ?? '';
+
+    if (projectName.isEmpty || supervisor.isEmpty) {
+      for (final entry in _siteDetailsMap.entries) {
+        final k = entry.key;
+        if (k == siteId || (siteId.contains('_') && k == siteId.split('_').first) || (k.contains('_') && siteId == k.split('_').first)) {
+          if (projectName.isEmpty && (entry.value['projectName'] ?? '').isNotEmpty) {
+            projectName = entry.value['projectName']!;
+          }
+          if (supervisor.isEmpty && (entry.value['supervisor'] ?? '').isNotEmpty) {
+            supervisor = entry.value['supervisor']!;
+          }
+        }
+      }
+    }
 
     setState(() {
       if (isReturn) {
@@ -876,13 +944,6 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Data',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
-            onPressed: _loadInitialData,
-          ),
-        ],
       ),
       body: SafeArea(
         child: Column(
@@ -1097,7 +1158,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: currentSiteId,
+                          value: _siteIds.contains(currentSiteId) ? currentSiteId : null,
                           isExpanded: true,
                           hint: Text(
                             isReturn ? 'Choose site to return from...' : 'Choose site to send tools...',
@@ -1109,12 +1170,10 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                           ),
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
                           items: _siteIds.map((sId) {
-                            final info = _siteDetailsMap[sId] ?? {};
-                            final pName = info['projectName'] ?? '';
                             return DropdownMenuItem<String>(
                               value: sId,
                               child: Text(
-                                pName.isNotEmpty ? '$sId - $pName' : sId,
+                                sId,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 13.5,
@@ -2075,19 +2134,23 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              log['id'] ?? '',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: darkAccent,
+                            Expanded(
+                              child: Text(
+                                log['id'] ?? '',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: darkAccent,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 8),
                             Text(
                               log['date']?.toString().split(' at ').first ?? '',
                               style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF64748B),
                               ),

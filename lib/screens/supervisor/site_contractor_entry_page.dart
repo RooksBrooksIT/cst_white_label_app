@@ -785,7 +785,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
                         Expanded(
                           child: GlassButton(
                             label: 'RESET',
-                            icon: Icons.refresh,
+                            icon: Icons.restart_alt,
                             onPressed: _resetForm,
                             isSecondary: true,
                           ),

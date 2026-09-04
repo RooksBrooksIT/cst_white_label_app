@@ -2,22 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
-class MaterialAtSiteEntryPage extends StatefulWidget {
+class ToolsAtSitePage extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
 
-  const MaterialAtSiteEntryPage({
+  const ToolsAtSitePage({
     super.key,
     required this.supervisorId,
     required this.supervisorName,
   });
 
   @override
-  State<MaterialAtSiteEntryPage> createState() =>
-      _MaterialAtSiteEntryPageState();
+  State<ToolsAtSitePage> createState() => _ToolsAtSitePageState();
 }
 
-class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
+class _ToolsAtSitePageState extends State<ToolsAtSitePage> {
   // Theme helper
   Color get primaryColor => Theme.of(context).colorScheme.primary;
 
@@ -25,16 +24,16 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
   List<String> assignedSiteIds = [];
   String? selectedSiteId;
 
-  // Transferred Materials Inventory state
-  List<Map<String, dynamic>> transferredMaterials = [];
+  // Tools at Site Inventory state
+  List<Map<String, dynamic>> siteTools = [];
   bool isLoadingSites = true;
-  bool isLoadingMaterials = false;
+  bool isLoadingTools = false;
   String? errorMsg;
   String searchQuery = '';
   final TextEditingController searchController = TextEditingController();
 
-  // Selected Material for details popup/card
-  Map<String, dynamic>? selectedMaterialDetail;
+  // Selected Tool for details popup/card
+  Map<String, dynamic>? selectedToolDetail;
 
   @override
   void initState() {
@@ -144,11 +143,11 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         });
 
         if (selectedSiteId != null) {
-          await fetchSiteStockFromMaterialTransfer(selectedSiteId!);
+          await fetchSiteTools(selectedSiteId!);
         }
       }
     } catch (e) {
-      debugPrint('Error fetching assigned sites: $e');
+      debugPrint('Error fetching assigned sites for tools: $e');
       if (mounted) {
         setState(() {
           isLoadingSites = false;
@@ -158,22 +157,21 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     }
   }
 
-  /// Fetches material data directly from `materialTransfer` collection,
-  /// using the selected site's `siteId` (e.g. ST001_shek) to match the entry in `siteInventories` array.
-  Future<void> fetchSiteStockFromMaterialTransfer(String siteId) async {
+  /// Fetches tool stock for the selected site from `toolsInventory` and `tools` master collections.
+  Future<void> fetchSiteTools(String siteId) async {
     final cleanSiteId = siteId.trim();
     if (cleanSiteId.isEmpty) {
       setState(() {
-        transferredMaterials = [];
-        isLoadingMaterials = false;
+        siteTools = [];
+        isLoadingTools = false;
       });
       return;
     }
 
     setState(() {
-      isLoadingMaterials = true;
+      isLoadingTools = true;
       errorMsg = null;
-      selectedMaterialDetail = null;
+      selectedToolDetail = null;
     });
 
     try {
@@ -181,88 +179,201 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         await FirestoreService.initialize();
       }
 
-      // Fetch from materialTransfer collection
-      final transferSnap = await FirestoreService.getCollection('materialTransfer').get();
-      // Also fetch fallback from materialsAvailability
-      final availSnap = await FirestoreService.getCollection('materialsAvailability').get();
+      // 1. Fetch master tools
+      final toolsSnap = await FirestoreService.getCollection('tools').get();
+      final Map<String, Map<String, dynamic>> masterToolsMap = {};
 
-      final Map<String, Map<String, dynamic>> siteMaterialsMap = {};
-
-      final allDocs = [...transferSnap.docs, ...availSnap.docs];
-
-      for (final doc in allDocs) {
+      for (final doc in toolsSnap.docs) {
         final data = doc.data();
-        final matName = (data['materialName'] ?? data['displayName'] ?? doc.id).toString().trim();
-        if (matName.isEmpty) continue;
-        final docKey = matName.toLowerCase();
+        final toolCode = (data['toolCode'] ?? doc.id).toString().trim();
+        final toolName = (data['toolName'] ?? toolCode).toString().trim();
+        final toolId = (data['toolId'] ?? doc.id).toString().trim();
+        final description = (data['description'] ?? '').toString().trim();
+        final toolOwner = (data['toolOwner'] ?? 'Org').toString().trim();
 
-        final rawSites = data['siteInventories'];
-        if (rawSites is! List) continue;
+        final key = toolCode.isNotEmpty ? toolCode.toLowerCase() : doc.id.toLowerCase();
+        masterToolsMap[key] = {
+          'docId': doc.id,
+          'toolId': toolId,
+          'toolCode': toolCode,
+          'toolName': toolName,
+          'description': description,
+          'toolOwner': toolOwner,
+          'unit': (data['unit'] ?? 'Units').toString().trim(),
+        };
+      }
 
-        for (final s in rawSites) {
-          if (s is! Map) continue;
-          final sMap = Map<String, dynamic>.from(s);
-          final sId = (sMap['siteId'] ?? sMap['siteid'] ?? '').toString().trim();
-          final sName = (sMap['siteName'] ?? sMap['sitename'] ?? '').toString().trim();
+      // 2. Fetch tool distribution from toolsInventory
+      final inventorySnap = await FirestoreService.getCollection('toolsInventory').get();
+      final Map<String, Map<String, dynamic>> siteToolsMap = {};
 
-          // Match by siteId or siteName (e.g. ST001_shek) flexibly & case-insensitively
-          final cleanLow = cleanSiteId.toLowerCase();
-          final sIdLow = sId.toLowerCase();
-          final sNameLow = sName.toLowerCase();
+      final cleanLow = cleanSiteId.toLowerCase();
 
-          final bool isMatch = sIdLow == cleanLow ||
-              (sNameLow.isNotEmpty && sNameLow == cleanLow) ||
-              (cleanLow.contains('_') && sIdLow.isNotEmpty && (cleanLow.startsWith('$sIdLow' '_') || cleanLow.endsWith('_$sIdLow'))) ||
-              (cleanLow.contains('_') && sNameLow.isNotEmpty && (cleanLow.startsWith('$sNameLow' '_') || cleanLow.endsWith('_$sNameLow'))) ||
-              (sIdLow.contains('_') && cleanLow.isNotEmpty && (sIdLow.startsWith('$cleanLow' '_') || sIdLow.endsWith('_$cleanLow')));
+      for (final doc in inventorySnap.docs) {
+        final data = doc.data();
+        final toolCode = (data['toolCode'] ?? doc.id).toString().trim();
+        final key = toolCode.isNotEmpty ? toolCode.toLowerCase() : doc.id.toLowerCase();
 
-          if (isMatch) {
-            final availableCount = (sMap['availableCount'] as num?)?.toInt() ??
-                (sMap['count'] as num?)?.toInt() ??
-                (sMap['quantity'] as num?)?.toInt() ??
-                int.tryParse((sMap['availableCount'] ?? sMap['count'] ?? '0').toString()) ??
-                0;
+        int availableCount = 0;
 
-            final unit = (data['unit'] ?? data['materialUnit'] ?? 'Bags').toString().trim();
-            final displayName = (data['displayName'] ?? data['materialName'] ?? matName).toString().trim();
-            final materialId = (data['materialId'] ?? doc.id).toString().trim();
-            final category = (data['category'] ?? data['materialCategory'] ?? '').toString().trim();
-            final companyAvailableCount = (data['companyAvailableCount'] as num?)?.toInt() ?? 0;
-            final totalAvailableCount = (data['totalAvailableCount'] as num?)?.toInt() ?? (companyAvailableCount + availableCount);
+        // Check Map format: availableCountAtSites: { siteId: count }
+        if (data['availableCountAtSites'] is Map) {
+          final sitesMap = Map<String, dynamic>.from(data['availableCountAtSites']);
+          sitesMap.forEach((k, v) {
+            final kLow = k.toString().trim().toLowerCase();
+            final bool isMatch = kLow == cleanLow ||
+                (cleanLow.contains('_') && kLow.isNotEmpty && (cleanLow.startsWith('$kLow' '_') || cleanLow.endsWith('_$kLow'))) ||
+                (kLow.contains('_') && cleanLow.isNotEmpty && (kLow.startsWith('$cleanLow' '_') || kLow.endsWith('_$cleanLow')));
 
-            siteMaterialsMap[docKey] = {
-              'materialId': materialId,
-              'materialName': matName,
-              'displayName': displayName.isNotEmpty ? displayName : matName,
-              'category': category,
-              'unit': unit,
-              'availableCount': availableCount,
-              'siteAvailableCount': availableCount,
-              'companyAvailableCount': companyAvailableCount,
-              'totalAvailableCount': totalAvailableCount,
-              'siteId': sId.isNotEmpty ? sId : cleanSiteId,
-              'projectName': (sMap['projectName'] ?? '').toString(),
-            };
-            break;
+            if (isMatch) {
+              final c = (v as num?)?.toInt() ?? int.tryParse(v.toString()) ?? 0;
+              availableCount += c;
+            }
+          });
+        }
+
+        // Check List format: sites: [{ siteId, count }] or siteInventories: [{ siteId, count }]
+        final rawSitesList = data['sites'] ?? data['siteInventories'];
+        if (rawSitesList is List) {
+          for (var s in rawSitesList) {
+            if (s is! Map) continue;
+            final sMap = Map<String, dynamic>.from(s);
+            final sId = (sMap['siteId'] ?? sMap['siteid'] ?? '').toString().trim().toLowerCase();
+            final sName = (sMap['siteName'] ?? sMap['sitename'] ?? '').toString().trim().toLowerCase();
+
+            final bool isMatch = sId == cleanLow ||
+                (sName.isNotEmpty && sName == cleanLow) ||
+                (cleanLow.contains('_') && sId.isNotEmpty && (cleanLow.startsWith('$sId' '_') || cleanLow.endsWith('_$sId'))) ||
+                (sId.contains('_') && cleanLow.isNotEmpty && (sId.startsWith('$cleanLow' '_') || sId.endsWith('_$cleanLow')));
+
+            if (isMatch) {
+              final c = (sMap['availableCount'] as num?)?.toInt() ??
+                  (sMap['count'] as num?)?.toInt() ??
+                  (sMap['toolCount'] as num?)?.toInt() ??
+                  int.tryParse((sMap['availableCount'] ?? sMap['count'] ?? '0').toString()) ??
+                  0;
+              availableCount += c;
+            }
           }
+        }
+
+        // Get master metadata or use inventory data
+        final master = masterToolsMap[key] ?? {};
+        final toolName = (master['toolName'] ?? data['toolName'] ?? toolCode).toString().trim();
+        final toolId = (master['toolId'] ?? data['toolId'] ?? doc.id).toString().trim();
+        final description = (master['description'] ?? data['description'] ?? '').toString().trim();
+        final toolOwner = (master['toolOwner'] ?? data['toolOwner'] ?? 'Org').toString().trim();
+        final unit = (master['unit'] ?? data['unit'] ?? 'Units').toString().trim();
+
+        if (availableCount > 0) {
+          siteToolsMap[key] = {
+            'toolId': toolId,
+            'toolCode': toolCode,
+            'toolName': toolName,
+            'displayName': toolName,
+            'description': description,
+            'toolOwner': toolOwner,
+            'unit': unit,
+            'availableCount': availableCount,
+            'siteId': cleanSiteId,
+          };
         }
       }
 
-      final list = siteMaterialsMap.values.toList();
+      // Fallback: If toolsInventory is empty or not yet seeded, check toolsMovement dispatches for this site
+      if (siteToolsMap.isEmpty) {
+        try {
+          final movementSnap = await FirestoreService.getCollection('toolsMovement')
+              .where('mtSiteId', isEqualTo: cleanSiteId)
+              .get();
+
+          final Map<String, int> movementCounts = {};
+
+          for (final doc in movementSnap.docs) {
+            final data = doc.data();
+            final toolsList = data['tools'];
+            if (toolsList is List) {
+              for (final t in toolsList) {
+                if (t is Map) {
+                  final tCode = (t['toolCode'] ?? t['toolId'] ?? '').toString().trim();
+                  final tCount = (t['toolCount'] as num?)?.toInt() ?? (t['count'] as num?)?.toInt() ?? 1;
+                  if (tCode.isNotEmpty) {
+                    movementCounts[tCode.toLowerCase()] = (movementCounts[tCode.toLowerCase()] ?? 0) + tCount;
+                  }
+                }
+              }
+            }
+          }
+
+          // Subtract any returns from toolsReturn
+          final returnSnap = await FirestoreService.getCollection('toolsReturn')
+              .where('rfSiteId', isEqualTo: cleanSiteId)
+              .get();
+
+          for (final doc in returnSnap.docs) {
+            final data = doc.data();
+            final toolsList = data['tools'];
+            if (toolsList is List) {
+              for (final t in toolsList) {
+                if (t is Map) {
+                  final tCode = (t['toolCode'] ?? t['toolId'] ?? '').toString().trim();
+                  final tCount = (t['toolCount'] as num?)?.toInt() ?? (t['count'] as num?)?.toInt() ?? 1;
+                  if (tCode.isNotEmpty) {
+                    final curr = movementCounts[tCode.toLowerCase()] ?? 0;
+                    final remain = curr - tCount;
+                    if (remain <= 0) {
+                      movementCounts.remove(tCode.toLowerCase());
+                    } else {
+                      movementCounts[tCode.toLowerCase()] = remain;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          // Build siteToolsMap from calculated movements
+          movementCounts.forEach((k, count) {
+            if (count > 0) {
+              final master = masterToolsMap[k] ?? {};
+              final toolName = (master['toolName'] ?? k).toString().trim();
+              final toolId = (master['toolId'] ?? k).toString().trim();
+              final toolCode = (master['toolCode'] ?? k).toString().trim();
+              final description = (master['description'] ?? '').toString().trim();
+              final toolOwner = (master['toolOwner'] ?? 'Org').toString().trim();
+              final unit = (master['unit'] ?? 'Units').toString().trim();
+
+              siteToolsMap[k] = {
+                'toolId': toolId,
+                'toolCode': toolCode,
+                'toolName': toolName,
+                'displayName': toolName,
+                'description': description,
+                'toolOwner': toolOwner,
+                'unit': unit,
+                'availableCount': count,
+                'siteId': cleanSiteId,
+              };
+            }
+          });
+        } catch (_) {}
+      }
+
+      final list = siteToolsMap.values.toList();
       list.sort((a, b) => (a['displayName'] as String).toLowerCase().compareTo((b['displayName'] as String).toLowerCase()));
 
       if (mounted) {
         setState(() {
-          transferredMaterials = list;
-          isLoadingMaterials = false;
+          siteTools = list;
+          isLoadingTools = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetching site materials from materialTransfer: $e');
+      debugPrint('Error fetching site tools: $e');
       if (mounted) {
         setState(() {
-          isLoadingMaterials = false;
-          errorMsg = "Failed to load material stock: ${e.toString()}";
+          isLoadingTools = false;
+          errorMsg = "Failed to load tools stock: ${e.toString()}";
         });
       }
     }
@@ -275,23 +386,26 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       selectedSiteId = newSiteId;
       searchQuery = '';
       searchController.clear();
-      selectedMaterialDetail = null;
+      selectedToolDetail = null;
     });
 
-    await fetchSiteStockFromMaterialTransfer(newSiteId);
+    await fetchSiteTools(newSiteId);
   }
 
-  /// Opens detailed stock popup for a selected material
-  void _showMaterialDetailsSheet(Map<String, dynamic> mat) {
+  /// Opens detailed tool stock popup for a selected tool
+  void _showToolDetailsSheet(Map<String, dynamic> tool) {
     setState(() {
-      selectedMaterialDetail = mat;
+      selectedToolDetail = tool;
     });
 
-    final matName = (mat['displayName'] ?? mat['materialName'] ?? '').toString();
-    final count = mat['availableCount'] as int? ?? 0;
-    final unit = (mat['unit'] ?? 'Bags').toString();
-    final materialId = (mat['materialId'] ?? '').toString();
-    final siteId = (mat['siteId'] ?? selectedSiteId ?? '').toString();
+    final toolName = (tool['displayName'] ?? tool['toolName'] ?? '').toString();
+    final count = tool['availableCount'] as int? ?? 0;
+    final unit = (tool['unit'] ?? 'Units').toString();
+    final toolId = (tool['toolId'] ?? '').toString();
+    final toolCode = (tool['toolCode'] ?? '').toString();
+    final description = (tool['description'] ?? '').toString();
+    final toolOwner = (tool['toolOwner'] ?? 'Org').toString();
+    final siteId = (tool['siteId'] ?? selectedSiteId ?? '').toString();
     final isAvailable = count > 0;
 
     showModalBottomSheet(
@@ -331,7 +445,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
-                      Icons.inventory_2_rounded,
+                      Icons.home_repair_service_rounded,
                       size: 24,
                       color: isAvailable
                           ? const Color(0xFF059669)
@@ -344,16 +458,16 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          matName,
+                          toolName,
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0F172A),
                           ),
                         ),
-                        if (materialId.isNotEmpty)
+                        if (toolCode.isNotEmpty)
                           Text(
-                            'Material ID: $materialId',
+                            'Code: $toolCode',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF64748B),
@@ -392,7 +506,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Available Stock at Site',
+                          'Available Tools at Site',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -453,7 +567,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               ),
               const SizedBox(height: 16),
 
-              // Site Information details - Site ID only
+              // Tool Information Details
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -464,13 +578,17 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                 child: Column(
                   children: [
                     _buildDetailRow('Site ID', siteId),
-                    if ((mat['projectName'] ?? '').toString().isNotEmpty && mat['projectName'] != siteId) ...[
+                    if (toolId.isNotEmpty && toolId != toolCode) ...[
                       const Divider(height: 16),
-                      _buildDetailRow('Project Name', mat['projectName']),
+                      _buildDetailRow('Tool ID', toolId),
                     ],
-                    if ((mat['category'] ?? '').toString().isNotEmpty && mat['category'] != 'General Material') ...[
+                    if (toolOwner.isNotEmpty) ...[
                       const Divider(height: 16),
-                      _buildDetailRow('Category', mat['category']),
+                      _buildDetailRow('Owner', toolOwner),
+                    ],
+                    if (description.isNotEmpty) ...[
+                      const Divider(height: 16),
+                      _buildDetailRow('Description', description),
                     ],
                   ],
                 ),
@@ -513,12 +631,16 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             fontWeight: FontWeight.w500,
           ),
         ),
-        Text(
-          value.isNotEmpty ? value : '-',
-          style: const TextStyle(
-            fontSize: 13.5,
-            color: Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
+        Flexible(
+          child: Text(
+            value.isNotEmpty ? value : '-',
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -531,14 +653,15 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    // Filtered materials
-    final filtered = transferredMaterials.where((mat) {
+    // Filtered tools
+    final filtered = siteTools.where((tool) {
       if (searchQuery.trim().isEmpty) return true;
       final q = searchQuery.trim().toLowerCase();
-      final name = (mat['materialName'] ?? '').toString().toLowerCase();
-      final dName = (mat['displayName'] ?? '').toString().toLowerCase();
-      final cat = (mat['category'] ?? '').toString().toLowerCase();
-      return name.contains(q) || dName.contains(q) || cat.contains(q);
+      final name = (tool['toolName'] ?? '').toString().toLowerCase();
+      final dName = (tool['displayName'] ?? '').toString().toLowerCase();
+      final code = (tool['toolCode'] ?? '').toString().toLowerCase();
+      final desc = (tool['description'] ?? '').toString().toLowerCase();
+      return name.contains(q) || dName.contains(q) || code.contains(q) || desc.contains(q);
     }).toList();
 
     return Scaffold(
@@ -546,7 +669,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'Materials at Site',
+          'Tools at Site',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -587,7 +710,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           child: RefreshIndicator(
             onRefresh: () async {
               if (selectedSiteId != null) {
-                await fetchSiteStockFromMaterialTransfer(selectedSiteId!);
+                await fetchSiteTools(selectedSiteId!);
               } else {
                 await fetchAssignedSites();
               }
@@ -601,13 +724,13 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                 const SizedBox(height: 14),
 
                 // Search Bar
-                if (transferredMaterials.isNotEmpty || searchQuery.isNotEmpty) ...[
+                if (siteTools.isNotEmpty || searchQuery.isNotEmpty) ...[
                   _buildSearchBar(),
                   const SizedBox(height: 14),
                 ],
 
                 // Content Views
-                if (isLoadingSites || isLoadingMaterials)
+                if (isLoadingSites || isLoadingTools)
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 60),
                     child: Center(
@@ -620,12 +743,12 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   _buildErrorState(primaryColor)
                 else if (selectedSiteId == null || assignedSiteIds.isEmpty)
                   _buildNoSitesAssignedState()
-                else if (transferredMaterials.isEmpty)
+                else if (siteTools.isEmpty)
                   _buildEmptyState()
                 else if (filtered.isEmpty)
                   _buildNoSearchResults()
                 else
-                  _buildMaterialsList(filtered, primaryColor),
+                  _buildToolsList(filtered, primaryColor),
               ],
             ),
           ),
@@ -690,7 +813,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             )
           else
             DropdownButtonFormField<String>(
-              key: ValueKey('site_dropdown_${selectedSiteId}_${assignedSiteIds.length}'),
+              key: ValueKey('site_dropdown_tools_${selectedSiteId}_${assignedSiteIds.length}'),
               initialValue: selectedSiteId,
               isExpanded: true,
               style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
@@ -744,7 +867,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       onChanged: (val) => setState(() => searchQuery = val),
       style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
       decoration: InputDecoration(
-        hintText: 'Search material by name...',
+        hintText: 'Search tool by name or code...',
         hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
         prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
         suffixIcon: searchQuery.isNotEmpty
@@ -776,8 +899,8 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     );
   }
 
-  /// Materials List displaying Material Name & Available Stock Count
-  Widget _buildMaterialsList(List<Map<String, dynamic>> items, Color primaryColor) {
+  /// Tools List displaying Tool Name & Available Stock Count
+  Widget _buildToolsList(List<Map<String, dynamic>> items, Color primaryColor) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -799,7 +922,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Available Stock (${selectedSiteId ?? ""})',
+                'Available Tools (${selectedSiteId ?? ""})',
                 style: const TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.bold,
@@ -813,7 +936,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${items.length} materials',
+                  '${items.length} tools',
                   style: TextStyle(
                     color: primaryColor,
                     fontWeight: FontWeight.bold,
@@ -830,14 +953,15 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             itemCount: items.length,
             separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
-              final mat = items[index];
-              final matName = (mat['displayName'] ?? mat['materialName'] ?? '').toString().trim();
-              final unit = (mat['unit'] ?? 'Bags').toString().trim();
-              final count = mat['availableCount'] as int? ?? 0;
+              final tool = items[index];
+              final toolName = (tool['displayName'] ?? tool['toolName'] ?? '').toString().trim();
+              final toolCode = (tool['toolCode'] ?? '').toString().trim();
+              final unit = (tool['unit'] ?? 'Units').toString().trim();
+              final count = tool['availableCount'] as int? ?? 0;
               final isAvailable = count > 0;
 
               return InkWell(
-                onTap: () => _showMaterialDetailsSheet(mat),
+                onTap: () => _showToolDetailsSheet(tool),
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -850,7 +974,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   ),
                   child: Row(
                     children: [
-                      // Material Icon
+                      // Tool Icon
                       Container(
                         padding: const EdgeInsets.all(9),
                         decoration: BoxDecoration(
@@ -861,8 +985,8 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                         ),
                         child: Icon(
                           isAvailable
-                              ? Icons.inventory_2_rounded
-                              : Icons.inventory_2_outlined,
+                              ? Icons.home_repair_service_rounded
+                              : Icons.home_repair_service_outlined,
                           size: 20,
                           color: isAvailable
                               ? const Color(0xFF059669)
@@ -871,22 +995,22 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                       ),
                       const SizedBox(width: 12),
 
-                      // Material Name
+                      // Tool Name & Code
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              matName,
+                              toolName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                                 color: Color(0xFF0F172A),
                               ),
                             ),
-                            if ((mat['category'] ?? '').toString().isNotEmpty && mat['category'] != 'General Material')
+                            if (toolCode.isNotEmpty)
                               Text(
-                                mat['category'].toString(),
+                                'Code: $toolCode',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: Color(0xFF64748B),
@@ -989,14 +1113,14 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.warehouse_rounded,
+              Icons.home_repair_service_rounded,
               size: 40,
               color: Color(0xFF94A3B8),
             ),
           ),
           const SizedBox(height: 14),
           Text(
-            'No Stock at Site (${selectedSiteId ?? ""})',
+            'No Tools at Site (${selectedSiteId ?? ""})',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 15,
@@ -1005,7 +1129,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Materials transferred to this site by the manager will be automatically displayed here with their available counts.',
+            'Tools dispatched to this site will be automatically displayed here with their available counts.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF64748B),
@@ -1063,7 +1187,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             const Icon(Icons.search_off_rounded, size: 36, color: Color(0xFF94A3B8)),
             const SizedBox(height: 10),
             Text(
-              'No materials matching "$searchQuery"',
+              'No tools matching "$searchQuery"',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 4),

@@ -7,6 +7,7 @@ import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
 import 'package:demo_cst/services/location_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/app_storage_service.dart';
+import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class SupervisorVerificationPage extends StatefulWidget {
@@ -33,6 +34,7 @@ class _SupervisorVerificationPageState
   String? _locationError;
   String? _photoError;
   bool _isLoading = false;
+  bool _isLoadingSites = true;
 
   List<Map<String, dynamic>> _assignedSites = [];
   Map<String, dynamic>? _selectedSite;
@@ -49,63 +51,258 @@ class _SupervisorVerificationPageState
     _fetchAssignedSites();
   }
 
+  /// Safely extracts the clean Site ID (e.g. ST001_shek) from document data, ignoring physical location/address strings
+  String _extractCleanSiteId(Map<String, dynamic> data, String docId) {
+    final location = (data['location'] ?? '').toString().trim();
+    final site = (data['site'] ?? '').toString().trim();
+    final siteId = (data['siteId'] ?? '').toString().trim();
+
+    if (site.isNotEmpty && site != location) {
+      return site;
+    }
+    if (siteId.isNotEmpty && siteId != location) {
+      return siteId;
+    }
+    if (docId.isNotEmpty && docId != location) {
+      return docId.trim();
+    }
+    return site.isNotEmpty ? site : (siteId.isNotEmpty ? siteId : docId);
+  }
+
   Future<void> _fetchAssignedSites() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoadingSites = true;
+      _locationError = null;
+    });
+
     try {
-      final query = await FirestoreService.getCollection('siteSupervisorMap')
-          .where('Supervisor ID', isEqualTo: widget.supervisorId)
-          .get();
+      if (!FirestoreService.isReady) {
+        await FirestoreService.initialize();
+      }
 
-      List<Map<String, dynamic>> sites = [];
-      for (var doc in query.docs) {
-        final siteId = doc['site']?.toString() ?? '';
-        if (siteId.isEmpty) continue;
+      final authData = AuthService().userData;
+      final candidateIds = <String>{};
+      final candidateNames = <String>{};
 
-        final siteDoc = await FirestoreService.getCollection('Site').doc(siteId).get();
-        if (siteDoc.exists) {
-          final siteData = siteDoc.data()!;
-          sites.add({
+      void addId(dynamic id) {
+        if (id != null) {
+          final s = id.toString().trim();
+          if (s.isNotEmpty) candidateIds.add(s.toLowerCase());
+        }
+      }
+
+      void addName(dynamic name) {
+        if (name != null) {
+          final s = name.toString().trim();
+          if (s.isNotEmpty) candidateNames.add(s.toLowerCase());
+        }
+      }
+
+      addId(widget.supervisorId);
+      addId(authData['supervisorId']);
+      addId(authData['Supervisor ID']);
+      addId(authData['SupervisorId']);
+      addId(authData['username']);
+      addId(authData['UserName']);
+
+      addName(widget.supervisorName);
+      addName(authData['supervisorName']);
+      addName(authData['fullName']);
+      addName(authData['FullName']);
+      addName(authData['name']);
+      addName(authData['username']);
+      addName(authData['UserName']);
+
+      // 1. Ingest all mappings from siteSupervisorMap
+      final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
+
+      // 2. Prefetch Site collection for coordinates and metadata lookup
+      final siteDocsSnap = await FirestoreService.getCollection('Site').get();
+      final siteLookupMap = <String, Map<String, dynamic>>{};
+      for (final sDoc in siteDocsSnap.docs) {
+        final data = sDoc.data();
+        siteLookupMap[sDoc.id.trim().toLowerCase()] = data;
+        final sId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+        if (sId.isNotEmpty) siteLookupMap[sId] = data;
+        final sSite = (data['site'] ?? '').toString().trim().toLowerCase();
+        if (sSite.isNotEmpty) siteLookupMap[sSite] = data;
+      }
+
+      final List<Map<String, dynamic>> matchedSites = [];
+
+      for (final doc in mapSnapshot.docs) {
+        final data = doc.data();
+        final docSupId = (data['Supervisor ID'] ?? data['supervisorId'] ?? data['SupervisorId'] ?? '').toString().trim().toLowerCase();
+        final docSupName = (data['supervisor'] ?? data['supervisorName'] ?? data['FullName'] ?? '').toString().trim().toLowerCase();
+        final docUsername = (data['username'] ?? data['UserName'] ?? '').toString().trim().toLowerCase();
+        final docId = doc.id.trim().toLowerCase();
+
+        bool isMatch = false;
+        if (candidateIds.any((cid) => cid == docSupId || (cid.isNotEmpty && docSupId.contains(cid)))) {
+          isMatch = true;
+        } else if (candidateNames.any((cname) => cname == docSupName || (cname.isNotEmpty && docSupName.contains(cname)))) {
+          isMatch = true;
+        } else if (candidateNames.any((cname) => cname.isNotEmpty && (docId.endsWith('_$cname') || docId.contains(cname)))) {
+          isMatch = true;
+        } else if (candidateIds.any((cid) => cid.isNotEmpty && (docId.startsWith('$cid' '_') || docId.endsWith('_$cid')))) {
+          isMatch = true;
+        } else if (candidateNames.any((cname) => cname == docUsername)) {
+          isMatch = true;
+        }
+
+        if (isMatch) {
+          final siteId = _extractCleanSiteId(data, doc.id);
+          if (siteId.isEmpty) continue;
+
+          double? lat;
+          double? lng;
+          String loc = (data['location'] ?? '').toString().trim();
+          String projName = (data['projectName'] ?? data['project'] ?? '').toString().trim();
+          String projStage = (data['projectStage'] ?? data['stage'] ?? '').toString().trim();
+
+          if (data['latitude'] != null) {
+            lat = double.tryParse(data['latitude'].toString());
+          }
+          if (data['longitude'] != null) {
+            lng = double.tryParse(data['longitude'].toString());
+          }
+
+          final cleanSiteKey = siteId.toLowerCase();
+          Map<String, dynamic>? matchedSiteMeta = siteLookupMap[cleanSiteKey];
+          if (matchedSiteMeta == null && cleanSiteKey.contains('_')) {
+            final baseSiteKey = cleanSiteKey.split('_').first;
+            matchedSiteMeta = siteLookupMap[baseSiteKey];
+          }
+
+          if (matchedSiteMeta != null) {
+            if (lat == null && matchedSiteMeta['latitude'] != null) {
+              lat = double.tryParse(matchedSiteMeta['latitude'].toString());
+            }
+            if (lng == null && matchedSiteMeta['longitude'] != null) {
+              lng = double.tryParse(matchedSiteMeta['longitude'].toString());
+            }
+            if (loc.isEmpty && matchedSiteMeta['location'] != null) {
+              loc = matchedSiteMeta['location'].toString().trim();
+            }
+            if (projName.isEmpty && matchedSiteMeta['projectName'] != null) {
+              projName = matchedSiteMeta['projectName'].toString().trim();
+            }
+          }
+
+          matchedSites.add({
             'siteId': siteId,
-            'siteName': siteData['location'] ?? siteData['siteName'] ?? siteId,
-            'latitude': siteData['latitude'],
-            'longitude': siteData['longitude'],
-            'location': siteData['location'] ?? '',
+            'siteName': siteId,
+            'location': loc,
+            'projectName': projName,
+            'projectStage': projStage,
+            'latitude': lat,
+            'longitude': lng,
+            'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? widget.supervisorName).toString(),
+            'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'] ?? widget.supervisorId).toString(),
           });
         }
       }
 
-      // If no mapping found by ID, attempt lookup by supervisor name
-      if (sites.isEmpty) {
-        final nameQuery = await FirestoreService.getCollection('Site')
-            .where('supervisor', isEqualTo: widget.supervisorName)
-            .get();
+      // If no mapping found in siteSupervisorMap, check Site collection directly
+      if (matchedSites.isEmpty) {
+        for (final sDoc in siteDocsSnap.docs) {
+          final sData = sDoc.data();
+          final sSupId = (sData['Supervisor ID'] ?? sData['supervisorId'] ?? '').toString().trim().toLowerCase();
+          final sSupName = (sData['supervisor'] ?? sData['supervisorName'] ?? '').toString().trim().toLowerCase();
+          if ((sSupId.isNotEmpty && candidateIds.contains(sSupId)) ||
+              (sSupName.isNotEmpty && candidateNames.contains(sSupName))) {
+            final sId = sDoc.id.trim();
+            double? lat = double.tryParse((sData['latitude'] ?? '').toString());
+            double? lng = double.tryParse((sData['longitude'] ?? '').toString());
+            matchedSites.add({
+              'siteId': sId,
+              'siteName': sId,
+              'location': (sData['location'] ?? '').toString().trim(),
+              'projectName': (sData['projectName'] ?? '').toString().trim(),
+              'projectStage': (sData['projectStage'] ?? '').toString().trim(),
+              'latitude': lat,
+              'longitude': lng,
+              'supervisor': (sData['supervisor'] ?? widget.supervisorName).toString(),
+              'supervisorId': (sData['Supervisor ID'] ?? widget.supervisorId).toString(),
+            });
+          }
+        }
+      }
 
-        for (var doc in nameQuery.docs) {
+      // Fallback: If still empty and siteSupervisorMap has documents, list all sites
+      if (matchedSites.isEmpty && mapSnapshot.docs.isNotEmpty) {
+        for (final doc in mapSnapshot.docs) {
           final data = doc.data();
-          sites.add({
-            'siteId': doc.id,
-            'siteName': data['location'] ?? data['siteName'] ?? doc.id,
-            'latitude': data['latitude'],
-            'longitude': data['longitude'],
-            'location': data['location'] ?? '',
+          final siteId = _extractCleanSiteId(data, doc.id);
+          if (siteId.isEmpty) continue;
+
+          double? lat;
+          double? lng;
+          if (data['latitude'] != null) {
+            lat = double.tryParse(data['latitude'].toString());
+          }
+          if (data['longitude'] != null) {
+            lng = double.tryParse(data['longitude'].toString());
+          }
+
+          final cleanSiteKey = siteId.toLowerCase();
+          Map<String, dynamic>? matchedSiteMeta = siteLookupMap[cleanSiteKey];
+          if (matchedSiteMeta == null && cleanSiteKey.contains('_')) {
+            final baseSiteKey = cleanSiteKey.split('_').first;
+            matchedSiteMeta = siteLookupMap[baseSiteKey];
+          }
+
+          if (matchedSiteMeta != null) {
+            if (lat == null && matchedSiteMeta['latitude'] != null) {
+              lat = double.tryParse(matchedSiteMeta['latitude'].toString());
+            }
+            if (lng == null && matchedSiteMeta['longitude'] != null) {
+              lng = double.tryParse(matchedSiteMeta['longitude'].toString());
+            }
+          }
+
+          matchedSites.add({
+            'siteId': siteId,
+            'siteName': siteId,
+            'location': (data['location'] ?? '').toString().trim(),
+            'projectName': (data['projectName'] ?? data['project'] ?? '').toString().trim(),
+            'projectStage': (data['projectStage'] ?? data['stage'] ?? '').toString().trim(),
+            'latitude': lat,
+            'longitude': lng,
+            'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? widget.supervisorName).toString(),
+            'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'] ?? widget.supervisorId).toString(),
           });
         }
       }
+
+      // Deduplicate by siteId
+      final Map<String, Map<String, dynamic>> deduped = {};
+      for (final s in matchedSites) {
+        final key = (s['siteId'] ?? '').toString().trim().toLowerCase();
+        if (key.isNotEmpty && !deduped.containsKey(key)) {
+          deduped[key] = s;
+        }
+      }
+
+      final finalSiteList = deduped.values.toList();
 
       if (mounted) {
         setState(() {
-          _assignedSites = sites;
-          if (sites.isNotEmpty) {
-            _selectedSite = sites[0];
+          _assignedSites = finalSiteList;
+          if (finalSiteList.isNotEmpty) {
+            _selectedSite = finalSiteList.first;
+          } else {
+            _selectedSite = null;
           }
-          _isLoading = false;
+          _isLoadingSites = false;
         });
       }
     } catch (e) {
+      debugPrint('Error fetching assigned sites: $e');
       if (mounted) {
         setState(() {
-          _locationError = 'Failed to fetch assigned sites: $e';
-          _isLoading = false;
+          _locationError = 'Failed to fetch assigned sites: ${e.toString()}';
+          _isLoadingSites = false;
         });
       }
     }
@@ -124,24 +321,10 @@ class _SupervisorVerificationPageState
     });
 
     try {
-      final rawLat = _selectedSite!['latitude'];
-      final rawLng = _selectedSite!['longitude'];
-
-      if (rawLat == null || rawLng == null) {
-        setState(() {
-          _locationError = 'Site coordinates not configured in master database.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      _siteLat = (rawLat as num).toDouble();
-      _siteLng = (rawLng as num).toDouble();
-
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         setState(() {
-          _locationError = 'GPS Location services are disabled on your device.';
+          _locationError = 'GPS Location services are disabled on your device. Please enable GPS.';
           _isLoading = false;
         });
         return;
@@ -159,49 +342,72 @@ class _SupervisorVerificationPageState
         return;
       }
 
-      Position? tempPosition;
+      Position position;
       try {
-        tempPosition = await Geolocator.getCurrentPosition(
+        position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
             timeLimit: Duration(seconds: 10),
           ),
         );
       } catch (_) {
-        tempPosition = await Geolocator.getLastKnownPosition();
-        tempPosition ??= await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.low,
-            timeLimit: Duration(seconds: 5),
-          ),
-        );
+        final lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null) {
+          position = lastKnown;
+        } else {
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 5),
+            ),
+          );
+        }
       }
 
-      final position = tempPosition;
-      final distance = Geolocator.distanceBetween(
-        position.latitude,
-        position.longitude,
-        _siteLat!,
-        _siteLng!,
-      );
-      final match = distance <= _allowedDistance;
+      final rawLat = _selectedSite!['latitude'];
+      final rawLng = _selectedSite!['longitude'];
 
-      if (mounted) {
-        setState(() {
-          _currentPosition = position;
-          _locationChecked = true;
-          _distanceFromSite = distance;
-          _locationValid = match;
-          _locationError = _locationValid
-              ? null
-              : 'You are currently ${distance.toStringAsFixed(0)}m away. You must be within $_allowedDistance meters of the site.';
-          _isLoading = false;
-        });
+      if (rawLat != null && rawLng != null) {
+        _siteLat = (rawLat as num).toDouble();
+        _siteLng = (rawLng as num).toDouble();
+
+        final distance = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          _siteLat!,
+          _siteLng!,
+        );
+        final match = distance <= _allowedDistance;
+
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            _locationChecked = true;
+            _distanceFromSite = distance;
+            _locationValid = match;
+            _locationError = _locationValid
+                ? null
+                : 'You are currently ${distance.toStringAsFixed(0)}m away. You must be within ${_allowedDistance.toInt()} meters of the site.';
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Site coordinates not configured in master database -> capture current position & verify presence
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            _locationChecked = true;
+            _distanceFromSite = 0;
+            _locationValid = true;
+            _locationError = null;
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _locationError = 'Failed to acquire accurate GPS position: $e';
+          _locationError = 'Failed to acquire GPS position: $e';
           _isLoading = false;
         });
       }
@@ -247,11 +453,11 @@ class _SupervisorVerificationPageState
   }
 
   Future<String?> _uploadPhotoWithMetadata() async {
-    if (_selectedImage == null || _currentPosition == null) return null;
+    if (_selectedImage == null) return null;
 
     try {
       final url = await AppStorageService.uploadSupervisorVerificationPhoto(
-        supervisorId: widget.supervisorId,
+        supervisorId: _selectedSite?['supervisorId'] ?? widget.supervisorId,
         imageFile: _selectedImage!,
         siteId: _selectedSite?['siteId'],
       );
@@ -263,11 +469,12 @@ class _SupervisorVerificationPageState
       await FirestoreService.getCollection('supervisorPhotoLogs').add({
         'photoUrl': url,
         'timestamp': FieldValue.serverTimestamp(),
-        'latitude': _currentPosition!.latitude,
-        'longitude': _currentPosition!.longitude,
-        'supervisorId': widget.supervisorId,
+        'latitude': _currentPosition?.latitude ?? 0.0,
+        'longitude': _currentPosition?.longitude ?? 0.0,
+        'supervisorId': _selectedSite?['supervisorId'] ?? widget.supervisorId,
         'supervisorName': widget.supervisorName,
         'siteId': _selectedSite?['siteId'],
+        'projectName': _selectedSite?['projectName'] ?? '',
       });
 
       return url;
@@ -308,10 +515,12 @@ class _SupervisorVerificationPageState
           builder: (context) => SiteEntryPage(
             userName: widget.supervisorName,
             userDetails: {
-              'supervisorId': widget.supervisorId,
+              'supervisorId': _selectedSite?['supervisorId'] ?? widget.supervisorId,
               'siteId': _selectedSite?['siteId'],
               'location': _selectedSite?['location'],
-              'siteName': _selectedSite?['siteName'],
+              'siteName': _selectedSite?['siteName'] ?? _selectedSite?['siteId'],
+              'projectName': _selectedSite?['projectName'],
+              'projectStage': _selectedSite?['projectStage'],
             },
           ),
         ),
@@ -334,10 +543,12 @@ class _SupervisorVerificationPageState
         builder: (context) => SiteEntryPage(
           userName: widget.supervisorName,
           userDetails: {
-            'supervisorId': widget.supervisorId,
+            'supervisorId': _selectedSite?['supervisorId'] ?? widget.supervisorId,
             'siteId': _selectedSite?['siteId'],
             'location': _selectedSite?['location'],
-            'siteName': _selectedSite?['siteName'],
+            'siteName': _selectedSite?['siteName'] ?? _selectedSite?['siteId'],
+            'projectName': _selectedSite?['projectName'],
+            'projectStage': _selectedSite?['projectStage'],
           },
         ),
       ),
@@ -471,15 +682,15 @@ class _SupervisorVerificationPageState
 
   Widget _buildHeaderBanner(Color darkAccent) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-            blurRadius: 14,
+            blurRadius: 12,
             offset: const Offset(0, 3),
           ),
         ],
@@ -490,7 +701,10 @@ class _SupervisorVerificationPageState
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [primaryColor, darkAccent],
+                colors: [
+                  primaryColor,
+                  darkAccent,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -569,66 +783,158 @@ class _SupervisorVerificationPageState
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(color: Color(0xFFF1F5F9), height: 1),
           ),
-          if (_assignedSites.isNotEmpty)
+          if (_isLoadingSites)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<Map<String, dynamic>>(
-                  value: _selectedSite,
-                  isExpanded: true,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                  items: _assignedSites.map((site) {
-                    return DropdownMenuItem<Map<String, dynamic>>(
-                      value: site,
-                      child: Text(
-                        site['siteName'] ?? site['siteId'],
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (site) {
-                    setState(() {
-                      _selectedSite = site;
-                      _locationChecked = false;
-                      _locationValid = false;
-                      _distanceFromSite = null;
-                      _locationError = null;
-                    });
-                  },
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.2, color: primaryColor),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Detecting assigned site...',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
               ),
+            )
+          else if (_assignedSites.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<Map<String, dynamic>>(
+                      value: _selectedSite,
+                      isExpanded: true,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                      items: _assignedSites.map((site) {
+                        final displayName = (site['siteName'] ?? site['siteId'] ?? '').toString();
+                        return DropdownMenuItem<Map<String, dynamic>>(
+                          value: site,
+                          child: Text(
+                            displayName,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (site) {
+                        setState(() {
+                          _selectedSite = site;
+                          _locationChecked = false;
+                          _locationValid = false;
+                          _distanceFromSite = null;
+                          _locationError = null;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                if (_selectedSite != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: primaryColor.withValues(alpha: 0.15)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded, color: primaryColor, size: 16),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Assigned Site ID: ${_selectedSite!['siteId']}',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: darkAccent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if ((_selectedSite!['projectName'] ?? '').toString().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Project: ${_selectedSite!['projectName']}',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                        if ((_selectedSite!['location'] ?? '').toString().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Location: ${_selectedSite!['location']}',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             )
           else
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFFCA5A5)),
               ),
-              child: const Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'No sites assigned to this supervisor account.',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFDC2626),
+                  const Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'No sites assigned to this supervisor account.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFDC2626),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Checked for: ${widget.supervisorName} (${widget.supervisorId.isNotEmpty ? widget.supervisorId : "N/A"})',
+                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF991B1B)),
                   ),
                 ],
               ),

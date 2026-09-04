@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/material_inventory_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class MaterialInventoryDetailsPage extends StatefulWidget {
@@ -67,40 +68,16 @@ class _MaterialInventoryDetailsPageState
         await FirestoreService.initialize();
       }
 
-      // 1. Fetch metadata and collections in parallel
       final results = await Future.wait([
+        MaterialInventoryService.fetchMaterialInventory(widget.materialName),
         FirestoreService.getCollection('Site').get(),
         FirestoreService.projects.get(),
-        FirestoreService.getCollection('materials').get(),
-        FirestoreService.getCollection('materialsavailablity').get(),
-        FirestoreService.getCollection('materialsavailability').get(),
-        FirestoreService.getCollection('materialsAtCompany').get(),
-        FirestoreService.getCollection('materialatsite').get(),
-        FirestoreService.getCollection('materialsAtSite').get(),
-        FirestoreService.getCollection('materialsInventory').get(),
       ]);
 
-      final sitesSnap = results[0].docs;
-      final projectsSnap = results[1].docs;
-      final materialsSnap = results[2].docs;
-      final availSnap1 = results[3].docs;
-      final availSnap2 = results[4].docs;
-      final compSnap = results[5].docs;
-      final matAtSiteSnap = results[6].docs;
-      final atSiteSnap = results[7].docs;
-      final invSnap = results[8].docs;
+      final item = results[0] as MaterialInventoryItem?;
+      final sitesSnap = (results[1] as QuerySnapshot<Map<String, dynamic>>).docs;
+      final projectsSnap = (results[2] as QuerySnapshot<Map<String, dynamic>>).docs;
 
-      // Fetch siteMaterials subcollections in parallel for all sites
-      List<QuerySnapshot<Map<String, dynamic>>> siteMaterialsSnaps = [];
-      try {
-        siteMaterialsSnaps = await Future.wait(
-          sitesSnap.map((s) => FirestoreService.getCollection('siteMaterials').doc(s.id).collection('materials').get()),
-        );
-      } catch (e) {
-        debugPrint('Error fetching siteMaterials in details: $e');
-      }
-
-      // 2. Build Site & Project Name Maps
       final sNameMap = <String, String>{};
       final sProjMap = <String, String>{};
 
@@ -123,180 +100,47 @@ class _MaterialInventoryDetailsPageState
         if (pName.isNotEmpty) sProjMap[sId.toLowerCase()] = pName;
       }
 
-      String normalize(String s) => s.trim().toLowerCase();
-      final targetNorm = normalize(widget.materialName);
-      final targetCodeNorm = normalize(widget.code);
+      if (item != null) {
+        if (item.category.isNotEmpty && item.category != 'General Material') _effectiveCategory = item.category;
+        if (item.subCategory.isNotEmpty) _effectiveSubCategory = item.subCategory;
+        if (item.unit.isNotEmpty && item.unit != 'Units') _effectiveUnit = item.unit;
+        if (item.materialId.isNotEmpty) _effectiveCode = item.materialId;
+        if (item.unitPrice > 0) _effectivePrice = item.unitPrice;
+        if (item.description.isNotEmpty) _effectiveDescription = item.description;
 
-      bool isMatch(String name, String docId) {
-        final n = normalize(name);
-        final d = normalize(docId);
-        if (n == targetNorm || d == targetNorm) return true;
-        if (targetCodeNorm.isNotEmpty && (d == targetCodeNorm || n == targetCodeNorm)) return true;
-        if (n.startsWith('${targetNorm}_') || targetNorm.startsWith('${n}_')) return true;
-        return false;
-      }
-
-      // 3. Extract Master Material metadata
-      for (var doc in materialsSnap) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['matName'] ?? data['name'] ?? doc.id).toString().trim();
-        if (isMatch(name, doc.id)) {
-          final cat = (data['materialCategory'] ?? data['matCategory'] ?? data['category'] ?? '').toString().trim();
-          final subCat = (data['materialSubCategory'] ?? data['matSubCategory'] ?? data['subCategory'] ?? '').toString().trim();
-          final unit = (data['materialUnit'] ?? data['matUnit'] ?? data['unit'] ?? '').toString().trim();
-          final code = (data['materialId'] ?? doc.id).toString().trim();
-          final price = _parseNum(data['unitPrice'] ?? data['materialPrice'] ?? data['price']);
-          final desc = (data['description'] ?? '').toString().trim();
-
-          if (cat.isNotEmpty) _effectiveCategory = cat;
-          if (subCat.isNotEmpty) _effectiveSubCategory = subCat;
-          if (unit.isNotEmpty) _effectiveUnit = unit;
-          if (code.isNotEmpty) _effectiveCode = code;
-          if (price > 0) _effectivePrice = price;
-          if (desc.isNotEmpty) _effectiveDescription = desc;
-          break;
-        }
-      }
-
-      // 4. Fetch Company / Central Storage stock from materialsavailablity & materialsavailability & materialsAtCompany
-      double compQty = 0.0;
-      int latestAvailTs = -1;
-
-      final allAvailDocs = [...availSnap1, ...availSnap2];
-      for (var doc in allAvailDocs) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['materialname'] ?? data['matName'] ?? data['name'] ?? '').toString().trim();
-        if (isMatch(name, doc.id)) {
-          final qty = _parseNum(data['count'] ?? data['availableCount'] ?? data['quantity']);
-          final ts = _extractMillis(data['lastupdated'] ?? data['lastUpdated'] ?? data['updatedAt'] ?? data['createdAt'] ?? data['timestamp']);
-          if (ts >= latestAvailTs) {
-            compQty = qty;
-            latestAvailTs = ts;
+        final List<Map<String, dynamic>> breakdown = [];
+        for (final s in item.siteInventories) {
+          if (s.availableCount > 0) {
+            final lowerId = s.siteId.toLowerCase();
+            breakdown.add({
+              'siteId': s.siteId,
+              'siteName': s.siteName.isNotEmpty ? s.siteName : (sNameMap[lowerId] ?? s.siteId),
+              'projectName': s.projectName.isNotEmpty
+                  ? s.projectName
+                  : (sProjMap[lowerId] ?? sNameMap[lowerId] ?? 'Site Project'),
+              'quantity': s.availableCount.toDouble(),
+              'lastUpdated': _formatDateStr(s.updatedAt),
+            });
           }
         }
-      }
 
-      // Fallback to materialsAtCompany
-      for (var doc in compSnap) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['name'] ?? doc.id).toString().trim();
-        if (isMatch(name, doc.id)) {
-          final qty = _parseNum(data['quantity'] ?? data['availableCount']);
-          if (qty > 0 && compQty == 0) {
-            compQty = qty;
-          }
-        }
-      }
+        breakdown.sort((a, b) => (b['quantity'] as double).compareTo(a['quantity'] as double));
 
-      // 5. Fetch Site-level Breakdown from materialatsite, materialsAtSite, materialsInventory, and siteMaterials
-      final Map<String, double> siteQtyMap = {};
-      final Map<String, String> siteLastUpdated = {};
-
-      for (var doc in matAtSiteSnap) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['materialname'] ?? data['name'] ?? '').toString().trim();
-        final sId = (data['siteid'] ?? data['siteId'] ?? data['site'] ?? '').toString().trim();
-        if (isMatch(name, doc.id) && sId.isNotEmpty) {
-          final qty = _parseNum(data['count'] ?? data['availableCount'] ?? data['quantity']);
-          if (qty > 0) {
-            siteQtyMap.update(sId, (prev) => prev + qty, ifAbsent: () => qty);
-            if (data['updatedAt'] != null || data['lastupdated'] != null) {
-              siteLastUpdated[sId] = _formatDateStr(data['updatedAt'] ?? data['lastupdated']);
-            }
-          }
-        }
-      }
-
-      for (var doc in atSiteSnap) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['name'] ?? '').toString().trim();
-        final sId = (data['siteId'] ?? data['siteid'] ?? data['site'] ?? '').toString().trim();
-        if (isMatch(name, doc.id) && sId.isNotEmpty) {
-          final qty = _parseNum(data['quantity'] ?? data['availableCount'] ?? data['materialQty'] ?? data['count']);
-          if (qty > 0) {
-            final existing = siteQtyMap[sId] ?? 0.0;
-            if (qty > existing) {
-              siteQtyMap[sId] = qty;
-              if (data['updatedAt'] != null || data['createdAt'] != null) {
-                siteLastUpdated[sId] = _formatDateStr(data['updatedAt'] ?? data['createdAt']);
-              }
-            }
-          }
-        }
-      }
-
-      for (var doc in invSnap) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['name'] ?? doc.id).toString().trim();
-        if (isMatch(name, doc.id)) {
-          final sites = data['sites'];
-          if (sites is List) {
-            for (var s in sites) {
-              if (s is Map<String, dynamic>) {
-                final sId = (s['siteId'] ?? s['siteid'] ?? '').toString().trim();
-                if (sId.isEmpty) continue;
-                final qty = _parseNum(s['materialQty'] ?? s['quantity']);
-                if (qty > 0) {
-                  final existing = siteQtyMap[sId] ?? 0.0;
-                  if (qty > existing) {
-                    siteQtyMap[sId] = qty;
-                    if (s['updatedAt'] != null || s['date'] != null) {
-                      siteLastUpdated[sId] = (s['updatedAt'] ?? s['date']).toString();
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // Ingest from siteMaterials subcollections
-      for (int i = 0; i < sitesSnap.length; i++) {
-        final siteDoc = sitesSnap[i];
-        final sId = (siteDoc.data()['siteId'] ?? siteDoc.id).toString().trim();
-        if (i < siteMaterialsSnaps.length) {
-          for (var doc in siteMaterialsSnaps[i].docs) {
-            final data = doc.data();
-            final name = (data['materialName'] ?? data['materialname'] ?? data['displayName'] ?? doc.id).toString().trim();
-            if (isMatch(name, doc.id) && sId.isNotEmpty) {
-              final qty = _parseNum(data['count'] ?? data['availableCount'] ?? data['quantity']);
-              if (qty > 0) {
-                final existingQty = siteQtyMap[sId] ?? 0.0;
-                if (qty > existingQty) {
-                  siteQtyMap[sId] = qty;
-                  if (data['updatedAt'] != null || data['lastupdated'] != null || data['timestamp'] != null) {
-                    siteLastUpdated[sId] = _formatDateStr(data['updatedAt'] ?? data['lastupdated'] ?? data['timestamp']);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      final List<Map<String, dynamic>> breakdown = [];
-      siteQtyMap.forEach((sId, qty) {
-        if (qty > 0) {
-          final lowerId = sId.toLowerCase();
-          breakdown.add({
-            'siteId': sId,
-            'siteName': sNameMap[lowerId] ?? sId,
-            'projectName': sProjMap[lowerId] ?? sNameMap[lowerId] ?? 'Site Project',
-            'quantity': qty,
-            'lastUpdated': siteLastUpdated[sId] ?? 'Active Stock',
+        if (mounted) {
+          setState(() {
+            _companyQty = item.companyAvailableCount.toDouble();
+            _siteBreakdown = breakdown;
+            _isLoading = false;
           });
         }
-      });
-
-      breakdown.sort((a, b) => (b['quantity'] as double).compareTo(a['quantity'] as double));
-
-      if (mounted) {
-        setState(() {
-          _companyQty = compQty;
-          _siteBreakdown = breakdown;
-          _isLoading = false;
-        });
+      } else {
+        if (mounted) {
+          setState(() {
+            _companyQty = 0.0;
+            _siteBreakdown = [];
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -308,32 +152,11 @@ class _MaterialInventoryDetailsPageState
     }
   }
 
-  int _extractMillis(dynamic ts) {
-    if (ts == null) return 0;
-    if (ts is Timestamp) return ts.millisecondsSinceEpoch;
-    if (ts is DateTime) return ts.millisecondsSinceEpoch;
-    if (ts is num) return ts.toInt();
-    if (ts is String) {
-      final parsed = DateTime.tryParse(ts);
-      if (parsed != null) return parsed.millisecondsSinceEpoch;
-    }
-    return 0;
-  }
-
   String _formatDateStr(dynamic ts) {
     if (ts == null) return 'Active Stock';
     if (ts is Timestamp) return DateFormat('dd MMM yyyy').format(ts.toDate());
     if (ts is DateTime) return DateFormat('dd MMM yyyy').format(ts);
     return ts.toString();
-  }
-
-  double _parseNum(dynamic v) {
-    if (v == null) return 0.0;
-    if (v is num) return v.toDouble();
-    if (v is String) {
-      return double.tryParse(v.replaceAll(RegExp(r'[^0-9.+-]'), '')) ?? 0.0;
-    }
-    return 0.0;
   }
 
   String _formatQty(double val) {

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
+import 'package:demo_cst/services/material_inventory_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 import 'package:intl/intl.dart';
@@ -72,9 +73,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   // List to store multiple materials for transfer
   List<Map<String, dynamic>> materialsToTransfer = [];
 
-  // Loading states
+  // Loading and processing states
   bool _isLoadingSites = true;
   bool _isLoadingMaterials = true;
+  bool _isProcessing = false;
+  bool _isFetchingLiveStock = false;
 
   @override
   void initState() {
@@ -309,57 +312,44 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     return 0;
   }
 
-  int _tsMillis(dynamic v) {
-    try {
-      if (v == null) return -1;
-      if (v is Timestamp) return v.millisecondsSinceEpoch;
-      if (v is DateTime) return v.millisecondsSinceEpoch;
-      if (v is String) return DateTime.tryParse(v)?.millisecondsSinceEpoch ?? -1;
-      return -1;
-    } catch (_) {
-      return -1;
-    }
-  }
-
   Future<void> _loadMaterialData() async {
     try {
-      final Map<String, Map<String, dynamic>> materialMap = {};
-
-      // Fetch exclusively from materialsavailablity collection
-      try {
-        final availSnapshot = await FirestoreService.getCollection('materialsavailablity').get();
-        for (final doc in availSnapshot.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
-          if (name.isEmpty) continue;
-          final count = _parseCount(data['count'] ?? data['availableCount']);
-          final lastUpdatedMs = _tsMillis(data['lastupdated'] ?? data['lastUpdated']);
-
-          if (!materialMap.containsKey(name) || lastUpdatedMs > (materialMap[name]!['lastupdatedMillis'] as int? ?? -1)) {
-            materialMap[name] = {
-              'materialId': doc.id,
-              'materialName': name,
-              'displayName': name,
-              'count': count,
-              'lastupdatedMillis': lastUpdatedMs,
-            };
-          }
+      final items = await MaterialInventoryService.fetchAllMaterialsInventory();
+      final Map<String, Map<String, dynamic>> mapByDocOrName = {};
+      for (final item in items) {
+        final key = item.materialName.trim();
+        if (key.isEmpty) continue;
+        if (!mapByDocOrName.containsKey(key)) {
+          mapByDocOrName[key] = {
+            'materialId': item.docId,
+            'materialName': key,
+            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
+            'unit': item.unit,
+            'count': item.companyAvailableCount,
+          };
         }
-      } catch (e) {
-        debugPrint('Error fetching materialsavailablity: $e');
       }
 
-      final list = materialMap.values.toList()
-        ..sort(
-          (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-                (b['displayName'] as String).toLowerCase(),
-              ),
-        );
+      final list = mapByDocOrName.values.toList();
+      list.sort(
+        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
+              (b['displayName'] as String).toLowerCase(),
+            ),
+      );
 
       if (mounted) {
         setState(() {
           materialsList = list;
           _isLoadingMaterials = false;
+          if (_selectedMaterialName != null) {
+            final match = list.firstWhere(
+              (m) =>
+                  (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+                  _selectedMaterialName!.trim().toLowerCase(),
+              orElse: () => <String, dynamic>{'count': 0},
+            );
+            availableCount = _parseCount(match['count']);
+          }
         });
       }
     } catch (e) {
@@ -376,58 +366,46 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
   Future<void> _loadSiteMaterialData(String siteId) async {
     try {
-      final Map<String, Map<String, dynamic>> siteMatMap = {};
-
-      // 1. Fetch from materialatsite
-      try {
-        final snap = await FirestoreService.getCollection('materialatsite')
-            .where('siteid', isEqualTo: siteId).get();
-        for (final doc in snap.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
-          if (name.isEmpty) continue;
-          final count = _parseCount(data['count'] ?? data['availableCount']);
-          siteMatMap[name] = {
-            'materialId': doc.id,
-            'materialName': name,
-            'displayName': name,
-            'count': count,
+      final items = await MaterialInventoryService.fetchAllMaterialsInventory();
+      final Map<String, Map<String, dynamic>> mapByDocOrName = {};
+      for (final item in items) {
+        final key = item.materialName.trim();
+        if (key.isEmpty) continue;
+        final siteEntry = item.siteInventories.firstWhere(
+          (s) => s.siteId.trim().toLowerCase() == siteId.trim().toLowerCase(),
+          orElse: () => SiteInventoryEntry(siteId: siteId, availableCount: 0),
+        );
+        if (!mapByDocOrName.containsKey(key)) {
+          mapByDocOrName[key] = {
+            'materialId': item.docId,
+            'materialName': key,
+            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
+            'unit': item.unit,
+            'count': siteEntry.availableCount,
           };
         }
-      } catch (_) {}
+      }
 
-      // 2. Fetch from siteMaterials/{siteId}/materials
-      try {
-        final snap = await FirestoreService.getCollection('siteMaterials')
-            .doc(siteId).collection('materials').get();
-        for (final doc in snap.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ?? data['materialname'] ?? data['displayName'] ?? doc.id).toString().trim();
-          if (name.isEmpty) continue;
-          final count = _parseCount(data['count'] ?? data['availableCount']);
-          final existingCount = siteMatMap[name]?['count'] as int? ?? 0;
-          if (!siteMatMap.containsKey(name) || count > existingCount) {
-            siteMatMap[name] = {
-              'materialId': doc.id,
-              'materialName': name,
-              'displayName': (data['displayName'] ?? name).toString().trim(),
-              'count': count,
-            };
-          }
-        }
-      } catch (_) {}
-
-      final list = siteMatMap.values.toList()
-        ..sort(
-          (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-                (b['displayName'] as String).toLowerCase(),
-              ),
-        );
+      final list = mapByDocOrName.values.toList();
+      list.sort(
+        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
+              (b['displayName'] as String).toLowerCase(),
+            ),
+      );
 
       if (mounted) {
         setState(() {
           siteMaterialsList = list;
           _isLoadingMaterials = false;
+          if (_selectedMaterialName != null) {
+            final match = list.firstWhere(
+              (m) =>
+                  (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+                  _selectedMaterialName!.trim().toLowerCase(),
+              orElse: () => <String, dynamic>{'count': 0},
+            );
+            availableCount = _parseCount(match['count']);
+          }
         });
       }
     } catch (e) {
@@ -474,24 +452,97 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     }
   }
 
-  void _onMaterialChanged(String? materialName) {
-    if (materialName != null) {
+  void _onMaterialChanged(String? materialName) async {
+    if (materialName == null || materialName.trim().isEmpty) {
       setState(() {
-        _selectedMaterialName = materialName;
-        final list = _transferMode == 0 ? materialsList : siteMaterialsList;
-        final material = list.firstWhere(
-          (m) => (m['materialName'] ?? m['displayName']) == materialName,
-          orElse: () => {'count': 0},
-        );
-        availableCount = _parseCount(material['count']);
+        _selectedMaterialName = null;
+        availableCount = 0;
+        _isFetchingLiveStock = false;
       });
+      return;
+    }
+
+    final trimmed = materialName.trim();
+    final list = _transferMode == 0 ? materialsList : siteMaterialsList;
+
+    final match = list.firstWhere(
+      (m) =>
+          (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+              trimmed.toLowerCase() ||
+          (m['displayName'] ?? '').toString().trim().toLowerCase() ==
+              trimmed.toLowerCase(),
+      orElse: () => <String, dynamic>{'count': 0},
+    );
+
+    final initialCount = _parseCount(match['count']);
+
+    setState(() {
+      _selectedMaterialName = trimmed;
+      availableCount = initialCount;
+      _isFetchingLiveStock = true;
+    });
+
+    try {
+      final freshItem =
+          await MaterialInventoryService.fetchMaterialInventory(trimmed);
+      if (freshItem != null && mounted && _selectedMaterialName == trimmed) {
+        int backendCount = 0;
+        if (_transferMode == 0) {
+          backendCount = freshItem.companyAvailableCount;
+        } else if (_transferMode == 1) {
+          if (_fromSiteId != null && _fromSiteId!.isNotEmpty) {
+            final sEntry = freshItem.siteInventories.firstWhere(
+              (s) =>
+                  s.siteId.trim().toLowerCase() ==
+                  _fromSiteId!.trim().toLowerCase(),
+              orElse: () => SiteInventoryEntry(
+                siteId: _fromSiteId!,
+                availableCount: 0,
+              ),
+            );
+            backendCount = sEntry.availableCount;
+          }
+        } else if (_transferMode == 2) {
+          if (_selectedSiteId != null && _selectedSiteId!.isNotEmpty) {
+            final sEntry = freshItem.siteInventories.firstWhere(
+              (s) =>
+                  s.siteId.trim().toLowerCase() ==
+                  _selectedSiteId!.trim().toLowerCase(),
+              orElse: () => SiteInventoryEntry(
+                siteId: _selectedSiteId!,
+                availableCount: 0,
+              ),
+            );
+            backendCount = sEntry.availableCount;
+          }
+        }
+
+        setState(() {
+          availableCount = backendCount;
+          _isFetchingLiveStock = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          _isFetchingLiveStock = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error syncing live stock for $trimmed: $e');
+      if (mounted) {
+        setState(() {
+          _isFetchingLiveStock = false;
+        });
+      }
     }
   }
 
   void _addMaterial() {
-    if (_selectedMaterialName == null) {
+    if (_selectedMaterialName == null || _selectedMaterialName!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a material')),
+        const SnackBar(
+          content: Text('Please select a material first'),
+          backgroundColor: Color(0xFF0A183D),
+        ),
       );
       return;
     }
@@ -499,7 +550,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     final neededCountStr = _neededCountController.text.trim();
     if (neededCountStr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter needed count')),
+        const SnackBar(
+          content: Text('Please enter transfer count'),
+          backgroundColor: Color(0xFF0A183D),
+        ),
       );
       return;
     }
@@ -507,17 +561,19 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     final neededCount = int.tryParse(neededCountStr);
     if (neededCount == null || neededCount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid positive number')),
+        const SnackBar(
+          content: Text('Please enter a valid positive transfer quantity'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
       );
       return;
     }
 
-    if (neededCount > availableCount) {
+    if (availableCount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Needed count ($neededCount) cannot exceed available count ($availableCount)',
-          ),
+        const SnackBar(
+          content: Text('Selected material has 0 available units in inventory'),
+          backgroundColor: Color(0xFFEF4444),
         ),
       );
       return;
@@ -525,42 +581,79 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
     final list = _transferMode == 0 ? materialsList : siteMaterialsList;
     final material = list.firstWhere(
-      (m) => m['materialName'] == _selectedMaterialName,
+      (m) =>
+          (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+          _selectedMaterialName!.trim().toLowerCase(),
+      orElse: () => <String, dynamic>{
+        'materialId': _selectedMaterialName!,
+        'materialName': _selectedMaterialName!,
+        'displayName': _selectedMaterialName!,
+        'unit': 'Units',
+      },
     );
 
+    final alreadyAddedCount = materialsToTransfer
+        .where(
+          (m) =>
+              (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+              _selectedMaterialName!.trim().toLowerCase(),
+        )
+        .fold<int>(0, (acc, m) => acc + (m['neededCount'] as int));
+
+    final availableRemaining = availableCount - alreadyAddedCount;
+
+    if (neededCount > availableRemaining) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            alreadyAddedCount > 0
+                ? 'Needed count ($neededCount) exceeds remaining available ($availableRemaining). Already added: $alreadyAddedCount, Total available: $availableCount.'
+                : 'Needed count ($neededCount) cannot exceed available count ($availableCount).',
+          ),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
     final existingIndex = materialsToTransfer.indexWhere(
-      (m) => m['materialName'] == _selectedMaterialName,
+      (m) =>
+          (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+          _selectedMaterialName!.trim().toLowerCase(),
     );
 
     if (existingIndex >= 0) {
-      final currentNeeded = materialsToTransfer[existingIndex]['neededCount'];
-      final newTotal = currentNeeded + neededCount;
-
-      if (newTotal > availableCount) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Total count ($newTotal) would exceed available count ($availableCount)',
-            ),
-          ),
-        );
-        return;
-      }
-
+      final currentNeeded =
+          materialsToTransfer[existingIndex]['neededCount'] as int;
       setState(() {
-        materialsToTransfer[existingIndex]['neededCount'] = newTotal;
+        materialsToTransfer[existingIndex]['neededCount'] =
+            currentNeeded + neededCount;
+        materialsToTransfer[existingIndex]['availableCount'] = availableCount;
       });
     } else {
       setState(() {
         materialsToTransfer.add({
-          'materialId': material['materialId'],
-          'materialName': material['materialName'],
-          'displayName': material['displayName'],
+          'materialId': material['materialId'] ?? _selectedMaterialName!,
+          'materialName': material['materialName'] ?? _selectedMaterialName!,
+          'displayName': material['displayName'] ??
+              material['materialName'] ??
+              _selectedMaterialName!,
+          'unit': material['unit'] ?? 'Units',
           'neededCount': neededCount,
           'availableCount': availableCount,
         });
       });
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Added ${material['displayName'] ?? _selectedMaterialName} ($neededCount) to transfer list',
+        ),
+        backgroundColor: const Color(0xFF10B981),
+        duration: const Duration(seconds: 2),
+      ),
+    );
 
     _clearMaterial();
   }
@@ -575,6 +668,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     setState(() {
       _selectedMaterialName = null;
       availableCount = 0;
+      _isFetchingLiveStock = false;
       _neededCountController.clear();
     });
   }
@@ -718,362 +812,157 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   }
 
   Future<void> _saveCompanyToSiteTransfer() async {
-    if (!_validateCompanyToSiteForm()) return;
+    if (!_validateCompanyToSiteForm() || _isProcessing) return;
+
+    setState(() => _isProcessing = true);
 
     try {
-      final transferData = {
-        'managerName': _managerNameController.text.trim(),
-        'siteId': _selectedSiteId,
-        'projectName': _projectNameController.text.trim(),
-        'supervisorName': _supervisorNameController.text.trim(),
-        'date': _dateController.text.trim(),
-        'transferType': 'CompanyToSite',
-        'materials': materialsToTransfer,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-
-      await FirestoreService.getCollection('materialTransfers').add(transferData);
+      final siteObj = sitesList.firstWhere(
+        (s) => s['siteId'] == _selectedSiteId,
+        orElse: () => <String, dynamic>{},
+      );
+      final resolvedSiteName = (siteObj['siteName'] ?? _selectedSiteId!).toString().trim();
 
       for (var material in materialsToTransfer) {
-        final materialName = material['materialName'];
-        final neededCount = material['neededCount'];
+        final materialName = material['materialName'] as String;
+        final neededCount = material['neededCount'] as int;
 
-        // Update materialsavailablity collection
-        try {
-          final availSnapshot = await FirestoreService.getCollection('materialsavailablity').get();
-          for (final doc in availSnapshot.docs) {
-            final data = doc.data();
-            final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
-            if (name == materialName) {
-              final currentCount = _parseCount(data['count'] ?? data['availableCount']);
-              final newCount = (currentCount - neededCount).clamp(0, double.infinity).toInt();
-              await FirestoreService.getCollection('materialsavailablity').doc(doc.id).update({
-                'count': newCount,
-                'lastupdated': FieldValue.serverTimestamp(),
-              });
-            }
-          }
-        } catch (e) {
-          debugPrint('Error updating materialsavailablity: $e');
-        }
-
-        final materialQuery = await FirestoreService.getCollection('materials')
-            .where('materialName', isEqualTo: materialName)
-            .get();
-
-        if (materialQuery.docs.isNotEmpty) {
-          final doc = materialQuery.docs.first;
-          final currentAvailable = doc.data()['availableCount'] ?? doc.data()['count'] ?? 0;
-          final newAvailable = (currentAvailable - neededCount).clamp(0, double.infinity).toInt();
-
-          await FirestoreService.getCollection('materials').doc(doc.id).update({
-            'availableCount': newAvailable,
-            'count': newAvailable,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        final siteMaterialRef = FirestoreService.getCollection('siteMaterials')
-            .doc(_selectedSiteId)
-            .collection('materials')
-            .doc(materialName);
-
-        final siteMaterialDoc = await siteMaterialRef.get();
-
-        if (siteMaterialDoc.exists) {
-          final currentSiteCount = siteMaterialDoc.data()?['count'] ?? 0;
-          await siteMaterialRef.update({
-            'count': currentSiteCount + neededCount,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        } else {
-          await siteMaterialRef.set({
-            'materialId': materialName,
-            'materialName': materialName,
-            'displayName': material['displayName'],
-            'count': neededCount,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        // Sync to materialatsite collection
-        try {
-          final matAtSiteRef = FirestoreService.getCollection('materialatsite')
-              .doc('${_selectedSiteId}_$materialName');
-          final matAtSiteDoc = await matAtSiteRef.get();
-          if (matAtSiteDoc.exists) {
-            final curr = _parseCount(matAtSiteDoc.data()?['count'] ?? matAtSiteDoc.data()?['availableCount']);
-            await matAtSiteRef.update({
-              'count': curr + neededCount,
-              'availableCount': curr + neededCount,
-              'siteid': _selectedSiteId,
-              'materialName': materialName,
-              'materialname': materialName,
-              'lastUpdated': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          } else {
-            await matAtSiteRef.set({
-              'siteid': _selectedSiteId,
-              'materialName': materialName,
-              'materialname': materialName,
-              'count': neededCount,
-              'availableCount': neededCount,
-              'lastUpdated': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-        } catch (e) {
-          debugPrint('Error syncing materialatsite on company to site transfer: $e');
-        }
+        await MaterialInventoryService.transferCompanyToSite(
+          materialName: materialName,
+          siteId: _selectedSiteId!,
+          quantity: neededCount,
+          siteName: resolvedSiteName,
+          managerName: _managerNameController.text.trim(),
+          supervisorName: _supervisorNameController.text.trim(),
+          projectName: _projectNameController.text.trim(),
+          displayName: material['displayName'],
+        );
       }
 
       if (mounted) {
+        setState(() => _isProcessing = false);
         await DialogUtils.showSuccessDialog(
           context,
-          message: 'Materials transferred successfully!',
+          message: 'Materials transferred to site successfully!',
         );
         _clearAll();
-        _loadMaterialData();
+        await _loadMaterialData();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error transferring materials: $e')));
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error transferring materials: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
       }
     }
   }
 
   Future<void> _saveSiteToSiteTransfer() async {
+    if (!_validateSiteToSiteForm() || _isProcessing) return;
+
+    setState(() => _isProcessing = true);
+
     try {
-      final transferData = {
-        'fromManagerName': _fromManagerController.text.trim(),
-        'fromSiteId': _fromSiteId,
-        'fromSiteName': _fromSiteNameController.text.trim(),
-        'fromProjectName': _fromProjectNameController.text.trim(),
-        'fromSupervisorName': _fromSupervisorController.text.trim(),
-        'fromDate': _fromDateController.text.trim(),
-        'toManagerName': _toManagerController.text.trim(),
-        'toSiteId': _toSiteId,
-        'toSiteName': _toSiteNameController.text.trim(),
-        'toProjectName': _toProjectNameController.text.trim(),
-        'toSupervisorName': _toSupervisorController.text.trim(),
-        'toDate': _toDateController.text.trim(),
-        'transferType': 'SiteToSite',
-        'materials': materialsToTransfer,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-
-      await FirestoreService.getCollection('materialTransfers').add(transferData);
-
       for (var material in materialsToTransfer) {
-        final materialName = material['materialName'];
-        final neededCount = material['neededCount'];
+        final materialName = material['materialName'] as String;
+        final neededCount = material['neededCount'] as int;
 
-        final fromSiteRef = FirestoreService.getCollection('siteMaterials')
-            .doc(_fromSiteId)
-            .collection('materials')
-            .doc(materialName);
-
-        final fromDoc = await fromSiteRef.get();
-        if (fromDoc.exists) {
-          final currentFromCount = fromDoc.data()?['count'] ?? 0;
-          final newFromCount = (currentFromCount - neededCount).clamp(0, double.infinity).toInt();
-          await fromSiteRef.update({
-            'count': newFromCount,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        final toSiteRef = FirestoreService.getCollection('siteMaterials')
-            .doc(_toSiteId)
-            .collection('materials')
-            .doc(materialName);
-
-        final toDoc = await toSiteRef.get();
-        if (toDoc.exists) {
-          final currentToCount = toDoc.data()?['count'] ?? 0;
-          await toSiteRef.update({
-            'count': currentToCount + neededCount,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        } else {
-          await toSiteRef.set({
-            'materialId': materialName,
-            'materialName': materialName,
-            'displayName': material['displayName'],
-            'count': neededCount,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        // Sync to materialatsite for both fromSite and toSite
-        try {
-          final fromMatAtSiteRef = FirestoreService.getCollection('materialatsite')
-              .doc('${_fromSiteId}_$materialName');
-          final fromMatAtSiteDoc = await fromMatAtSiteRef.get();
-          if (fromMatAtSiteDoc.exists) {
-            final curr = _parseCount(fromMatAtSiteDoc.data()?['count'] ?? fromMatAtSiteDoc.data()?['availableCount']);
-            final updated = (curr - neededCount).clamp(0, double.infinity).toInt();
-            await fromMatAtSiteRef.update({
-              'count': updated,
-              'availableCount': updated,
-              'lastUpdated': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-
-          final toMatAtSiteRef = FirestoreService.getCollection('materialatsite')
-              .doc('${_toSiteId}_$materialName');
-          final toMatAtSiteDoc = await toMatAtSiteRef.get();
-          if (toMatAtSiteDoc.exists) {
-            final curr = _parseCount(toMatAtSiteDoc.data()?['count'] ?? toMatAtSiteDoc.data()?['availableCount']);
-            await toMatAtSiteRef.update({
-              'count': curr + neededCount,
-              'availableCount': curr + neededCount,
-              'siteid': _toSiteId,
-              'materialName': materialName,
-              'materialname': materialName,
-              'lastUpdated': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          } else {
-            await toMatAtSiteRef.set({
-              'siteid': _toSiteId,
-              'materialName': materialName,
-              'materialname': materialName,
-              'count': neededCount,
-              'availableCount': neededCount,
-              'lastUpdated': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-        } catch (e) {
-          debugPrint('Error syncing materialatsite on site to site transfer: $e');
-        }
+        await MaterialInventoryService.transferSiteToSite(
+          materialName: materialName,
+          fromSiteId: _fromSiteId!,
+          toSiteId: _toSiteId!,
+          quantity: neededCount,
+          fromSiteName: _fromSiteNameController.text.trim(),
+          toSiteName: _toSiteNameController.text.trim(),
+          fromManagerName: _fromManagerController.text.trim(),
+          toManagerName: _toManagerController.text.trim(),
+          fromSupervisorName: _fromSupervisorController.text.trim(),
+          toSupervisorName: _toSupervisorController.text.trim(),
+          fromProjectName: _fromProjectNameController.text.trim(),
+          toProjectName: _toProjectNameController.text.trim(),
+          displayName: material['displayName'],
+        );
       }
 
       if (mounted) {
+        setState(() => _isProcessing = false);
         await DialogUtils.showSuccessDialog(
           context,
           message: 'Site-to-Site transfer completed successfully!',
         );
         _clearAll();
+        if (_fromSiteId != null) {
+          await _loadSiteMaterialData(_fromSiteId!);
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error performing transfer: $e')));
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error performing transfer: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
       }
     }
   }
 
   Future<void> _saveSiteToCompanyTransfer() async {
-    try {
-      final transferData = {
-        'managerName': _siteToCompanyManagerController.text.trim(),
-        'siteId': _selectedSiteId,
-        'siteName': _siteToCompanySiteNameController.text.trim(),
-        'projectName': _projectNameController.text.trim(),
-        'supervisorName': _siteToCompanySupervisorController.text.trim(),
-        'date': _siteToCompanyDateController.text.trim(),
-        'transferType': 'SiteToCompany',
-        'materials': materialsToTransfer,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+    if (!_validateSiteToCompanyForm() || _isProcessing) return;
 
-      await FirestoreService.getCollection('materialTransfers').add(transferData);
+    setState(() => _isProcessing = true);
+
+    try {
+      final siteObj = sitesList.firstWhere(
+        (s) => s['siteId'] == _selectedSiteId,
+        orElse: () => <String, dynamic>{},
+      );
+      final siteNameFromCtrl = _siteToCompanySiteNameController.text.trim();
+      final resolvedSiteName = (siteObj['siteName'] != null &&
+              siteObj['siteName'].toString().trim().isNotEmpty)
+          ? siteObj['siteName'].toString().trim()
+          : (siteNameFromCtrl.isNotEmpty ? siteNameFromCtrl : _selectedSiteId!);
 
       for (var material in materialsToTransfer) {
-        final materialName = material['materialName'];
-        final neededCount = material['neededCount'];
+        final materialName = material['materialName'] as String;
+        final neededCount = material['neededCount'] as int;
 
-        final siteMaterialRef = FirestoreService.getCollection('siteMaterials')
-            .doc(_selectedSiteId)
-            .collection('materials')
-            .doc(materialName);
-
-        final siteMaterialDoc = await siteMaterialRef.get();
-        if (siteMaterialDoc.exists) {
-          final currentSiteCount = siteMaterialDoc.data()?['count'] ?? 0;
-          final newSiteCount = (currentSiteCount - neededCount).clamp(0, double.infinity).toInt();
-          await siteMaterialRef.update({
-            'count': newSiteCount,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        // Sync to materialatsite
-        try {
-          final matAtSiteRef = FirestoreService.getCollection('materialatsite')
-              .doc('${_selectedSiteId}_$materialName');
-          final matAtSiteDoc = await matAtSiteRef.get();
-          if (matAtSiteDoc.exists) {
-            final curr = _parseCount(matAtSiteDoc.data()?['count'] ?? matAtSiteDoc.data()?['availableCount']);
-            final updated = (curr - neededCount).clamp(0, double.infinity).toInt();
-            await matAtSiteRef.update({
-              'count': updated,
-              'availableCount': updated,
-              'lastUpdated': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-        } catch (e) {
-          debugPrint('Error syncing materialatsite on site to company transfer: $e');
-        }
-
-        // Update materialsavailablity collection
-        try {
-          final availSnapshot = await FirestoreService.getCollection('materialsavailablity').get();
-          for (final doc in availSnapshot.docs) {
-            final data = doc.data();
-            final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
-            if (name == materialName) {
-              final currentCount = _parseCount(data['count'] ?? data['availableCount']);
-              final newCount = currentCount + neededCount;
-              await FirestoreService.getCollection('materialsavailablity').doc(doc.id).update({
-                'count': newCount,
-                'lastupdated': FieldValue.serverTimestamp(),
-              });
-            }
-          }
-        } catch (e) {
-          debugPrint('Error updating materialsavailablity on return: $e');
-        }
-
-        final materialQuery = await FirestoreService.getCollection('materials')
-            .where('materialName', isEqualTo: materialName)
-            .get();
-
-        if (materialQuery.docs.isNotEmpty) {
-          final doc = materialQuery.docs.first;
-          final currentAvailable = doc.data()['availableCount'] ?? doc.data()['count'] ?? 0;
-          final newAvailable = currentAvailable + neededCount;
-
-          await FirestoreService.getCollection('materials').doc(doc.id).update({
-            'availableCount': newAvailable,
-            'count': newAvailable,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
+        await MaterialInventoryService.transferSiteToCompany(
+          materialName: materialName,
+          siteId: _selectedSiteId!,
+          quantity: neededCount,
+          siteName: resolvedSiteName,
+          managerName: _siteToCompanyManagerController.text.trim(),
+          supervisorName: _siteToCompanySupervisorController.text.trim(),
+          projectName: _projectNameController.text.trim(),
+          displayName: material['displayName'],
+        );
       }
 
       if (mounted) {
+        setState(() => _isProcessing = false);
         await DialogUtils.showSuccessDialog(
           context,
           message: 'Site-to-Company return completed successfully!',
         );
         _clearAll();
-        _loadMaterialData();
+        if (_selectedSiteId != null) {
+          await _loadSiteMaterialData(_selectedSiteId!);
+        }
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isProcessing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error performing return: $e')),
+          SnackBar(
+            content: Text('Error performing return: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
         );
       }
     }
@@ -1209,7 +1098,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           _buildCardContainer(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1219,11 +1108,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                 _buildMaterialDropdown(),
                                 const SizedBox(height: 16),
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
                                       child: _buildCountBox(
                                         'Available Count',
-                                        '$availableCount',
+                                        _isFetchingLiveStock
+                                            ? 'Syncing...'
+                                            : '$availableCount',
                                         const Color(0xFF10B981),
                                         Icons.check_circle_rounded,
                                       ),
@@ -1235,6 +1127,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                         label: 'Transfer Count *',
                                         hint: 'Enter count',
                                         keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                        ],
                                         icon: Icons.numbers_rounded,
                                       ),
                                     ),
@@ -1249,20 +1144,21 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           _buildCardContainer(
                             child: Column(
                               children: [
                                 _buildTransferActionsButton(
                                   primaryColor: primaryColor,
                                   actionText: 'Transfer to Site',
+                                  isProcessing: _isProcessing,
                                   onPressed: () {
                                     if (_validateCompanyToSiteForm()) {
                                       _saveCompanyToSiteTransfer();
                                     }
                                   },
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 18),
                                 _buildHowItWorksBox(
                                   primaryColor: primaryColor,
                                   items: const [
@@ -1289,8 +1185,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                     if (v != null) {
                                       setState(() {
                                         _fromSiteId = v;
+                                        _selectedMaterialName = null;
+                                        availableCount = 0;
                                       });
-                                      _fetchAndFillSiteDetails(v, mode: 1);
+                                      _fetchAndFillSiteDetails(v, mode: 1, isFromSite: true);
                                       _loadSiteMaterialData(v);
                                     }
                                   },
@@ -1338,7 +1236,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           _buildCardContainer(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1352,7 +1250,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                       setState(() {
                                         _toSiteId = v;
                                       });
-                                      _fetchAndFillSiteDetails(v, mode: 2);
+                                      _fetchAndFillSiteDetails(v, mode: 1, isFromSite: false);
                                     }
                                   },
                                   label: 'To Site *',
@@ -1399,7 +1297,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           _buildCardContainer(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1409,11 +1307,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                 _buildMaterialDropdown(),
                                 const SizedBox(height: 16),
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
                                       child: _buildCountBox(
                                         'Available Count',
-                                        '$availableCount',
+                                        _isFetchingLiveStock
+                                            ? 'Syncing...'
+                                            : '$availableCount',
                                         const Color(0xFF10B981),
                                         Icons.check_circle_rounded,
                                       ),
@@ -1425,6 +1326,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                         label: 'Transfer Count *',
                                         hint: 'Enter count',
                                         keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                        ],
                                         icon: Icons.numbers_rounded,
                                       ),
                                     ),
@@ -1439,20 +1343,21 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           _buildCardContainer(
                             child: Column(
                               children: [
                                 _buildTransferActionsButton(
                                   primaryColor: primaryColor,
                                   actionText: 'Transfer Site to Site',
+                                  isProcessing: _isProcessing,
                                   onPressed: () {
                                     if (_validateSiteToSiteForm()) {
                                       _saveSiteToSiteTransfer();
                                     }
                                   },
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 18),
                                 _buildHowItWorksBox(
                                   primaryColor: primaryColor,
                                   items: const [
@@ -1479,8 +1384,10 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                     if (v != null) {
                                       setState(() {
                                         _selectedSiteId = v;
+                                        _selectedMaterialName = null;
+                                        availableCount = 0;
                                       });
-                                      _fetchAndFillSiteDetails(v, mode: 3);
+                                      _fetchAndFillSiteDetails(v, mode: 2);
                                       _loadSiteMaterialData(v);
                                     }
                                   },
@@ -1520,7 +1427,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           _buildCardContainer(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1530,11 +1437,14 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                 _buildMaterialDropdown(),
                                 const SizedBox(height: 16),
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
                                       child: _buildCountBox(
                                         'Available Count',
-                                        '$availableCount',
+                                        _isFetchingLiveStock
+                                            ? 'Syncing...'
+                                            : '$availableCount',
                                         const Color(0xFF10B981),
                                         Icons.check_circle_rounded,
                                       ),
@@ -1546,6 +1456,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                         label: 'Transfer Count *',
                                         hint: 'Enter count',
                                         keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                        ],
                                         icon: Icons.numbers_rounded,
                                       ),
                                     ),
@@ -1560,20 +1473,21 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           _buildCardContainer(
                             child: Column(
                               children: [
                                 _buildTransferActionsButton(
                                   primaryColor: primaryColor,
                                   actionText: 'Return to Company',
+                                  isProcessing: _isProcessing,
                                   onPressed: () {
                                     if (_validateSiteToCompanyForm()) {
                                       _saveSiteToCompanyTransfer();
                                     }
                                   },
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 18),
                                 _buildHowItWorksBox(
                                   primaryColor: primaryColor,
                                   items: const [
@@ -1611,7 +1525,9 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             _transferMode = modeIndex;
             _selectedMaterialName = null;
             availableCount = 0;
+            _isFetchingLiveStock = false;
             _neededCountController.clear();
+            materialsToTransfer.clear();
             if (_loggedInManagerName.isNotEmpty) {
               if (_managerNameController.text.trim().isEmpty) {
                 _managerNameController.text = _loggedInManagerName;
@@ -1624,6 +1540,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               }
             }
           });
+          if (modeIndex == 0) {
+            _loadMaterialData();
+          } else if (modeIndex == 1 && _fromSiteId != null) {
+            _loadSiteMaterialData(_fromSiteId!);
+          } else if (modeIndex == 2 && _selectedSiteId != null) {
+            _loadSiteMaterialData(_selectedSiteId!);
+          }
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -1651,16 +1574,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     required Widget child,
   }) {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1672,7 +1595,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: FontWeight.w800,
         color: Color(0xFF0A183D),
         letterSpacing: -0.3,
@@ -1686,6 +1609,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     required String hint,
     bool enabled = true,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
     VoidCallback? onTap,
     IconData? icon,
   }) {
@@ -1705,6 +1629,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         ),
         const SizedBox(height: 8),
         Container(
+          height: 52,
           decoration: BoxDecoration(
             color: enabled ? Colors.white : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(14),
@@ -1714,6 +1639,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             controller: controller,
             enabled: enabled,
             keyboardType: keyboardType,
+            inputFormatters: inputFormatters,
             onTap: onTap,
             style: const TextStyle(
               color: Color(0xFF0A183D),
@@ -1752,6 +1678,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   }) {
     final theme = Theme.of(context);
     final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
+    final hasSelected = sitesList.any((s) => s['siteId'] == selectedId);
+    final currentVal = hasSelected ? selectedId : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1766,6 +1694,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         ),
         const SizedBox(height: 8),
         Container(
+          height: 52,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -1773,7 +1702,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           ),
           child: _isLoadingSites
               ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
                       SizedBox(
@@ -1790,7 +1719,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   ),
                 )
               : DropdownButtonFormField<String>(
-                  initialValue: selectedId,
+                  key: ValueKey('site_${currentVal}_${sitesList.length}'),
+                  initialValue: currentVal,
                   isExpanded: true,
                   dropdownColor: Colors.white,
                   borderRadius: BorderRadius.circular(14),
@@ -1817,13 +1747,16 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 14,
+                      vertical: 12,
                     ),
                   ),
                   items: sitesList.map((site) {
                     return DropdownMenuItem<String>(
                       value: site['siteId'],
-                      child: Text(site['siteName'] ?? site['siteId']),
+                      child: Text(
+                        site['siteName'] ?? site['siteId'],
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     );
                   }).toList(),
                   onChanged: onChanged,
@@ -1851,6 +1784,13 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   Widget _buildMaterialDropdown() {
     final theme = Theme.of(context);
     final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
+    final validList = _transferMode == 0 ? materialsList : siteMaterialsList;
+    final hasSelected = validList.any(
+      (m) =>
+          (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+          (_selectedMaterialName ?? '').trim().toLowerCase(),
+    );
+    final currentSelectedValue = hasSelected ? _selectedMaterialName : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1865,6 +1805,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         ),
         const SizedBox(height: 8),
         Container(
+          height: 52,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -1872,7 +1813,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           ),
           child: _isLoadingMaterials
               ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
                       SizedBox(
@@ -1889,7 +1830,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   ),
                 )
               : DropdownButtonFormField<String>(
-                  initialValue: _selectedMaterialName,
+                  key: ValueKey('mat_${currentSelectedValue}_${validList.length}'),
+                  initialValue: currentSelectedValue,
                   isExpanded: true,
                   dropdownColor: Colors.white,
                   borderRadius: BorderRadius.circular(14),
@@ -1899,7 +1841,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Select Material',
+                    hintText: validList.isEmpty
+                        ? (_transferMode != 0 && (_fromSiteId == null && _selectedSiteId == null)
+                            ? 'Select site first'
+                            : 'No materials available')
+                        : 'Select Material',
                     hintStyle: const TextStyle(
                       color: Color(0xFF94A3B8),
                       fontSize: 14,
@@ -1916,54 +1862,59 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 14,
+                      vertical: 12,
                     ),
                   ),
-                  items: (_transferMode == 0 ? materialsList : siteMaterialsList)
-                      .map((material) {
-                        final materialName = material['materialName'];
-                        final displayName = material['displayName'];
-                        final count = _parseCount(material['count']);
+                  items: validList.map((material) {
+                    final materialName =
+                        (material['materialName'] ?? '').toString().trim();
+                    final displayName =
+                        (material['displayName'] ?? materialName).toString().trim();
+                    final count = _parseCount(material['count']);
 
-                        return DropdownMenuItem<String>(
-                          value: materialName,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  displayName ?? materialName,
-                                  style: const TextStyle(
-                                    color: Color(0xFF0A183D),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                    return DropdownMenuItem<String>(
+                      value: materialName,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              displayName.isNotEmpty ? displayName : materialName,
+                              style: const TextStyle(
+                                color: Color(0xFF0A183D),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: (count > 0 ? Colors.green : Colors.red)
-                                      .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'Avail: $count',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: count > 0
-                                        ? const Color(0xFF2E7D32)
-                                        : Colors.red[700],
-                                  ),
-                                ),
-                              ),
-                            ],
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        );
-                      })
-                      .toList(),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (count > 0
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFFEF4444))
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Available: $count',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: count > 0
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFFDC2626),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                   onChanged: _onMaterialChanged,
                 ),
         ),
@@ -1991,22 +1942,26 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
               Icon(icon, size: 20, color: color),
-              const SizedBox(width: 10),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: color,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -2087,18 +2042,38 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Materials to Transfer:',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 15,
-            color: Color(0xFF0A183D),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Materials to Transfer:',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                color: Color(0xFF0A183D),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${materialsToTransfer.length} items',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).primaryColor,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
+            color: const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
@@ -2110,6 +2085,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
               return Column(
                 children: [
                   ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -2123,7 +2100,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       ),
                     ),
                     title: Text(
-                      material['displayName'],
+                      material['displayName'] ?? material['materialName'] ?? '',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF0A183D),
@@ -2131,36 +2108,30 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                       ),
                     ),
                     subtitle: Text(
-                      'Quantity: ${material['neededCount']} units',
+                      'Quantity: ${material['neededCount']} ${material['unit'] ?? 'units'} (Available: ${material['availableCount']})',
                       style: const TextStyle(
                         color: Color(0xFF64748B),
                         fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete_rounded, color: Color(0xFFEF4444)),
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: Color(0xFFEF4444)),
+                      tooltip: 'Remove material',
                       onPressed: () => _removeMaterial(index),
                     ),
                   ),
                   if (!isLast)
                     const Divider(
                       height: 1,
-                      color: Color(0xFFCBD5E1),
+                      color: Color(0xFFE2E8F0),
                       indent: 16,
                       endIndent: 16,
                     ),
                 ],
               );
             }).toList(),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Total Materials: ${materialsToTransfer.length}',
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF64748B),
-            fontStyle: FontStyle.italic,
           ),
         ),
       ],
@@ -2171,6 +2142,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     required Color primaryColor,
     required String actionText,
     required VoidCallback onPressed,
+    bool isProcessing = false,
   }) {
     return Row(
       children: [
@@ -2178,7 +2150,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           child: SizedBox(
             height: 52,
             child: ElevatedButton(
-              onPressed: _clearAll,
+              onPressed: isProcessing ? null : _clearAll,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFF0A183D),
@@ -2206,7 +2178,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           child: SizedBox(
             height: 52,
             child: ElevatedButton(
-              onPressed: onPressed,
+              onPressed: isProcessing ? null : onPressed,
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
@@ -2216,26 +2188,35 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                 ),
                 elevation: 2,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.swap_horiz_rounded,
-                    size: 22,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    actionText.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6,
+              child: isProcessing
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.swap_horiz_rounded,
+                          size: 22,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          actionText.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
@@ -2284,7 +2265,11 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('• ', style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), fontWeight: FontWeight.bold)),
+          const Text('• ',
+              style: TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF475569),
+                  fontWeight: FontWeight.bold)),
           Expanded(
             child: Text(
               text,

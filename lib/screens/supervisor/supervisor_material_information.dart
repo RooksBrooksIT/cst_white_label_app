@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '/services/firestore_service.dart';
 import '/services/auth_service.dart';
+import '/services/material_inventory_service.dart';
 import '/utils/app_theme.dart';
 
 class SupervisorMaterialInfoScreen extends StatefulWidget {
@@ -66,9 +68,11 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   // List to store multiple materials for transfer
   List<Map<String, dynamic>> materialsToTransfer = [];
 
-  // Loading states
+  // Loading and processing states
   bool _isLoadingSites = true;
   bool _isLoadingMaterials = true;
+  bool _isProcessing = false;
+  bool _isFetchingLiveStock = false;
 
   @override
   void initState() {
@@ -250,22 +254,65 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       ).get();
 
       if (mounted) {
+        final List<Map<String, dynamic>> parsedSites = [];
+        for (final doc in querySnapshot.docs) {
+          final data = doc.data();
+          final loc = (data['location'] ?? '').toString().trim();
+          final s = (data['site'] ?? '').toString().trim();
+          final sId = (data['siteId'] ?? '').toString().trim();
+          
+          String resolvedSiteId = s.isNotEmpty && s != loc
+              ? s
+              : (sId.isNotEmpty && sId != loc ? sId : doc.id.trim());
+          if (resolvedSiteId.isEmpty) resolvedSiteId = doc.id.trim();
+
+          parsedSites.add({
+            'siteId': resolvedSiteId,
+            'siteName': resolvedSiteId, // Ensure clean Site ID (e.g. ST001_shek) is used, never address!
+            'projectName': data['projectName'] ?? '',
+            'supervisorName':
+                data['supervisor'] ?? data['supervisorName'] ?? '',
+          });
+        }
+
         setState(() {
-          sitesList = querySnapshot.docs.map((doc) {
-            final data = doc.data();
-            return {
-              'siteId': doc.id,
-              'siteName': data['site'] ?? doc.id,
-              'projectName': data['projectName'] ?? '',
-              'supervisorName':
-                  data['supervisor'] ?? data['supervisorName'] ?? '',
-            };
-          }).toList();
+          sitesList = parsedSites;
           _isLoadingSites = false;
+
+          // If supervisor has assigned site, auto-select it if nothing selected yet
+          if (_selectedSiteId == null && parsedSites.isNotEmpty) {
+            final auth = AuthService();
+            if (auth.userRole == UserRole.supervisor) {
+              final supName = (auth.userData['supervisorName'] ??
+                      auth.userData['fullName'] ??
+                      auth.userData['name'] ??
+                      '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+              final mySite = parsedSites.firstWhere(
+                (s) =>
+                    (s['supervisorName'] ?? '').toString().trim().toLowerCase() == supName,
+                orElse: () => parsedSites.first,
+              );
+              _selectedSiteId = mySite['siteId']?.toString();
+              _fromSiteId = mySite['siteId']?.toString();
+              _siteToCompanySiteNameController.text = mySite['siteName']?.toString() ?? '';
+              _siteToCompanySupervisorController.text = mySite['supervisorName']?.toString() ?? '';
+              _projectNameController.text = mySite['projectName']?.toString() ?? '';
+              _fromSiteNameController.text = mySite['siteName']?.toString() ?? '';
+              _fromSupervisorController.text = mySite['supervisorName']?.toString() ?? '';
+              _fromProjectNameController.text = mySite['projectName']?.toString() ?? '';
+            }
+          }
         });
+
+        if (_selectedSiteId != null) {
+          await _loadSiteMaterialData(_selectedSiteId);
+        }
       }
     } catch (e) {
-      print('Error loading site data: $e');
+      debugPrint('Error loading site data: $e');
       if (mounted) {
         setState(() {
           _isLoadingSites = false;
@@ -283,85 +330,49 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     return 0;
   }
 
-  // Utility: coerce a Firestore timestamp-like value to milliseconds since epoch
-  int _tsMillis(dynamic v) {
-    try {
-      if (v == null) return -1;
-      if (v is Timestamp) {
-        return v.millisecondsSinceEpoch;
-      }
-      if (v is DateTime) {
-        return v.millisecondsSinceEpoch;
-      }
-      if (v is String) {
-        final dt = DateTime.tryParse(v);
-        return dt?.millisecondsSinceEpoch ?? -1;
-      }
-      // Fallback not supported type
-      return -1;
-    } catch (_) {
-      return -1;
-    }
-  }
-
-  // Load material data from materialsavailablity collection
+  // Load material data using unified MaterialInventoryService
   Future<void> _loadMaterialData() async {
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'materialsavailablity',
-      ).get();
-
-      // Group by materialname and pick the latest entry (by lastupdated) for each
-      final Map<String, Map<String, dynamic>> latestByName = {};
-      for (final doc in querySnapshot.docs) {
-        final data = doc.data();
-        // Check for both materialName and materialname
-        final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
-        if (name.isEmpty) continue;
-        
-        final count = _parseCount(data['count']);
-        // Check for both lastupdated and lastUpdated
-        final lastUpdatedMs = _tsMillis(data['lastupdated'] ?? data['lastUpdated']);
-
-        if (!latestByName.containsKey(name)) {
-          latestByName[name] = {
-            'docId': doc.id,
-            'materialName': name,
-            'displayName': name,
-            'count': count,
-            'lastupdatedMillis': lastUpdatedMs,
+      final items = await MaterialInventoryService.fetchAllMaterialsInventory();
+      final Map<String, Map<String, dynamic>> mapByDocOrName = {};
+      for (final item in items) {
+        final key = item.materialName.trim();
+        if (key.isEmpty) continue;
+        if (!mapByDocOrName.containsKey(key)) {
+          mapByDocOrName[key] = {
+            'materialId': item.docId,
+            'materialName': key,
+            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
+            'unit': item.unit,
+            'count': item.companyAvailableCount,
           };
-        } else {
-          final existing = latestByName[name]!;
-          final existingTs = existing['lastupdatedMillis'];
-          final isNewer = lastUpdatedMs > (existingTs as int? ?? -1);
-          if (isNewer) {
-            latestByName[name] = {
-              'docId': doc.id,
-              'materialName': name,
-              'displayName': name,
-              'count': count,
-              'lastupdatedMillis': lastUpdatedMs,
-            };
-          }
         }
       }
 
-      final list = latestByName.values.toList()
-        ..sort(
-          (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-            (b['displayName'] as String).toLowerCase(),
-          ),
-        );
+      final list = mapByDocOrName.values.toList();
+      list.sort(
+        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
+              (b['displayName'] as String).toLowerCase(),
+            ),
+      );
 
       if (mounted) {
         setState(() {
           materialsList = list;
           _isLoadingMaterials = false;
+          if (_selectedMaterialName != null) {
+            final match = list.firstWhere(
+              (m) =>
+                  (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+                  _selectedMaterialName!.trim().toLowerCase(),
+              orElse: () => <String, dynamic>{'count': 0},
+            );
+            availableCount = _parseCount(match['count']);
+          }
         });
       }
     } catch (e) {
-      print('Error loading material data: $e');
+      debugPrint('Error loading material data: $e');
       if (mounted) {
         setState(() {
           _isLoadingMaterials = false;
@@ -371,7 +382,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
   }
 
-  // Load material data for a specific site from materialatsite and siteMaterials
+  // Load material data for a specific site from unified MaterialInventoryService
   Future<void> _loadSiteMaterialData(String? siteId) async {
     if (siteId == null || siteId.isEmpty) {
       if (mounted) {
@@ -384,60 +395,55 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
 
     try {
-      final Map<String, Map<String, dynamic>> siteMatMap = {};
-
-      // 1. Query materialatsite
-      try {
-        final querySnapshot = await FirestoreService.getCollection(
-          'materialatsite',
-        ).where('siteid', isEqualTo: siteId).get();
-
-        for (var doc in querySnapshot.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
-          if (name.isEmpty) continue;
-          final count = _parseCount(data['count'] ?? data['availableCount']);
-          siteMatMap[name] = {
-            'docId': doc.id,
-            'materialName': name,
-            'displayName': name,
-            'count': count,
+      final items = await MaterialInventoryService.fetchAllMaterialsInventory();
+      final Map<String, Map<String, dynamic>> mapByDocOrName = {};
+      for (final item in items) {
+        final key = item.materialName.trim();
+        if (key.isEmpty) continue;
+        final cleanLow = siteId.trim().toLowerCase();
+        final siteEntry = item.siteInventories.firstWhere(
+          (s) {
+            final sIdLow = s.siteId.trim().toLowerCase();
+            final sNameLow = s.siteName.trim().toLowerCase();
+            return sIdLow == cleanLow ||
+                (sNameLow.isNotEmpty && sNameLow == cleanLow) ||
+                (cleanLow.contains('_') && sIdLow.isNotEmpty && (cleanLow.startsWith('$sIdLow' '_') || cleanLow.endsWith('_$sIdLow'))) ||
+                (cleanLow.contains('_') && sNameLow.isNotEmpty && (cleanLow.startsWith('$sNameLow' '_') || cleanLow.endsWith('_$sNameLow'))) ||
+                (sIdLow.contains('_') && cleanLow.isNotEmpty && (sIdLow.startsWith('$cleanLow' '_') || sIdLow.endsWith('_$cleanLow')));
+          },
+          orElse: () => SiteInventoryEntry(siteId: siteId, availableCount: 0),
+        );
+        if (!mapByDocOrName.containsKey(key)) {
+          mapByDocOrName[key] = {
+            'materialId': item.docId,
+            'materialName': key,
+            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
+            'unit': item.unit,
+            'count': siteEntry.availableCount,
           };
         }
-      } catch (_) {}
+      }
 
-      // 2. Query siteMaterials/{siteId}/materials subcollection
-      try {
-        final snap = await FirestoreService.getCollection('siteMaterials')
-            .doc(siteId).collection('materials').get();
-        for (var doc in snap.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ?? data['materialname'] ?? data['displayName'] ?? doc.id).toString().trim();
-          if (name.isEmpty) continue;
-          final count = _parseCount(data['count'] ?? data['availableCount']);
-          final existingCount = siteMatMap[name]?['count'] as int? ?? 0;
-          if (!siteMatMap.containsKey(name) || count > existingCount) {
-            siteMatMap[name] = {
-              'docId': doc.id,
-              'materialName': name,
-              'displayName': (data['displayName'] ?? name).toString().trim(),
-              'count': count,
-            };
-          }
-        }
-      } catch (_) {}
-
-      final list = siteMatMap.values.toList()
-        ..sort(
-          (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-            (b['displayName'] as String).toLowerCase(),
-          ),
-        );
+      final list = mapByDocOrName.values.toList();
+      list.sort(
+        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
+              (b['displayName'] as String).toLowerCase(),
+            ),
+      );
 
       if (mounted) {
         setState(() {
           siteMaterialsList = list;
           _isLoadingMaterials = false;
+          if (_selectedMaterialName != null) {
+            final match = list.firstWhere(
+              (m) =>
+                  (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+                  _selectedMaterialName!.trim().toLowerCase(),
+              orElse: () => <String, dynamic>{'count': 0},
+            );
+            availableCount = _parseCount(match['count']);
+          }
         });
       }
     } catch (e) {
@@ -451,80 +457,148 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
   }
 
-  // Handle material selection change
-  void _onMaterialChanged(String? materialName) {
-    if (materialName == _selectedMaterialName) return;
-
-    setState(() {
-      _selectedMaterialName = materialName;
-      if (materialName != null) {
-        Map<String, dynamic> selectedMaterial = siteMaterialsList.firstWhere(
-          (material) => (material['materialName'] ?? material['displayName']) == materialName,
-          orElse: () => {},
-        );
-        if (selectedMaterial.isEmpty) {
-          selectedMaterial = materialsList.firstWhere(
-            (material) => (material['materialName'] ?? material['displayName']) == materialName,
-            orElse: () => {},
-          );
-        }
-        if (selectedMaterial.isNotEmpty) {
-          availableCount = _parseCount(selectedMaterial['count'] ?? selectedMaterial['availableCount']);
-        } else {
-          availableCount = 0;
-        }
-      } else {
+  // Handle material selection change with instant in-memory lookup and live background sync
+  void _onMaterialChanged(String? materialName) async {
+    if (materialName == null || materialName.trim().isEmpty) {
+      setState(() {
+        _selectedMaterialName = null;
         availableCount = 0;
-      }
-      _neededCountController.clear();
-    });
-  }
-
-  // Add material to transfer list
-  void _addMaterial() {
-    if (_selectedMaterialName == null || _selectedMaterialName!.isEmpty) {
-      _showSnackBar('Please select a material');
+        _isFetchingLiveStock = false;
+      });
       return;
     }
 
-    if (_neededCountController.text.isEmpty) {
+    final trimmed = materialName.trim();
+    final list = siteMaterialsList.isNotEmpty ? siteMaterialsList : materialsList;
+
+    final match = list.firstWhere(
+      (m) =>
+          (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+              trimmed.toLowerCase() ||
+          (m['displayName'] ?? '').toString().trim().toLowerCase() ==
+              trimmed.toLowerCase(),
+      orElse: () => <String, dynamic>{'count': 0},
+    );
+
+    final initialCount = _parseCount(match['count']);
+
+    setState(() {
+      _selectedMaterialName = trimmed;
+      availableCount = initialCount;
+      _isFetchingLiveStock = true;
+    });
+
+    try {
+      final freshItem =
+          await MaterialInventoryService.fetchMaterialInventory(trimmed);
+      if (freshItem != null && mounted && _selectedMaterialName == trimmed) {
+        int backendCount = 0;
+        final targetSiteId = _transferMode == 0 ? _fromSiteId : _selectedSiteId;
+        if (targetSiteId != null && targetSiteId.isNotEmpty) {
+          final sEntry = freshItem.siteInventories.firstWhere(
+            (s) =>
+                s.siteId.trim().toLowerCase() ==
+                targetSiteId.trim().toLowerCase(),
+            orElse: () => SiteInventoryEntry(
+              siteId: targetSiteId,
+              availableCount: 0,
+            ),
+          );
+          backendCount = sEntry.availableCount;
+        } else {
+          backendCount = freshItem.companyAvailableCount;
+        }
+
+        setState(() {
+          availableCount = backendCount;
+          _isFetchingLiveStock = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          _isFetchingLiveStock = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error syncing live stock for $trimmed: $e');
+      if (mounted) {
+        setState(() {
+          _isFetchingLiveStock = false;
+        });
+      }
+    }
+  }
+
+  // Add material to transfer list with cumulative quantity validation
+  void _addMaterial() {
+    if (_selectedMaterialName == null || _selectedMaterialName!.trim().isEmpty) {
+      _showSnackBar('Please select a material first');
+      return;
+    }
+
+    final neededCountStr = _neededCountController.text.trim();
+    if (neededCountStr.isEmpty) {
       _showSnackBar('Please enter needed count');
       return;
     }
 
-    final neededCount = int.tryParse(_neededCountController.text) ?? 0;
-    if (neededCount <= 0) {
-      _showSnackBar('Please enter a valid needed count');
+    final neededCount = int.tryParse(neededCountStr);
+    if (neededCount == null || neededCount <= 0) {
+      _showSnackBar('Please enter a valid positive needed count');
       return;
     }
 
-    if (neededCount > availableCount) {
-      _showSnackBar('Needed count cannot exceed available count');
+    if (availableCount <= 0) {
+      _showSnackBar('Selected material has 0 available units in inventory');
       return;
     }
 
-    // Get the display name for the material
-    final source = siteMaterialsList;
-    final selectedMaterial = source.firstWhere(
-      (material) => material['materialName'] == _selectedMaterialName,
-      orElse: () => {},
+    final list = siteMaterialsList.isNotEmpty ? siteMaterialsList : materialsList;
+    final selectedMaterial = list.firstWhere(
+      (m) =>
+          (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+          _selectedMaterialName!.trim().toLowerCase(),
+      orElse: () => <String, dynamic>{
+        'materialName': _selectedMaterialName!,
+        'displayName': _selectedMaterialName!,
+      },
     );
-    final displayName =
-        selectedMaterial['displayName'] ?? _selectedMaterialName!;
 
-    // Check if material already exists in the list
+    final displayName =
+        (selectedMaterial['displayName'] ?? _selectedMaterialName!).toString();
+
+    final alreadyAddedCount = materialsToTransfer
+        .where(
+          (m) =>
+              (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+              _selectedMaterialName!.trim().toLowerCase(),
+        )
+        .fold<int>(0, (acc, m) => acc + (m['neededCount'] as int));
+
+    final availableRemaining = availableCount - alreadyAddedCount;
+
+    if (neededCount > availableRemaining) {
+      _showSnackBar(
+        alreadyAddedCount > 0
+            ? 'Needed count ($neededCount) exceeds remaining available ($availableRemaining). Already added: $alreadyAddedCount, Total available: $availableCount.'
+            : 'Needed count ($neededCount) cannot exceed available count ($availableCount).',
+      );
+      return;
+    }
+
     final existingIndex = materialsToTransfer.indexWhere(
-      (item) => item['materialName'] == _selectedMaterialName,
+      (item) =>
+          (item['materialName'] ?? '').toString().trim().toLowerCase() ==
+          _selectedMaterialName!.trim().toLowerCase(),
     );
 
     if (existingIndex != -1) {
-      // Update existing material
       setState(() {
-        materialsToTransfer[existingIndex]['neededCount'] = neededCount;
+        materialsToTransfer[existingIndex]['neededCount'] =
+            (materialsToTransfer[existingIndex]['neededCount'] as int) + neededCount;
+        materialsToTransfer[existingIndex]['availableCount'] = availableCount;
       });
-      _showSnackBar('Material quantity updated');
+      _showSnackBar('Material quantity updated in transfer list');
     } else {
-      // Add new material
       setState(() {
         materialsToTransfer.add({
           'materialName': _selectedMaterialName!,
@@ -647,6 +721,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
 
   // Site-to-Site transfer method
   Future<void> _saveSiteToSiteTransfer() async {
+    if (_isProcessing) return;
     if (!_validateSiteToSiteForm()) {
       return;
     }
@@ -656,138 +731,79 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       return;
     }
 
+    setState(() {
+      _isProcessing = true;
+    });
+
     try {
       final date = _fromDateController.text.isNotEmpty
           ? _fromDateController.text
           : DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      // Show loading dialog
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return const AlertDialog(
-            content: Row(
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Text('Processing site transfer...'),
-              ],
-            ),
-          );
-        },
+      final fromSite = sitesList.firstWhere(
+        (s) => s['siteId'] == _fromSiteId,
+        orElse: () => <String, dynamic>{},
+      );
+      final toSite = sitesList.firstWhere(
+        (s) => s['siteId'] == _toSiteId,
+        orElse: () => <String, dynamic>{},
       );
 
-      // Use batch for atomic operations
-      final batch = FirebaseFirestore.instance.batch();
+      final fromSiteName = (fromSite['siteName'] ?? _fromSiteNameController.text).toString().trim();
+      final toSiteName = (toSite['siteName'] ?? _toSiteNameController.text).toString().trim();
 
-      // 1. Process each material for materialatsite collection
       for (final material in materialsToTransfer) {
         final String matName = material['materialName'];
-        final int moveCount = material['neededCount'];
+        final int moveCount = material['neededCount'] as int;
 
-        // Document references
-        final fromDocRef = FirestoreService.getCollection(
-          'materialatsite',
-        ).doc('${_fromSiteId}_$matName');
-        final toDocRef = FirestoreService.getCollection(
-          'materialatsite',
-        ).doc('${_toSiteId}_$matName');
-
-        // Get current counts
-        final fromSnap = await fromDocRef.get();
-        final toSnap = await toDocRef.get();
-
-        final int fromCurrent = _parseCount(fromSnap.data()?['count']);
-        final int toCurrent = _parseCount(toSnap.data()?['count']);
-
-        // Calculate new counts
-        final int fromNew = (fromCurrent - moveCount) < 0
-            ? 0
-            : (fromCurrent - moveCount);
-        final int toNew = toCurrent + moveCount;
-
-        // Update FROM site document
-        batch.set(fromDocRef, {
-          'siteid': _fromSiteId,
-          'Tositeid': _toSiteId,
-          'count': fromNew,
-          'materialName': matName,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        // Update TO site document
-        batch.set(toDocRef, {
-          'siteid': _toSiteId,
-          'Tositeid': _fromSiteId,
-          'count': toNew,
-          'materialName': matName,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        // Update siteMaterials collection for fromSite and toSite
-        final fromSiteRef = FirestoreService.getCollection('siteMaterials')
-            .doc(_fromSiteId)
-            .collection('materials')
-            .doc(matName);
-        final toSiteRef = FirestoreService.getCollection('siteMaterials')
-            .doc(_toSiteId)
-            .collection('materials')
-            .doc(matName);
-
-        batch.set(fromSiteRef, {
-          'count': fromNew,
-          'materialId': matName,
-          'materialName': matName,
-          'displayName': material['displayName'] ?? matName,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        batch.set(toSiteRef, {
-          'count': toNew,
-          'materialId': matName,
-          'materialName': matName,
-          'displayName': material['displayName'] ?? matName,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        await MaterialInventoryService.transferSiteToSite(
+          materialName: matName,
+          fromSiteId: _fromSiteId!,
+          toSiteId: _toSiteId!,
+          quantity: moveCount,
+          fromSiteName: fromSiteName.isNotEmpty ? fromSiteName : _fromSiteId!,
+          toSiteName: toSiteName.isNotEmpty ? toSiteName : _toSiteId!,
+          fromManagerName: _fromManagerController.text.trim(),
+          toManagerName: _toManagerController.text.trim(),
+          fromSupervisorName: _fromSupervisorController.text.trim(),
+          toSupervisorName: _toSupervisorController.text.trim(),
+          fromProjectName: _fromProjectNameController.text.trim(),
+          toProjectName: _toProjectNameController.text.trim(),
+          displayName: material['displayName'],
+        );
       }
 
-      // 2. Save to materialmovementhistory collection
-      final movementId =
-          '${_fromSiteId}_${_toSiteId}_${DateTime.now().millisecondsSinceEpoch}';
-      final movementRef = FirestoreService.getCollection(
-        'materialmovementhistory',
-      ).doc(movementId);
-
-      Map<String, dynamic> movementHistoryData = {};
-      for (int i = 0; i < materialsToTransfer.length; i++) {
-        final material = materialsToTransfer[i];
-        movementHistoryData[i.toString()] = {
-          "map": i,
-          "count": material['neededCount'].toString(),
-          "date": date,
-          "fromsiteid": _fromSiteId,
-          "Tositeid": _toSiteId,
-          "managername": _fromManagerController.text,
-          "materialname": material['materialName'],
-          "materialdisplayname": material['displayName'],
-          "fromsitename": _fromSiteNameController.text,
-          "fromprojectname": _fromProjectNameController.text,
-          "fromsupervisorname": _fromSupervisorController.text,
-          "tositename": _toSiteNameController.text,
-          "toprojectname": _toProjectNameController.text,
-          "tosupervisorname": _toSupervisorController.text,
-          "timestamp": FieldValue.serverTimestamp(),
-        };
+      // Record legacy movement history entry
+      try {
+        final movementId = '${_fromSiteId}_${_toSiteId}_${DateTime.now().millisecondsSinceEpoch}';
+        final movementRef = FirestoreService.getCollection('materialmovementhistory').doc(movementId);
+        Map<String, dynamic> movementHistoryData = {};
+        for (int i = 0; i < materialsToTransfer.length; i++) {
+          final material = materialsToTransfer[i];
+          movementHistoryData[i.toString()] = {
+            "map": i,
+            "count": material['neededCount'].toString(),
+            "date": date,
+            "fromsiteid": _fromSiteId,
+            "Tositeid": _toSiteId,
+            "managername": _fromManagerController.text,
+            "materialname": material['materialName'],
+            "materialdisplayname": material['displayName'],
+            "fromsitename": _fromSiteNameController.text,
+            "fromprojectname": _fromProjectNameController.text,
+            "fromsupervisorname": _fromSupervisorController.text,
+            "tositename": _toSiteNameController.text,
+            "toprojectname": _toProjectNameController.text,
+            "tosupervisorname": _toSupervisorController.text,
+            "timestamp": FieldValue.serverTimestamp(),
+          };
+        }
+        await movementRef.set(movementHistoryData);
+      } catch (e) {
+        debugPrint('Error recording movement history: $e');
       }
-
-      batch.set(movementRef, movementHistoryData);
-
-      // Commit all batch operations
-      await batch.commit();
 
       if (mounted) {
-        Navigator.of(context).pop(); // Close loading dialog
         _showSuccessDialogSiteToSite();
 
         // Clear form and reload data
@@ -802,16 +818,20 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         await _loadSiteMaterialData(_fromSiteId);
       }
     } catch (e) {
-      if (mounted) {
-        Navigator.of(context).pop(); // Close loading dialog
-      }
       _showSnackBar('Error saving site-to-site transfer: $e');
-      print('Site-to-Site transfer error: $e');
+      debugPrint('Site-to-Site transfer error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     }
   }
 
   // Site-to-Company transfer method
   Future<void> _saveSiteToCompanyTransfer() async {
+    if (_isProcessing) return;
     if (!_validateSiteToCompanyForm()) {
       return;
     }
@@ -821,164 +841,80 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       return;
     }
 
+    setState(() {
+      _isProcessing = true;
+    });
+
     try {
       final date = _siteToCompanyDateController.text.isNotEmpty
           ? _siteToCompanyDateController.text
           : DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      // Show loading dialog
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return const AlertDialog(
-            content: Row(
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Text('Processing site to company transfer...'),
-              ],
-            ),
-          );
-        },
+      final selSite = sitesList.firstWhere(
+        (s) => s['siteId'] == _selectedSiteId,
+        orElse: () => <String, dynamic>{},
       );
+      final siteName = (selSite['siteName'] ?? _siteToCompanySiteNameController.text).toString().trim();
 
-      // Use batch for atomic operations
-      final batch = FirebaseFirestore.instance.batch();
-
-      // 1. Save to materialmovementhistory collection
-      final movementId =
-          '${_selectedSiteId}_company_${DateTime.now().millisecondsSinceEpoch}';
-      final movementRef = FirestoreService.getCollection(
-        'materialmovementhistory',
-      ).doc(movementId);
-
-      Map<String, dynamic> movementHistoryData = {};
-      for (int i = 0; i < materialsToTransfer.length; i++) {
-        final material = materialsToTransfer[i];
-        movementHistoryData[i.toString()] = {
-          "count": material['neededCount'].toString(),
-          "date": date,
-          "fromsiteid": _selectedSiteId,
-          "managername": _siteToCompanyManagerController.text,
-          "materialdisplayname": material['displayName'],
-          "materialname": material['materialName'],
-          "projectname": _projectNameController.text,
-          "sitename": _siteToCompanySiteNameController.text,
-          "supervisorname": _siteToCompanySupervisorController.text,
-          "timestamp": FieldValue.serverTimestamp(),
-          "info": "SiteToCompany",
-        };
-      }
-
-      batch.set(movementRef, movementHistoryData);
-
-      // 2. Process each material
       for (final material in materialsToTransfer) {
         final String matName = material['materialName'];
-        final int moveCount = material['neededCount'];
+        final int moveCount = material['neededCount'] as int;
 
-        // Update materialsavailablity collection (increase count)
-        final latestEntry = materialsList.firstWhere(
-          (mat) => mat['materialName'] == matName,
-          orElse: () => {'count': 0, 'docId': matName},
+        await MaterialInventoryService.transferSiteToCompany(
+          materialName: matName,
+          siteId: _selectedSiteId!,
+          quantity: moveCount,
+          siteName: siteName.isNotEmpty ? siteName : _selectedSiteId!,
+          managerName: _siteToCompanyManagerController.text.trim(),
+          supervisorName: _siteToCompanySupervisorController.text.trim(),
+          projectName: _projectNameController.text.trim(),
+          displayName: material['displayName'],
         );
-        final String docId = (latestEntry['docId'] ?? matName).toString();
-        final currentAvailableCount = (latestEntry['count'] ?? 0).toInt();
-        final newAvailableCount = currentAvailableCount + moveCount;
-
-        final materialAvailabilityRef = FirestoreService.getCollection(
-          'materialsavailablity',
-        ).doc(docId);
-        batch.set(materialAvailabilityRef, {
-          "count": newAvailableCount,
-          "materialname": matName,
-          "lastupdated": FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        // Update materialatsite collection (decrease count at site)
-        final materialAtSiteDocId = '${_selectedSiteId}_$matName';
-        final materialAtSiteRef = FirestoreService.getCollection(
-          'materialatsite',
-        ).doc(materialAtSiteDocId);
-
-        final existingDoc = await materialAtSiteRef.get();
-        if (existingDoc.exists) {
-          final existingData = existingDoc.data();
-          final existingCount = (existingData?['count'] ?? 0).toInt();
-          final newCount = existingCount - moveCount;
-
-          if (newCount <= 0) {
-            // If count becomes 0 or negative, delete the document
-            batch.delete(materialAtSiteRef);
-          } else {
-            batch.update(materialAtSiteRef, {
-              "count": newCount,
-              "materialname": matName,
-              "siteid": _selectedSiteId,
-              "lastUpdated": FieldValue.serverTimestamp(),
-            });
-          }
-        }
-
-        // Update siteMaterials collection
-        try {
-          final siteMaterialRef = FirestoreService.getCollection('siteMaterials')
-              .doc(_selectedSiteId)
-              .collection('materials')
-              .doc(matName);
-          final siteMatDoc = await siteMaterialRef.get();
-          if (siteMatDoc.exists) {
-            final curr = _parseCount(siteMatDoc.data()?['count'] ?? siteMatDoc.data()?['availableCount']);
-            final updated = (curr - moveCount).clamp(0, double.infinity).toInt();
-            batch.set(siteMaterialRef, {
-              'count': updated,
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-          }
-        } catch (e) {
-          debugPrint('Error updating siteMaterials in supervisor transfer: $e');
-        }
-
-        // Update local materials list
-        final materialIndex = materialsList.indexWhere(
-          (mat) => mat['materialName'] == material['materialName'],
-        );
-        if (materialIndex != -1) {
-          materialsList[materialIndex]['count'] = newAvailableCount;
-        }
-
-        // Update local site materials list
-        final siteMaterialIndex = siteMaterialsList.indexWhere(
-          (mat) => mat['materialName'] == material['materialName'],
-        );
-        if (siteMaterialIndex != -1) {
-          final newSiteCount =
-              siteMaterialsList[siteMaterialIndex]['count'] - moveCount;
-          if (newSiteCount <= 0) {
-            siteMaterialsList.removeAt(siteMaterialIndex);
-          } else {
-            siteMaterialsList[siteMaterialIndex]['count'] = newSiteCount;
-          }
-        }
       }
 
-      // Commit all batch operations
-      await batch.commit();
+      // Record legacy movement history entry
+      try {
+        final movementId = '${_selectedSiteId}_company_${DateTime.now().millisecondsSinceEpoch}';
+        final movementRef = FirestoreService.getCollection('materialmovementhistory').doc(movementId);
+        Map<String, dynamic> movementHistoryData = {};
+        for (int i = 0; i < materialsToTransfer.length; i++) {
+          final material = materialsToTransfer[i];
+          movementHistoryData[i.toString()] = {
+            "count": material['neededCount'].toString(),
+            "date": date,
+            "fromsiteid": _selectedSiteId,
+            "managername": _siteToCompanyManagerController.text,
+            "materialdisplayname": material['displayName'],
+            "materialname": material['materialName'],
+            "projectname": _projectNameController.text,
+            "sitename": _siteToCompanySiteNameController.text,
+            "supervisorname": _siteToCompanySupervisorController.text,
+            "timestamp": FieldValue.serverTimestamp(),
+            "info": "SiteToCompany",
+          };
+        }
+        await movementRef.set(movementHistoryData);
+      } catch (e) {
+        debugPrint('Error recording movement history: $e');
+      }
 
       if (mounted) {
-        Navigator.of(context).pop(); // Close loading dialog
         _showSuccessDialogSiteToCompany();
-
-        // Clear form
         _clearSiteToCompanyFields();
+        await _loadMaterialData();
+        if (_selectedSiteId != null) {
+          await _loadSiteMaterialData(_selectedSiteId);
+        }
       }
     } catch (e) {
-      if (mounted) {
-        Navigator.of(context).pop(); // Close loading dialog
-      }
       _showSnackBar('Error saving site-to-company transfer: $e');
-      print('Site-to-Company transfer error: $e');
+      debugPrint('Site-to-Company transfer error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     }
   }
 
@@ -1113,12 +1049,18 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
               isSelected: _transferMode == 0,
               primaryColor: primaryColor,
               darkAccent: darkAccent,
-              onTap: () => setState(() {
-                _transferMode = 0;
-                _selectedMaterialName = null;
-                availableCount = 0;
-                _neededCountController.clear();
-              }),
+              onTap: () async {
+                setState(() {
+                  _transferMode = 0;
+                  _selectedMaterialName = null;
+                  availableCount = 0;
+                  _neededCountController.clear();
+                  materialsToTransfer.clear();
+                });
+                if (_fromSiteId != null && _fromSiteId!.isNotEmpty) {
+                  await _loadSiteMaterialData(_fromSiteId);
+                }
+              },
             ),
           ),
           const SizedBox(width: 6),
@@ -1129,12 +1071,18 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
               isSelected: _transferMode == 1,
               primaryColor: primaryColor,
               darkAccent: darkAccent,
-              onTap: () => setState(() {
-                _transferMode = 1;
-                _selectedMaterialName = null;
-                availableCount = 0;
-                _neededCountController.clear();
-              }),
+              onTap: () async {
+                setState(() {
+                  _transferMode = 1;
+                  _selectedMaterialName = null;
+                  availableCount = 0;
+                  _neededCountController.clear();
+                  materialsToTransfer.clear();
+                });
+                if (_selectedSiteId != null && _selectedSiteId!.isNotEmpty) {
+                  await _loadSiteMaterialData(_selectedSiteId);
+                }
+              },
             ),
           ),
         ],
@@ -1390,7 +1338,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 Expanded(
                   child: _buildCountBox(
                     'Available Stock',
-                    availableCount.toString(),
+                    _isFetchingLiveStock ? '...' : availableCount.toString(),
                     availableCount > 0
                         ? const Color(0xFF10B981)
                         : const Color(0xFFEF4444),
@@ -1404,6 +1352,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                     label: 'Needed Quantity *',
                     hint: 'Enter quantity',
                     keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     icon: Icons.pin_rounded,
                     primaryColor: primaryColor,
                   ),
@@ -1497,11 +1446,13 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
             child: SizedBox(
               height: 48,
               child: ElevatedButton(
-                onPressed: () {
-                  if (_validateSiteToSiteForm()) {
-                    _saveSiteToSiteTransfer();
-                  }
-                },
+                onPressed: _isProcessing
+                    ? null
+                    : () {
+                        if (_validateSiteToSiteForm()) {
+                          _saveSiteToSiteTransfer();
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   foregroundColor: Colors.white,
@@ -1511,8 +1462,17 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text('TRANSFER MATERIALS',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: _isProcessing
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('TRANSFER MATERIALS',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ),
@@ -1627,7 +1587,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 Expanded(
                   child: _buildCountBox(
                     'Available Stock',
-                    availableCount.toString(),
+                    _isFetchingLiveStock ? '...' : availableCount.toString(),
                     availableCount > 0
                         ? const Color(0xFF10B981)
                         : const Color(0xFFEF4444),
@@ -1641,6 +1601,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                     label: 'Return Count *',
                     hint: 'Enter return count',
                     keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     icon: Icons.pin_rounded,
                     primaryColor: primaryColor,
                   ),
@@ -1734,11 +1695,13 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
             child: SizedBox(
               height: 48,
               child: ElevatedButton(
-                onPressed: () {
-                  if (_validateSiteToCompanyForm()) {
-                    _saveSiteToCompanyTransfer();
-                  }
-                },
+                onPressed: _isProcessing
+                    ? null
+                    : () {
+                        if (_validateSiteToCompanyForm()) {
+                          _saveSiteToCompanyTransfer();
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   foregroundColor: Colors.white,
@@ -1748,8 +1711,17 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text('RETURN TO COMPANY',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: _isProcessing
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('RETURN TO COMPANY',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ),
@@ -2046,6 +2018,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     bool enabled = true,
     IconData? icon,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
     VoidCallback? onTap,
     required Color primaryColor,
   }) {
@@ -2054,6 +2027,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       readOnly: onTap != null || !enabled,
       onTap: onTap,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
       decoration: InputDecoration(
         labelText: label,
@@ -2117,7 +2091,8 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     IconData icon,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      constraints: const BoxConstraints(minHeight: 48),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
@@ -2125,17 +2100,23 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+              Icon(icon, size: 13, color: color),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
                 ),
               ),
             ],
@@ -2144,7 +2125,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           Text(
             value,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14.5,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -2326,11 +2307,16 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     Color primaryColor,
     ValueChanged<String?> onChanged,
   ) {
+    final hasMatch = selectedId != null && sitesList.any((s) => s['siteId'] == selectedId);
+    final currentValue = hasMatch ? selectedId : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          initialValue: selectedId,
+          key: ValueKey('site_${currentValue}_${sitesList.length}'),
+          initialValue: currentValue,
+          isExpanded: true,
           style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
           decoration: InputDecoration(
             labelText: label,
@@ -2359,10 +2345,12 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
             ),
           ),
           items: sitesList.map((site) {
+            final displayId = (site['siteId'] ?? site['siteName'] ?? '').toString();
             return DropdownMenuItem<String>(
-              value: site['siteId'],
+              value: site['siteId']?.toString(),
               child: Text(
-                site['siteName'] ?? site['siteId'],
+                displayId,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
               ),
             );
@@ -2376,11 +2364,22 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   }
 
   Widget _buildMaterialDropdown(Color primaryColor) {
+    final effectiveList = siteMaterialsList.isNotEmpty ? siteMaterialsList : materialsList;
+    final hasMatch = _selectedMaterialName != null &&
+        effectiveList.any((m) =>
+            (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+                _selectedMaterialName!.trim().toLowerCase() ||
+            (m['displayName'] ?? '').toString().trim().toLowerCase() ==
+                _selectedMaterialName!.trim().toLowerCase());
+    final currentValue = hasMatch ? _selectedMaterialName : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          initialValue: _selectedMaterialName,
+          key: ValueKey('mat_${currentValue}_${effectiveList.length}'),
+          initialValue: currentValue,
+          isExpanded: true,
           style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
           decoration: InputDecoration(
             labelText: 'Select Material *',
@@ -2408,12 +2407,9 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
               borderSide: BorderSide(color: primaryColor, width: 1.8),
             ),
           ),
-          items: (siteMaterialsList.isNotEmpty
-                  ? siteMaterialsList
-                  : materialsList)
-              .map((material) {
-            final materialName = material['materialName'];
-            final displayName = material['displayName'];
+          items: effectiveList.map((material) {
+            final materialName = (material['materialName'] ?? '').toString();
+            final displayName = (material['displayName'] ?? materialName).toString();
             final count =
                 _parseCount(material['count'] ?? material['availableCount']);
 
@@ -2422,13 +2418,17 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    displayName ?? materialName,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      color: Color(0xFF0F172A),
+                  Expanded(
+                    child: Text(
+                      displayName.isNotEmpty ? displayName : materialName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

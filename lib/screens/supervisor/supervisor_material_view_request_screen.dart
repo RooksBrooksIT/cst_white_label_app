@@ -472,7 +472,7 @@ class _SupervisorMaterialViewRequestScreenState
                 _searchCtrl.clear();
                 setState(() => _statusFilter = 'All');
               },
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.filter_alt_off_rounded),
               label: const Text('Reset Filters'),
               style: TextButton.styleFrom(
                 foregroundColor: cs.primary,

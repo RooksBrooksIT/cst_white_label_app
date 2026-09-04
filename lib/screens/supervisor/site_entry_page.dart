@@ -5,17 +5,19 @@ import 'package:demo_cst/services/expense_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
 import 'package:demo_cst/widgets/glass_button.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class SiteEntryPage extends StatefulWidget {
   final String userName;
   final Map<String, dynamic> userDetails;
+  final bool hideAppBar;
+
   const SiteEntryPage({
     super.key,
     required this.userName,
     required this.userDetails,
+    this.hideAppBar = false,
   });
 
   @override
@@ -101,6 +103,30 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   @override
   void initState() {
     super.initState();
+    // Pre-initialize state directly from passed userDetails if available
+    final passedSiteId = (widget.userDetails['siteId'] ?? '').toString().trim();
+    if (passedSiteId.isNotEmpty) {
+      selectedSiteId = passedSiteId;
+      siteCode = passedSiteId;
+    }
+    final passedLocation = (widget.userDetails['location'] ?? '').toString().trim();
+    if (passedLocation.isNotEmpty) {
+      siteLocation = passedLocation;
+    }
+    final passedSupId = (widget.userDetails['supervisorId'] ?? '').toString().trim();
+    if (passedSupId.isNotEmpty) {
+      supervisorId = passedSupId;
+    }
+    final passedProject = (widget.userDetails['projectName'] ?? '').toString().trim();
+    if (passedProject.isNotEmpty) {
+      projectName = passedProject;
+    }
+    final passedStage = (widget.userDetails['projectStage'] ?? '').toString().trim();
+    if (passedStage.isNotEmpty) {
+      selectedProjectPhase = passedStage;
+    }
+    supervisorName = widget.userName;
+
     _fetchMaterialOptions();
     _fetchLabourOptions();
     _fetchSupervisorData();
@@ -147,32 +173,56 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
 
   Future<void> _fetchSupervisorData() async {
     try {
-      final orgId = getOrgId();
-      final String? passedSupervisorId = widget.userDetails['supervisorId']
-          ?.toString();
-      Query query = FirebaseFirestore.instance
-          .collection('organisation')
-          .doc(orgId)
-          .collection('siteSupervisorMap');
+      final String? passedSupervisorId = widget.userDetails['supervisorId']?.toString().trim();
+      final String passedName = widget.userName.trim();
 
-      if (passedSupervisorId != null && passedSupervisorId.isNotEmpty) {
-        query = query.where('Supervisor ID', isEqualTo: passedSupervisorId);
-      } else {
-        query = query.where('supervisor', isEqualTo: widget.userName);
+      var snapshot = await FirestoreService.siteSupervisorMap
+          .where('Supervisor ID', isEqualTo: passedSupervisorId)
+          .get();
+
+      if (snapshot.docs.isEmpty && passedSupervisorId != null && passedSupervisorId.isNotEmpty) {
+        snapshot = await FirestoreService.siteSupervisorMap
+            .where('supervisorId', isEqualTo: passedSupervisorId)
+            .get();
       }
 
-      final snapshot = await query.get();
-      if (snapshot.docs.isNotEmpty) {
-        final sites = snapshot.docs
+      if (snapshot.docs.isEmpty) {
+        snapshot = await FirestoreService.siteSupervisorMap
+            .where('supervisor', isEqualTo: passedName)
+            .get();
+      }
+
+      if (snapshot.docs.isEmpty) {
+        snapshot = await FirestoreService.siteSupervisorMap
+            .where('supervisorName', isEqualTo: passedName)
+            .get();
+      }
+
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> allDocs = snapshot.docs;
+      if (allDocs.isEmpty) {
+        final broadSnap = await FirestoreService.siteSupervisorMap.get();
+        allDocs = broadSnap.docs.where((doc) {
+          final data = doc.data();
+          final sId = (data['Supervisor ID'] ?? data['supervisorId'] ?? '').toString().trim().toLowerCase();
+          final sName = (data['supervisor'] ?? data['supervisorName'] ?? '').toString().trim().toLowerCase();
+          final docId = doc.id.trim().toLowerCase();
+          return (passedSupervisorId != null && passedSupervisorId.isNotEmpty && (sId == passedSupervisorId.toLowerCase() || docId.contains(passedSupervisorId.toLowerCase()))) ||
+                 (passedName.isNotEmpty && (sName == passedName.toLowerCase() || docId.contains(passedName.toLowerCase())));
+        }).toList();
+      }
+
+      if (allDocs.isNotEmpty) {
+        final sites = allDocs
             .map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
+              final data = doc.data();
+              final sId = (data['site'] ?? data['siteId'] ?? doc.id).toString().trim();
               return <String, String>{
-                'siteId': data['site']?.toString() ?? '',
-                'supervisor': data['supervisor']?.toString() ?? '',
-                'location': data['location']?.toString() ?? 'Unknown',
-                'supervisorId': data['Supervisor ID']?.toString() ?? '',
-                'projectName': data['projectName']?.toString() ?? '',
-                'projectStage': data['projectStage']?.toString() ?? '',
+                'siteId': sId,
+                'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? widget.userName).toString(),
+                'location': (data['location'] ?? 'Unknown').toString(),
+                'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'] ?? '').toString(),
+                'projectName': (data['projectName'] ?? data['project'] ?? '').toString(),
+                'projectStage': (data['projectStage'] ?? data['stage'] ?? '').toString(),
               };
             })
             .where((site) => site['siteId']!.isNotEmpty)
@@ -180,17 +230,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         setState(() {
           supervisorSites = sites;
           if (sites.isNotEmpty) {
-            String passedSiteId =
-                widget.userDetails['siteId']?.toString() ?? '';
+            String passedSiteId = widget.userDetails['siteId']?.toString() ?? '';
             var matchedSite = sites.first;
             if (passedSiteId.isNotEmpty) {
-              try {
-                matchedSite = sites.firstWhere(
-                  (s) => s['siteId'] == passedSiteId,
-                );
-              } catch (_) {
-                // If not found, fallback to first
-              }
+              matchedSite = sites.firstWhere(
+                (s) => s['siteId'] == passedSiteId || s['siteId']!.toLowerCase() == passedSiteId.toLowerCase(),
+                orElse: () => sites.first,
+              );
             }
             selectedSiteId = matchedSite['siteId'];
             siteCode = matchedSite['siteId']!;
@@ -201,29 +247,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
             selectedProjectPhase = matchedSite['projectStage']!.isNotEmpty
                 ? matchedSite['projectStage']
                 : (projectPhases.isNotEmpty ? projectPhases.first : null);
-          } else {
-            selectedSiteId = null;
-            siteCode = '';
-            supervisorName = widget.userName;
-            siteLocation = 'Unknown';
-            supervisorId = 'Not found';
-            projectName = 'Not found';
-            selectedProjectPhase = null;
           }
-        });
-      } else {
-        setState(() {
-          supervisorSites = [];
-          selectedSiteId = null;
-          supervisorName = widget.userName;
-          supervisorId = 'Not found';
-          siteCode = '';
-          siteLocation = 'Unknown';
-          projectName = 'Not found';
-          selectedProjectPhase = null;
         });
       }
     } catch (e) {
+      debugPrint('Error fetching supervisor data in site_entry_page: $e');
       setState(() {
         supervisorSites = [];
         selectedSiteId = null;
@@ -659,17 +687,21 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       } else {
         await actualColl.doc(actualDocId).set({...actualData, "actDays": 1});
       }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Entry saved successfully!')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to save entry: $e')));
     } finally {
-      setState(() {
-        isSaving = false;
-      });
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+        });
+      }
     }
   }
 
@@ -778,7 +810,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
             columnSpacing: 16,
             horizontalMargin: 12,
             headingRowHeight: 44,
-            dataRowHeight: 42,
+            dataRowMinHeight: 42,
+            dataRowMaxHeight: 48,
             headingRowColor: WidgetStateProperty.all(
               isDark ? primaryColor.withValues(alpha: 0.25) : primaryColor.withValues(alpha: 0.08),
             ),
@@ -1060,24 +1093,61 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.primaryColor;
+    final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final dropdownBg = isDark ? AppTheme.getDarkAccent(primaryColor) : Colors.white;
+    final dropdownBg = isDark ? darkAccent : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
     final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
     final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
     final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
 
-    return GlassScaffold(
-      title: 'Daily Site Entry',
-      appBarForegroundColor: Colors.white,
-      onBack: () => Navigator.pop(context),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 16.0,
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              iconTheme: const IconThemeData(color: Colors.white),
+              title: const Text(
+                'Daily Site Entry',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              centerTitle: true,
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      darkAccent,
+                      Color.alphaBlend(
+                        primaryColor.withValues(alpha: 0.35),
+                        darkAccent,
+                      ),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 16.0,
+              ),
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
@@ -2165,7 +2235,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         Expanded(
                           child: GlassButton(
                             label: 'Reset',
-                            icon: Icons.refresh,
+                            icon: Icons.restart_alt,
                             onPressed: () {
                               setState(() {
                                 materials.clear();
@@ -2207,8 +2277,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildModernSiteRow(IconData icon, String label, String value) {
     final theme = Theme.of(context);

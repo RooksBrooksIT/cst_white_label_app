@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/material_inventory_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:intl/intl.dart';
 
@@ -72,19 +73,18 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
       _isLoadingAvailability = true;
     });
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'materialsavailablity',
-      ).orderBy('lastupdated', descending: true).limit(50).get();
+      final items = await MaterialInventoryService.fetchAllMaterialsInventory();
 
       if (!mounted) return;
       setState(() {
-        _availabilityData = querySnapshot.docs.map((doc) {
-          final data = doc.data();
+        _availabilityData = items.map((item) {
           return {
-            'id': doc.id,
-            'materialName': data['materialName'] ?? '',
-            'count': data['count'] ?? 0,
-            'lastupdated': data['lastupdated'],
+            'id': item.docId,
+            'materialName': item.displayName.isNotEmpty ? item.displayName : item.materialName,
+            'count': item.companyAvailableCount,
+            'totalCount': item.totalStock,
+            'totalSiteCount': item.totalSiteStock,
+            'lastupdated': item.lastUpdated,
           };
         }).toList();
         _isLoadingAvailability = false;
@@ -96,14 +96,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         _isLoadingAvailability = false;
       });
     }
-  }
-
-  String _generateDocumentId(String materialName) {
-    final now = DateTime.now();
-    final year = now.year;
-    final formattedDate =
-        '${now.day.toString().padLeft(2, '0')}-${now.month.toString().padLeft(2, '0')}-$year';
-    return '${materialName}_$formattedDate';
   }
 
   Future<void> _submitNewMaterial() async {
@@ -124,30 +116,13 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     });
 
     try {
-      final documentId = _generateDocumentId(_selectedMaterial!);
-      final todayDocRef = FirestoreService.getCollection(
-        'materialsavailablity',
-      ).doc(documentId);
+      final newCount = await MaterialInventoryService.setCompanyStock(
+        materialName: _selectedMaterial!,
+        count: _count,
+        isAddition: true,
+      );
 
-      final todayDoc = await todayDocRef.get();
-
-      if (todayDoc.exists) {
-        final currentCount = todayDoc.data()!['count'] as int;
-        final newCount = currentCount + _count;
-
-        await todayDocRef.update({
-          'count': newCount,
-          'lastupdated': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await todayDocRef.set({
-          'materialName': _selectedMaterial,
-          'count': _count,
-          'lastupdated': FieldValue.serverTimestamp(),
-        });
-      }
-
-      _showSuccessDialog('New material added successfully!');
+      _showSuccessDialog('Added $_count units! Company stock is now $newCount units.');
       _resetForm();
       _loadAvailabilityData();
     } catch (e) {
@@ -181,61 +156,17 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     });
 
     try {
-      final documentId = _generateDocumentId(_selectedMaterialToUpdate!);
-      final todayDocRef = FirestoreService.getCollection(
-        'materialsavailablity',
-      ).doc(documentId);
+      final newCount = await MaterialInventoryService.setCompanyStock(
+        materialName: _selectedMaterialToUpdate!,
+        count: _count,
+        isAddition: _addToExisting,
+      );
 
-      final todayDoc = await todayDocRef.get();
-
-      if (todayDoc.exists) {
-        final currentCount = todayDoc.data()!['count'] as int;
-        final newCount = _addToExisting ? currentCount + _count : _count;
-
-        await todayDocRef.update({
-          'count': newCount,
-          'lastupdated': FieldValue.serverTimestamp(),
-        });
-
-        _showSuccessDialog(
-          _addToExisting
-              ? 'Material count added successfully! ($newCount)'
-              : 'Material count updated successfully! ($_count)',
-        );
-      } else {
-        final existingDocs =
-            await FirestoreService.getCollection('materialsavailablity')
-                .where('materialName', isEqualTo: _selectedMaterialToUpdate)
-                .orderBy('lastupdated', descending: true)
-                .limit(1)
-                .get();
-
-        if (existingDocs.docs.isNotEmpty) {
-          final existingDoc = existingDocs.docs.first;
-          final currentCount = existingDoc.data()['count'] as int;
-          final newCount = _addToExisting ? currentCount + _count : _count;
-
-          await FirestoreService.getCollection(
-            'materialsavailablity',
-          ).doc(existingDoc.id).update({
-            'count': newCount,
-            'lastupdated': FieldValue.serverTimestamp(),
-          });
-
-          _showSuccessDialog(
-            _addToExisting
-                ? 'Material count added successfully! ($newCount)'
-                : 'Material count updated successfully! ($_count)',
-          );
-        } else {
-          await todayDocRef.set({
-            'materialName': _selectedMaterialToUpdate,
-            'count': _count,
-            'lastupdated': FieldValue.serverTimestamp(),
-          });
-          _showSuccessDialog('New material entry created successfully!');
-        }
-      }
+      _showSuccessDialog(
+        _addToExisting
+            ? 'Material count added successfully! ($newCount units)'
+            : 'Material count updated successfully! ($newCount units)',
+      );
 
       _resetForm();
       _loadAvailabilityData();
@@ -265,36 +196,16 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
   Future<void> _fetchExistingCount(String materialName) async {
     try {
-      final documentId = _generateDocumentId(materialName);
-      final todayDoc = await FirestoreService.getCollection(
-        'materialsavailablity',
-      ).doc(documentId).get();
+      final item = await MaterialInventoryService.fetchMaterialInventory(materialName);
+      if (!mounted) return;
 
-      if (todayDoc.exists) {
+      if (item != null) {
         setState(() {
-          _existingCount = todayDoc.data()!['count'] as int;
-          _countController.text = _existingCount.toString();
-          _count = _existingCount;
-        });
-        return;
-      }
-
-      final existingDocs =
-          await FirestoreService.getCollection('materialsavailablity')
-              .where('materialName', isEqualTo: materialName)
-              .orderBy('lastupdated', descending: true)
-              .limit(1)
-              .get();
-
-      if (existingDocs.docs.isNotEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _existingCount = existingDocs.docs.first.data()['count'] as int;
+          _existingCount = item.companyAvailableCount;
           _countController.text = _existingCount.toString();
           _count = _existingCount;
         });
       } else {
-        if (!mounted) return;
         setState(() {
           _existingCount = 0;
           _countController.clear();
@@ -1100,20 +1011,37 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$count units',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF059669),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Company: $count units',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF059669),
+                      ),
+                    ),
                   ),
-                ),
+                  if (item['totalCount'] != null && (item['totalCount'] as int) != count) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      'Total: ${item['totalCount']} (Sites: ${item['totalSiteCount'] ?? 0})',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
