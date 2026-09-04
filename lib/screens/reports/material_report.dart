@@ -120,6 +120,17 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
       final matAtSiteDocs = results[5].docs;
       final atSiteDocs = results[6].docs;
       final invDocs = results[7].docs;
+      final siteDocs = results[8].docs;
+
+      // Fetch siteMaterials subcollections in parallel for all sites
+      List<QuerySnapshot<Map<String, dynamic>>> siteMaterialsSnaps = [];
+      try {
+        siteMaterialsSnaps = await Future.wait(
+          siteDocs.map((s) => FirestoreService.getCollection('siteMaterials').doc(s.id).collection('materials').get()),
+        );
+      } catch (e) {
+        debugPrint('Error fetching siteMaterials subcollections: $e');
+      }
 
       final Map<String, MaterialInventorySummary> summaryMap = {};
 
@@ -292,7 +303,8 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
           final current = summaryMap[key]!;
           final breakdown = Map<String, double>.from(current.siteBreakdown);
           final targetSiteId = sId.isNotEmpty ? sId : 'Site';
-          if (!breakdown.containsKey(targetSiteId)) {
+          final existing = breakdown[targetSiteId] ?? 0.0;
+          if (qty > existing) {
             breakdown[targetSiteId] = qty;
             summaryMap[key] = current.copyWith(
               atSite: breakdown.values.fold<double>(0.0, (acc, q) => acc + q),
@@ -320,7 +332,8 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
               final sId = (s['siteId'] ?? s['siteid'] ?? '').toString().trim();
               if (sId.isEmpty) continue;
               final qty = _parseNum(s['materialQty'] ?? s['quantity']);
-              if (qty > 0 && !breakdown.containsKey(sId)) {
+              final existing = breakdown[sId] ?? 0.0;
+              if (qty > existing) {
                 breakdown[sId] = qty;
               }
             }
@@ -331,6 +344,34 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
           atSite: breakdown.values.fold<double>(0.0, (acc, q) => acc + q),
           siteBreakdown: breakdown,
         );
+      }
+
+      // 8. Ingest Site Stock from 'siteMaterials/{siteId}/materials' subcollections
+      for (int i = 0; i < siteDocs.length; i++) {
+        final siteDoc = siteDocs[i];
+        final sId = (siteDoc.data()['siteId'] ?? siteDoc.id).toString().trim();
+        if (i < siteMaterialsSnaps.length) {
+          for (var doc in siteMaterialsSnaps[i].docs) {
+            final data = doc.data();
+            final name = (data['materialName'] ?? data['materialname'] ?? data['displayName'] ?? doc.id).toString().trim();
+            final qty = _parseNum(data['count'] ?? data['availableCount'] ?? data['quantity']);
+            if (name.isNotEmpty && qty > 0) {
+              final item = getOrCreateItem(name, doc.id);
+              final key = normalize(item.materialName);
+              final current = summaryMap[key]!;
+              final breakdown = Map<String, double>.from(current.siteBreakdown);
+              final targetSiteId = sId.isNotEmpty ? sId : 'Site';
+              final existingQty = breakdown[targetSiteId] ?? 0.0;
+              if (qty > existingQty) {
+                breakdown[targetSiteId] = qty;
+                summaryMap[key] = current.copyWith(
+                  atSite: breakdown.values.fold<double>(0.0, (acc, q) => acc + q),
+                  siteBreakdown: breakdown,
+                );
+              }
+            }
+          }
+        }
       }
 
       final list = summaryMap.values.toList();

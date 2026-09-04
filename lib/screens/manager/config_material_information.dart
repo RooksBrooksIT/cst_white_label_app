@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/dialog_utils.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MaterialInfoScreen extends StatefulWidget {
   const MaterialInfoScreen({super.key});
@@ -13,6 +15,9 @@ class MaterialInfoScreen extends StatefulWidget {
 }
 
 class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
+  // Logged-in manager name state
+  String _loggedInManagerName = '';
+
   // Form controllers
   final TextEditingController _managerNameController = TextEditingController();
   final TextEditingController _projectNameController = TextEditingController();
@@ -80,6 +85,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     _siteToCompanyDateController.text = DateFormat(
       'yyyy-MM-dd',
     ).format(DateTime.now());
+    _fetchCurrentManagerName();
     _loadSiteData();
     _loadMaterialData();
   }
@@ -111,6 +117,141 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     _siteToCompanyDateController.dispose();
 
     super.dispose();
+  }
+
+  Future<void> _fetchCurrentManagerName() async {
+    try {
+      final auth = AuthService();
+      String resolvedName = '';
+
+      if (auth.userRole == UserRole.organization) {
+        resolvedName = (auth.userData['org_name'] ??
+                auth.userData['username'] ??
+                'Organization Administrator')
+            .toString()
+            .trim();
+      } else if (auth.userRole == UserRole.manager) {
+        final data = auth.userData;
+        resolvedName = (data['FullName'] ??
+                data['fullName'] ??
+                data['name'] ??
+                data['managerName'] ??
+                data['UserName'] ??
+                data['username'] ??
+                '')
+            .toString()
+            .trim();
+
+        final username = (data['username'] ?? data['UserName'] ?? '')
+            .toString()
+            .trim();
+
+        if (resolvedName.isEmpty ||
+            resolvedName.toLowerCase() == 'manager' ||
+            resolvedName == username) {
+          if (username.isNotEmpty) {
+            try {
+              final q = await FirestoreService.getCollection('manager')
+                  .where('UserName', isEqualTo: username)
+                  .limit(1)
+                  .get();
+              if (q.docs.isNotEmpty) {
+                final docData = q.docs.first.data();
+                final name = (docData['FullName'] ??
+                        docData['fullName'] ??
+                        docData['name'] ??
+                        '')
+                    .toString()
+                    .trim();
+                if (name.isNotEmpty) {
+                  resolvedName = name;
+                }
+              }
+            } catch (e) {
+              debugPrint('Error fetching manager details: $e');
+            }
+
+            if (resolvedName.isEmpty ||
+                resolvedName.toLowerCase() == 'manager' ||
+                resolvedName == username) {
+              try {
+                final qConfig = await FirestoreService.configUsers
+                    .where('UserName', isEqualTo: username)
+                    .limit(1)
+                    .get();
+                if (qConfig.docs.isNotEmpty) {
+                  final docData = qConfig.docs.first.data();
+                  final name = (docData['FullName'] ??
+                          docData['fullName'] ??
+                          docData['name'] ??
+                          '')
+                      .toString()
+                      .trim();
+                  if (name.isNotEmpty) {
+                    resolvedName = name;
+                  }
+                }
+              } catch (e) {
+                debugPrint('Error fetching config user details: $e');
+              }
+            }
+          }
+        }
+      } else if (auth.userRole == UserRole.supervisor) {
+        final data = auth.userData;
+        resolvedName = (data['supervisorName'] ??
+                data['fullName'] ??
+                data['FullName'] ??
+                data['name'] ??
+                data['username'] ??
+                '')
+            .toString()
+            .trim();
+      }
+
+      if (resolvedName.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final configUsername = prefs.getString('config_username') ?? '';
+        if (configUsername.isNotEmpty) {
+          try {
+            final q = await FirestoreService.getCollection('manager')
+                .where('UserName', isEqualTo: configUsername)
+                .limit(1)
+                .get();
+            if (q.docs.isNotEmpty) {
+              final docData = q.docs.first.data();
+              final name = (docData['FullName'] ??
+                      docData['fullName'] ??
+                      docData['name'] ??
+                      '')
+                  .toString()
+                  .trim();
+              if (name.isNotEmpty) resolvedName = name;
+            }
+          } catch (_) {}
+          if (resolvedName.isEmpty) {
+            resolvedName = configUsername;
+          }
+        }
+      }
+
+      if (resolvedName.isNotEmpty && mounted) {
+        setState(() {
+          _loggedInManagerName = resolvedName;
+          if (_managerNameController.text.trim().isEmpty) {
+            _managerNameController.text = resolvedName;
+          }
+          if (_fromManagerController.text.trim().isEmpty) {
+            _fromManagerController.text = resolvedName;
+          }
+          if (_siteToCompanyManagerController.text.trim().isEmpty) {
+            _siteToCompanyManagerController.text = resolvedName;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching logged in manager name: $e');
+    }
   }
 
   Future<void> _loadSiteData() async {
@@ -261,14 +402,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             .doc(siteId).collection('materials').get();
         for (final doc in snap.docs) {
           final data = doc.data();
-          final name = (data['materialName'] ?? data['materialname'] ?? doc.id).toString().trim();
+          final name = (data['materialName'] ?? data['materialname'] ?? data['displayName'] ?? doc.id).toString().trim();
           if (name.isEmpty) continue;
           final count = _parseCount(data['count'] ?? data['availableCount']);
-          if (!siteMatMap.containsKey(name) || (siteMatMap[name]!['count'] as int? ?? 0) == 0) {
+          final existingCount = siteMatMap[name]?['count'] as int? ?? 0;
+          if (!siteMatMap.containsKey(name) || count > existingCount) {
             siteMatMap[name] = {
               'materialId': doc.id,
               'materialName': name,
-              'displayName': name,
+              'displayName': (data['displayName'] ?? name).toString().trim(),
               'count': count,
             };
           }
@@ -439,7 +581,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
   void _clearAll() {
     setState(() {
-      _managerNameController.clear();
+      _managerNameController.text = _loggedInManagerName;
       _projectNameController.clear();
       _supervisorNameController.clear();
       _dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -449,7 +591,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
       _fromSiteId = null;
       _toSiteId = null;
-      _fromManagerController.clear();
+      _fromManagerController.text = _loggedInManagerName;
       _fromSiteNameController.clear();
       _fromSupervisorController.clear();
       _fromProjectNameController.clear();
@@ -463,7 +605,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       _toProjectNameController.clear();
       _toDateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      _siteToCompanyManagerController.clear();
+      _siteToCompanyManagerController.text = _loggedInManagerName;
       _siteToCompanySiteNameController.clear();
       _siteToCompanySupervisorController.clear();
       _siteToCompanyDateController.text = DateFormat(
@@ -654,6 +796,37 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             'updatedAt': FieldValue.serverTimestamp(),
           });
         }
+
+        // Sync to materialatsite collection
+        try {
+          final matAtSiteRef = FirestoreService.getCollection('materialatsite')
+              .doc('${_selectedSiteId}_$materialName');
+          final matAtSiteDoc = await matAtSiteRef.get();
+          if (matAtSiteDoc.exists) {
+            final curr = _parseCount(matAtSiteDoc.data()?['count'] ?? matAtSiteDoc.data()?['availableCount']);
+            await matAtSiteRef.update({
+              'count': curr + neededCount,
+              'availableCount': curr + neededCount,
+              'siteid': _selectedSiteId,
+              'materialName': materialName,
+              'materialname': materialName,
+              'lastUpdated': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          } else {
+            await matAtSiteRef.set({
+              'siteid': _selectedSiteId,
+              'materialName': materialName,
+              'materialname': materialName,
+              'count': neededCount,
+              'availableCount': neededCount,
+              'lastUpdated': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (e) {
+          debugPrint('Error syncing materialatsite on company to site transfer: $e');
+        }
       }
 
       if (mounted) {
@@ -736,6 +909,51 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             'updatedAt': FieldValue.serverTimestamp(),
           });
         }
+
+        // Sync to materialatsite for both fromSite and toSite
+        try {
+          final fromMatAtSiteRef = FirestoreService.getCollection('materialatsite')
+              .doc('${_fromSiteId}_$materialName');
+          final fromMatAtSiteDoc = await fromMatAtSiteRef.get();
+          if (fromMatAtSiteDoc.exists) {
+            final curr = _parseCount(fromMatAtSiteDoc.data()?['count'] ?? fromMatAtSiteDoc.data()?['availableCount']);
+            final updated = (curr - neededCount).clamp(0, double.infinity).toInt();
+            await fromMatAtSiteRef.update({
+              'count': updated,
+              'availableCount': updated,
+              'lastUpdated': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+
+          final toMatAtSiteRef = FirestoreService.getCollection('materialatsite')
+              .doc('${_toSiteId}_$materialName');
+          final toMatAtSiteDoc = await toMatAtSiteRef.get();
+          if (toMatAtSiteDoc.exists) {
+            final curr = _parseCount(toMatAtSiteDoc.data()?['count'] ?? toMatAtSiteDoc.data()?['availableCount']);
+            await toMatAtSiteRef.update({
+              'count': curr + neededCount,
+              'availableCount': curr + neededCount,
+              'siteid': _toSiteId,
+              'materialName': materialName,
+              'materialname': materialName,
+              'lastUpdated': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          } else {
+            await toMatAtSiteRef.set({
+              'siteid': _toSiteId,
+              'materialName': materialName,
+              'materialname': materialName,
+              'count': neededCount,
+              'availableCount': neededCount,
+              'lastUpdated': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (e) {
+          debugPrint('Error syncing materialatsite on site to site transfer: $e');
+        }
       }
 
       if (mounted) {
@@ -787,6 +1005,25 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             'count': newSiteCount,
             'updatedAt': FieldValue.serverTimestamp(),
           });
+        }
+
+        // Sync to materialatsite
+        try {
+          final matAtSiteRef = FirestoreService.getCollection('materialatsite')
+              .doc('${_selectedSiteId}_$materialName');
+          final matAtSiteDoc = await matAtSiteRef.get();
+          if (matAtSiteDoc.exists) {
+            final curr = _parseCount(matAtSiteDoc.data()?['count'] ?? matAtSiteDoc.data()?['availableCount']);
+            final updated = (curr - neededCount).clamp(0, double.infinity).toInt();
+            await matAtSiteRef.update({
+              'count': updated,
+              'availableCount': updated,
+              'lastUpdated': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (e) {
+          debugPrint('Error syncing materialatsite on site to company transfer: $e');
         }
 
         // Update materialsavailablity collection
@@ -967,19 +1204,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                   label: 'Date *',
                                   hint: 'YYYY-MM-DD',
                                   icon: Icons.calendar_today_rounded,
-                                  onTap: () async {
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: DateTime.now(),
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime(2030),
-                                    );
-                                    if (picked != null) {
-                                      _dateController.text = DateFormat(
-                                        'yyyy-MM-dd',
-                                      ).format(picked);
-                                    }
-                                  },
+                                  onTap: () => _selectDate(context, _dateController),
                                 ),
                               ],
                             ),
@@ -1066,6 +1291,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                         _fromSiteId = v;
                                       });
                                       _fetchAndFillSiteDetails(v, mode: 1);
+                                      _loadSiteMaterialData(v);
                                     }
                                   },
                                   label: 'From Site *',
@@ -1107,19 +1333,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                   label: 'From Date *',
                                   hint: 'YYYY-MM-DD',
                                   icon: Icons.calendar_today_rounded,
-                                  onTap: () async {
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: DateTime.now(),
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime(2030),
-                                    );
-                                    if (picked != null) {
-                                      _fromDateController.text = DateFormat(
-                                        'yyyy-MM-dd',
-                                      ).format(picked);
-                                    }
-                                  },
+                                  onTap: () => _selectDate(context, _fromDateController),
                                 ),
                               ],
                             ),
@@ -1180,19 +1394,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                   label: 'To Date *',
                                   hint: 'YYYY-MM-DD',
                                   icon: Icons.calendar_today_rounded,
-                                  onTap: () async {
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: DateTime.now(),
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime(2030),
-                                    );
-                                    if (picked != null) {
-                                      _toDateController.text = DateFormat(
-                                        'yyyy-MM-dd',
-                                      ).format(picked);
-                                    }
-                                  },
+                                  onTap: () => _selectDate(context, _toDateController),
                                 ),
                               ],
                             ),
@@ -1279,6 +1481,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                         _selectedSiteId = v;
                                       });
                                       _fetchAndFillSiteDetails(v, mode: 3);
+                                      _loadSiteMaterialData(v);
                                     }
                                   },
                                   label: 'From Site *',
@@ -1312,19 +1515,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                                   label: 'Date *',
                                   hint: 'YYYY-MM-DD',
                                   icon: Icons.calendar_today_rounded,
-                                  onTap: () async {
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: DateTime.now(),
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime(2030),
-                                    );
-                                    if (picked != null) {
-                                      _siteToCompanyDateController.text = DateFormat(
-                                        'yyyy-MM-dd',
-                                      ).format(picked);
-                                    }
-                                  },
+                                  onTap: () => _selectDate(context, _siteToCompanyDateController),
                                 ),
                               ],
                             ),
@@ -1421,6 +1612,17 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
             _selectedMaterialName = null;
             availableCount = 0;
             _neededCountController.clear();
+            if (_loggedInManagerName.isNotEmpty) {
+              if (_managerNameController.text.trim().isEmpty) {
+                _managerNameController.text = _loggedInManagerName;
+              }
+              if (_fromManagerController.text.trim().isEmpty) {
+                _fromManagerController.text = _loggedInManagerName;
+              }
+              if (_siteToCompanyManagerController.text.trim().isEmpty) {
+                _siteToCompanyManagerController.text = _loggedInManagerName;
+              }
+            }
           });
         },
         child: AnimatedContainer(

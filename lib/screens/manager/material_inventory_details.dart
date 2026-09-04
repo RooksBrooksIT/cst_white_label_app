@@ -90,6 +90,16 @@ class _MaterialInventoryDetailsPageState
       final atSiteSnap = results[7].docs;
       final invSnap = results[8].docs;
 
+      // Fetch siteMaterials subcollections in parallel for all sites
+      List<QuerySnapshot<Map<String, dynamic>>> siteMaterialsSnaps = [];
+      try {
+        siteMaterialsSnaps = await Future.wait(
+          sitesSnap.map((s) => FirestoreService.getCollection('siteMaterials').doc(s.id).collection('materials').get()),
+        );
+      } catch (e) {
+        debugPrint('Error fetching siteMaterials in details: $e');
+      }
+
       // 2. Build Site & Project Name Maps
       final sNameMap = <String, String>{};
       final sProjMap = <String, String>{};
@@ -178,7 +188,7 @@ class _MaterialInventoryDetailsPageState
         }
       }
 
-      // 5. Fetch Site-level Breakdown from materialatsite, materialsAtSite, materialsInventory
+      // 5. Fetch Site-level Breakdown from materialatsite, materialsAtSite, materialsInventory, and siteMaterials
       final Map<String, double> siteQtyMap = {};
       final Map<String, String> siteLastUpdated = {};
 
@@ -203,10 +213,13 @@ class _MaterialInventoryDetailsPageState
         final sId = (data['siteId'] ?? data['siteid'] ?? data['site'] ?? '').toString().trim();
         if (isMatch(name, doc.id) && sId.isNotEmpty) {
           final qty = _parseNum(data['quantity'] ?? data['availableCount'] ?? data['materialQty'] ?? data['count']);
-          if (qty > 0 && !siteQtyMap.containsKey(sId)) {
-            siteQtyMap[sId] = qty;
-            if (data['updatedAt'] != null || data['createdAt'] != null) {
-              siteLastUpdated[sId] = _formatDateStr(data['updatedAt'] ?? data['createdAt']);
+          if (qty > 0) {
+            final existing = siteQtyMap[sId] ?? 0.0;
+            if (qty > existing) {
+              siteQtyMap[sId] = qty;
+              if (data['updatedAt'] != null || data['createdAt'] != null) {
+                siteLastUpdated[sId] = _formatDateStr(data['updatedAt'] ?? data['createdAt']);
+              }
             }
           }
         }
@@ -223,10 +236,37 @@ class _MaterialInventoryDetailsPageState
                 final sId = (s['siteId'] ?? s['siteid'] ?? '').toString().trim();
                 if (sId.isEmpty) continue;
                 final qty = _parseNum(s['materialQty'] ?? s['quantity']);
-                if (qty > 0 && !siteQtyMap.containsKey(sId)) {
+                if (qty > 0) {
+                  final existing = siteQtyMap[sId] ?? 0.0;
+                  if (qty > existing) {
+                    siteQtyMap[sId] = qty;
+                    if (s['updatedAt'] != null || s['date'] != null) {
+                      siteLastUpdated[sId] = (s['updatedAt'] ?? s['date']).toString();
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Ingest from siteMaterials subcollections
+      for (int i = 0; i < sitesSnap.length; i++) {
+        final siteDoc = sitesSnap[i];
+        final sId = (siteDoc.data()['siteId'] ?? siteDoc.id).toString().trim();
+        if (i < siteMaterialsSnaps.length) {
+          for (var doc in siteMaterialsSnaps[i].docs) {
+            final data = doc.data();
+            final name = (data['materialName'] ?? data['materialname'] ?? data['displayName'] ?? doc.id).toString().trim();
+            if (isMatch(name, doc.id) && sId.isNotEmpty) {
+              final qty = _parseNum(data['count'] ?? data['availableCount'] ?? data['quantity']);
+              if (qty > 0) {
+                final existingQty = siteQtyMap[sId] ?? 0.0;
+                if (qty > existingQty) {
                   siteQtyMap[sId] = qty;
-                  if (s['updatedAt'] != null || s['date'] != null) {
-                    siteLastUpdated[sId] = (s['updatedAt'] ?? s['date']).toString();
+                  if (data['updatedAt'] != null || data['lastupdated'] != null || data['timestamp'] != null) {
+                    siteLastUpdated[sId] = _formatDateStr(data['updatedAt'] ?? data['lastupdated'] ?? data['timestamp']);
                   }
                 }
               }

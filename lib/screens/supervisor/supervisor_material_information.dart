@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '/services/firestore_service.dart';
+import '/services/auth_service.dart';
 import '/utils/app_theme.dart';
 
 class SupervisorMaterialInfoScreen extends StatefulWidget {
@@ -13,7 +15,8 @@ class SupervisorMaterialInfoScreen extends StatefulWidget {
 }
 
 class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
-  // Removed unused _firestore field
+  // Logged-in manager name state
+  String _loggedInManagerName = '';
 
   // Selected values
   String? _selectedSiteId;
@@ -75,6 +78,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     _siteToCompanyDateController.text = DateFormat(
       'yyyy-MM-dd',
     ).format(DateTime.now());
+    _fetchCurrentManagerName();
     _loadSiteData();
     _loadMaterialData();
   }
@@ -104,6 +108,138 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     _neededCountController.dispose();
 
     super.dispose();
+  }
+
+  Future<void> _fetchCurrentManagerName() async {
+    try {
+      final auth = AuthService();
+      String resolvedName = '';
+
+      if (auth.userRole == UserRole.organization) {
+        resolvedName = (auth.userData['org_name'] ??
+                auth.userData['username'] ??
+                'Organization Administrator')
+            .toString()
+            .trim();
+      } else if (auth.userRole == UserRole.manager) {
+        final data = auth.userData;
+        resolvedName = (data['FullName'] ??
+                data['fullName'] ??
+                data['name'] ??
+                data['managerName'] ??
+                data['UserName'] ??
+                data['username'] ??
+                '')
+            .toString()
+            .trim();
+
+        final username = (data['username'] ?? data['UserName'] ?? '')
+            .toString()
+            .trim();
+
+        if (resolvedName.isEmpty ||
+            resolvedName.toLowerCase() == 'manager' ||
+            resolvedName == username) {
+          if (username.isNotEmpty) {
+            try {
+              final q = await FirestoreService.getCollection('manager')
+                  .where('UserName', isEqualTo: username)
+                  .limit(1)
+                  .get();
+              if (q.docs.isNotEmpty) {
+                final docData = q.docs.first.data();
+                final name = (docData['FullName'] ??
+                        docData['fullName'] ??
+                        docData['name'] ??
+                        '')
+                    .toString()
+                    .trim();
+                if (name.isNotEmpty) {
+                  resolvedName = name;
+                }
+              }
+            } catch (e) {
+              debugPrint('Error fetching manager details: $e');
+            }
+
+            if (resolvedName.isEmpty ||
+                resolvedName.toLowerCase() == 'manager' ||
+                resolvedName == username) {
+              try {
+                final qConfig = await FirestoreService.configUsers
+                    .where('UserName', isEqualTo: username)
+                    .limit(1)
+                    .get();
+                if (qConfig.docs.isNotEmpty) {
+                  final docData = qConfig.docs.first.data();
+                  final name = (docData['FullName'] ??
+                          docData['fullName'] ??
+                          docData['name'] ??
+                          '')
+                      .toString()
+                      .trim();
+                  if (name.isNotEmpty) {
+                    resolvedName = name;
+                  }
+                }
+              } catch (e) {
+                debugPrint('Error fetching config user details: $e');
+              }
+            }
+          }
+        }
+      } else if (auth.userRole == UserRole.supervisor) {
+        final data = auth.userData;
+        resolvedName = (data['supervisorName'] ??
+                data['fullName'] ??
+                data['FullName'] ??
+                data['name'] ??
+                data['username'] ??
+                '')
+            .toString()
+            .trim();
+      }
+
+      if (resolvedName.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final configUsername = prefs.getString('config_username') ?? '';
+        if (configUsername.isNotEmpty) {
+          try {
+            final q = await FirestoreService.getCollection('manager')
+                .where('UserName', isEqualTo: configUsername)
+                .limit(1)
+                .get();
+            if (q.docs.isNotEmpty) {
+              final docData = q.docs.first.data();
+              final name = (docData['FullName'] ??
+                      docData['fullName'] ??
+                      docData['name'] ??
+                      '')
+                  .toString()
+                  .trim();
+              if (name.isNotEmpty) resolvedName = name;
+            }
+          } catch (_) {}
+          if (resolvedName.isEmpty) {
+            resolvedName = configUsername;
+          }
+        }
+      }
+
+      if (resolvedName.isNotEmpty && mounted) {
+        setState(() {
+          _loggedInManagerName = resolvedName;
+          if (_fromManagerController.text.trim().isEmpty) {
+            _fromManagerController.text = resolvedName;
+          }
+          if (_siteToCompanyManagerController.text.trim().isEmpty) {
+            _siteToCompanyManagerController.text = resolvedName;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching logged in manager name: $e');
+    }
   }
 
   // Load site data from siteSupervisorMap collection
@@ -235,7 +371,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
   }
 
-  // Load material data for a specific site from materialatsite
+  // Load material data for a specific site from materialatsite and siteMaterials
   Future<void> _loadSiteMaterialData(String? siteId) async {
     if (siteId == null || siteId.isEmpty) {
       if (mounted) {
@@ -248,32 +384,55 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
 
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'materialatsite',
-      ).where('siteid', isEqualTo: siteId).get();
+      final Map<String, Map<String, dynamic>> siteMatMap = {};
 
-      final list =
-          querySnapshot.docs
-              .map((doc) {
-                final data = doc.data();
-                // Check for both materialName and materialname
-                final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
-                if (name.isEmpty) return null;
-                final count = _parseCount(data['count']);
-                return {
-                  'docId': doc.id,
-                  'materialName': name,
-                  'displayName': name,
-                  'count': count,
-                };
-              })
-              .whereType<Map<String, dynamic>>()
-              .toList()
-            ..sort(
-              (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-                (b['displayName'] as String).toLowerCase(),
-              ),
-            );
+      // 1. Query materialatsite
+      try {
+        final querySnapshot = await FirestoreService.getCollection(
+          'materialatsite',
+        ).where('siteid', isEqualTo: siteId).get();
+
+        for (var doc in querySnapshot.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ?? data['materialname'] ?? '').toString().trim();
+          if (name.isEmpty) continue;
+          final count = _parseCount(data['count'] ?? data['availableCount']);
+          siteMatMap[name] = {
+            'docId': doc.id,
+            'materialName': name,
+            'displayName': name,
+            'count': count,
+          };
+        }
+      } catch (_) {}
+
+      // 2. Query siteMaterials/{siteId}/materials subcollection
+      try {
+        final snap = await FirestoreService.getCollection('siteMaterials')
+            .doc(siteId).collection('materials').get();
+        for (var doc in snap.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ?? data['materialname'] ?? data['displayName'] ?? doc.id).toString().trim();
+          if (name.isEmpty) continue;
+          final count = _parseCount(data['count'] ?? data['availableCount']);
+          final existingCount = siteMatMap[name]?['count'] as int? ?? 0;
+          if (!siteMatMap.containsKey(name) || count > existingCount) {
+            siteMatMap[name] = {
+              'docId': doc.id,
+              'materialName': name,
+              'displayName': (data['displayName'] ?? name).toString().trim(),
+              'count': count,
+            };
+          }
+        }
+      } catch (_) {}
+
+      final list = siteMatMap.values.toList()
+        ..sort(
+          (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
+            (b['displayName'] as String).toLowerCase(),
+          ),
+        );
 
       if (mounted) {
         setState(() {
@@ -401,7 +560,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   // Clear SiteToSite fields
   void _clearSiteToSiteFields() {
     setState(() {
-      _fromManagerController.clear();
+      _fromManagerController.text = _loggedInManagerName;
       _toManagerController.clear();
       _fromSiteId = null;
       _toSiteId = null;
@@ -423,7 +582,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   // Clear SiteToCompany fields
   void _clearSiteToCompanyFields() {
     setState(() {
-      _siteToCompanyManagerController.clear();
+      _siteToCompanyManagerController.text = _loggedInManagerName;
       _selectedSiteId = null;
       _siteToCompanySiteNameController.clear();
       _siteToCompanySupervisorController.clear();
@@ -564,6 +723,32 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           'count': toNew,
           'materialName': matName,
           'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Update siteMaterials collection for fromSite and toSite
+        final fromSiteRef = FirestoreService.getCollection('siteMaterials')
+            .doc(_fromSiteId)
+            .collection('materials')
+            .doc(matName);
+        final toSiteRef = FirestoreService.getCollection('siteMaterials')
+            .doc(_toSiteId)
+            .collection('materials')
+            .doc(matName);
+
+        batch.set(fromSiteRef, {
+          'count': fromNew,
+          'materialId': matName,
+          'materialName': matName,
+          'displayName': material['displayName'] ?? matName,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        batch.set(toSiteRef, {
+          'count': toNew,
+          'materialId': matName,
+          'materialName': matName,
+          'displayName': material['displayName'] ?? matName,
+          'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
 
@@ -734,6 +919,25 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
               "lastUpdated": FieldValue.serverTimestamp(),
             });
           }
+        }
+
+        // Update siteMaterials collection
+        try {
+          final siteMaterialRef = FirestoreService.getCollection('siteMaterials')
+              .doc(_selectedSiteId)
+              .collection('materials')
+              .doc(matName);
+          final siteMatDoc = await siteMaterialRef.get();
+          if (siteMatDoc.exists) {
+            final curr = _parseCount(siteMatDoc.data()?['count'] ?? siteMatDoc.data()?['availableCount']);
+            final updated = (curr - moveCount).clamp(0, double.infinity).toInt();
+            batch.set(siteMaterialRef, {
+              'count': updated,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          }
+        } catch (e) {
+          debugPrint('Error updating siteMaterials in supervisor transfer: $e');
         }
 
         // Update local materials list

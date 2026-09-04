@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
@@ -66,7 +67,18 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {
+          if (_loggedInManagerName.isNotEmpty) {
+            if (_managerNameController.text.trim().isEmpty) {
+              _managerNameController.text = _loggedInManagerName;
+            }
+            if (_returnManagerNameController.text.trim().isEmpty) {
+              _returnManagerNameController.text = _loggedInManagerName;
+            }
+          }
+        });
+      }
       if (_tabController.index == 2 && !_tabController.indexIsChanging) {
         _fetchMovementLogs();
       }
@@ -120,27 +132,109 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         resolvedName = (auth.userData['org_name'] ??
                 auth.userData['username'] ??
                 'Organization Administrator')
-            .toString();
+            .toString()
+            .trim();
       } else if (auth.userRole == UserRole.manager) {
         final data = auth.userData;
         resolvedName = (data['FullName'] ??
                 data['fullName'] ??
+                data['name'] ??
+                data['managerName'] ??
                 data['UserName'] ??
                 data['username'] ??
                 '')
-            .toString();
+            .toString()
+            .trim();
 
-        if (resolvedName.isEmpty || resolvedName == 'Manager') {
-          final username = (data['username'] ?? data['UserName'] ?? '').toString().trim();
+        final username = (data['username'] ?? data['UserName'] ?? '')
+            .toString()
+            .trim();
+
+        if (resolvedName.isEmpty ||
+            resolvedName.toLowerCase() == 'manager' ||
+            resolvedName == username) {
           if (username.isNotEmpty) {
+            try {
+              final q = await FirestoreService.getCollection('manager')
+                  .where('UserName', isEqualTo: username)
+                  .limit(1)
+                  .get();
+              if (q.docs.isNotEmpty) {
+                final docData = q.docs.first.data();
+                final name = (docData['FullName'] ??
+                        docData['fullName'] ??
+                        docData['name'] ??
+                        '')
+                    .toString()
+                    .trim();
+                if (name.isNotEmpty) {
+                  resolvedName = name;
+                }
+              }
+            } catch (e) {
+              debugPrint('Error fetching manager details: $e');
+            }
+
+            if (resolvedName.isEmpty ||
+                resolvedName.toLowerCase() == 'manager' ||
+                resolvedName == username) {
+              try {
+                final qConfig = await FirestoreService.configUsers
+                    .where('UserName', isEqualTo: username)
+                    .limit(1)
+                    .get();
+                if (qConfig.docs.isNotEmpty) {
+                  final docData = qConfig.docs.first.data();
+                  final name = (docData['FullName'] ??
+                          docData['fullName'] ??
+                          docData['name'] ??
+                          '')
+                      .toString()
+                      .trim();
+                  if (name.isNotEmpty) {
+                    resolvedName = name;
+                  }
+                }
+              } catch (e) {
+                debugPrint('Error fetching config user details: $e');
+              }
+            }
+          }
+        }
+      } else if (auth.userRole == UserRole.supervisor) {
+        final data = auth.userData;
+        resolvedName = (data['supervisorName'] ??
+                data['fullName'] ??
+                data['FullName'] ??
+                data['name'] ??
+                data['username'] ??
+                '')
+            .toString()
+            .trim();
+      }
+
+      if (resolvedName.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final configUsername = prefs.getString('config_username') ?? '';
+        if (configUsername.isNotEmpty) {
+          try {
             final q = await FirestoreService.getCollection('manager')
-                .where('UserName', isEqualTo: username)
+                .where('UserName', isEqualTo: configUsername)
                 .limit(1)
                 .get();
             if (q.docs.isNotEmpty) {
               final docData = q.docs.first.data();
-              resolvedName = (docData['FullName'] ?? docData['fullName'] ?? docData['name'] ?? '').toString();
+              final name = (docData['FullName'] ??
+                      docData['fullName'] ??
+                      docData['name'] ??
+                      '')
+                  .toString()
+                  .trim();
+              if (name.isNotEmpty) resolvedName = name;
             }
+          } catch (_) {}
+          if (resolvedName.isEmpty) {
+            resolvedName = configUsername;
           }
         }
       }
