@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/material_inventory_service.dart';
 import 'package:demo_cst/services/notification_service.dart';
 import 'package:intl/intl.dart';
 
@@ -445,6 +447,7 @@ class ApprovalWorkflowService {
     required String remarks,
     String? supervisorName,
     String? siteId,
+    List<dynamic>? materials,
     Map<String, dynamic>? additionalUpdates,
   }) async {
     final auditEntry = createAuditEntry(
@@ -456,6 +459,52 @@ class ApprovalWorkflowService {
       remarks: remarks.isNotEmpty ? remarks : 'Final clearance granted. Dispatched to site.',
     );
 
+    final reqRef = FirestoreService.getCollection(collectionName).doc(docId);
+    final reqSnap = await reqRef.get();
+    final reqData = reqSnap.data() ?? {};
+
+    final isAlreadyTransferred = (reqData['isStockTransferred'] == true);
+    final rawMaterials = materials ?? (reqData['materials'] as List?);
+    final targetSiteId = (siteId != null && siteId.isNotEmpty)
+        ? siteId
+        : (reqData['siteId'] ?? '').toString();
+    final targetSiteName = (reqData['siteName'] ?? reqData['projectName'] ?? targetSiteId).toString();
+    final targetProjectName = (reqData['projectName'] ?? '').toString();
+    final targetSupervisor = supervisorName ?? (reqData['supervisorName'] ?? '').toString();
+
+    // If it's a material request and not already transferred, execute company-to-site stock movement
+    if (!isAlreadyTransferred &&
+        collectionName.toLowerCase().contains('material') &&
+        rawMaterials != null &&
+        rawMaterials.isNotEmpty &&
+        targetSiteId.isNotEmpty) {
+      for (final m in rawMaterials) {
+        if (m is Map) {
+          final matMap = Map<String, dynamic>.from(m);
+          final matName = (matMap['materialName'] ?? matMap['material'] ?? '').toString().trim();
+          final rawQty = matMap['materialQty'] ?? matMap['quantity'] ?? matMap['releasedQty'] ?? 0;
+          final int qty = (rawQty is num) ? rawQty.toInt() : (int.tryParse(rawQty.toString()) ?? 0);
+
+          if (matName.isNotEmpty && qty > 0) {
+            try {
+              await MaterialInventoryService.transferCompanyToSite(
+                materialName: matName,
+                siteId: targetSiteId,
+                quantity: qty,
+                siteName: targetSiteName,
+                managerName: managerName,
+                supervisorName: targetSupervisor,
+                projectName: targetProjectName,
+                displayName: matName,
+              );
+            } catch (invErr) {
+              debugPrint('MaterialInventoryService stock transfer error for $matName: $invErr');
+            }
+          }
+        }
+      }
+    }
+
     final updates = {
       if (additionalUpdates != null) ...additionalUpdates,
       'status': statusApproved,
@@ -463,12 +512,14 @@ class ApprovalWorkflowService {
       'currentStep': 4,
       'finalApprovedBy': managerName,
       'finalClearanceRemarks': remarks,
+      'isStockTransferred': true,
+      'stockTransferredAt': FieldValue.serverTimestamp(),
       'approvalHistory': FieldValue.arrayUnion([auditEntry]),
       'updatedAt': FieldValue.serverTimestamp(),
       'completedAt': FieldValue.serverTimestamp(),
     };
 
-    await FirestoreService.getCollection(collectionName).doc(docId).update(updates);
+    await reqRef.update(updates);
 
     final reqType = getRequestType(collectionName);
     final reqTypeName = getRequestTypeDisplayName(reqType);
@@ -478,7 +529,7 @@ class ApprovalWorkflowService {
       await NotificationService.notifySupervisor(
         supervisorName: supervisorName,
         title: '🎉 $reqTypeName Approved & Released!',
-        body: 'Manager $managerName completed final clearance for $reqTypeName #$docId. Items/funds/workforce released to site.',
+        body: 'Manager $managerName completed final clearance for $reqTypeName #$docId. Material released – awaiting arrival confirmation.',
         requestType: reqType,
         requestId: docId,
         docId: docId,
@@ -489,5 +540,113 @@ class ApprovalWorkflowService {
         remarks: remarks,
       );
     }
+  }
+
+  // ===========================================================================
+  // STAGE 5 (POST-RELEASE): SUPERVISOR MATERIAL ARRIVAL CONFIRMATION
+  // ===========================================================================
+
+  /// Call when the requesting Supervisor confirms physical arrival of material at the site with proof image.
+  static Future<void> supervisorConfirmArrival({
+    required String collectionName,
+    required String docId,
+    required String supervisorName,
+    String? supervisorId,
+    required String proofImageUrl,
+    String? remarks,
+    String? siteId,
+    String? matReqId,
+    List<dynamic>? materials,
+  }) async {
+    final auditEntry = createAuditEntry(
+      step: '5. Material Arrival Confirmation',
+      action: 'Material Arrival Confirmed',
+      actorRole: 'Supervisor',
+      actorName: supervisorName,
+      actorId: supervisorId,
+      remarks: (remarks != null && remarks.isNotEmpty)
+          ? '$remarks (Proof photo verified)'
+          : 'Material physically received and verified at site. Proof photo uploaded.',
+    );
+
+    final reqRef = FirestoreService.getCollection(collectionName).doc(docId);
+    final reqSnap = await reqRef.get();
+    final reqData = reqSnap.data() ?? {};
+
+    final isAlreadyTransferred = (reqData['isStockTransferred'] == true);
+    final rawMaterials = materials ?? (reqData['materials'] as List?);
+    final targetSiteId = (siteId != null && siteId.isNotEmpty)
+        ? siteId
+        : (reqData['siteId'] ?? '').toString();
+    final targetSiteName = (reqData['siteName'] ?? reqData['projectName'] ?? targetSiteId).toString();
+    final targetProjectName = (reqData['projectName'] ?? '').toString();
+    final targetManagerName = (reqData['finalApprovedBy'] ?? reqData['managerName'] ?? '').toString();
+
+    // Idempotent safeguard: If not previously transferred during clearance, transfer each item now
+    if (!isAlreadyTransferred &&
+        collectionName.toLowerCase().contains('material') &&
+        rawMaterials != null &&
+        rawMaterials.isNotEmpty &&
+        targetSiteId.isNotEmpty) {
+      for (final m in rawMaterials) {
+        if (m is Map) {
+          final matMap = Map<String, dynamic>.from(m);
+          final matName = (matMap['materialName'] ?? matMap['material'] ?? '').toString().trim();
+          final rawQty = matMap['materialQty'] ?? matMap['quantity'] ?? matMap['releasedQty'] ?? 0;
+          final int qty = (rawQty is num) ? rawQty.toInt() : (int.tryParse(rawQty.toString()) ?? 0);
+
+          if (matName.isNotEmpty && qty > 0) {
+            try {
+              await MaterialInventoryService.transferCompanyToSite(
+                materialName: matName,
+                siteId: targetSiteId,
+                quantity: qty,
+                siteName: targetSiteName,
+                managerName: targetManagerName,
+                supervisorName: supervisorName,
+                projectName: targetProjectName,
+                displayName: matName,
+              );
+            } catch (invErr) {
+              debugPrint('MaterialInventoryService arrival sync error for $matName: $invErr');
+            }
+          }
+        }
+      }
+    }
+
+    final updates = {
+      'arrivalConfirmationStatus': 'confirmed',
+      'arrivalConfirmedBy': supervisorName,
+      'arrivalConfirmedById': supervisorId ?? '',
+      'arrivalConfirmedAt': FieldValue.serverTimestamp(),
+      'arrivalProofImageUrl': proofImageUrl,
+      if (remarks != null && remarks.isNotEmpty)
+        'arrivalConfirmationRemarks': remarks,
+      'isStockTransferred': true,
+      'stockTransferredAt': reqData['stockTransferredAt'] ?? FieldValue.serverTimestamp(),
+      'approvalHistory': FieldValue.arrayUnion([auditEntry]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    await reqRef.update(updates);
+
+    final reqType = getRequestType(collectionName);
+    final reqTypeName = getRequestTypeDisplayName(reqType);
+    final displayReqId = (matReqId != null && matReqId.isNotEmpty) ? matReqId : docId;
+
+    // Real-time notification to Manager(s) confirming material has arrived on site!
+    await NotificationService.notifyManager(
+      title: '📦 $reqTypeName Arrival Confirmed',
+      body: '$supervisorName (Site: ${targetSiteId.isNotEmpty ? targetSiteId : 'N/A'}) confirmed physical arrival & uploaded proof photo for $reqTypeName #$displayReqId.',
+      requestType: reqType,
+      requestId: displayReqId,
+      docId: docId,
+      siteId: targetSiteId,
+      status: statusApproved,
+      senderRole: 'Supervisor',
+      senderName: supervisorName,
+      remarks: remarks,
+    );
   }
 }

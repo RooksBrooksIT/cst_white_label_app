@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/material_inventory_service.dart';
@@ -13,36 +15,47 @@ class MaterialAvailability extends StatefulWidget {
 }
 
 class _MaterialAvailabilityState extends State<MaterialAvailability> {
+  // New Tab State
   String? _selectedMaterial;
   int _count = 0;
+  final TextEditingController _countController = TextEditingController();
+
+  // General State
+  bool _isNewMode = true;
   bool _isLoading = false;
   bool _isLoadingMaterials = true;
   bool _isLoadingAvailability = false;
   List<String> _materialNames = [];
   List<Map<String, dynamic>> _availabilityData = [];
-  final TextEditingController _countController = TextEditingController();
-  final TextEditingController _editCountController = TextEditingController();
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _availabilitySub;
 
-  // Mode variables
-  bool _isNewMode = true;
-  String? _selectedMaterialToUpdate;
-  int _existingCount = 0;
-
-  // Operation mode toggles
-  bool _addToExisting = true;
-  bool _updateExisting = false;
+  // Update Tab State
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadMaterials();
     _loadAvailabilityData();
+    _initAvailabilityStream();
+  }
+
+  void _initAvailabilityStream() {
+    _availabilitySub = FirestoreService.getCollection('materialsAvailability')
+        .snapshots()
+        .listen((_) {
+      if (mounted) {
+        _loadAvailabilityData(isSilent: true);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _availabilitySub?.cancel();
     _countController.dispose();
-    _editCountController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -50,13 +63,14 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     try {
       final querySnapshot = await FirestoreService.getCollection(
         'materials',
-      ).limit(100).get();
+      ).limit(200).get();
       if (!mounted) return;
       setState(() {
         _materialNames = querySnapshot.docs.map((doc) {
           final data = doc.data();
           return (data['materialName'] ?? doc.id).toString();
         }).toList();
+        _materialNames.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
         _isLoadingMaterials = false;
       });
     } catch (e) {
@@ -68,10 +82,12 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     }
   }
 
-  Future<void> _loadAvailabilityData() async {
-    setState(() {
-      _isLoadingAvailability = true;
-    });
+  Future<void> _loadAvailabilityData({bool isSilent = false}) async {
+    if (!isSilent) {
+      setState(() {
+        _isLoadingAvailability = true;
+      });
+    }
     try {
       final items = await MaterialInventoryService.fetchAllMaterialsInventory();
 
@@ -85,16 +101,23 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
             'totalCount': item.totalStock,
             'totalSiteCount': item.totalSiteStock,
             'lastupdated': item.lastUpdated,
+            'unit': item.unit,
           };
         }).toList();
-        _isLoadingAvailability = false;
+        _availabilityData.sort((a, b) =>
+            (a['materialName'] as String).toLowerCase().compareTo((b['materialName'] as String).toLowerCase()));
+        if (!isSilent) {
+          _isLoadingAvailability = false;
+        }
       });
     } catch (e) {
       if (!mounted) return;
-      _showErrorDialog('Failed to load availability data: $e');
-      setState(() {
-        _isLoadingAvailability = false;
-      });
+      if (!isSilent) {
+        _showErrorDialog('Failed to load availability data: $e');
+        setState(() {
+          _isLoadingAvailability = false;
+        });
+      }
     }
   }
 
@@ -122,7 +145,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         isAddition: true,
       );
 
-      _showSuccessDialog('Added $_count units! Company stock is now $newCount units.');
+      _showSuccessDialog('Added $_count units! Company stock for "$_selectedMaterial" is now $newCount units.');
       _resetForm();
       _loadAvailabilityData();
     } catch (e) {
@@ -137,118 +160,304 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     }
   }
 
-  Future<void> _updateExistingMaterial() async {
-    if (_selectedMaterialToUpdate == null ||
-        _selectedMaterialToUpdate!.isEmpty) {
-      _showErrorDialog('Please select a material to update');
-      return;
-    }
-
-    if (_count <= 0) {
-      _showErrorDialog('Please enter a valid count (greater than 0)');
-      return;
-    }
-
-    FocusScope.of(context).unfocus();
-
+  Future<void> _addStockToExisting(String materialName, int quantity) async {
     setState(() {
-      _isLoading = true;
+      _isLoadingAvailability = true;
     });
 
     try {
       final newCount = await MaterialInventoryService.setCompanyStock(
-        materialName: _selectedMaterialToUpdate!,
-        count: _count,
-        isAddition: _addToExisting,
+        materialName: materialName,
+        count: quantity,
+        isAddition: true,
       );
 
-      _showSuccessDialog(
-        _addToExisting
-            ? 'Material count added successfully! ($newCount units)'
-            : 'Material count updated successfully! ($newCount units)',
-      );
-
-      _resetForm();
-      _loadAvailabilityData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Added $quantity units! Updated stock for $materialName is $newCount units.',
+            ),
+            backgroundColor: const Color(0xFF059669),
+          ),
+        );
+      }
+      await _loadAvailabilityData();
     } catch (e) {
-      if (!mounted) return;
-      _showErrorDialog('Failed to update data: $e');
+      if (mounted) {
+        _showErrorDialog('Failed to add stock: $e');
+      }
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoadingAvailability = false;
         });
       }
     }
   }
 
-  void _onUpdateMaterialSelected(String? materialName) {
-    setState(() {
-      _selectedMaterialToUpdate = materialName;
-      _existingCount = 0;
-      _countController.clear();
-    });
+  void _showAddStockModal(BuildContext context, Map<String, dynamic> item) {
+    final materialName = item['materialName']?.toString() ?? '';
+    final currentStock = (item['count'] as num?)?.toInt() ?? 0;
+    final unit = (item['unit'] ?? 'units').toString();
+    final addQtyController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    int additionalQty = 0;
 
-    if (materialName != null) {
-      _fetchExistingCount(materialName);
-    }
-  }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final theme = Theme.of(context);
+            final primaryColor = theme.primaryColor;
+            final previewTotal = currentStock + additionalQty;
 
-  Future<void> _fetchExistingCount(String materialName) async {
-    try {
-      final item = await MaterialInventoryService.fetchMaterialInventory(materialName);
-      if (!mounted) return;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFCBD5E1),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              child: Icon(
+                                Icons.add_business_rounded,
+                                color: primaryColor,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Add Stock Quantity',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                                Text(
+                                  materialName,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            size: 20,
+                            color: Color(0xFF64748B),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    // Current Stock vs New Stock Preview Card
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Current Stock',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '$currentStock $unit',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Color(0xFF94A3B8),
+                            size: 18,
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                const Text(
+                                  'Updated Stock',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFF059669),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '$previewTotal $unit',
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF059669),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Quantity input
+                    TextFormField(
+                      controller: addQtyController,
+                      autofocus: true,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Please enter quantity';
+                        }
+                        final numVal = int.tryParse(val.trim());
+                        if (numVal == null || numVal <= 0) {
+                          return 'Enter a quantity > 0';
+                        }
+                        return null;
+                      },
+                      onChanged: (val) {
+                        setModalState(() {
+                          additionalQty = int.tryParse(val.trim()) ?? 0;
+                        });
+                      },
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0A183D),
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Additional Quantity Received *',
+                        hintText: 'e.g. 50',
+                        prefixIcon: Icon(
+                          Icons.add_circle_outline_rounded,
+                          color: primaryColor,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFCBD5E1),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(
+                          Icons.check_circle_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        label: Text(
+                          additionalQty > 0
+                              ? 'Add $additionalQty to Stock (Total: $previewTotal)'
+                              : 'Add to Stock',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 2,
+                        ),
+                        onPressed: () async {
+                          if (!formKey.currentState!.validate()) return;
+                          final qty = int.tryParse(addQtyController.text.trim()) ?? 0;
+                          if (qty <= 0) return;
 
-      if (item != null) {
-        setState(() {
-          _existingCount = item.companyAvailableCount;
-          _countController.text = _existingCount.toString();
-          _count = _existingCount;
-        });
-      } else {
-        setState(() {
-          _existingCount = 0;
-          _countController.clear();
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching existing count: $e');
-      if (!mounted) return;
-      setState(() {
-        _existingCount = 0;
-        _countController.clear();
-      });
-    }
-  }
-
-  void _onAddToExistingChanged(bool? value) {
-    if (value == true) {
-      setState(() {
-        _addToExisting = true;
-        _updateExisting = false;
-      });
-    }
-  }
-
-  void _onUpdateExistingChanged(bool? value) {
-    if (value == true) {
-      setState(() {
-        _addToExisting = false;
-        _updateExisting = true;
-      });
-    }
-  }
+                          Navigator.pop(ctx);
+                          await _addStockToExisting(materialName, qty);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   void _switchToNewMode() {
     setState(() {
       _isNewMode = true;
-      _selectedMaterialToUpdate = null;
       _selectedMaterial = null;
       _count = 0;
-      _existingCount = 0;
       _countController.clear();
-      _addToExisting = true;
-      _updateExisting = false;
     });
   }
 
@@ -256,12 +465,8 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     setState(() {
       _isNewMode = false;
       _selectedMaterial = null;
-      _selectedMaterialToUpdate = null;
       _count = 0;
-      _existingCount = 0;
       _countController.clear();
-      _addToExisting = true;
-      _updateExisting = false;
     });
   }
 
@@ -350,9 +555,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
   void _resetForm() {
     setState(() {
       _selectedMaterial = null;
-      _selectedMaterialToUpdate = null;
       _count = 0;
-      _existingCount = 0;
       _countController.clear();
     });
   }
@@ -495,9 +698,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
   }
 
   Widget _buildNewMaterialSection() {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -540,7 +740,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Record daily material count into company inventory',
+                'Add a new material with its initial available stock count',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -571,7 +771,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
 
               // Count Field
               _buildWhiteTextField(
-                label: 'Available Count *',
+                label: 'Availability Count *',
                 icon: Icons.numbers_rounded,
                 hintText: 'Enter available quantity',
                 controller: _countController,
@@ -580,7 +780,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Enter a number greater than 0',
+                'Enter initial available quantity (greater than 0)',
                 style: TextStyle(
                   fontSize: 12,
                   color: Color(0xFF64748B),
@@ -592,34 +792,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
         const SizedBox(height: 20),
 
         _buildNewSubmitButton(),
-
-        const SizedBox(height: 24),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Recent Availability Records',
-              style: TextStyle(
-                fontSize: 16.5,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0A183D),
-                letterSpacing: -0.3,
-              ),
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.refresh_rounded,
-                color: primaryColor,
-                size: 20,
-              ),
-              onPressed: _loadAvailabilityData,
-              tooltip: 'Refresh data',
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _buildAvailabilityDataList(),
         const SizedBox(height: 80),
       ],
     );
@@ -629,335 +801,17 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
 
+    final filteredList = _availabilityData.where((item) {
+      final name = (item['materialName'] ?? '').toString().toLowerCase();
+      return name.contains(_searchQuery.toLowerCase());
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Search / Filter Header Card
         Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(
-                    Icons.edit_note_rounded,
-                    color: Color(0xFF3B82F6),
-                    size: 24,
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    'Update Existing Material',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0A183D),
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Modify stock count or add to existing inventory',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              _buildWhiteDropdown(
-                label: 'Material Name *',
-                value: _selectedMaterialToUpdate,
-                icon: Icons.category_rounded,
-                hintText: _isLoadingMaterials ? 'Loading materials...' : 'Select material to update',
-                items: _materialNames.map((name) {
-                  return DropdownMenuItem<String>(
-                    value: name,
-                    child: Text(name),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    _onUpdateMaterialSelected(value);
-                  }
-                },
-              ),
-              const SizedBox(height: 18),
-
-              const Text(
-                'Update Operation Mode',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0A183D),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _onAddToExistingChanged(true),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _addToExisting ? primaryColor : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _addToExisting ? primaryColor : const Color(0xFFCBD5E1),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.add_circle_outline_rounded,
-                              size: 18,
-                              color: _addToExisting ? Colors.white : const Color(0xFF0A183D),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Add',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: _addToExisting ? Colors.white : const Color(0xFF0A183D),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _onUpdateExistingChanged(true),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _updateExisting ? primaryColor : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _updateExisting ? primaryColor : const Color(0xFFCBD5E1),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.swap_horiz_rounded,
-                              size: 18,
-                              color: _updateExisting ? Colors.white : const Color(0xFF0A183D),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Replace',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: _updateExisting ? Colors.white : const Color(0xFF0A183D),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              if (_selectedMaterialToUpdate != null && _existingCount > 0) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: primaryColor.withValues(alpha: 0.25),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        color: primaryColor,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Current: "$_selectedMaterialToUpdate"',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '$_existingCount units',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-              _buildWhiteTextField(
-                label: 'New Count',
-                icon: Icons.pin_rounded,
-                hintText: 'Enter count',
-                controller: _countController,
-                keyboardType: TextInputType.number,
-                onChanged: (v) => setState(() => _count = int.tryParse(v) ?? 0),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Enter a number greater than 0',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        _buildUpdateSubmitButton(),
-
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: primaryColor.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: primaryColor.withValues(alpha: 0.25)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                color: primaryColor,
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Update Material Logic',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _addToExisting
-                          ? '• Adds the new count to existing count\n'
-                                '• Example: Current 22 + Add 22 = Total 44\n'
-                                '• Use this for adding more stock to existing materials'
-                          : '• Replaces the current count with new value\n'
-                                '• Example: Current 22 → Update 44 = Total 44\n'
-                                '• Use this for correcting or setting exact counts',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 1.6,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 80),
-      ],
-    );
-  }
-
-  Widget _buildAvailabilityDataList() {
-    if (_isLoadingAvailability) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_availabilityData.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
-        ),
-        child: const Center(
-          child: Text(
-            'No availability records found.',
-            style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-          ),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _availabilityData.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final item = _availabilityData[index];
-        final name = item['materialName']?.toString() ?? 'Unnamed';
-        final count = item['count'] ?? 0;
-        final ts = item['lastupdated'];
-        String dateStr = '';
-        if (ts is Timestamp) {
-          dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(ts.toDate());
-        }
-
-        return Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -972,81 +826,246 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.inventory_2_rounded,
-                  color: Color(0xFF3B82F6),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0A183D),
-                      ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  decoration: const InputDecoration(
+                    hintText: 'Search material (e.g. Cement, Steel)...',
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF94A3B8),
                     ),
-                    if (dateStr.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        dateStr,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ],
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                  ),
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Company: $count units',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF059669),
-                      ),
-                    ),
-                  ),
-                  if (item['totalCount'] != null && (item['totalCount'] as int) != count) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      'Total: ${item['totalCount']} (Sites: ${item['totalSiteCount'] ?? 0})',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ],
+              if (_searchQuery.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
+              IconButton(
+                icon: Icon(Icons.refresh_rounded, color: primaryColor, size: 20),
+                tooltip: 'Refresh',
+                onPressed: _loadAvailabilityData,
               ),
             ],
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 14),
+
+        // Materials Stock Table Card
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Column(
+              children: [
+                // Table Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: Text(
+                          'Material Name',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          'Stock Count',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'Action',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+                // Table Body
+                if (_isLoadingAvailability)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 36),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (filteredList.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.inventory_2_outlined, size: 36, color: Colors.grey.shade400),
+                          const SizedBox(height: 8),
+                          Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No materials matching "$_searchQuery"'
+                                : 'No material availability records found.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filteredList.length,
+                    separatorBuilder: (context, index) => const Divider(
+                      height: 1,
+                      color: Color(0xFFF1F5F9),
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = filteredList[index];
+                      final name = item['materialName']?.toString() ?? 'Unnamed';
+                      final count = item['count'] ?? 0;
+                      final ts = item['lastupdated'];
+                      String dateStr = '';
+                      if (ts is Timestamp) {
+                        dateStr = DateFormat('dd MMM, hh:mm a').format(ts.toDate());
+                      }
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        color: index % 2 == 0 ? Colors.white : const Color(0xFFF8FAFC),
+                        child: Row(
+                          children: [
+                            // Material Name
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  if (dateStr.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Updated: $dateStr',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            // Stock Count
+                            Expanded(
+                              flex: 3,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '$count',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF059669),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Action (+)
+                            Expanded(
+                              flex: 2,
+                              child: Center(
+                                child: Material(
+                                  color: primaryColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: InkWell(
+                                    onTap: () => _showAddStockModal(context, item),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      child: const Icon(
+                                        Icons.add_rounded,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 80),
+      ],
     );
   }
 
@@ -1213,56 +1232,6 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                   Text(
                     'ADD MATERIAL',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildUpdateSubmitButton() {
-    final theme = Theme.of(context);
-    return SizedBox(
-      height: 50,
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _updateExistingMaterial,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: theme.primaryColor,
-          foregroundColor: Colors.white,
-          alignment: Alignment.center,
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          elevation: 2,
-        ),
-        child: _isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _addToExisting ? Icons.add_rounded : Icons.swap_horiz_rounded,
-                    size: 20,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _addToExisting ? 'ADD TO MATERIAL' : 'UPDATE MATERIAL',
-                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.w800,

@@ -48,6 +48,8 @@ class _SiteScreenState extends State<SiteScreen>
   final TextEditingController _ownerPhoneController = TextEditingController();
   final TextEditingController _projectBudgetController = TextEditingController();
   final TextEditingController _amountPaidController = TextEditingController();
+  final TextEditingController _amountSpentController = TextEditingController();
+  final TextEditingController _balanceAmountController = TextEditingController();
   final TextEditingController _contractorNameController = TextEditingController();
   final TextEditingController _contractorBudgetController = TextEditingController();
 
@@ -96,6 +98,9 @@ class _SiteScreenState extends State<SiteScreen>
   final TextEditingController _updateOwnerPhoneController = TextEditingController();
   final TextEditingController _updateProjectBudgetController = TextEditingController();
   final TextEditingController _updateAmountPaidController = TextEditingController();
+  final TextEditingController _updateAmountSpentController = TextEditingController();
+  final TextEditingController _updateBalanceAmountController = TextEditingController();
+
   String? _updateProjectSubCategory;
   String? _updateProjectStage;
   String? _updateProjectContract;
@@ -107,6 +112,31 @@ class _SiteScreenState extends State<SiteScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _setupFinancialCalculationListeners();
+  }
+
+  void _setupFinancialCalculationListeners() {
+    _amountSpentController.text = '0.00';
+    _balanceAmountController.text = '0.00';
+    _projectBudgetController.addListener(_recalcNewSetupBalance);
+    _amountSpentController.addListener(_recalcNewSetupBalance);
+
+    _updateProjectBudgetController.addListener(_recalcUpdateBalance);
+    _updateAmountSpentController.addListener(_recalcUpdateBalance);
+  }
+
+  void _recalcNewSetupBalance() {
+    final budget = double.tryParse(_projectBudgetController.text.trim()) ?? 0.0;
+    final spent = double.tryParse(_amountSpentController.text.trim()) ?? 0.0;
+    final balance = budget - spent;
+    _balanceAmountController.text = balance.toStringAsFixed(2);
+  }
+
+  void _recalcUpdateBalance() {
+    final budget = double.tryParse(_updateProjectBudgetController.text.trim()) ?? 0.0;
+    final spent = double.tryParse(_updateAmountSpentController.text.trim()) ?? 0.0;
+    final balance = budget - spent;
+    _updateBalanceAmountController.text = balance.toStringAsFixed(2);
   }
 
   @override
@@ -121,6 +151,8 @@ class _SiteScreenState extends State<SiteScreen>
     _ownerPhoneController.dispose();
     _projectBudgetController.dispose();
     _amountPaidController.dispose();
+    _amountSpentController.dispose();
+    _balanceAmountController.dispose();
     _contractorNameController.dispose();
     _contractorBudgetController.dispose();
 
@@ -135,6 +167,8 @@ class _SiteScreenState extends State<SiteScreen>
     _updateOwnerPhoneController.dispose();
     _updateProjectBudgetController.dispose();
     _updateAmountPaidController.dispose();
+    _updateAmountSpentController.dispose();
+    _updateBalanceAmountController.dispose();
     super.dispose();
   }
 
@@ -397,11 +431,743 @@ class _SiteScreenState extends State<SiteScreen>
         _updateProjectContract = null;
         _updateProjectStatus = null;
       }
+
+      // Fetch expenses & compute balance
+      final double currentBudget =
+          double.tryParse(_updateProjectBudgetController.text.trim()) ?? 0.0;
+      await _fetchAndSetUpdateExpensesAndBalance(docId, _selectedSiteId, currentBudget);
+      await _loadReceivedPaymentsForSite(docId, _selectedProjectId);
     } catch (e) {
       debugPrint('Error loading site for update: $e');
     } finally {
       if (mounted) setState(() => _isLoadingSiteData = false);
     }
+  }
+
+  Future<void> _fetchAndSetUpdateExpensesAndBalance(
+    String siteDocId,
+    String? siteIdStr,
+    double budget,
+  ) async {
+    double amountSpent = 0.0;
+    try {
+      final expDoc = await FirestoreService.getCollection(
+        'totalSiteExpensesPerDay',
+      ).doc(siteDocId).get();
+
+      if (expDoc.exists) {
+        final data = expDoc.data()!;
+        final totalAll = (data['totalAllExpenses'] as num?)?.toDouble() ?? 0.0;
+        if (totalAll > 0) {
+          amountSpent = totalAll;
+        } else {
+          final totalMgr = (data['totalMgrExpense'] as num?)?.toDouble() ?? 0.0;
+          final totalOrg = (data['totalOrgExpense'] as num?)?.toDouble() ?? 0.0;
+          final totalSite = (data['totalSiteExpense'] as num?)?.toDouble() ?? 0.0;
+          final totalInc =
+              (data['totalIncentiveExpenses'] as num?)?.toDouble() ?? 0.0;
+          final totalCont =
+              (data['totalContractorExpense'] as num?)?.toDouble() ?? 0.0;
+          amountSpent = totalMgr + totalOrg + totalSite + totalInc + totalCont;
+        }
+      } else if (siteIdStr != null && siteIdStr.isNotEmpty) {
+        final altExpDoc = await FirestoreService.getCollection(
+          'totalSiteExpensesPerDay',
+        ).doc(siteIdStr).get();
+        if (altExpDoc.exists) {
+          final data = altExpDoc.data()!;
+          final totalAll =
+              (data['totalAllExpenses'] as num?)?.toDouble() ?? 0.0;
+          if (totalAll > 0) {
+            amountSpent = totalAll;
+          } else {
+            final totalMgr =
+                (data['totalMgrExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalOrg =
+                (data['totalOrgExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalSite =
+                (data['totalSiteExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalInc =
+                (data['totalIncentiveExpenses'] as num?)?.toDouble() ?? 0.0;
+            final totalCont =
+                (data['totalContractorExpense'] as num?)?.toDouble() ?? 0.0;
+            amountSpent =
+                totalMgr + totalOrg + totalSite + totalInc + totalCont;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching site expenses: $e');
+    }
+
+    _updateAmountSpentController.text = amountSpent.toStringAsFixed(2);
+    final balance = budget - amountSpent;
+    _updateBalanceAmountController.text = balance.toStringAsFixed(2);
+  }
+
+  Future<void> _loadReceivedPaymentsForSite(
+    String siteDocId,
+    String? projDocId,
+  ) async {
+    try {
+      final query = await FirestoreService.getCollection('projectPayments')
+          .where('siteId', isEqualTo: siteDocId)
+          .get();
+
+      if (query.docs.isNotEmpty) {
+        double total = 0.0;
+        for (final doc in query.docs) {
+          final data = doc.data();
+          total += (data['amount'] as num?)?.toDouble() ?? 0.0;
+        }
+        _updateAmountPaidController.text = total.toStringAsFixed(2);
+      }
+    } catch (e) {
+      debugPrint('Error loading received payments: $e');
+    }
+  }
+
+  void _showAddPaymentModal(BuildContext context) {
+    if (_selectedSiteDocId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a site first.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final amountController = TextEditingController();
+    final remarksController = TextEditingController();
+    final refController = TextEditingController();
+    DateTime paymentDate = DateTime.now();
+    String paymentMode = 'Cash';
+    final modes = ['Cash', 'Bank Transfer', 'UPI / Online', 'Cheque', 'Other'];
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final theme = Theme.of(context);
+            final primaryColor = theme.primaryColor;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFCBD5E1),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.add_card_rounded,
+                                  color: primaryColor,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Add Amount Received',
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0A183D),
+                                    ),
+                                  ),
+                                  Text(
+                                    'Site: ${_selectedSiteName ?? _selectedSiteId}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              size: 20,
+                              color: Color(0xFF64748B),
+                            ),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      // Amount Input
+                      TextFormField(
+                        controller: amountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d+\.?\d{0,2}'),
+                          ),
+                        ],
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter amount';
+                          }
+                          final numVal = double.tryParse(val.trim());
+                          if (numVal == null || numVal <= 0) {
+                            return 'Enter a valid amount > 0';
+                          }
+                          return null;
+                        },
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Payment Amount (₹) *',
+                          hintText: 'e.g. 50000',
+                          prefixIcon: Icon(
+                            Icons.currency_rupee_rounded,
+                            color: primaryColor,
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFCBD5E1),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Payment Date
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: ctx,
+                            initialDate: paymentDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2101),
+                          );
+                          if (picked != null) {
+                            setModalState(() => paymentDate = picked);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today_rounded,
+                                    color: primaryColor,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Text(
+                                    'Payment Date: ',
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                DateFormat('dd MMM yyyy').format(paymentDate),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0A183D),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Payment Mode Dropdown
+                      DropdownButtonFormField<String>(
+                        initialValue: paymentMode,
+                        items: modes
+                            .map(
+                              (m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(m),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setModalState(() => paymentMode = val);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Payment Mode',
+                          prefixIcon: Icon(
+                            Icons.payment_rounded,
+                            color: primaryColor,
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFCBD5E1),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Reference / Transaction ID
+                      TextFormField(
+                        controller: refController,
+                        decoration: InputDecoration(
+                          labelText: 'Reference / Trans. ID (Optional)',
+                          hintText: 'e.g. TXN987654321',
+                          prefixIcon: Icon(
+                            Icons.tag_rounded,
+                            color: primaryColor,
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFCBD5E1),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Remarks
+                      TextFormField(
+                        controller: remarksController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Notes / Remarks (Optional)',
+                          hintText: 'e.g. 2nd installment received for foundation',
+                          prefixIcon: Icon(
+                            Icons.notes_rounded,
+                            color: primaryColor,
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFCBD5E1),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      // Submit Add Payment Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(
+                            Icons.check_circle_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          label: const Text(
+                            'Save & Add to Amount Received',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14.5,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 2,
+                          ),
+                          onPressed: () async {
+                            if (!formKey.currentState!.validate()) return;
+                            final double newAmount =
+                                double.tryParse(amountController.text.trim()) ??
+                                0.0;
+                            if (newAmount <= 0) return;
+
+                            Navigator.pop(ctx);
+                            await _saveNewReceivedPayment(
+                              amount: newAmount,
+                              date: paymentDate,
+                              mode: paymentMode,
+                              referenceNo: refController.text.trim(),
+                              remarks: remarksController.text.trim(),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _saveNewReceivedPayment({
+    required double amount,
+    required DateTime date,
+    required String mode,
+    required String referenceNo,
+    required String remarks,
+  }) async {
+    try {
+      final entryId = 'PAY_${DateTime.now().millisecondsSinceEpoch}';
+      final paymentEntry = {
+        'paymentId': entryId,
+        'projectId': _selectedProjectId,
+        'siteId': _selectedSiteDocId,
+        'siteName': _selectedSiteName,
+        'amount': amount,
+        'date': Timestamp.fromDate(date),
+        'paymentMode': mode,
+        'referenceNo': referenceNo,
+        'remarks': remarks,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // 1. Add to projectPayments collection
+      await FirestoreService.getCollection(
+        'projectPayments',
+      ).doc(entryId).set(paymentEntry);
+
+      // 2. Fetch all payments for this site to calculate cumulative total
+      final allPaymentsSnapshot = await FirestoreService.getCollection(
+        'projectPayments',
+      ).where('siteId', isEqualTo: _selectedSiteDocId).get();
+
+      double cumulativeAmountReceived = 0.0;
+      final List<Map<String, dynamic>> updatedList = [];
+
+      for (final doc in allPaymentsSnapshot.docs) {
+        final data = doc.data();
+        final a = (data['amount'] as num?)?.toDouble() ?? 0.0;
+        cumulativeAmountReceived += a;
+        updatedList.add(data);
+      }
+
+      if (allPaymentsSnapshot.docs.isEmpty) {
+        final currentPaid =
+            double.tryParse(_updateAmountPaidController.text) ?? 0.0;
+        cumulativeAmountReceived = currentPaid + amount;
+      }
+
+      // 3. Update project document & Site document
+      final double budget =
+          double.tryParse(_updateProjectBudgetController.text) ?? 0.0;
+      final double spent =
+          double.tryParse(_updateAmountSpentController.text) ?? 0.0;
+      final double balance = budget - spent;
+
+      if (_selectedProjectId != null && _selectedProjectId!.isNotEmpty) {
+        await FirestoreService.getCollection('projects')
+            .doc(_selectedProjectId)
+            .update({
+          'amountPaid': cumulativeAmountReceived,
+          'amountReceived': cumulativeAmountReceived,
+          'amountBalance': balance,
+          'receivedPayments': FieldValue.arrayUnion([paymentEntry]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (_selectedSiteDocId != null) {
+        await FirestoreService.getCollection('Site')
+            .doc(_selectedSiteDocId)
+            .update({
+          'amountPaid': cumulativeAmountReceived,
+          'amountReceived': cumulativeAmountReceived,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _updateAmountPaidController.text =
+            cumulativeAmountReceived.toStringAsFixed(2);
+        _updateBalanceAmountController.text = balance.toStringAsFixed(2);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '₹${amount.toStringAsFixed(2)} added! Total Amount Received: ₹${cumulativeAmountReceived.toStringAsFixed(2)}',
+          ),
+          backgroundColor: const Color(0xFF059669),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding payment: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showPaymentHistoryModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Received Payments History',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0A183D),
+                        ),
+                      ),
+                      Text(
+                        'Site: ${_selectedSiteName ?? _selectedSiteId}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirestoreService.getCollection('projectPayments')
+                      .where('siteId', isEqualTo: _selectedSiteDocId)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final docs = snapshot.data!.docs;
+                    if (docs.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.receipt_long_outlined,
+                              size: 48,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'No individual payment records found.',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      itemCount: docs.length,
+                      separatorBuilder: (c, i) => const SizedBox(height: 10),
+                      itemBuilder: (c, i) {
+                        final data = docs[i].data() as Map<String, dynamic>;
+                        final amount =
+                            (data['amount'] as num?)?.toDouble() ?? 0.0;
+                        final date = (data['date'] is Timestamp)
+                            ? DateFormat('dd MMM yyyy').format(
+                                (data['date'] as Timestamp).toDate(),
+                              )
+                            : 'N/A';
+                        final mode = data['paymentMode'] ?? 'Cash';
+                        final remarks = data['remarks'] ?? '';
+                        final ref = data['referenceNo'] ?? '';
+
+                        return Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF059669)
+                                                .withValues(alpha: 0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            mode,
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF059669),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          date,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF64748B),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (ref.toString().isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Ref: $ref',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                    if (remarks.toString().isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Note: $remarks',
+                                        style: const TextStyle(
+                                          fontSize: 11.5,
+                                          color: Color(0xFF334155),
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '+ ₹${amount.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _getCurrentUpdateLocation() async {
@@ -564,6 +1330,9 @@ class _SiteScreenState extends State<SiteScreen>
           double.tryParse(_updateProjectBudgetController.text) ?? 0.0;
       final double amountPaid =
           double.tryParse(_updateAmountPaidController.text) ?? 0.0;
+      final double amountSpent =
+          double.tryParse(_updateAmountSpentController.text) ?? 0.0;
+      final double amountBalance = budget - amountSpent;
 
       final projectUpdateData = {
         'projectName': projectName,
@@ -571,6 +1340,9 @@ class _SiteScreenState extends State<SiteScreen>
         'ownerPhoneNumber': _updateOwnerPhoneController.text.trim(),
         'projectBudget': budget,
         'amountPaid': amountPaid,
+        'amountReceived': amountPaid,
+        'amountSpent': amountSpent,
+        'amountBalance': amountBalance,
         'projectCategory': _updateProjectCategory ?? '',
         'projectSubCategory': _updateProjectSubCategory ?? '',
         'projectContract': _updateProjectContract ?? '',
@@ -992,6 +1764,27 @@ class _SiteScreenState extends State<SiteScreen>
             double.tryParse(_projectBudgetController.text) ?? 0.0;
         final double amountPaid =
             double.tryParse(_amountPaidController.text) ?? 0.0;
+        final double balance = budget - 0.0;
+
+        Map<String, dynamic>? initialPaymentEntry;
+        if (amountPaid > 0) {
+          final entryId = 'PAY_${DateTime.now().millisecondsSinceEpoch}';
+          initialPaymentEntry = {
+            'paymentId': entryId,
+            'projectId': nextPrDocId,
+            'siteId': createdSiteDocId,
+            'siteName': siteName,
+            'amount': amountPaid,
+            'date': Timestamp.now(),
+            'paymentMode': 'Initial Payment',
+            'referenceNo': 'SETUP',
+            'remarks': 'Initial advance/payment received on site creation',
+            'createdAt': FieldValue.serverTimestamp(),
+          };
+          await FirestoreService.getCollection('projectPayments')
+              .doc(entryId)
+              .set(initialPaymentEntry);
+        }
 
         final projectData = {
           'projectId': nextPrDocId,
@@ -999,8 +1792,10 @@ class _SiteScreenState extends State<SiteScreen>
           'ownerName': _ownerNameController.text.trim(),
           'ownerPhoneNumber': _ownerPhoneController.text.trim(),
           'amountPaid': amountPaid,
+          'amountReceived': amountPaid,
           'amountSpent': 0.0,
-          'amountBalance': amountPaid,
+          'amountBalance': balance,
+          'receivedPayments': initialPaymentEntry != null ? [initialPaymentEntry] : [],
           'projectBudget': budget,
           'projectCategory': _projectCategory ?? '',
           'projectSubCategory': _projectSubCategory ?? '',
@@ -1166,6 +1961,8 @@ class _SiteScreenState extends State<SiteScreen>
       _ownerPhoneController.clear();
       _projectBudgetController.clear();
       _amountPaidController.clear();
+      _amountSpentController.text = '0.00';
+      _balanceAmountController.text = '0.00';
       _contractorNameController.clear();
       _contractorBudgetController.clear();
       _startDate = null;
@@ -1906,10 +2703,34 @@ class _SiteScreenState extends State<SiteScreen>
                       Expanded(
                         child: _buildTextField(
                           controller: _amountPaidController,
-                          label: 'Advance / Paid (₹)',
+                          label: 'Amount Received (₹)',
                           hintText: 'e.g. 500000',
                           primaryColor: primaryColor,
                           keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _amountSpentController,
+                          label: 'Amount Spent (₹)',
+                          hintText: '0.00',
+                          primaryColor: primaryColor,
+                          readOnly: true,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _balanceAmountController,
+                          label: 'Balance Amount (₹)',
+                          hintText: '0.00',
+                          primaryColor: primaryColor,
+                          readOnly: true,
                         ),
                       ),
                     ],
@@ -2735,19 +3556,42 @@ class _SiteScreenState extends State<SiteScreen>
                               child: _buildTextField(
                                 controller: _updateProjectBudgetController,
                                 label: 'Estimated Budget (₹)',
-                                hintText: 'e.g. 2500000',
+                                hintText: '0.00',
                                 primaryColor: primaryColor,
-                                keyboardType: TextInputType.number,
+                                readOnly: true,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildAmountReceivedField(
+                                controller: _updateAmountPaidController,
+                                primaryColor: primaryColor,
+                                onAddPressed: () => _showAddPaymentModal(context),
+                                onHistoryPressed: () => _showPaymentHistoryModal(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _updateAmountSpentController,
+                                label: 'Amount Spent (₹)',
+                                hintText: '0.00',
+                                primaryColor: primaryColor,
+                                readOnly: true,
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: _buildTextField(
-                                controller: _updateAmountPaidController,
-                                label: 'Advance / Paid (₹)',
-                                hintText: 'e.g. 500000',
+                                controller: _updateBalanceAmountController,
+                                label: 'Balance Amount (₹)',
+                                hintText: '0.00',
                                 primaryColor: primaryColor,
-                                keyboardType: TextInputType.number,
+                                readOnly: true,
                               ),
                             ),
                           ],
@@ -2880,6 +3724,91 @@ class _SiteScreenState extends State<SiteScreen>
                 style: TextStyle(
                   fontSize: 11.5,
                   color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAmountReceivedField({
+    required TextEditingController controller,
+    required Color primaryColor,
+    required VoidCallback onAddPressed,
+    VoidCallback? onHistoryPressed,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Amount Received (₹)',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF334155),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 4),
+                  child: Text(
+                    controller.text.isEmpty ? '0.00' : controller.text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ),
+              if (onHistoryPressed != null)
+                IconButton(
+                  icon: Icon(
+                    Icons.history_rounded,
+                    color: primaryColor,
+                    size: 18,
+                  ),
+                  tooltip: 'Payment History',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                  onPressed: onHistoryPressed,
+                ),
+              Container(
+                margin: const EdgeInsets.only(right: 6, left: 2),
+                child: Material(
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    onTap: onAddPressed,
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
