@@ -127,7 +127,10 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
       }
     }
 
-    return summaryMap.values.toList();
+    final list = summaryMap.values.toList();
+    list.sort((a, b) =>
+        a.toolName.toLowerCase().compareTo(b.toolName.toLowerCase()));
+    return list;
   }
 
   List<ToolInventorySummary> get _filteredInventory {

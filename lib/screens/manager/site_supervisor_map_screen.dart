@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/auth_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class SiteSupervisorMapScreen extends StatefulWidget {
   const SiteSupervisorMapScreen({super.key});
 
   @override
-  _SiteSupervisorMapScreenState createState() =>
+  State<SiteSupervisorMapScreen> createState() =>
       _SiteSupervisorMapScreenState();
 }
 
@@ -18,23 +20,32 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   final int _infoItemsPerPage = 10;
   String _infoSearchQuery = '';
 
+  String? selectedSiteKey;
+  String? selectedSiteId;
   String? selectedSite;
   String? selectedSupervisor;
   String? selectedSupervisorId;
   String? selectedProjectStage;
   String? projectName;
-  String? siteComments;
   DateTime? joinedDate;
   DateTime? startDate;
   DateTime? endDate;
 
-  Map<String, String> _siteToDocId = {};
+  bool _isLoadingSites = true;
+  bool _isLoadingSupervisors = true;
+
   Map<String, Map<String, dynamic>> _docCache = {};
 
   final locationController = TextEditingController();
   final commentsController = TextEditingController();
+  final projectNameController = TextEditingController();
+  final supervisorNameController = TextEditingController();
+  final projectStageController = TextEditingController();
+  final siteNameController = TextEditingController();
+  final startDateController = TextEditingController();
+  final endDateController = TextEditingController();
 
-  List<String> siteList = [];
+  List<Map<String, dynamic>> _allSites = [];
   List<Map<String, String>> _supervisorList = [];
 
   Color get primaryColor => Theme.of(context).primaryColor;
@@ -42,7 +53,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchSiteSupervisorMapDocs();
+    _fetchSitesAndMappings();
     _fetchSupervisors();
   }
 
@@ -50,19 +61,26 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
   void dispose() {
     locationController.dispose();
     commentsController.dispose();
+    projectNameController.dispose();
+    supervisorNameController.dispose();
+    projectStageController.dispose();
+    siteNameController.dispose();
+    startDateController.dispose();
+    endDateController.dispose();
     super.dispose();
   }
 
   Future<void> _fetchSupervisors() async {
+    setState(() => _isLoadingSupervisors = true);
     try {
       final snapshot = await FirestoreService.getCollection('supervisor').get();
       if (!mounted) return;
 
       final loaded = <Map<String, String>>[];
       for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>? ?? {};
-        final supId = (data['SupervisorId'] ?? doc.id).toString();
-        final fullName = (data['FullName'] ?? '').toString();
+        final data = doc.data();
+        final supId = (data['SupervisorId'] ?? data['supervisorId'] ?? doc.id).toString();
+        final fullName = (data['FullName'] ?? data['fullName'] ?? data['name'] ?? '').toString();
 
         if (supId.isNotEmpty) {
           loaded.add({
@@ -74,119 +92,309 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
       setState(() {
         _supervisorList = loaded;
+        _isLoadingSupervisors = false;
       });
     } catch (e) {
       debugPrint('Error fetching supervisors: $e');
+      if (mounted) setState(() => _isLoadingSupervisors = false);
     }
   }
 
-  Future<void> _fetchSiteSupervisorMapDocs() async {
+  Future<void> _fetchSitesAndMappings() async {
+    setState(() => _isLoadingSites = true);
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'siteSupervisorMap',
-      ).get();
+      // 1. Fetch from 'Site' collection (primary) and 'sites' (legacy fallback)
+      final siteDocs = <String, Map<String, dynamic>>{};
 
-      final tempSiteList = <String>[];
-      final tempSiteToDocId = <String, String>{};
+      try {
+        final siteSnap = await FirestoreService.getCollection('Site').get();
+        for (var doc in siteSnap.docs) {
+          final data = doc.data();
+          siteDocs[doc.id] = {
+            ...data,
+            'docId': doc.id,
+          };
+        }
+      } catch (e) {
+        debugPrint('Error fetching Site collection: $e');
+      }
+
+      try {
+        final legacySiteSnap = await FirestoreService.getCollection('sites').get();
+        for (var doc in legacySiteSnap.docs) {
+          if (!siteDocs.containsKey(doc.id)) {
+            siteDocs[doc.id] = {
+              ...doc.data(),
+              'docId': doc.id,
+            };
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching legacy sites: $e');
+      }
+
+      // 2. Fetch projects to correlate project name & stage with site
+      final projectMap = <String, Map<String, dynamic>>{};
+      try {
+        final projSnap = await FirestoreService.getCollection('projects').get();
+        for (var doc in projSnap.docs) {
+          final pData = doc.data();
+          final sId = (pData['siteId'] ?? '').toString().trim();
+          final sName = (pData['siteName'] ?? '').toString().trim();
+          if (sId.isNotEmpty) projectMap[sId] = pData;
+          if (sName.isNotEmpty) projectMap[sName] = pData;
+          projectMap[doc.id] = pData;
+        }
+      } catch (e) {
+        debugPrint('Error fetching projects: $e');
+      }
+
+      // 3. Fetch existing mappings in siteSupervisorMap
+      final mappingMap = <String, Map<String, dynamic>>{};
       final tempCache = <String, Map<String, dynamic>>{};
+      try {
+        final mapSnap = await FirestoreService.getCollection('siteSupervisorMap').get();
+        for (var doc in mapSnap.docs) {
+          final mData = doc.data();
+          tempCache[doc.id] = mData;
+          final sField = (mData['site'] ?? mData['siteName'] ?? mData['siteId'] ?? '').toString().trim();
+          final sId = (mData['siteId'] ?? '').toString().trim();
+          if (sField.isNotEmpty) mappingMap[sField] = mData;
+          if (sId.isNotEmpty) mappingMap[sId] = mData;
+          mappingMap[doc.id] = mData;
+        }
+      } catch (e) {
+        debugPrint('Error fetching siteSupervisorMap: $e');
+      }
 
-      for (var doc in querySnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>? ?? {};
-        final docId = doc.id;
-        final siteName = data['site'] ?? data['siteName'] ?? data['siteId'] ?? docId;
+      // 4. Combine all sources into a consolidated list
+      final consolidated = <Map<String, dynamic>>[];
+      final seenKeys = <String>{};
 
-        tempSiteList.add(siteName);
-        tempSiteToDocId[siteName] = docId;
-        tempCache[docId] = data;
+      // First add all sites from Site collection
+      for (var entry in siteDocs.entries) {
+        final sData = entry.value;
+        final docId = entry.key;
+        final rawSiteId = (sData['siteId'] ?? docId).toString().trim();
+        final rawSiteName = (sData['siteName'] ?? rawSiteId).toString().trim();
+
+        final proj = projectMap[rawSiteId] ?? projectMap[rawSiteName] ?? projectMap[docId];
+        final mapping = mappingMap[rawSiteId] ?? mappingMap[rawSiteName] ?? mappingMap[docId];
+
+        final projectNameVal = (mapping?['projectName'] ??
+                mapping?['project'] ??
+                proj?['projectName'] ??
+                sData['projectName'] ??
+                sData['project'] ??
+                '')
+            .toString();
+        final stageVal = (mapping?['projectStage'] ??
+                mapping?['stage'] ??
+                proj?['projectStage'] ??
+                proj?['stage'] ??
+                sData['projectStage'] ??
+                '')
+            .toString();
+        final locVal = (mapping?['location'] ??
+                mapping?['address'] ??
+                sData['location'] ??
+                proj?['location'] ??
+                '')
+            .toString();
+        final sDate = _parseDate(
+            mapping?['startDate'] ?? proj?['startDate'] ?? sData['startDate']);
+        final eDate = _parseDate(
+            mapping?['endDate'] ?? proj?['endDate'] ?? sData['endDate']);
+        final jDate = _parseDate(mapping?['Joined On'] ??
+            mapping?['joinedDate'] ??
+            mapping?['joined_date']);
+        final supId = (mapping?['Supervisor ID'] ??
+                mapping?['supervisorId'] ??
+                mapping?['SupervisorId'] ??
+                '')
+            .toString();
+        final supName = (mapping?['supervisor'] ??
+                mapping?['supervisorName'] ??
+                mapping?['FullName'] ??
+                '')
+            .toString();
+        final comments =
+            (mapping?['siteComments'] ?? mapping?['comments'] ?? '').toString();
+
+        String label;
+        if (rawSiteId.isNotEmpty &&
+            rawSiteName.isNotEmpty &&
+            rawSiteId != rawSiteName) {
+          label = '$rawSiteId - $rawSiteName';
+        } else {
+          label = rawSiteName.isNotEmpty ? rawSiteName : rawSiteId;
+        }
+
+        final uniqueKey = rawSiteId.isNotEmpty
+            ? rawSiteId
+            : (rawSiteName.isNotEmpty ? rawSiteName : docId);
+        if (seenKeys.add(uniqueKey)) {
+          consolidated.add({
+            'key': uniqueKey,
+            'docId': docId,
+            'siteId': rawSiteId,
+            'siteName': rawSiteName,
+            'displayLabel': label,
+            'projectName': projectNameVal,
+            'projectStage': stageVal,
+            'location': locVal,
+            'startDate': sDate,
+            'endDate': eDate,
+            'joinedDate': jDate,
+            'supervisorId': supId,
+            'supervisorName': supName,
+            'siteComments': comments,
+            'rawMapping': mapping,
+          });
+        }
+      }
+
+      // Also include any mappings that might exist in siteSupervisorMap but not in Site collection
+      for (var entry in mappingMap.entries) {
+        final mData = entry.value;
+        final docId = entry.key;
+        final sId = (mData['siteId'] ?? mData['site'] ?? docId).toString().trim();
+        final sName =
+            (mData['siteName'] ?? mData['site'] ?? sId).toString().trim();
+        final uniqueKey = sId.isNotEmpty ? sId : sName;
+
+        if (uniqueKey.isNotEmpty && seenKeys.add(uniqueKey)) {
+          final proj = projectMap[sId] ?? projectMap[sName];
+          final projectNameVal = (mData['projectName'] ??
+                  mData['project'] ??
+                  proj?['projectName'] ??
+                  '')
+              .toString();
+          final stageVal = (mData['projectStage'] ??
+                  mData['stage'] ??
+                  proj?['projectStage'] ??
+                  '')
+              .toString();
+          final locVal =
+              (mData['location'] ?? mData['address'] ?? '').toString();
+          final sDate = _parseDate(mData['startDate'] ?? proj?['startDate']);
+          final eDate = _parseDate(mData['endDate'] ?? proj?['endDate']);
+          final jDate = _parseDate(mData['Joined On'] ?? mData['joinedDate']);
+          final supId = (mData['Supervisor ID'] ??
+                  mData['supervisorId'] ??
+                  mData['SupervisorId'] ??
+                  '')
+              .toString();
+          final supName = (mData['supervisor'] ??
+                  mData['supervisorName'] ??
+                  mData['FullName'] ??
+                  '')
+              .toString();
+          final comments =
+              (mData['siteComments'] ?? mData['comments'] ?? '').toString();
+
+          String label;
+          if (sId.isNotEmpty && sName.isNotEmpty && sId != sName) {
+            label = '$sId - $sName';
+          } else {
+            label = sName.isNotEmpty ? sName : sId;
+          }
+
+          consolidated.add({
+            'key': uniqueKey,
+            'docId': docId,
+            'siteId': sId,
+            'siteName': sName,
+            'displayLabel': label,
+            'projectName': projectNameVal,
+            'projectStage': stageVal,
+            'location': locVal,
+            'startDate': sDate,
+            'endDate': eDate,
+            'joinedDate': jDate,
+            'supervisorId': supId,
+            'supervisorName': supName,
+            'siteComments': comments,
+            'rawMapping': mData,
+          });
+        }
       }
 
       if (!mounted) return;
       setState(() {
-        siteList = tempSiteList;
-        _siteToDocId = tempSiteToDocId;
+        _allSites = consolidated;
         _docCache = tempCache;
+        _isLoadingSites = false;
       });
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching site mapping docs: $e')),
-      );
+      debugPrint('Error fetching sites and mappings: $e');
+      if (mounted) {
+        setState(() => _isLoadingSites = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading sites: $e')),
+        );
+      }
     }
   }
 
-  Future<void> _autoFillFromSite(String siteName) async {
-    try {
-      final docId = _siteToDocId[siteName] ?? siteName;
+  void _onSiteSelected(String? siteKey) {
+    if (siteKey == null) return;
+    final site = _allSites.firstWhere(
+      (s) =>
+          s['key'] == siteKey ||
+          s['siteId'] == siteKey ||
+          s['siteName'] == siteKey,
+      orElse: () => {},
+    );
+    if (site.isEmpty) return;
 
-      Map<String, dynamic>? data = _docCache[docId];
+    setState(() {
+      selectedSiteKey = site['key'] as String?;
+      selectedSiteId = (site['siteId'] != null &&
+              site['siteId'].toString().isNotEmpty)
+          ? site['siteId'].toString()
+          : (site['siteName']?.toString() ?? siteKey);
+      selectedSite = site['siteName']?.toString() ?? selectedSiteId;
+      projectName = site['projectName']?.toString() ?? '';
+      selectedProjectStage = site['projectStage']?.toString() ?? '';
 
-      if (data == null) {
-        final docSnap = await FirestoreService.getCollection(
-          'siteSupervisorMap',
-        ).doc(docId).get();
-        if (docSnap.exists) {
-          data = docSnap.data();
-          if (data != null) _docCache[docId] = data;
+      locationController.text = site['location']?.toString() ?? '';
+      commentsController.text = site['siteComments']?.toString() ?? '';
+      projectNameController.text = projectName ?? '';
+      projectStageController.text = selectedProjectStage ?? '';
+      siteNameController.text = selectedSite ?? '';
+
+      startDate = site['startDate'] as DateTime?;
+      endDate = site['endDate'] as DateTime?;
+      joinedDate = site['joinedDate'] as DateTime?;
+
+      startDateController.text = startDate != null
+          ? DateFormat('yyyy-MM-dd').format(startDate!)
+          : '';
+      endDateController.text =
+          endDate != null ? DateFormat('yyyy-MM-dd').format(endDate!) : '';
+
+      final supId = site['supervisorId']?.toString() ?? '';
+      final supName = site['supervisorName']?.toString() ?? '';
+      if (supId.isNotEmpty) {
+        selectedSupervisorId = supId;
+        selectedSupervisor = supName;
+        if (selectedSupervisor == null || selectedSupervisor!.isEmpty) {
+          final match = _supervisorList.firstWhere(
+            (s) => s['id'] == supId,
+            orElse: () => {'id': '', 'fullName': ''},
+          );
+          selectedSupervisor = match['fullName'];
         }
       }
-
-      if (data != null) {
-        _applyMapData(data);
-        return;
-      }
-
-      final siteSnap = await FirestoreService.getCollection('sites')
-          .where('siteName', isEqualTo: siteName)
-          .limit(1)
-          .get();
-
-      if (siteSnap.docs.isNotEmpty) {
-        final siteData = siteSnap.docs.first.data();
-        _applyMapData(siteData);
-      }
-    } catch (e) {
-      debugPrint('Error auto-filling from site: $e');
-    }
-  }
-
-  void _applyMapData(Map<String, dynamic> data) {
-    if (!mounted) return;
-    setState(() {
-      projectName = data['projectName'] ?? data['project'] ?? '';
-
-      final rawSupervisorId = (data['Supervisor ID'] ?? data['supervisorId'] ?? data['SupervisorId'] ?? '').toString();
-      final rawSupervisorName = (data['supervisor'] ?? data['supervisorName'] ?? data['FullName'] ?? '').toString();
-
-      if (rawSupervisorId.isNotEmpty) {
-        selectedSupervisorId = rawSupervisorId;
-      }
-
-      if (rawSupervisorName.isNotEmpty) {
-        selectedSupervisor = rawSupervisorName;
-      } else if (selectedSupervisorId != null && selectedSupervisorId!.isNotEmpty) {
-        final match = _supervisorList.firstWhere(
-          (s) => s['id'] == selectedSupervisorId,
-          orElse: () => {'id': '', 'fullName': ''},
-        );
-        selectedSupervisor = match['fullName'];
-      }
-
-      selectedProjectStage = data['projectStage'] ?? data['stage'] ?? '';
-      selectedSite = data['site'] ?? data['siteName'] ?? data['siteId'] ?? selectedSite;
-
-      locationController.text = data['location'] ?? data['address'] ?? '';
-      commentsController.text = data['siteComments'] ?? data['comments'] ?? '';
-
-      startDate = _parseDate(data['startDate'] ?? data['start_date']);
-      endDate = _parseDate(data['endDate'] ?? data['end_date']);
-
-      joinedDate = _parseDate(data['joinedDate'] ?? data['joined_date'] ?? data['Joined On']);
+      supervisorNameController.text = selectedSupervisor ?? '';
     });
   }
 
   DateTime? _parseDate(dynamic val) {
     if (val == null) return null;
     if (val is Timestamp) return val.toDate();
+    if (val is DateTime) return val;
     if (val is String && val.isNotEmpty) {
       try {
         return DateTime.parse(val);
@@ -195,7 +403,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     return null;
   }
 
-  Future<void> _selectAnyDate(BuildContext context, {required String dateType}) async {
+  Future<void> _selectAnyDate(BuildContext context,
+      {required String dateType}) async {
     DateTime initial = DateTime.now();
     if (dateType == 'joined' && joinedDate != null) initial = joinedDate!;
     if (dateType == 'start' && startDate != null) initial = startDate!;
@@ -211,33 +420,47 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     if (picked != null) {
       setState(() {
         if (dateType == 'joined') joinedDate = picked;
-        if (dateType == 'start') startDate = picked;
-        if (dateType == 'end') endDate = picked;
+        if (dateType == 'start') {
+          startDate = picked;
+          startDateController.text = DateFormat('yyyy-MM-dd').format(picked);
+        }
+        if (dateType == 'end') {
+          endDate = picked;
+          endDateController.text = DateFormat('yyyy-MM-dd').format(picked);
+        }
       });
     }
   }
 
   void resetForm() {
     setState(() {
+      selectedSiteKey = null;
+      selectedSiteId = null;
       selectedSite = null;
       selectedSupervisor = null;
       selectedSupervisorId = null;
       selectedProjectStage = null;
       projectName = null;
-      siteComments = null;
       joinedDate = null;
       startDate = null;
       endDate = null;
 
       locationController.clear();
       commentsController.clear();
+      projectNameController.clear();
+      supervisorNameController.clear();
+      projectStageController.clear();
+      siteNameController.clear();
+      startDateController.clear();
+      endDateController.clear();
     });
   }
 
   Future<void> _showSaveConfirmationDialog(BuildContext context) async {
-    if (selectedSite == null || selectedSite!.isEmpty) {
+    if ((selectedSite == null || selectedSite!.isEmpty) &&
+        (selectedSiteId == null || selectedSiteId!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a site')),
+        const SnackBar(content: Text('Please select a site ID / site')),
       );
       return;
     }
@@ -253,25 +476,29 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text(
             'Confirm Save',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: Color(0xFF0A183D)),
           ),
           content: Text(
-            'Are you sure you want to save mapping for site "$selectedSite" with supervisor "$selectedSupervisor" ($selectedSupervisorId)?',
+            'Are you sure you want to save mapping for site "${selectedSiteId ?? selectedSite}" with supervisor "$selectedSupervisor" ($selectedSupervisorId)?',
             style: const TextStyle(color: Color(0xFF64748B)),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B))),
+              child: const Text('CANCEL',
+                  style: TextStyle(color: Color(0xFF64748B))),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('SAVE'),
@@ -288,28 +515,74 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
   Future<void> _saveMappingData() async {
     try {
-      final docId = _siteToDocId[selectedSite] ?? selectedSite!;
+      final sId = (selectedSiteId != null && selectedSiteId!.trim().isNotEmpty)
+          ? selectedSiteId!.trim()
+          : (selectedSite ?? 'SITE').trim();
+      final supName = (selectedSupervisor != null && selectedSupervisor!.trim().isNotEmpty)
+          ? selectedSupervisor!.trim()
+          : (selectedSupervisorId ?? 'SUPERVISOR').trim();
+
+      // Document ID generated as siteid_with supervisor name (e.g. ST001_Shyju)
+      final cleanSite = sId.replaceAll(' ', '');
+      final cleanSup = supName.replaceAll(' ', '');
+      final docId = '${cleanSite}_$cleanSup';
 
       final mappingData = {
-        'site': selectedSite,
-        'siteName': selectedSite,
-        'projectName': projectName ?? '',
+        'site': selectedSite ?? selectedSiteId,
+        'siteName': selectedSite ?? selectedSiteId,
+        'siteId': selectedSiteId ?? selectedSite ?? '',
+        'projectName': projectName ?? projectNameController.text.trim(),
+        'project': projectName ?? projectNameController.text.trim(),
         'location': locationController.text.trim(),
         'Supervisor ID': selectedSupervisorId ?? '',
         'supervisorId': selectedSupervisorId ?? '',
+        'SupervisorId': selectedSupervisorId ?? '',
         'supervisor': selectedSupervisor ?? '',
         'supervisorName': selectedSupervisor ?? '',
-        'projectStage': selectedProjectStage ?? '',
+        'FullName': selectedSupervisor ?? '',
+        'projectStage':
+            selectedProjectStage ?? projectStageController.text.trim(),
+        'stage': selectedProjectStage ?? projectStageController.text.trim(),
         'siteComments': commentsController.text.trim(),
-        'startDate': startDate != null ? DateFormat('yyyy-MM-dd').format(startDate!) : '',
-        'endDate': endDate != null ? DateFormat('yyyy-MM-dd').format(endDate!) : '',
-        'Joined On': joinedDate != null ? DateFormat('yyyy-MM-dd').format(joinedDate!) : '',
+        'startDate': startDate != null
+            ? DateFormat('yyyy-MM-dd').format(startDate!)
+            : startDateController.text.trim(),
+        'endDate': endDate != null
+            ? DateFormat('yyyy-MM-dd').format(endDate!)
+            : endDateController.text.trim(),
+        'Joined On': joinedDate != null
+            ? DateFormat('yyyy-MM-dd').format(joinedDate!)
+            : '',
+        'joinedDate': joinedDate != null
+            ? DateFormat('yyyy-MM-dd').format(joinedDate!)
+            : '',
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
+      // Store once in siteSupervisorMap with document ID siteid_with supervisor name
       await FirestoreService.getCollection('siteSupervisorMap')
           .doc(docId)
           .set(mappingData, SetOptions(merge: true));
+
+      // Trigger immediate real-time push notification to the mapped supervisor
+      try {
+        final managerName = AuthService().userData['Name'] ??
+            AuthService().userData['username'] ??
+            AuthService().userData['userName'] ??
+            'Manager';
+
+        await NotificationService.notifySiteAssignment(
+          supervisorName: selectedSupervisor ?? supName,
+          supervisorId: selectedSupervisorId,
+          siteId: selectedSiteId ?? selectedSite ?? sId,
+          siteName: selectedSite ?? selectedSiteId ?? sId,
+          projectName: projectName ?? projectNameController.text.trim(),
+          location: locationController.text.trim(),
+          managerName: managerName.toString(),
+        );
+      } catch (notifErr) {
+        debugPrint('Error triggering site assignment notification: $notifErr');
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -320,6 +593,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       );
 
       _docCache[docId] = mappingData;
+
+      await _fetchSitesAndMappings();
 
       setState(() {
         isEntrySelected = false;
@@ -368,7 +643,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -400,7 +676,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: isEntrySelected ? primaryColor : Colors.transparent,
+                          color: isEntrySelected
+                              ? primaryColor
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -409,7 +687,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                             Icon(
                               Icons.edit_note_rounded,
                               size: 16,
-                              color: isEntrySelected ? Colors.white : const Color(0xFF0A183D),
+                              color: isEntrySelected
+                                  ? Colors.white
+                                  : const Color(0xFF0A183D),
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -418,7 +698,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.4,
-                                color: isEntrySelected ? Colors.white : const Color(0xFF0A183D),
+                                color: isEntrySelected
+                                  ? Colors.white
+                                  : const Color(0xFF0A183D),
                               ),
                             ),
                           ],
@@ -433,7 +715,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: !isEntrySelected ? primaryColor : Colors.transparent,
+                          color: !isEntrySelected
+                              ? primaryColor
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -442,7 +726,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                             Icon(
                               Icons.map_rounded,
                               size: 16,
-                              color: !isEntrySelected ? Colors.white : const Color(0xFF0A183D),
+                              color: !isEntrySelected
+                                  ? Colors.white
+                                  : const Color(0xFF0A183D),
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -451,7 +737,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.4,
-                                color: !isEntrySelected ? Colors.white : const Color(0xFF0A183D),
+                                color: !isEntrySelected
+                                  ? Colors.white
+                                  : const Color(0xFF0A183D),
                               ),
                             ),
                           ],
@@ -468,15 +756,18 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+                  constraints: BoxConstraints(
+                      maxWidth: isMobile ? double.infinity : 600),
                   child: isEntrySelected
                       ? SingleChildScrollView(
                           physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
                           child: _buildEntrySection(),
                         )
                       : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
                           child: _buildInfoTableSection(),
                         ),
                 ),
@@ -535,7 +826,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
               _buildTextField(
                 label: 'Project Name',
-                controller: TextEditingController(text: projectName ?? ''),
+                controller: projectNameController,
                 hint: 'Auto-filled from site selection',
                 readOnly: true,
                 icon: Icons.business_rounded,
@@ -555,7 +846,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
               _buildTextField(
                 label: 'Supervisor Name',
-                controller: TextEditingController(text: selectedSupervisor ?? ''),
+                controller: supervisorNameController,
                 hint: 'Auto-filled from ID selection',
                 readOnly: true,
                 icon: Icons.person_rounded,
@@ -564,7 +855,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
               _buildTextField(
                 label: 'Project Stage',
-                controller: TextEditingController(text: selectedProjectStage ?? ''),
+                controller: projectStageController,
                 hint: 'Auto-filled from site selection',
                 readOnly: true,
                 icon: Icons.timeline_rounded,
@@ -573,7 +864,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
               _buildTextField(
                 label: 'Site',
-                controller: TextEditingController(text: selectedSite ?? ''),
+                controller: siteNameController,
                 hint: 'Auto-filled from site selection',
                 readOnly: true,
                 icon: Icons.store_rounded,
@@ -591,11 +882,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
               _buildTextField(
                 label: 'Start Date',
-                controller: TextEditingController(
-                  text: startDate != null
-                      ? DateFormat('yyyy-MM-dd').format(startDate!)
-                      : '',
-                ),
+                controller: startDateController,
                 hint: 'Auto-filled start date',
                 readOnly: true,
                 icon: Icons.calendar_today_rounded,
@@ -604,11 +891,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
 
               _buildTextField(
                 label: 'End Date',
-                controller: TextEditingController(
-                  text: endDate != null
-                      ? DateFormat('yyyy-MM-dd').format(endDate!)
-                      : '',
-                ),
+                controller: endDateController,
                 hint: 'Auto-filled end date',
                 readOnly: true,
                 icon: Icons.event_rounded,
@@ -637,13 +920,27 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Select Site *',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Select Site ID / Site *',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A183D),
+              ),
+            ),
+            if (_isLoadingSites)
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(brandIconColor),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         Container(
@@ -653,7 +950,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
-            initialValue: selectedSite,
+            initialValue: (_allSites.any((s) => s['key'] == selectedSiteKey))
+                ? selectedSiteKey
+                : null,
             isExpanded: true,
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -663,7 +962,11 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               fontWeight: FontWeight.w700,
             ),
             decoration: InputDecoration(
-              hintText: 'Select Site',
+              hintText: _isLoadingSites
+                  ? 'Loading site IDs & sites...'
+                  : (_allSites.isEmpty
+                      ? 'No sites found'
+                      : 'Select Site ID / Site'),
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 13.5,
@@ -683,22 +986,17 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 vertical: 14,
               ),
             ),
-            items: siteList.map((site) {
-              return DropdownMenuItem(
-                value: site,
+            items: _allSites.map((site) {
+              return DropdownMenuItem<String>(
+                value: site['key'] as String,
                 child: Text(
-                  site,
+                  site['displayLabel'] as String,
                   overflow: TextOverflow.ellipsis,
                 ),
               );
             }).toList(),
             onChanged: (value) {
-              setState(() {
-                selectedSite = value;
-              });
-              if (value != null) {
-                _autoFillFromSite(value);
-              }
+              _onSiteSelected(value);
             },
           ),
         ),
@@ -712,13 +1010,27 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Supervisor ID *',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Supervisor ID *',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A183D),
+              ),
+            ),
+            if (_isLoadingSupervisors)
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(brandIconColor),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         Container(
@@ -728,9 +1040,10 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
-            initialValue: (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
-                ? selectedSupervisorId
-                : null,
+            initialValue:
+                (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
+                    ? selectedSupervisorId
+                    : null,
             isExpanded: true,
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -740,7 +1053,11 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               fontWeight: FontWeight.w700,
             ),
             decoration: InputDecoration(
-              hintText: 'Select Supervisor ID',
+              hintText: _isLoadingSupervisors
+                  ? 'Loading supervisors...'
+                  : (_supervisorList.isEmpty
+                      ? 'No supervisors found'
+                      : 'Select Supervisor ID'),
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 13.5,
@@ -761,10 +1078,13 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
             ),
             items: _supervisorList.map((sup) {
+              final id = sup['id'] ?? '';
+              final name = sup['fullName'] ?? '';
+              final label = name.isNotEmpty ? '$id - $name' : id;
               return DropdownMenuItem<String>(
-                value: sup['id'],
+                value: id,
                 child: Text(
-                  '${sup['id']} - ${sup['fullName']}',
+                  label,
                   overflow: TextOverflow.ellipsis,
                 ),
               );
@@ -777,6 +1097,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                   orElse: () => {'id': '', 'fullName': ''},
                 );
                 selectedSupervisor = match['fullName'] ?? '';
+                supervisorNameController.text = selectedSupervisor ?? '';
               });
             },
           ),
@@ -1046,12 +1367,27 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     final filteredEntries = allEntries.where((entry) {
       final docId = entry.key.toLowerCase();
       final data = entry.value;
-      final site = (data['site'] ?? data['siteName'] ?? data['siteId'] ?? '').toString().toLowerCase();
-      final supervisor = (data['supervisor'] ?? data['supervisorName'] ?? data['FullName'] ?? '').toString().toLowerCase();
-      final supervisorId = (data['Supervisor ID'] ?? data['supervisorId'] ?? data['SupervisorId'] ?? '').toString().toLowerCase();
-      final projectNameVal = (data['projectName'] ?? data['project'] ?? '').toString().toLowerCase();
-      final projectStage = (data['projectStage'] ?? data['stage'] ?? '').toString().toLowerCase();
-      final location = (data['location'] ?? data['address'] ?? '').toString().toLowerCase();
+      final site = (data['site'] ?? data['siteName'] ?? data['siteId'] ?? '')
+          .toString()
+          .toLowerCase();
+      final supervisor = (data['supervisor'] ??
+              data['supervisorName'] ??
+              data['FullName'] ??
+              '')
+          .toString()
+          .toLowerCase();
+      final supervisorId = (data['Supervisor ID'] ??
+              data['supervisorId'] ??
+              data['SupervisorId'] ??
+              '')
+          .toString()
+          .toLowerCase();
+      final projectNameVal =
+          (data['projectName'] ?? data['project'] ?? '').toString().toLowerCase();
+      final projectStage =
+          (data['projectStage'] ?? data['stage'] ?? '').toString().toLowerCase();
+      final location =
+          (data['location'] ?? data['address'] ?? '').toString().toLowerCase();
 
       final query = _infoSearchQuery.trim().toLowerCase();
       return query.isEmpty ||
@@ -1065,11 +1401,13 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     }).toList();
 
     final totalItems = filteredEntries.length;
-    final totalPages = (totalItems / _infoItemsPerPage).ceil().clamp(1, 999999);
+    final totalPages =
+        (totalItems / _infoItemsPerPage).ceil().clamp(1, 999999);
     if (_infoCurrentPage > totalPages) {
       _infoCurrentPage = totalPages;
     }
-    final startIndex = (totalItems == 0) ? 0 : (_infoCurrentPage - 1) * _infoItemsPerPage;
+    final startIndex =
+        (totalItems == 0) ? 0 : (_infoCurrentPage - 1) * _infoItemsPerPage;
     final endIndex = (startIndex + _infoItemsPerPage).clamp(0, totalItems);
     final paginatedEntries = filteredEntries.sublist(startIndex, endIndex);
 
@@ -1105,7 +1443,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 color: Color(0xFF0A183D),
               ),
               decoration: InputDecoration(
-                hintText: 'Search mapping by site, supervisor, project, stage...',
+                hintText:
+                    'Search mapping by site, supervisor, project, stage...',
                 hintStyle: const TextStyle(
                   fontSize: 12.5,
                   color: Color(0xFF94A3B8),
@@ -1117,7 +1456,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 ),
                 suffixIcon: _infoSearchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                        icon: const Icon(Icons.clear_rounded,
+                            size: 18, color: Color(0xFF64748B)),
                         onPressed: () {
                           setState(() {
                             _infoSearchQuery = '';
@@ -1153,12 +1493,31 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                     final entry = paginatedEntries[index];
                     final data = entry.value;
 
-                    final siteName = data['site'] ?? data['siteName'] ?? data['siteId'] ?? entry.key;
-                    final supervisorName = data['supervisor'] ?? data['supervisorName'] ?? data['FullName'] ?? 'Not Assigned';
-                    final supervisorId = data['Supervisor ID'] ?? data['supervisorId'] ?? data['SupervisorId'] ?? '';
-                    final pName = data['projectName'] ?? data['project'] ?? '';
-                    final pStage = data['projectStage'] ?? data['stage'] ?? '';
-                    final loc = data['location'] ?? data['address'] ?? '';
+                    final siteName = data['siteName'] ??
+                        data['site'] ??
+                        data['siteId'] ??
+                        entry.key;
+                    final siteIdVal = data['siteId'] ?? data['site'] ?? '';
+                    final displaySite = (siteIdVal.isNotEmpty &&
+                            siteName.isNotEmpty &&
+                            siteIdVal != siteName)
+                        ? '$siteIdVal - $siteName'
+                        : (siteName.isNotEmpty ? siteName : siteIdVal);
+
+                    final supervisorName = data['supervisor'] ??
+                        data['supervisorName'] ??
+                        data['FullName'] ??
+                        'Not Assigned';
+                    final supervisorId = data['Supervisor ID'] ??
+                        data['supervisorId'] ??
+                        data['SupervisorId'] ??
+                        '';
+                    final pName =
+                        data['projectName'] ?? data['project'] ?? '';
+                    final pStage =
+                        data['projectStage'] ?? data['stage'] ?? '';
+                    final loc =
+                        data['location'] ?? data['address'] ?? '';
                     final sDate = data['startDate'] ?? '';
                     final eDate = data['endDate'] ?? '';
 
@@ -1171,7 +1530,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                         border: Border.all(color: const Color(0xFFCBD5E1)),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+                            color:
+                                const Color(0xFF0A183D).withValues(alpha: 0.04),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -1189,7 +1549,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                                   color: primaryColor.withValues(alpha: 0.12),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(Icons.location_on_rounded, color: primaryColor, size: 20),
+                                child: Icon(Icons.location_on_rounded,
+                                    color: primaryColor, size: 20),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -1197,7 +1558,7 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      siteName,
+                                      displaySite,
                                       style: const TextStyle(
                                         fontSize: 15.5,
                                         fontWeight: FontWeight.w800,
@@ -1220,9 +1581,11 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                               ),
                               if (pStage.isNotEmpty)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                                    color: const Color(0xFF3B82F6)
+                                        .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
@@ -1242,16 +1605,26 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                           ),
                           Row(
                             children: [
-                              const Icon(Icons.person_rounded, size: 16, color: Color(0xFF64748B)),
+                              const Icon(Icons.person_rounded,
+                                  size: 16, color: Color(0xFF64748B)),
                               const SizedBox(width: 6),
-                              Text(
+                              const Text(
                                 'Supervisor: ',
-                                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w600),
                               ),
                               Expanded(
                                 child: Text(
-                                  supervisorName + (supervisorId.isNotEmpty ? ' ($supervisorId)' : ''),
-                                  style: const TextStyle(fontSize: 13.5, color: Color(0xFF0A183D), fontWeight: FontWeight.w700),
+                                  supervisorName +
+                                      (supervisorId.isNotEmpty
+                                          ? ' ($supervisorId)'
+                                          : ''),
+                                  style: const TextStyle(
+                                      fontSize: 13.5,
+                                      color: Color(0xFF0A183D),
+                                      fontWeight: FontWeight.w700),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -1261,12 +1634,15 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                const Icon(Icons.place_outlined, size: 16, color: Color(0xFF64748B)),
+                                const Icon(Icons.place_outlined,
+                                    size: 16, color: Color(0xFF64748B)),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     loc,
-                                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                                    style: const TextStyle(
+                                        fontSize: 12.5,
+                                        color: Color(0xFF64748B)),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -1277,11 +1653,15 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                const Icon(Icons.date_range_rounded, size: 16, color: Color(0xFF64748B)),
+                                const Icon(Icons.date_range_rounded,
+                                    size: 16, color: Color(0xFF64748B)),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Duration: ${sDate.isEmpty ? 'N/A' : sDate} to ${eDate.isEmpty ? 'N/A' : eDate}',
-                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w500),
                                 ),
                               ],
                             ),
@@ -1373,7 +1753,8 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                   size: 18,
                   color: currentPage > 1 ? primaryColor : Colors.grey.shade300,
                 ),
-                onPressed: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
+                onPressed:
+                    currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
                 tooltip: 'Previous Page',
               ),
               Container(
@@ -1398,9 +1779,13 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 icon: Icon(
                   Icons.chevron_right_rounded,
                   size: 18,
-                  color: currentPage < totalPages ? primaryColor : Colors.grey.shade300,
+                  color: currentPage < totalPages
+                      ? primaryColor
+                      : Colors.grey.shade300,
                 ),
-                onPressed: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
+                onPressed: currentPage < totalPages
+                    ? () => onPageChanged(currentPage + 1)
+                    : null,
                 tooltip: 'Next Page',
               ),
               IconButton(
@@ -1409,9 +1794,13 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                 icon: Icon(
                   Icons.last_page_rounded,
                   size: 18,
-                  color: currentPage < totalPages ? primaryColor : Colors.grey.shade300,
+                  color: currentPage < totalPages
+                      ? primaryColor
+                      : Colors.grey.shade300,
                 ),
-                onPressed: currentPage < totalPages ? () => onPageChanged(totalPages) : null,
+                onPressed: currentPage < totalPages
+                    ? () => onPageChanged(totalPages)
+                    : null,
                 tooltip: 'Last Page',
               ),
             ],

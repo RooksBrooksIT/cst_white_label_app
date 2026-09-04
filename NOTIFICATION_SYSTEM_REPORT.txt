@@ -1,0 +1,272 @@
+================================================================================
+  ENTERPRISE ROLE-BASED SCHEDULED & REAL-TIME NOTIFICATION SYSTEM REPORT (v2.0)
+================================================================================
+Project: CST White Label Application (eBricks Construction ERP)
+Date: September 03, 2026
+Status: Implemented, Verified, and Deployed to Production
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. Complete Notification Architecture: Real-Time & Scheduled Engine
+2. Role-Based Notification Recipients and Scheduling Logic
+3. Real-Time vs. Scheduled Notification Triggers
+4. Codebase Changes & File Modifications
+5. Firebase Cloud Functions & Backend Scheduled Cron Engine
+6. Database Schema & Architecture for Scheduled Notifications
+7. Duplicate-Prevention, Idempotency & Retry Logic
+8. Edge Cases, Permissions, Multi-Tenant Isolation & Stale Token Pruning
+9. Final End-to-End Notification Flow for Organization, Manager & Supervisor
+
+================================================================================
+1. COMPLETE NOTIFICATION ARCHITECTURE: REAL-TIME & SCHEDULED ENGINE
+================================================================================
+The notification system is engineered as an enterprise-grade, event-driven dual-engine
+architecture providing both Instant Real-Time Alerts and Automated Scheduled Cron
+Deliveries.
+
+Architecture Dataflow:
+
+A. Real-Time Pipeline (Immediate Actions):
+   1. User action (Site mapping, Requisition submit, Manager/Supervisor created,
+      Approval stage transition).
+   2. `NotificationService` writes document to `/notifications` and `/organisation/{orgId}/notifications`.
+   3. Firestore `onCreate` trigger immediately invokes Cloud Function `onNotificationCreated`
+      or `onOrgNotificationCreated`.
+   4. Cloud Function resolves targeted user tokens based on `targetRole`, `forSupervisorName`,
+      `forSupervisorId`, and `forManagerName`.
+   5. High-priority FCM push notification multicast is sent to user devices
+      (with `cst_high_importance_channel`, custom sound, heads-up banner, and background wake-up).
+
+B. Scheduled & Recurring Pipeline (Cron-based Workflows):
+   1. System or User schedules a future/recurring notification using `NotificationService.scheduleNotification`
+      or helper methods (`scheduleDailySupervisorReminder`, `schedulePendingApprovalReminder`).
+   2. Persisted to `/scheduled_notifications/{id}` with `status: 'pending'` and target `scheduledAt` timestamp.
+   3. Cloud Functions Pub/Sub Cron (`processScheduledNotifications`) executes every 5 minutes
+      (or on-demand via `triggerScheduledNotifications`).
+   4. Worker queries all due pending notifications (`scheduledAt <= now` and `status == 'pending'`).
+   5. Uses Firestore Atomic Transaction lock (`status: 'processing'`) to guarantee zero duplicate pushes.
+   6. Dispatches FCM push notification and writes an in-app notification record.
+   7. For `repeat: 'daily'` or `repeat: 'weekly'`, automatically calculates and schedules the next run date.
+   8. For one-time schedules, marks `status: 'delivered'` with `deliveredAt` timestamp.
+
+================================================================================
+2. ROLE-BASED NOTIFICATION RECIPIENTS AND SCHEDULING LOGIC
+================================================================================
+
+1. Organization Role (HQ Admin / Management):
+   - Real-Time Alerts:
+     * Stage 2: Requisitions forwarded by Manager for HQ authorization.
+     * Stage 3: Direct rejection / approval audit events.
+     * New Site / Project registered or updated by Manager.
+     * New Manager profile creation audit trail.
+     * New Supervisor profile registration audit trail.
+   - Scheduled Alerts:
+     * Daily Organization KPI / Pending Requisitions Summary.
+     * Subscription renewal & compliance reminder (7 days / 1 day before expiry).
+
+2. Manager Role (Project / Site Manager):
+   - Real-Time Alerts:
+     * Stage 1: New Requisition submitted by Site Supervisor (Material, Tools, Payment, Workforce).
+     * Stage 3: Requisition authorized by Organization HQ (requires Manager final clearance).
+     * Stage 3: Requisition declined by Organization HQ.
+     * Master Configuration changes (Materials, Vehicles, Contractors).
+   - Scheduled Alerts:
+     * Pending Requisition Clearance Reminders (if awaiting review > 24 hours).
+     * Daily Evening Site Submission Status summary.
+
+3. Supervisor Role (Site Supervisor):
+   - Real-Time Alerts:
+     * Site Assignment alert when mapped to a new site by a Manager.
+     * Welcome / Onboarding alert upon profile creation.
+     * Stage 2: Requisition declined by Manager with feedback reason.
+     * Stage 3: Requisition declined by Organization HQ with feedback reason.
+     * Stage 4: Requisition Approved & Released (funds/materials dispatched).
+   - Scheduled Alerts:
+     * Daily 09:00 AM Check-in & Site Log Reminder.
+     * Daily 06:00 PM Workforce, Tools Movement & Material Consumption submission reminder.
+
+================================================================================
+3. REAL-TIME VERSUS SCHEDULED NOTIFICATION TRIGGERS
+================================================================================
+
++-------------------------------------+------------+----------------------+---------------------------------------+
+| EVENT / PURPOSE                     | TYPE       | SCHEDULE / TRIGGER   | TARGET RECIPIENT                      |
++-------------------------------------+------------+----------------------+---------------------------------------+
+| Supervisor submits Requisition      | Real-Time  | Instant on submit    | Assigned Site Manager(s)              |
+| Manager verifies & forwards to Org  | Real-Time  | Instant on verify    | Organization HQ Admin(s)              |
+| Manager rejects Requisition         | Real-Time  | Instant on reject    | Submitting Supervisor                 |
+| Org authorizes Requisition          | Real-Time  | Instant on authorize | Manager (for clearance)               |
+| Org rejects Requisition             | Real-Time  | Instant on reject    | Submitting Supervisor & Manager       |
+| Manager releases Requisition        | Real-Time  | Instant on release   | Submitting Supervisor at Site         |
+| Manager assigns Supervisor to Site  | Real-Time  | Instant on mapping   | Mapped Supervisor                     |
+| Org creates Manager Account         | Real-Time  | Instant on save      | New Manager & Org Audit               |
+| Manager creates Supervisor Profile  | Real-Time  | Instant on save      | New Supervisor & Org Audit            |
+| Manager creates/updates Site        | Real-Time  | Instant on save      | Organization HQ Admin(s)              |
+| Daily Morning Site Log Reminder     | Scheduled  | Daily at 09:00 AM    | Site Supervisors                      |
+| Daily Evening Progress & Labor Log  | Scheduled  | Daily at 06:00 PM    | Site Supervisors                      |
+| Pending Requisition Review Alert    | Scheduled  | 24h after submission | Managers & Org Admins                 |
+| Subscription Expiry Warning         | Scheduled  | 7 Days & 1 Day Prior | Organization HQ Admin(s)              |
++-------------------------------------+------------+----------------------+---------------------------------------+
+
+================================================================================
+4. CODEBASE CHANGES & FILE MODIFICATIONS
+================================================================================
+
+1. `lib/services/notification_service.dart`:
+   - Added `scheduleNotification`: Core API to schedule future/recurring notifications.
+   - Added `scheduleDailySupervisorReminder`: Daily recurring reminder scheduler.
+   - Added `schedulePendingApprovalReminder`: 24h pending review alert scheduler.
+   - Added `cancelScheduledNotification`: Schedule cancellation and state updater.
+   - Added `streamScheduledNotifications`: Live Firestore stream of pending schedules.
+   - Added `notifyManagerAccountCreated`: Real-time onboarding notification.
+   - Added `notifySupervisorAccountCreated`: Real-time welcome notification.
+   - Added `notifySiteCreatedOrUpdated`: Real-time site management notification.
+   - Added `notifySiteAssignment`: Real-time supervisor assignment push alert.
+   - Added `notifyMasterConfigUpdated`: Master catalog change alert.
+   - Dual-write token registration (`/fcmTokens` and `/organisation/{orgId}/fcmTokens`).
+
+2. `lib/screens/manager/manager_config_screen.dart`:
+   - Integrated `NotificationService.notifyManagerAccountCreated`.
+
+3. `lib/screens/manager/site_supervisor_config.dart`:
+   - Integrated `NotificationService.notifySupervisorAccountCreated`.
+
+4. `lib/screens/manager/site_screen.dart`:
+   - Integrated `NotificationService.notifySiteCreatedOrUpdated`.
+
+5. `lib/screens/manager/site_supervisor_map_screen.dart`:
+   - Integrated `NotificationService.notifySiteAssignment`.
+   - Standardized document ID format `${siteId}_${supervisorName}`.
+
+6. `lib/services/approval_workflow_service.dart`:
+   - Standardized all 5 lifecycle stage notification hooks.
+   - Added `getStepNumber` helper for stepper tracking.
+
+7. `lib/screens/supervisor/material_request_form.dart`:
+   - Integrated live Required Materials section reading catalog (e.g. `cement_ppc`).
+   - Auto unit population and approval submission linking.
+
+================================================================================
+5. FIREBASE CLOUD FUNCTIONS & BACKEND SCHEDULED CRON ENGINE
+================================================================================
+
+Backend functions deployed in `functions/index.js`:
+
+1. `processScheduledNotifications` (PubSub Scheduled Trigger):
+   - Schedule: `every 5 minutes` (Timezone: `Asia/Kolkata`).
+   - Automatically polls `/scheduled_notifications` for pending items whose `scheduledAt <= now`.
+   - Claims documents using Firestore atomic transaction locks.
+   - Sends FCM high-priority push, creates in-app notification record, and updates next occurrence for repeating items.
+
+2. `triggerScheduledNotifications` (HTTPS Callable):
+   - Allows instant programmatic / manual execution of the scheduled notification runner.
+
+3. `onNotificationCreated` (Firestore Trigger):
+   - Listens to `/notifications/{notificationId}` (onCreate) for instant push.
+
+4. `onOrgNotificationCreated` (Firestore Trigger):
+   - Listens to `/organisation/{orgId}/notifications/{notificationId}` (onCreate).
+
+5. `sendPushNotification` (HTTPS Callable):
+   - Dispatches direct custom notifications via Admin SDK.
+
+================================================================================
+6. DATABASE SCHEMA & ARCHITECTURE FOR SCHEDULED NOTIFICATIONS
+================================================================================
+
+Collection: `/scheduled_notifications/{scheduleId}`
+Also mirrored in: `/organisation/{orgId}/scheduled_notifications/{scheduleId}`
+
+Document Schema:
+{
+  "id": "SCHED_1725350000000_452",
+  "scheduleId": "SCHED_1725350000000_452",
+  "title": "📋 Daily Site Log Reminder",
+  "body": "Please submit today's site progress, workforce entries, and material consumption.",
+  "targetRole": "supervisor",             // "supervisor" | "manager" | "organisation" | "all"
+  "forSupervisorName": "Shyju",
+  "forSupervisorId": "SUP001",
+  "forManagerName": null,
+  "forOrgId": "org_abc123",
+  "orgId": "org_abc123",
+  "requestType": "daily_site_log",
+  "scheduledAt": Timestamp (2026-09-04 09:00:00 UTC),
+  "repeat": "daily",                      // "none" | "daily" | "weekly"
+  "status": "pending",                    // "pending" | "processing" | "delivered" | "failed" | "cancelled"
+  "siteId": "ST001",
+  "siteName": "Skyline Tower A",
+  "createdAt": Timestamp,
+  "deliveredCount": 0,
+  "lastDeliveredAt": Timestamp (nullable),
+  "data": {
+    "click_action": "FLUTTER_NOTIFICATION_CLICK",
+    "requestType": "daily_site_log",
+    "siteId": "ST001",
+    "siteName": "Skyline Tower A",
+    "title": "📋 Daily Site Log Reminder",
+    "body": "..."
+  }
+}
+
+================================================================================
+7. DUPLICATE-PREVENTION, IDEMPOTENCY & RETRY LOGIC
+================================================================================
+
+1. Atomic Firestore Write Locks:
+   - When `processScheduledNotifications` picks up a due notification, it runs a Firestore
+     Transaction to immediately transition `status: 'pending'` -> `status: 'processing'`.
+   - If another worker instance or cron runner touches the same document concurrently, the
+     transaction fails for the second worker, preventing duplicate push dispatches.
+
+2. Idempotent Unique IDs:
+   - Scheduled notifications generate deterministic timestamps and random microsecond IDs
+     (`SCHED_${timestamp}_${random}`) to avoid collision.
+
+3. Failure Isolation & Automatic Error Marking:
+   - If a push fails, the document is tagged with `status: 'failed'`, `lastError`, and `failedAt`,
+     allowing admin inspection without crashing the remaining batch.
+
+================================================================================
+8. EDGE CASES, PERMISSIONS, MULTI-TENANT ISOLATION & STALE TOKEN PRUNING
+================================================================================
+
+1. App Killed / Deep Sleep Delivery:
+   - FCM Admin SDK payload includes `priority: 'high'`, `channelId: 'cst_high_importance_channel'`,
+     `sound: 'default'`, and `apns-priority: '10'`. This wakes the device even when the app is killed.
+
+2. Stale / Unregistered Token Cleanup:
+   - When FCM returns error codes `messaging/registration-token-not-registered` or
+     `messaging/invalid-registration-token`, the Cloud Function automatically removes the stale
+     token document from `/fcmTokens` and `/organisation/{orgId}/fcmTokens`.
+
+3. Strict Multi-Tenant Isolation:
+   - Every notification and scheduled document is tagged with `orgId` and `app_id`.
+   - Queries and push lookups are strictly partitioned by `orgId` to ensure no cross-organization
+     leakage in white-label deployments.
+
+================================================================================
+9. FINAL END-TO-END NOTIFICATION FLOW FOR ROLES
+================================================================================
+
+A. Supervisor Workflow:
+   - Receives Welcome Notification when profile is created.
+   - Receives Real-Time Push Notification with site details when assigned to a site.
+   - Receives Daily Scheduled Reminder at 09:00 AM for site log entry.
+   - Submits Requisition (Material, Tools, Payment) -> Receives push updates at each approval stage:
+     * Rejection reasons immediately visible if declined by Manager or Org.
+     * Final Release Push Notification with release remarks when Manager issues clearance.
+
+B. Manager Workflow:
+   - Receives Real-Time Push Notification immediately when a Supervisor submits any requisition.
+   - Receives Scheduled Reminder if a requisition has been pending review for over 24 hours.
+   - Verifies & Forwards requisition -> Receives Real-Time Push when Org HQ authorizes it.
+   - Issues Final Clearance -> Supervisor receives dispatch notification.
+   - Creates/Updates Site or Supervisor -> Real-time confirmation and Org alerts triggered.
+
+C. Organization Workflow:
+   - Receives Real-Time Push Notification when a Manager forwards a requisition for HQ authorization.
+   - Receives Real-Time Push Notification when a Manager registers a new Site or Project.
+   - Configures Manager -> Manager receives onboarding notification.
+   - Receives Scheduled System Alerts regarding plan renewal and billing status.
+================================================================================

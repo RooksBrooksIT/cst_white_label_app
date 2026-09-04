@@ -126,8 +126,12 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   @override
   Widget build(BuildContext context) {
     final darkAccent = AppTheme.getDarkAccent(primaryColor);
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    final crossAxisCount = isMobile ? 3 : (MediaQuery.of(context).size.width < 900 ? 4 : 6);
+    final availableWidth = MediaQuery.of(context).size.width;
+    final isMobile = availableWidth < 600;
+    final crossAxisCount = availableWidth >= 900
+        ? 4
+        : (availableWidth >= 600 ? 3 : 2);
+    final childAspectRatio = availableWidth >= 600 ? 1.25 : 1.16;
     final categories = _getCategories();
 
     return PopScope(
@@ -266,6 +270,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                     darkAccent,
                     categories,
                     crossAxisCount,
+                    childAspectRatio,
                   ),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 60)),
@@ -820,7 +825,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     Color darkAccent,
     List<_CategoryData> categories,
     int crossAxisCount,
+    double childAspectRatio,
   ) {
+    final hPad = Responsive.horizontalPadding(context);
     List<Widget> slivers = [];
 
     for (var category in categories) {
@@ -830,62 +837,78 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            padding: EdgeInsets.fromLTRB(hPad, 18, hPad, 12),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  width: 4,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        category.color,
-                        category.color.withValues(alpha: 0.5),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        category.title,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: darkAccent,
-                          letterSpacing: -0.3,
+                      Container(
+                        width: 4,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: category.color,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      Text(
-                        category.subtitle,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              category.title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            Text(
+                              category.subtitle,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF64748B),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
-                    color: category.color.withValues(alpha: 0.1),
+                    color: Colors.white.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${category.items.length}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: category.color,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        category.icon,
+                        size: 13,
+                        color: category.color,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${category.items.length} ${category.items.length == 1 ? 'Action' : 'Actions'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: category.color,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -894,20 +917,26 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         ),
       );
 
-      // Grid Items for this section
+      // Grid Items for this section (matches Manager Console Action Card design language)
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 10),
           sliver: SliverGrid(
             delegate: SliverChildBuilderDelegate((context, index) {
               final item = category.items[index];
-              return _buildGridItem(context, item, darkAccent);
+              return _buildConstructionActionCard(
+                title: item.title,
+                subtitle: item.subtitle,
+                icon: item.icon,
+                accentColor: item.color,
+                onTap: item.onTap,
+              );
             }, childCount: category.items.length),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: 0.88,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: childAspectRatio,
             ),
           ),
         ),
@@ -917,70 +946,151 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     return slivers;
   }
 
-  Widget _buildGridItem(BuildContext context, SubMenuItem item, Color darkAccent) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            item.onTap();
-          },
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+  // Executive Construction Action Card (matches Manager Console design language)
+  Widget _buildConstructionActionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+    required VoidCallback onTap,
+    bool isStatic = false,
+  }) {
+    return InkWell(
+      onTap: isStatic
+          ? null
+          : () {
+              HapticFeedback.lightImpact();
+              onTap();
+            },
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+              blurRadius: 14,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: accentColor.withValues(alpha: 0.05),
+              blurRadius: 10,
+              spreadRadius: 0,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Top Row: Soft Tinted Icon Badge + Top-Right Action Arrow Pill
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Prominent Tinted Icon Badge with Layered Depth
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: item.color.withValues(alpha: 0.12),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        accentColor.withValues(alpha: 0.16),
+                        accentColor.withValues(alpha: 0.07),
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.24),
+                      width: 1.2,
+                    ),
                   ),
-                  child: Icon(item.icon, color: item.color, size: 22),
+                  child: Center(
+                    child: Icon(icon, color: accentColor, size: 23),
+                  ),
                 ),
-                const SizedBox(height: 8),
+
+                // Top-Right Glass Outward Arrow Pill / Stay Tuned Pill
+                isStatic
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFEF3C7)),
+                        ),
+                        child: const Text(
+                          'Soon',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFD97706),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFFE2E8F0),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.arrow_outward_rounded,
+                            size: 14,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ),
+              ],
+            ),
+
+            // Bottom Block: Bold Title + Clean Subtitle
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  item.title,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                    color: darkAccent,
-                    letterSpacing: -0.2,
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                    height: 1.15,
                   ),
-                  textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
-                  item.subtitle,
+                  subtitle,
                   style: const TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                     color: Color(0xFF64748B),
                     height: 1.15,
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );

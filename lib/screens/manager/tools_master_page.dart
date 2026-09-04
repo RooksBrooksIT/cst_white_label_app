@@ -89,8 +89,16 @@ class _ToolMasterPageState extends State<ToolMasterPage>
     try {
       final snapshot = await FirestoreService.getCollection('tools').get();
       if (!mounted) return;
+      final docs = List<QueryDocumentSnapshot>.from(snapshot.docs);
+      docs.sort((a, b) {
+        final dataA = a.data() as Map<String, dynamic>?;
+        final dataB = b.data() as Map<String, dynamic>?;
+        final nameA = (dataA?['toolName'] ?? a.id).toString().toLowerCase();
+        final nameB = (dataB?['toolName'] ?? b.id).toString().toLowerCase();
+        return nameA.compareTo(nameB);
+      });
       setState(() {
-        _toolsList = snapshot.docs;
+        _toolsList = docs;
         if (_selectedToolDocId != null) {
           final match = _toolsList.where((doc) => doc.id == _selectedToolDocId);
           if (match.isNotEmpty) {
@@ -1993,6 +2001,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryColor,
                               foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
@@ -2007,20 +2016,24 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                     ),
                                   )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.check_circle_rounded, size: 20),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'CONFIRM STOCK UPDATE',
-                                        style: TextStyle(
-                                          fontSize: 13.5,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.5,
+                                : const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, size: 18),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'CONFIRM UPDATE',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                           ),
                         ),

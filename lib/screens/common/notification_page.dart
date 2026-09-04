@@ -130,7 +130,10 @@ class _NotificationPageState extends State<NotificationPage>
               onDismissed: (_) =>
                   NotificationService.markAsRead(docId),
               child: GestureDetector(
-                onTap: () => NotificationService.markAsRead(docId),
+                onTap: () {
+                  NotificationService.markAsRead(docId);
+                  NotificationService.navigateToTarget(context, data);
+                },
                 child: Container(
                   decoration: BoxDecoration(
                     color: isRead

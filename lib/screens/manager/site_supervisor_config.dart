@@ -6,6 +6,7 @@ import 'package:lottie/lottie.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/services/subscription_limit_service.dart';
 
@@ -449,6 +450,18 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
       await FirestoreService.getCollection('supervisor')
           .doc(newSupervisorId)
           .set(supervisorData);
+
+      // Trigger real-time push and in-app notification for Supervisor creation
+      try {
+        await NotificationService.notifySupervisorAccountCreated(
+          supervisorName: _fullNameController.text.trim(),
+          supervisorId: newSupervisorId,
+          username: _userNameController.text.trim(),
+          designation: _designationController.text.trim(),
+        );
+      } catch (notifErr) {
+        debugPrint('Error triggering supervisor creation notification: $notifErr');
+      }
 
       if (mounted) {
         _showSuccessDialog(newSupervisorId);
