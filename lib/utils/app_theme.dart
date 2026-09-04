@@ -219,10 +219,10 @@ class AppTheme {
   /// Generates a dynamic 4-stop light background gradient based on the selected brand color.
   static List<Color> getBackgroundGradientColors(Color brandColor) {
     final HSLColor hsl = HSLColor.fromColor(brandColor);
-    final Color c1 = hsl.withLightness(0.96).withSaturation((hsl.saturation * 0.4).clamp(0.0, 1.0)).toColor();
-    final Color c2 = hsl.withLightness(0.82).withSaturation((hsl.saturation * 0.6).clamp(0.0, 1.0)).toColor();
-    final Color c3 = hsl.withLightness(0.65).withSaturation((hsl.saturation * 0.75).clamp(0.0, 1.0)).toColor();
-    final Color c4 = brandColor;
+    final Color c1 = hsl.withLightness(0.95).withSaturation((hsl.saturation * 0.40).clamp(0.0, 1.0)).toColor();
+    final Color c2 = hsl.withLightness(0.88).withSaturation((hsl.saturation * 0.48).clamp(0.0, 1.0)).toColor();
+    final Color c3 = hsl.withLightness(0.80).withSaturation((hsl.saturation * 0.55).clamp(0.0, 1.0)).toColor();
+    final Color c4 = hsl.withLightness(0.74).withSaturation((hsl.saturation * 0.60).clamp(0.0, 1.0)).toColor();
 
     return [c1, c2, c3, c4];
   }

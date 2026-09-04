@@ -157,8 +157,8 @@ class ApprovalLifecycleStepper extends StatelessWidget {
     final steps = [
       {'num': 1, 'title': 'Supervisor', 'sub': 'Submitted'},
       {'num': 2, 'title': 'Manager', 'sub': 'Review'},
-      {'num': 3, 'title': 'Organization', 'sub': 'Authorization'},
-      {'num': 4, 'title': 'Manager', 'sub': 'Clearance'},
+      {'num': 3, 'title': 'Org HQ', 'sub': 'Approved'},
+      {'num': 4, 'title': 'Clearance', 'sub': 'Dispatched'},
     ];
 
     return Container(
@@ -217,7 +217,7 @@ class ApprovalLifecycleStepper extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'View Audit Trail',
+                          'Audit Trail',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -242,27 +242,42 @@ class ApprovalLifecycleStepper extends StatelessWidget {
                     children: [
                       _buildStepCircle(steps[i]['num'] as int, activeStep),
                       const SizedBox(height: 6),
-                      Text(
-                        steps[i]['title'] as String,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: activeStep >= (steps[i]['num'] as int)
-                              ? const Color(0xFF0F172A)
-                              : const Color(0xFF94A3B8),
+                      SizedBox(
+                        height: 14,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            steps[i]['title'] as String,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: activeStep >= (steps[i]['num'] as int)
+                                  ? const Color(0xFF0F172A)
+                                  : const Color(0xFF94A3B8),
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                          ),
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                      Text(
-                        steps[i]['sub'] as String,
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w500,
-                          color: activeStep >= (steps[i]['num'] as int)
-                              ? const Color(0xFF64748B)
-                              : const Color(0xFFCBD5E1),
+                      const SizedBox(height: 1),
+                      SizedBox(
+                        height: 13,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            steps[i]['sub'] as String,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                              color: activeStep >= (steps[i]['num'] as int)
+                                  ? const Color(0xFF64748B)
+                                  : const Color(0xFFCBD5E1),
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                          ),
                         ),
-                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -270,7 +285,7 @@ class ApprovalLifecycleStepper extends StatelessWidget {
                 if (i < steps.length - 1)
                   Container(
                     margin: const EdgeInsets.only(top: 11),
-                    width: 20,
+                    width: 14,
                     height: 2,
                     color: activeStep > (steps[i]['num'] as int)
                         ? const Color(0xFF10B981)
