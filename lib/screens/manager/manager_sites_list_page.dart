@@ -86,11 +86,12 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
     return isNegative ? '-$formatted' : formatted;
   }
 
-  void _showSortFilterBottomSheet() {
+  void _showSortFilterBottomSheet(Color primaryColor) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return StatefulBuilder(
@@ -108,9 +109,10 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                         const Text(
                           'Sort & Filter Sites',
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 18,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0F172A),
+                            letterSpacing: -0.3,
                           ),
                         ),
                         IconButton(
@@ -138,13 +140,21 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                         return ChoiceChip(
                           label: Text(option),
                           selected: isSelected,
-                          selectedColor: const Color(0xFF1A56DB),
+                          selectedColor: primaryColor,
                           labelStyle: TextStyle(
                             color: isSelected ? Colors.white : const Color(0xFF1E293B),
                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                             fontSize: 13,
                           ),
                           backgroundColor: const Color(0xFFF1F5F9),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? primaryColor
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
                           onSelected: (selected) {
                             if (selected) {
                               setState(() => _sortBy = option);
@@ -171,495 +181,104 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
-        return Scaffold(
-          backgroundColor: const Color(0xFFF9FAFC),
-          body: SafeArea(
-            bottom: false,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: Responsive.maxContentWidth,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 1. Top Header (Back Arrow + "Sites" Title)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: Row(
-                        children: [
-                          if ((widget.showBackButton &&
-                                  Navigator.canPop(context)) ||
-                              widget.onBack != null)
-                            InkWell(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                if (widget.onBack != null) {
-                                  widget.onBack!();
-                                } else if (Navigator.canPop(context)) {
-                                  Navigator.pop(context);
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                width: 38,
-                                height: 38,
-                                margin: const EdgeInsets.only(right: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                      color: const Color(0xFFE2E8F0)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.03),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  size: 16,
-                                  color: Color(0xFF0F172A),
-                                ),
-                              ),
-                            ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Sites & Projects',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0F172A),
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              Text(
-                                'Manage live sites & track project stages',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
+        final dynamicGradientColors = AppTheme.getBackgroundGradientColors(
+          primaryColor,
+        );
 
-                    // 2. Search Bar and Filter Option Row
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        children: [
-                          // Search TextField Container
-                          Expanded(
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.02),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: TextField(
-                                controller: _searchController,
-                                onChanged: (val) => setState(() => _searchQuery = val),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF0F172A),
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'Search by name, ID, supervisor...',
-                                  hintStyle: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF94A3B8),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.search_rounded,
-                                    color: Color(0xFF94A3B8),
-                                    size: 20,
-                                  ),
-                                  suffixIcon: _searchQuery.isNotEmpty
-                                      ? IconButton(
-                                          icon: const Icon(
-                                            Icons.close_rounded,
-                                            color: Color(0xFF94A3B8),
-                                            size: 18,
-                                          ),
-                                          onPressed: () {
-                                            _searchController.clear();
-                                            setState(() => _searchQuery = '');
-                                          },
-                                        )
-                                      : null,
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                    horizontal: 8,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-
-                          // Filter Button
-                          InkWell(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              _showSortFilterBottomSheet();
-                            },
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: _sortBy != 'Default'
-                                      ? const Color(0xFF1A56DB)
-                                      : const Color(0xFFE2E8F0),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.02),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.tune_rounded,
-                                  size: 20,
-                                  color: _sortBy != 'Default'
-                                      ? const Color(0xFF1A56DB)
-                                      : const Color(0xFF1E293B),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // 3. Dynamic Status Tabs & 4. Scrollable List of Site Cards
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                            stream: FirestoreService.getCollection('Site').snapshots(),
-                            builder: (context, siteSnap) {
-                              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                                stream: FirestoreService.projects.snapshots(),
-                                builder: (context, projSnap) {
-                                  if (siteSnap.connectionState == ConnectionState.waiting && projSnap.connectionState == ConnectionState.waiting) {
-                                    return const Center(
-                                      child: CircularProgressIndicator(),
-                                    );
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: dynamicGradientColors,
+              stops: const [0.0, 0.35, 0.7, 1.0],
+            ),
+          ),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: SafeArea(
+              bottom: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: Responsive.maxContentWidth,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. Top Header
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: Row(
+                          children: [
+                            if ((widget.showBackButton &&
+                                    Navigator.canPop(context)) ||
+                                widget.onBack != null)
+                              InkWell(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  if (widget.onBack != null) {
+                                    widget.onBack!();
+                                  } else if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
                                   }
-
-                                  final siteDocs = siteSnap.hasData ? siteSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                                  final projectDocs = projSnap.hasData ? projSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-                                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                                    stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
-                                    builder: (context, mapSnap) {
-                                      final supervisorDocs = mapSnap.hasData ? mapSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-                                      final supervisorMap = <String, String>{};
-                                      for (var d in supervisorDocs) {
-                                        final data = d.data();
-                                        final sName = data['supervisor'] ?? data['supervisorName'];
-                                        final sId = (data['siteId'] ?? data['site'] ?? d.id).toString();
-                                        if (sName != null) {
-                                          supervisorMap[sId] = sName.toString();
-                                        }
-                                      }
-
-                                      final unifiedMap = _buildUnifiedSiteDocs(
-                                        siteDocs: siteDocs,
-                                        projectDocs: projectDocs,
-                                        supervisorDocs: supervisorDocs,
-                                      );
-
-                                      final rawDocs = unifiedMap.entries
-                                          .map((e) => _SiteEntry(docId: e.key, data: e.value))
-                                          .toList();
-
-                                      // Compute Dynamic Tab Counts from Actual Backend Documents
-                                      int allCount = rawDocs.length;
-                                      int liveCount = 0;
-                                      int inProgressCount = 0;
-                                      int planningCount = 0;
-                                      int completedCount = 0;
-                                      int onHoldCount = 0;
-
-                                      for (final entry in rawDocs) {
-                                        final data = entry.data;
-                                        if (_isCompleted(data)) {
-                                          completedCount++;
-                                        } else if (_isPlanning(data)) {
-                                          planningCount++;
-                                        } else if (_isOnHold(data)) {
-                                          onHoldCount++;
-                                          liveCount++;
-                                        } else if (_isInProgress(data)) {
-                                          inProgressCount++;
-                                          liveCount++;
-                                        } else {
-                                          inProgressCount++;
-                                          liveCount++;
-                                        }
-                                      }
-
-                                      // Filter by Search Query & Selected Status Tab
-                                      final q = _searchQuery.trim().toLowerCase();
-                                      final filteredDocs = rawDocs.where((entry) {
-                                        final data = entry.data;
-                                        final name = (data['siteName'] ?? data['projectName'] ?? '').toString();
-                                        final siteId = (data['siteId'] ?? entry.docId).toString();
-                                        final projectType = (data['projectType'] ?? data['projectCategory'] ?? data['projectSubCategory'] ?? '').toString();
-                                        final supervisor = (data['supervisor'] ?? data['supervisorName'] ?? supervisorMap[siteId] ?? '').toString();
-                                        final status = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
-
-                                        // Search Query match
-                                        final matchesQuery = q.isEmpty ||
-                                            name.toLowerCase().contains(q) ||
-                                            siteId.toLowerCase().contains(q) ||
-                                            projectType.toLowerCase().contains(q) ||
-                                            supervisor.toLowerCase().contains(q) ||
-                                            status.toLowerCase().contains(q);
-
-                                        // Status Tab match
-                                        bool matchesStatus = true;
-                                        if (_selectedStatus == 'Live') {
-                                          matchesStatus = _isLive(data);
-                                        } else if (_selectedStatus == 'In Progress') {
-                                          matchesStatus = _isInProgress(data);
-                                        } else if (_selectedStatus == 'Planning') {
-                                          matchesStatus = _isPlanning(data);
-                                        } else if (_selectedStatus == 'Completed') {
-                                          matchesStatus = _isCompleted(data);
-                                        } else if (_selectedStatus == 'On Hold') {
-                                          matchesStatus = _isOnHold(data);
-                                        }
-
-                                        return matchesQuery && matchesStatus;
-                                      }).toList();
-
-                                      // Apply Sorting
-                                      if (_sortBy == 'Name') {
-                                        filteredDocs.sort((a, b) {
-                                          final nameA = (a.data['siteName'] ?? a.data['projectName'] ?? '').toString().toLowerCase();
-                                          final nameB = (b.data['siteName'] ?? b.data['projectName'] ?? '').toString().toLowerCase();
-                                          return nameA.compareTo(nameB);
-                                        });
-                                      } else if (_sortBy == 'Budget') {
-                                        filteredDocs.sort((a, b) {
-                                          final budgetA = (a.data['projectBudget'] is num ? (a.data['projectBudget'] as num).toDouble() : (a.data['budget'] is num ? (a.data['budget'] as num).toDouble() : 0.0));
-                                          final budgetB = (b.data['projectBudget'] is num ? (b.data['projectBudget'] as num).toDouble() : (b.data['budget'] is num ? (b.data['budget'] as num).toDouble() : 0.0));
-                                          return budgetB.compareTo(budgetA);
-                                        });
-                                      } else if (_sortBy == 'Progress') {
-                                        filteredDocs.sort((a, b) {
-                                          final progA = _calculateProgress(a.data);
-                                          final progB = _calculateProgress(b.data);
-                                          return progB.compareTo(progA);
-                                        });
-                                      }
-
-                                      return Column(
-                                        children: [
-                                          // Dynamic Status Tabs with Live Counters
-                                          SingleChildScrollView(
-                                            scrollDirection: Axis.horizontal,
-                                            physics: const BouncingScrollPhysics(),
-                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                            child: Row(
-                                              children: _statusTabs.map((status) {
-                                                final isSelected = _selectedStatus.toLowerCase() == status.toLowerCase();
-                                                final tabCount = _getCountForTab(
-                                                  status,
-                                                  all: allCount,
-                                                  live: liveCount,
-                                                  inProgress: inProgressCount,
-                                                  planning: planningCount,
-                                                  completed: completedCount,
-                                                  onHold: onHoldCount,
-                                                );
-
-                                                return Padding(
-                                                  padding: const EdgeInsets.only(right: 8),
-                                                  child: InkWell(
-                                                    onTap: () {
-                                                      HapticFeedback.lightImpact();
-                                                      setState(() => _selectedStatus = status);
-                                                    },
-                                                    borderRadius: BorderRadius.circular(14),
-                                                    child: AnimatedContainer(
-                                                      duration: const Duration(milliseconds: 200),
-                                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                                      decoration: BoxDecoration(
-                                                        color: isSelected ? const Color(0xFF1A56DB) : Colors.white,
-                                                        borderRadius: BorderRadius.circular(14),
-                                                        border: isSelected ? null : Border.all(color: const Color(0xFFE2E8F0)),
-                                                        boxShadow: isSelected
-                                                            ? [
-                                                                BoxShadow(
-                                                                  color: const Color(0xFF1A56DB).withValues(alpha: 0.3),
-                                                                  blurRadius: 8,
-                                                                  offset: const Offset(0, 3),
-                                                                ),
-                                                              ]
-                                                            : [
-                                                                BoxShadow(
-                                                                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                                                                  blurRadius: 4,
-                                                                  offset: const Offset(0, 1),
-                                                                ),
-                                                              ],
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Text(
-                                                            status,
-                                                            style: TextStyle(
-                                                              fontSize: 13,
-                                                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                                              color: isSelected ? Colors.white : const Color(0xFF64748B),
-                                                            ),
-                                                          ),
-                                                          const SizedBox(width: 6),
-                                                          Container(
-                                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                                            decoration: BoxDecoration(
-                                                              color: isSelected
-                                                                  ? Colors.white.withValues(alpha: 0.25)
-                                                                  : const Color(0xFFF1F5F9),
-                                                              borderRadius: BorderRadius.circular(10),
-                                                            ),
-                                                            child: Text(
-                                                              '$tabCount',
-                                                              style: TextStyle(
-                                                                fontSize: 11,
-                                                                fontWeight: FontWeight.w800,
-                                                                color: isSelected ? Colors.white : const Color(0xFF475569),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              }).toList(),
-                                            ),
-                                          ),
-
-                                          // Site Cards List or Empty State
-                                          Expanded(
-                                            child: filteredDocs.isEmpty
-                                                ? Center(
-                                                    child: SingleChildScrollView(
-                                                      child: Column(
-                                                        mainAxisAlignment: MainAxisAlignment.center,
-                                                        children: [
-                                                          Container(
-                                                            padding: const EdgeInsets.all(24),
-                                                            decoration: BoxDecoration(
-                                                              color: Colors.white,
-                                                              shape: BoxShape.circle,
-                                                              boxShadow: [
-                                                                BoxShadow(
-                                                                  color: const Color(0xFF0F172A).withValues(alpha: 0.06),
-                                                                  blurRadius: 12,
-                                                                ),
-                                                              ],
-                                                            ),
-                                                            child: const Icon(
-                                                              Icons.domain_disabled_rounded,
-                                                              size: 48,
-                                                              color: Color(0xFF1A56DB),
-                                                            ),
-                                                          ),
-                                                          const SizedBox(height: 16),
-                                                          const Text(
-                                                            'No Sites Found',
-                                                            style: TextStyle(
-                                                              fontSize: 18,
-                                                              fontWeight: FontWeight.w800,
-                                                              color: Color(0xFF0F172A),
-                                                            ),
-                                                          ),
-                                                          const SizedBox(height: 6),
-                                                          Text(
-                                                            _searchQuery.isNotEmpty
-                                                                ? 'No projects matching "$_searchQuery"'
-                                                                : 'No projects available under $_selectedStatus.',
-                                                            style: const TextStyle(
-                                                              fontSize: 13,
-                                                              color: Color(0xFF64748B),
-                                                            ),
-                                                            textAlign: TextAlign.center,
-                                                          ),
-                                                          const SizedBox(height: 90),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  )
-                                                : ListView.builder(
-                                                    controller: _scrollController,
-                                                    physics: const AlwaysScrollableScrollPhysics(
-                                                      parent: BouncingScrollPhysics(),
-                                                    ),
-                                                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 95),
-                                                    itemCount: filteredDocs.length,
-                                                    itemBuilder: (context, index) {
-                                                      final entry = filteredDocs[index];
-                                                      final data = entry.data;
-                                                      final siteDocId = entry.docId;
-
-                                                      return _buildSiteCard(
-                                                        context: context,
-                                                        data: data,
-                                                        siteDocId: siteDocId,
-                                                        supervisorMap: supervisorMap,
-                                                      );
-                                                    },
-                                                  ),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
                                 },
-                              );
-                            },
-                          ),
-
-                          // Fixed "+ Add Site" Bottom Floating Button
-                          Positioned(
-                            left: 16,
-                            right: 16,
-                            bottom: 16,
-                            child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF0F172A)
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    size: 16,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: const [
+                                  Text(
+                                    'Sites & Projects',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Manage live sites & track project stages',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
                               onTap: () {
                                 HapticFeedback.mediumImpact();
                                 Navigator.push(
@@ -669,47 +288,484 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                                   ),
                                 );
                               },
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(14),
                               child: Container(
-                                height: 50,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 13,
+                                  vertical: 9,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF1A56DB),
-                                  borderRadius: BorderRadius.circular(16),
+                                  gradient: LinearGradient(
+                                    colors: [primaryColor, darkAccent],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                    width: 1.2,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF1A56DB).withValues(alpha: 0.35),
+                                      color: primaryColor.withValues(alpha: 0.35),
                                       blurRadius: 10,
-                                      offset: const Offset(0, 4),
+                                      offset: const Offset(0, 3),
                                     ),
                                   ],
                                 ),
                                 child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
                                       Icons.add_rounded,
                                       color: Colors.white,
-                                      size: 22,
+                                      size: 18,
                                     ),
-                                    SizedBox(width: 8),
+                                    SizedBox(width: 4),
                                     Text(
-                                      '+ Add Site',
+                                      'Add Site',
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: 15,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.2,
+                                        letterSpacing: 0.1,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+
+                      // 2. Search Bar and Filter Option Row
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            // Search TextField Container
+                            Expanded(
+                              child: Container(
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: TextField(
+                                  controller: _searchController,
+                                  onChanged: (val) => setState(() => _searchQuery = val),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Search by name, ID, supervisor...',
+                                    hintStyle: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF94A3B8),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.search_rounded,
+                                      color: primaryColor.withValues(alpha: 0.75),
+                                      size: 20,
+                                    ),
+                                    suffixIcon: _searchQuery.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(
+                                              Icons.close_rounded,
+                                              color: Color(0xFF94A3B8),
+                                              size: 18,
+                                            ),
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              setState(() => _searchQuery = '');
+                                            },
+                                          )
+                                        : null,
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 8,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+
+                            // Filter Button
+                            InkWell(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                _showSortFilterBottomSheet(primaryColor);
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: _sortBy != 'Default'
+                                      ? primaryColor.withValues(alpha: 0.12)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: _sortBy != 'Default'
+                                        ? primaryColor
+                                        : Colors.white,
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _sortBy != 'Default'
+                                          ? primaryColor.withValues(alpha: 0.2)
+                                          : const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.tune_rounded,
+                                    size: 20,
+                                    color: _sortBy != 'Default'
+                                        ? primaryColor
+                                        : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 3. Dynamic Status Tabs & 4. Scrollable List of Site Cards
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                              stream: FirestoreService.getCollection('Site').snapshots(),
+                              builder: (context, siteSnap) {
+                                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                  stream: FirestoreService.projects.snapshots(),
+                                  builder: (context, projSnap) {
+                                    if (siteSnap.connectionState == ConnectionState.waiting && projSnap.connectionState == ConnectionState.waiting) {
+                                      return Center(
+                                        child: CircularProgressIndicator(
+                                          color: primaryColor,
+                                        ),
+                                      );
+                                    }
+
+                                    final siteDocs = siteSnap.hasData ? siteSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                                    final projectDocs = projSnap.hasData ? projSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+                                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                      stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
+                                      builder: (context, mapSnap) {
+                                        final supervisorDocs = mapSnap.hasData ? mapSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+                                        final supervisorMap = <String, String>{};
+                                        for (var d in supervisorDocs) {
+                                          final data = d.data();
+                                          final sName = data['supervisor'] ?? data['supervisorName'];
+                                          final sId = (data['siteId'] ?? data['site'] ?? d.id).toString();
+                                          if (sName != null) {
+                                            supervisorMap[sId] = sName.toString();
+                                          }
+                                        }
+
+                                        final unifiedMap = _buildUnifiedSiteDocs(
+                                          siteDocs: siteDocs,
+                                          projectDocs: projectDocs,
+                                          supervisorDocs: supervisorDocs,
+                                        );
+
+                                        final rawDocs = unifiedMap.entries
+                                            .map((e) => _SiteEntry(docId: e.key, data: e.value))
+                                            .toList();
+
+                                        // Compute Dynamic Tab Counts from Actual Backend Documents
+                                        int allCount = rawDocs.length;
+                                        int liveCount = 0;
+                                        int inProgressCount = 0;
+                                        int planningCount = 0;
+                                        int completedCount = 0;
+                                        int onHoldCount = 0;
+
+                                        for (final entry in rawDocs) {
+                                          final data = entry.data;
+                                          if (_isCompleted(data)) {
+                                            completedCount++;
+                                          } else if (_isPlanning(data)) {
+                                            planningCount++;
+                                          } else if (_isOnHold(data)) {
+                                            onHoldCount++;
+                                            liveCount++;
+                                          } else if (_isInProgress(data)) {
+                                            inProgressCount++;
+                                            liveCount++;
+                                          } else {
+                                            inProgressCount++;
+                                            liveCount++;
+                                          }
+                                        }
+
+                                        // Filter by Search Query & Selected Status Tab
+                                        final q = _searchQuery.trim().toLowerCase();
+                                        final filteredDocs = rawDocs.where((entry) {
+                                          final data = entry.data;
+                                          final name = (data['siteName'] ?? data['projectName'] ?? '').toString();
+                                          final siteId = (data['siteId'] ?? entry.docId).toString();
+                                          final projectType = (data['projectType'] ?? data['projectCategory'] ?? data['projectSubCategory'] ?? '').toString();
+                                          final supervisor = (data['supervisor'] ?? data['supervisorName'] ?? supervisorMap[siteId] ?? '').toString();
+                                          final status = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
+
+                                          // Search Query match
+                                          final matchesQuery = q.isEmpty ||
+                                              name.toLowerCase().contains(q) ||
+                                              siteId.toLowerCase().contains(q) ||
+                                              projectType.toLowerCase().contains(q) ||
+                                              supervisor.toLowerCase().contains(q) ||
+                                              status.toLowerCase().contains(q);
+
+                                          // Status Tab match
+                                          bool matchesStatus = true;
+                                          if (_selectedStatus == 'Live') {
+                                            matchesStatus = _isLive(data);
+                                          } else if (_selectedStatus == 'In Progress') {
+                                            matchesStatus = _isInProgress(data);
+                                          } else if (_selectedStatus == 'Planning') {
+                                            matchesStatus = _isPlanning(data);
+                                          } else if (_selectedStatus == 'Completed') {
+                                            matchesStatus = _isCompleted(data);
+                                          } else if (_selectedStatus == 'On Hold') {
+                                            matchesStatus = _isOnHold(data);
+                                          }
+
+                                          return matchesQuery && matchesStatus;
+                                        }).toList();
+
+                                        // Apply Sorting
+                                        if (_sortBy == 'Name') {
+                                          filteredDocs.sort((a, b) {
+                                            final nameA = (a.data['siteName'] ?? a.data['projectName'] ?? '').toString().toLowerCase();
+                                            final nameB = (b.data['siteName'] ?? b.data['projectName'] ?? '').toString().toLowerCase();
+                                            return nameA.compareTo(nameB);
+                                          });
+                                        } else if (_sortBy == 'Budget') {
+                                          filteredDocs.sort((a, b) {
+                                            final budgetA = (a.data['projectBudget'] is num ? (a.data['projectBudget'] as num).toDouble() : (a.data['budget'] is num ? (a.data['budget'] as num).toDouble() : 0.0));
+                                            final budgetB = (b.data['projectBudget'] is num ? (b.data['projectBudget'] as num).toDouble() : (b.data['budget'] is num ? (b.data['budget'] as num).toDouble() : 0.0));
+                                            return budgetB.compareTo(budgetA);
+                                          });
+                                        } else if (_sortBy == 'Progress') {
+                                          filteredDocs.sort((a, b) {
+                                            final progA = _calculateProgress(a.data);
+                                            final progB = _calculateProgress(b.data);
+                                            return progB.compareTo(progA);
+                                          });
+                                        }
+
+                                        return Column(
+                                          children: [
+                                            // Dynamic Status Tabs with Live Counters
+                                            SingleChildScrollView(
+                                              scrollDirection: Axis.horizontal,
+                                              physics: const BouncingScrollPhysics(),
+                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              child: Row(
+                                                children: _statusTabs.map((status) {
+                                                  final isSelected = _selectedStatus.toLowerCase() == status.toLowerCase();
+                                                  final tabCount = _getCountForTab(
+                                                    status,
+                                                    all: allCount,
+                                                    live: liveCount,
+                                                    inProgress: inProgressCount,
+                                                    planning: planningCount,
+                                                    completed: completedCount,
+                                                    onHold: onHoldCount,
+                                                  );
+
+                                                  return Padding(
+                                                    padding: const EdgeInsets.only(right: 8),
+                                                    child: InkWell(
+                                                      onTap: () {
+                                                        HapticFeedback.lightImpact();
+                                                        setState(() => _selectedStatus = status);
+                                                      },
+                                                      borderRadius: BorderRadius.circular(14),
+                                                      child: AnimatedContainer(
+                                                        duration: const Duration(milliseconds: 200),
+                                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                                        decoration: BoxDecoration(
+                                                          gradient: isSelected
+                                                              ? LinearGradient(
+                                                                  colors: [primaryColor, darkAccent],
+                                                                  begin: Alignment.topLeft,
+                                                                  end: Alignment.bottomRight,
+                                                                )
+                                                              : null,
+                                                          color: isSelected ? null : Colors.white,
+                                                          borderRadius: BorderRadius.circular(14),
+                                                          border: isSelected
+                                                              ? Border.all(color: Colors.white.withValues(alpha: 0.25))
+                                                              : Border.all(color: Colors.white, width: 1.2),
+                                                          boxShadow: isSelected
+                                                              ? [
+                                                                  BoxShadow(
+                                                                    color: primaryColor.withValues(alpha: 0.35),
+                                                                    blurRadius: 8,
+                                                                    offset: const Offset(0, 3),
+                                                                  ),
+                                                                ]
+                                                              : [
+                                                                  BoxShadow(
+                                                                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                                                                    blurRadius: 6,
+                                                                    offset: const Offset(0, 2),
+                                                                  ),
+                                                                ],
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Text(
+                                                              status,
+                                                              style: TextStyle(
+                                                                fontSize: 13,
+                                                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                                                color: isSelected ? Colors.white : const Color(0xFF64748B),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(width: 6),
+                                                            Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                              decoration: BoxDecoration(
+                                                                color: isSelected
+                                                                    ? Colors.white.withValues(alpha: 0.25)
+                                                                    : const Color(0xFFF1F5F9),
+                                                                borderRadius: BorderRadius.circular(10),
+                                                              ),
+                                                              child: Text(
+                                                                '$tabCount',
+                                                                style: TextStyle(
+                                                                  fontSize: 11,
+                                                                  fontWeight: FontWeight.w800,
+                                                                  color: isSelected ? Colors.white : const Color(0xFF475569),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                              ),
+                                            ),
+
+                                            // Site Cards List or Empty State
+                                            Expanded(
+                                              child: filteredDocs.isEmpty
+                                                  ? Center(
+                                                      child: SingleChildScrollView(
+                                                        child: Column(
+                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                          children: [
+                                                            Container(
+                                                              padding: const EdgeInsets.all(24),
+                                                              decoration: BoxDecoration(
+                                                                color: Colors.white,
+                                                                shape: BoxShape.circle,
+                                                                boxShadow: [
+                                                                  BoxShadow(
+                                                                    color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+                                                                    blurRadius: 14,
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              child: Icon(
+                                                                Icons.domain_disabled_rounded,
+                                                                size: 48,
+                                                                color: primaryColor,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(height: 16),
+                                                            const Text(
+                                                              'No Sites Found',
+                                                              style: TextStyle(
+                                                                fontSize: 18,
+                                                                fontWeight: FontWeight.w800,
+                                                                color: Color(0xFF0F172A),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(height: 6),
+                                                            Text(
+                                                              _searchQuery.isNotEmpty
+                                                                  ? 'No projects matching "$_searchQuery"'
+                                                                  : 'No projects available under $_selectedStatus.',
+                                                              style: const TextStyle(
+                                                                fontSize: 13,
+                                                                color: Color(0xFF64748B),
+                                                              ),
+                                                              textAlign: TextAlign.center,
+                                                            ),
+                                                            const SizedBox(height: 120),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : ListView.builder(
+                                                      controller: _scrollController,
+                                                      physics: const AlwaysScrollableScrollPhysics(
+                                                        parent: BouncingScrollPhysics(),
+                                                      ),
+                                                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+                                                      itemCount: filteredDocs.length,
+                                                      itemBuilder: (context, index) {
+                                                        final entry = filteredDocs[index];
+                                                        final data = entry.data;
+                                                        final siteDocId = entry.docId;
+
+                                                        return _buildSiteCard(
+                                                          context: context,
+                                                          data: data,
+                                                          siteDocId: siteDocId,
+                                                          supervisorMap: supervisorMap,
+                                                          primaryColor: primaryColor,
+                                                          darkAccent: darkAccent,
+                                                        );
+                                                      },
+                                                    ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -723,7 +779,7 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
     if (data['progress'] is num) {
       return (data['progress'] as num).toDouble();
     }
-    final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : 0.0);
+    final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : (data['budget'] is num ? (data['budget'] as num).toDouble() : 0.0));
     final spent = (data['amountSpent'] is num ? (data['amountSpent'] as num).toDouble() : 0.0);
     if (budget > 0) {
       final p = (spent / budget) * 100;
@@ -742,6 +798,8 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
     required Map<String, dynamic> data,
     required String siteDocId,
     required Map<String, String> supervisorMap,
+    required Color primaryColor,
+    required Color darkAccent,
   }) {
     final siteName = (data['siteName'] ?? data['projectName'] ?? 'Unnamed Site').toString();
     final siteId = (data['siteId'] ?? siteDocId).toString();
@@ -759,7 +817,7 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
         .toString();
 
     final rawStatus = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
-    final statusBadge = _getStatusBadge(rawStatus, data);
+    final statusBadge = _getStatusBadge(rawStatus, data, primaryColor);
 
     final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : (data['budget'] is num ? (data['budget'] as num).toDouble() : (double.tryParse(data['projectBudget']?.toString() ?? '') ?? 0.0)));
     final balance = (data['amountBalance'] is num ? (data['amountBalance'] as num).toDouble() : (data['balance'] is num ? (data['balance'] as num).toDouble() : (data['amountPaid'] is num ? (data['amountPaid'] as num).toDouble() : budget)));
@@ -769,19 +827,19 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: () {
             HapticFeedback.lightImpact();
@@ -798,17 +856,44 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
               ),
             );
           },
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Row: Site Name + Status Pill
+                // Top Row: Icon Avatar + Site Name + Status Pill
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Site Squircle Icon
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            primaryColor.withValues(alpha: 0.16),
+                            primaryColor.withValues(alpha: 0.05),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: primaryColor.withValues(alpha: 0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.domain_rounded,
+                        color: primaryColor,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Title & ID
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,7 +901,7 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                           Text(
                             siteName,
                             style: const TextStyle(
-                              fontSize: 16.5,
+                              fontSize: 16,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0F172A),
                               letterSpacing: -0.3,
@@ -828,8 +913,8 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                           Text(
                             siteId,
                             style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                               color: Color(0xFF94A3B8),
                             ),
                           ),
@@ -837,12 +922,13 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
+
                     // Status Pill Badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: statusBadge.bgColor,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         statusBadge.label,
@@ -855,42 +941,78 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
                 // Project & Supervisor Info
-                RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: Color(0xFF64748B),
-                    ),
-                    children: [
-                      const TextSpan(text: 'Project: '),
-                      TextSpan(
-                        text: projectType,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                    ],
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
                   ),
-                ),
-                const SizedBox(height: 4),
-                RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: Color(0xFF64748B),
-                    ),
+                  child: Column(
                     children: [
-                      const TextSpan(text: 'Supervisor: '),
-                      TextSpan(
-                        text: supervisor,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.architecture_rounded,
+                            size: 15,
+                            color: Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Project: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              projectType,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1E293B),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_pin_circle_rounded,
+                            size: 15,
+                            color: primaryColor,
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Supervisor: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              supervisor,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -911,50 +1033,114 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                     ),
                     Text(
                       '${progress.round()}%',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
+                        color: progress >= 100
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFF0F172A),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
                     value: (progress / 100).clamp(0.0, 1.0),
                     minHeight: 6,
                     backgroundColor: const Color(0xFFF1F5F9),
                     valueColor: AlwaysStoppedAnimation<Color>(
                       progress >= 100
-                          ? const Color(0xFF7C3AED)
-                          : progress >= 50
-                              ? const Color(0xFF16A34A)
-                              : const Color(0xFF1A56DB),
+                          ? const Color(0xFF16A34A)
+                          : (progress >= 50
+                              ? primaryColor
+                              : primaryColor.withValues(alpha: 0.8)),
                     ),
                   ),
                 ),
                 const SizedBox(height: 14),
 
-                // Bottom Row: Budget & Balance
+                // Bottom Row: Budget & Balance Pills
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Budget: ₹ ${_formatCurrency(budget)}',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF475569),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'Budget: ',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            Flexible(
+                              child: Text(
+                                '₹ ${_formatCurrency(budget)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1E293B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    Text(
-                      'Balance: ₹ ${_formatCurrency(balance)}',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: primaryColor.withValues(alpha: 0.22),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Bal: ',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: primaryColor,
+                              ),
+                            ),
+                            Flexible(
+                              child: Text(
+                                '₹ ${_formatCurrency(balance)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: primaryColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -1023,7 +1209,7 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
     }
   }
 
-  _StatusBadgeData _getStatusBadge(String rawStatus, Map<String, dynamic> data) {
+  _StatusBadgeData _getStatusBadge(String rawStatus, Map<String, dynamic> data, Color primaryColor) {
     if (_isCompleted(data)) {
       return _StatusBadgeData(
         label: 'Completed',
@@ -1045,8 +1231,8 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
     } else if (_isInProgress(data)) {
       return _StatusBadgeData(
         label: 'In Progress',
-        bgColor: const Color(0xFFDBEAFE),
-        textColor: const Color(0xFF1D4ED8),
+        bgColor: primaryColor.withValues(alpha: 0.12),
+        textColor: primaryColor,
       );
     } else if (_isLive(data)) {
       return _StatusBadgeData(

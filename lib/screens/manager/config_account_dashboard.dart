@@ -66,16 +66,19 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   String _managerDesignation = 'Manager';
   UserRole _currentUserRole = UserRole.none;
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _searchController = TextEditingController();
   final PageController _kpiPageController = PageController(
     initialPage: 400,
     viewportFraction: 0.92,
   );
   final ValueNotifier<int> _currentKpiPageNotifier = ValueNotifier<int>(0);
   int _currentIndex = 0;
-  String _searchQuery = '';
   String _selectedKpiPeriod = 'Today';
   Timer? _carouselTimer;
+
+  final TextEditingController _dashboardSearchController = TextEditingController();
+  final FocusNode _dashboardSearchFocusNode = FocusNode();
+  String _dashboardSearchQuery = '';
+  bool _isDashboardSearchOpen = false;
 
   // Cached Stream handles to avoid repeated subscriptions on rebuilds
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _notificationsStream;
@@ -501,8 +504,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     _carouselTimer?.cancel();
     _currentKpiPageNotifier.dispose();
     _scrollController.dispose();
-    _searchController.dispose();
     _kpiPageController.dispose();
+    _dashboardSearchController.dispose();
+    _dashboardSearchFocusNode.dispose();
     super.dispose();
   }
 
@@ -539,6 +543,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               },
               child: Scaffold(
                 backgroundColor: Colors.transparent,
+                extendBody: true,
                 floatingActionButtonLocation:
                     FloatingActionButtonLocation.endFloat,
                 floatingActionButton: _currentIndex == 0
@@ -756,10 +761,69 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
           ),
 
-          // Right: Notification Bell & Profile Avatar / Logout
+          // Right: Magnifier Icon, Notification Bell & Profile Avatar
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Magnifier / Search Icon (Displayed on Management Module / Home page)
+              if (_currentIndex == 0) ...[
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isDashboardSearchOpen ? primaryColor : Colors.white,
+                    border: Border.all(
+                      color: _isDashboardSearchOpen
+                          ? primaryColor
+                          : const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _isDashboardSearchOpen
+                            ? primaryColor.withValues(alpha: 0.3)
+                            : const Color(0xFF0F172A).withValues(alpha: 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() {
+                          _isDashboardSearchOpen = !_isDashboardSearchOpen;
+                          if (!_isDashboardSearchOpen) {
+                            _dashboardSearchController.clear();
+                            _dashboardSearchQuery = '';
+                          }
+                        });
+                        if (_isDashboardSearchOpen) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _dashboardSearchFocusNode.requestFocus();
+                          });
+                        }
+                      },
+                      child: Center(
+                        child: Icon(
+                          Icons.search_rounded,
+                          color: _isDashboardSearchOpen
+                              ? Colors.white
+                              : const Color(0xFF1E293B),
+                          size: 21,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+
               // Notification Bell with Badge
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _notificationsStream,
@@ -850,7 +914,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   );
                 },
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
 
               // Profile Avatar
               GestureDetector(
@@ -899,30 +963,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   ),
                 ),
               ),
-
-              if (widget.showLogout) ...[
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () => _showLogoutConfirmation(context),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFECACA)),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.logout_rounded,
-                        color: Color(0xFFDC2626),
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ],
@@ -1967,7 +2007,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     double availableWidth,
   ) {
     final hPad = Responsive.horizontalPadding(context);
-    final isSearching = _searchQuery.isNotEmpty;
 
     final crossAxisCount = availableWidth >= 900
         ? 4
@@ -1985,6 +2024,22 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         }
         return a.key.toLowerCase().compareTo(b.key.toLowerCase());
       });
+
+    final isSearching = _dashboardSearchQuery.isNotEmpty;
+    final filteredCategoryEntries = categoryEntries.where((entry) {
+      if (!isSearching) return true;
+      if (entry.key.toLowerCase().contains(_dashboardSearchQuery)) return true;
+      final meta = _categoryMetadata[entry.key];
+      final subtitle = meta?["subtitle"] as String? ?? '';
+      if (subtitle.toLowerCase().contains(_dashboardSearchQuery)) return true;
+      for (var item in entry.value) {
+        if (item.title.toLowerCase().contains(_dashboardSearchQuery) ||
+            item.subtitle.toLowerCase().contains(_dashboardSearchQuery)) {
+          return true;
+        }
+      }
+      return false;
+    }).toList();
 
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 24),
@@ -2039,7 +2094,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     const SizedBox(width: 3),
                     Text(
                       isSearching
-                          ? 'Filtering'
+                          ? '${filteredCategoryEntries.length} Found'
                           : '${categoryEntries.length} Categories',
                       style: TextStyle(
                         fontSize: 11,
@@ -2052,18 +2107,142 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
 
-          // Search Bar
-          _buildSearchBar(context, primaryColor),
+          // Expandable Search Bar under Management Modules Header
+          if (_isDashboardSearchOpen) ...[
+            const SizedBox(height: 12),
+            Container(
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _dashboardSearchQuery.isNotEmpty
+                      ? primaryColor.withValues(alpha: 0.6)
+                      : const Color(0xFFE2E8F0),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _dashboardSearchController,
+                focusNode: _dashboardSearchFocusNode,
+                autofocus: true,
+                onChanged: (val) {
+                  setState(() {
+                    _dashboardSearchQuery = val.trim().toLowerCase();
+                  });
+                },
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Search modules, materials, tools, sites...',
+                  hintStyle: TextStyle(
+                    fontSize: 12.5,
+                    color: Colors.grey.shade500,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: primaryColor,
+                    size: 20,
+                  ),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_dashboardSearchQuery.isNotEmpty)
+                        IconButton(
+                          icon: Icon(
+                            Icons.clear_rounded,
+                            color: Colors.grey.shade600,
+                            size: 18,
+                          ),
+                          onPressed: () {
+                            _dashboardSearchController.clear();
+                            setState(() => _dashboardSearchQuery = '');
+                          },
+                        ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Color(0xFF94A3B8),
+                          size: 18,
+                        ),
+                        tooltip: 'Close search',
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            _isDashboardSearchOpen = false;
+                            _dashboardSearchController.clear();
+                            _dashboardSearchQuery = '';
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+
           const SizedBox(height: 14),
 
-          // If NOT searching: 2-column Grid of Executive Category Action Cards
-          if (!isSearching) ...[
+          // 2-column Grid of Executive Category Action Cards
+          if (filteredCategoryEntries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.search_off_rounded,
+                        size: 38,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No module matches "$_dashboardSearchQuery"',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: categoryEntries.length,
+              itemCount: filteredCategoryEntries.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 14,
@@ -2071,206 +2250,58 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 childAspectRatio: childAspectRatio,
               ),
               itemBuilder: (context, index) {
-                final entry = categoryEntries[index];
-                final meta = _categoryMetadata[entry.key] ?? {
-                  "subtitle": "Management options and settings",
-                  "icon": entry.value.isNotEmpty
-                      ? entry.value.first.icon
-                      : Icons.sentiment_satisfied_alt_rounded,
-                  "color": primaryColor,
-                };
-                final isStatic = meta["isStatic"] as bool? ?? false;
-                final IconData categoryIcon = meta["icon"] as IconData;
-                final String subtitle = meta["subtitle"] as String;
-                final Color accentColor =
-                    (meta["color"] as Color?) ?? primaryColor;
+                final entry = filteredCategoryEntries[index];
+              final meta = _categoryMetadata[entry.key] ?? {
+                "subtitle": "Management options and settings",
+                "icon": entry.value.isNotEmpty
+                    ? entry.value.first.icon
+                    : Icons.sentiment_satisfied_alt_rounded,
+                "color": primaryColor,
+              };
+              final isStatic = meta["isStatic"] as bool? ?? false;
+              final IconData categoryIcon = meta["icon"] as IconData;
+              final String subtitle = meta["subtitle"] as String;
+              final Color accentColor =
+                  (meta["color"] as Color?) ?? primaryColor;
 
-                return _buildConstructionActionCard(
-                  title: entry.key,
-                  subtitle: isStatic
-                      ? subtitle
-                      : '${entry.value.length} options • $subtitle',
-                  icon: categoryIcon,
-                  accentColor: accentColor,
-                  isStatic: isStatic,
-                  onTap: isStatic
-                      ? () {}
-                      : () {
-                          HapticFeedback.lightImpact();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ConsoleCategoryDetailsPage(
-                                sectionTitle: entry.key,
-                                items: entry.value,
-                                managerName: _managerName,
-                                metadata: meta,
-                                navigateToScreen: (title) =>
-                                    _navigateToScreen(context, title),
-                                launchPrivacyPolicy: () =>
-                                    _launchPrivacyPolicy(context),
-                              ),
+              return _buildConstructionActionCard(
+                title: entry.key,
+                subtitle: isStatic
+                    ? subtitle
+                    : '${entry.value.length} options • $subtitle',
+                icon: categoryIcon,
+                accentColor: accentColor,
+                count: isStatic ? null : entry.value.length,
+                isStatic: isStatic,
+                onTap: isStatic
+                    ? () {}
+                    : () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ConsoleCategoryDetailsPage(
+                              sectionTitle: entry.key,
+                              items: entry.value,
+                              managerName: _managerName,
+                              metadata: meta,
+                              navigateToScreen: (title) =>
+                                  _navigateToScreen(context, title),
+                              launchPrivacyPolicy: () =>
+                                  _launchPrivacyPolicy(context),
                             ),
-                          );
-                        },
-                );
-              },
-            ),
-          ] else ...[
-            // Active Search Filtering across all items
-            _buildSearchResults(
-                context, primaryColor, crossAxisCount, childAspectRatio),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar(BuildContext context, Color primaryColor) {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: _searchQuery.isNotEmpty
-              ? primaryColor.withValues(alpha: 0.6)
-              : const Color(0xFFE2E8F0),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+                          ),
+                        );
+                      },
+              );
+            },
           ),
         ],
       ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (val) {
-          setState(() {
-            _searchQuery = val.trim().toLowerCase();
-          });
-        },
-        style: const TextStyle(
-          fontSize: 13.5,
-          color: Color(0xFF0F172A),
-          fontWeight: FontWeight.w600,
-        ),
-        decoration: InputDecoration(
-          hintText: 'Search modules, materials, tools, sites...',
-          hintStyle: TextStyle(
-            fontSize: 12.5,
-            color: Colors.grey.shade500,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: primaryColor,
-            size: 20,
-          ),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(
-                    Icons.clear_rounded,
-                    color: Colors.grey.shade600,
-                    size: 18,
-                  ),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
     );
   }
 
-  Widget _buildSearchResults(
-    BuildContext context,
-    Color primaryColor,
-    int crossAxisCount,
-    double childAspectRatio,
-  ) {
-    final List<DashboardItem> matchedItems = [];
-    for (var entry in groupedItems.entries) {
-      for (var item in entry.value) {
-        if (item.title.toLowerCase().contains(_searchQuery) ||
-            item.subtitle.toLowerCase().contains(_searchQuery) ||
-            entry.key.toLowerCase().contains(_searchQuery)) {
-          matchedItems.add(item);
-        }
-      }
-    }
-    matchedItems.sort(
-        (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-
-    if (matchedItems.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.search_off_rounded,
-                size: 54,
-                color: Colors.grey.shade400,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'No configurations found',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'No module matches "$_searchQuery"',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: matchedItems.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-        childAspectRatio: childAspectRatio,
-      ),
-      itemBuilder: (context, index) {
-        final item = matchedItems[index];
-        return _buildConstructionActionCard(
-          title: item.title,
-          subtitle: item.subtitle,
-          icon: item.icon,
-          accentColor: item.color,
-          onTap: () {
-            if (item.title == 'Privacy Policy') {
-              _launchPrivacyPolicy(context);
-            } else {
-              _navigateToScreen(context, item.title);
-            }
-          },
-        );
-      },
-    );
-  }
-
-  // Executive Construction Action Card (matches Organization Dashboard design language)
+  // Executive Construction Action Card with Modern Bento Glassmorphic Design
   Widget _buildConstructionActionCard({
     required String title,
     required String subtitle,
@@ -2278,6 +2309,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     required Color accentColor,
     required VoidCallback onTap,
     bool isStatic = false,
+    int? count,
   }) {
     return InkWell(
       onTap: isStatic
@@ -2286,24 +2318,35 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               HapticFeedback.lightImpact();
               onTap();
             },
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Color.alphaBlend(
+                accentColor.withValues(alpha: 0.04),
+                Colors.white,
+              ),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: accentColor.withValues(alpha: 0.16),
+            width: 1.2,
+          ),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-              blurRadius: 14,
-              spreadRadius: 0,
+              blurRadius: 12,
               offset: const Offset(0, 4),
             ),
             BoxShadow(
-              color: accentColor.withValues(alpha: 0.05),
+              color: accentColor.withValues(alpha: 0.08),
               blurRadius: 10,
-              spreadRadius: 0,
               offset: const Offset(0, 2),
             ),
           ],
@@ -2312,75 +2355,99 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Top Row: Soft Tinted Icon Badge + Top-Right Action Arrow Pill
+            // Top Row: Vibrant Colored Solid Gradient Icon + Modern Count/Action Pill
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Prominent Tinted Icon Badge with Layered Depth
+                // Prominent Vibrant Icon Badge with Drop Shadow
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        accentColor.withValues(alpha: 0.16),
-                        accentColor.withValues(alpha: 0.07),
+                        accentColor,
+                        Color.alphaBlend(
+                          Colors.black.withValues(alpha: 0.15),
+                          accentColor,
+                        ),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.24),
-                      width: 1.2,
-                    ),
+                    borderRadius: BorderRadius.circular(13),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentColor.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: Center(
-                    child: Icon(icon, color: accentColor, size: 23),
+                    child: Icon(icon, color: Colors.white, size: 21),
                   ),
                 ),
 
-                // Top-Right Glass Outward Arrow Pill / Stay Tuned Pill
-                isStatic
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3.5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFFBEB),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFFEF3C7)),
-                        ),
-                        child: const Text(
-                          'Soon',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFFD97706),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFFE2E8F0),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.arrow_outward_rounded,
-                            size: 14,
-                            color: Color(0xFF94A3B8),
-                          ),
-                        ),
+                // Top-Right Pill Badge
+                if (isStatic)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFFEF3C7)),
+                    ),
+                    child: const Text(
+                      'Soon',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFD97706),
                       ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: accentColor.withValues(alpha: 0.16),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (count != null) ...[
+                          Text(
+                            '$count',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: accentColor,
+                              height: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                        ],
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 8.5,
+                          color: accentColor,
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
 
@@ -2392,10 +2459,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   title,
                   style: const TextStyle(
                     fontSize: 13.5,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     color: Color(0xFF0F172A),
                     letterSpacing: -0.3,
-                    height: 1.15,
+                    height: 1.2,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -2405,9 +2472,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   subtitle,
                   style: const TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                     color: Color(0xFF64748B),
-                    height: 1.15,
+                    height: 1.2,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -2423,134 +2490,155 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   // -------------------- 4. MORE TAB & BOTTOM BAR --------------------
 
   Widget _buildBottomNavigationBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final activeColor = theme.primaryColor;
-    const inactiveColor = Color(0xFF64748B);
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-            spreadRadius: 0,
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    primaryColor,
+                    darkAccent,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.38),
+                    blurRadius: 22,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.18),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    icon: _currentIndex == 0
+                        ? Icons.home_rounded
+                        : Icons.home_outlined,
+                    label: 'Home',
+                    primaryColor: primaryColor,
+                    isSelected: _currentIndex == 0,
+                    onTap: () => setState(() => _currentIndex = 0),
+                  ),
+                  _buildNavItem(
+                    icon: _currentIndex == 1
+                        ? Icons.assignment_rounded
+                        : Icons.assignment_outlined,
+                    label: 'Sites',
+                    primaryColor: primaryColor,
+                    isSelected: _currentIndex == 1,
+                    onTap: () => setState(() => _currentIndex = 1),
+                  ),
+                  _buildNavItem(
+                    icon: _currentIndex == 2
+                        ? Icons.architecture_rounded
+                        : Icons.architecture_outlined,
+                    label: 'Project',
+                    primaryColor: primaryColor,
+                    isSelected: _currentIndex == 2,
+                    onTap: () => setState(() => _currentIndex = 2),
+                  ),
+                  _buildNavItem(
+                    icon: _currentIndex == 3
+                        ? Icons.fact_check_rounded
+                        : Icons.fact_check_outlined,
+                    label: 'Approvals',
+                    primaryColor: primaryColor,
+                    isSelected: _currentIndex == 3,
+                    onTap: () => setState(() => _currentIndex = 3),
+                  ),
+                  _buildNavItem(
+                    icon: _currentIndex == 4
+                        ? Icons.grid_view_rounded
+                        : Icons.menu_rounded,
+                    label: 'More',
+                    primaryColor: primaryColor,
+                    isSelected: _currentIndex == 4,
+                    onTap: () => setState(() => _currentIndex = 4),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                context: context,
-                icon: _currentIndex == 0
-                    ? Icons.home_rounded
-                    : Icons.home_outlined,
-                label: 'Home',
-                isActive: _currentIndex == 0,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-                onTap: () => setState(() => _currentIndex = 0),
-              ),
-              _buildNavItem(
-                context: context,
-                icon: _currentIndex == 1
-                    ? Icons.assignment_rounded
-                    : Icons.assignment_outlined,
-                label: 'Sites',
-                isActive: _currentIndex == 1,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-                onTap: () => setState(() => _currentIndex = 1),
-              ),
-              _buildNavItem(
-                context: context,
-                icon: _currentIndex == 2
-                    ? Icons.architecture_rounded
-                    : Icons.architecture_outlined,
-                label: 'Project',
-                isActive: _currentIndex == 2,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-                onTap: () => setState(() => _currentIndex = 2),
-              ),
-              _buildNavItem(
-                context: context,
-                icon: _currentIndex == 3
-                    ? Icons.fact_check_rounded
-                    : Icons.fact_check_outlined,
-                label: 'Approvals',
-                isActive: _currentIndex == 3,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-                onTap: () => setState(() => _currentIndex = 3),
-              ),
-              _buildNavItem(
-                context: context,
-                icon: Icons.grid_view_rounded,
-                label: 'More',
-                isActive: _currentIndex == 4,
-                activeColor: activeColor,
-                inactiveColor: inactiveColor,
-                onTap: () => setState(() => _currentIndex = 4),
-              ),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _buildNavItem({
-    required BuildContext context,
     required IconData icon,
     required String label,
-    required bool isActive,
-    required Color activeColor,
-    required Color inactiveColor,
+    required Color primaryColor,
+    required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        splashColor: activeColor.withValues(alpha: 0.1),
-        highlightColor: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: isActive ? activeColor : inactiveColor,
-                size: 24,
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected
+                  ? primaryColor
+                  : Colors.white.withValues(alpha: 0.85),
+              size: 21,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                color: isSelected
+                    ? primaryColor
+                    : Colors.white.withValues(alpha: 0.9),
+                letterSpacing: -0.2,
               ),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isActive ? activeColor : inactiveColor,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 11,
-                  letterSpacing: -0.1,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -2558,10 +2646,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   Widget _buildMoreTab(BuildContext context) {
     final hPad = Responsive.horizontalPadding(context);
+    final primaryColor = AppTheme.primaryColor.value;
 
     final List<Map<String, dynamic>> sections = [
       {
         'title': 'Management & Approvals',
+        'tag': 'Operations',
+        'icon': Icons.admin_panel_settings_rounded,
         'items': [
           {
             'title': 'Material Approvals',
@@ -2577,7 +2668,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           },
           {
             'title': 'Supervisor Setup',
-            'subtitle': 'Manage supervisors and access',
+            'subtitle': 'Manage supervisors and access permissions',
             'icon': Icons.badge_rounded,
             'color': const Color(0xFF6366F1),
             'action': () => Navigator.push(
@@ -2615,9 +2706,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       },
       {
         'title': 'Inventory & Resources',
+        'tag': 'Logistics',
+        'icon': Icons.inventory_2_rounded,
         'items': [
           {
-            'title': 'Material Configuration',
+            'title': 'Material Config',
             'subtitle': 'Central material catalogue & stocks',
             'icon': Icons.inventory_2_rounded,
             'color': const Color(0xFF059669),
@@ -2678,7 +2771,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           },
           {
             'title': 'Vehicle Fleet',
-            'subtitle': 'Vehicles, drivers & maintenance',
+            'subtitle': 'Vehicles, drivers & maintenance logs',
             'icon': Icons.directions_car_rounded,
             'color': const Color(0xFFEF4444),
             'action': () => Navigator.push(
@@ -2692,9 +2785,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       },
       {
         'title': 'Configurations & Settings',
+        'tag': 'System',
+        'icon': Icons.tune_rounded,
         'items': [
           {
-            'title': 'Master Configurations',
+            'title': 'Master Configs',
             'subtitle': 'Project categories, stages & contracts',
             'icon': Icons.tune_rounded,
             'color': const Color(0xFF475569),
@@ -2748,175 +2843,369 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     ];
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 100),
+      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 115),
       physics: const BouncingScrollPhysics(),
       children: [
-        // Manager Profile Header Card
+        // Executive Profile Hero Card
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white,
+              width: 1.5,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: primaryColor.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 5),
+              ),
+              BoxShadow(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Row(
+          child: Column(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF1A56DB),
-                      Color(0xFF3B82F6),
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          primaryColor,
+                          AppTheme.getDarkAccent(primaryColor),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        _managerName.isNotEmpty
+                            ? _managerName.substring(0, 1).toUpperCase()
+                            : 'M',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _managerName,
+                                style: const TextStyle(
+                                  fontSize: 16.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: -0.3,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'Active',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF10B981),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _managerDesignation,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (widget.showLogout)
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          _showLogoutConfirmation(context);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.logout_rounded,
+                            color: Color(0xFFEF4444),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Operations Hub',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
                     ],
                   ),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(Icons.person_rounded, color: Colors.white, size: 26),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _managerName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
-                      ),
+                  Text(
+                    'Workspace Desk',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: primaryColor,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _managerDesignation,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.showLogout)
-                IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.logout_rounded,
-                        color: Colors.red, size: 18),
                   ),
-                  onPressed: () => _showLogoutConfirmation(context),
-                  tooltip: 'Logout',
-                ),
+                ],
+              ),
             ],
           ),
         ),
         const SizedBox(height: 20),
 
-        // Section Cards
+        // Bento Sections
         ...sections.map((section) {
           final items = section['items'] as List<Map<String, dynamic>>;
+          final title = section['title'] as String;
+          final tag = section['tag'] as String;
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 10, top: 8),
-                child: Text(
-                  section['title'] as String,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF475569),
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                padding: const EdgeInsets.only(left: 4, right: 4, bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.3,
+                      ),
                     ),
-                  ],
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  itemCount: items.length,
-                  separatorBuilder: (context, index) => const Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: Color(0xFFF1F5F9),
-                    indent: 56,
-                  ),
-                  itemBuilder: (context, idx) {
-                    final item = items[idx];
-                    final color = item['color'] as Color;
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2.5,
                       ),
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          item['icon'] as IconData,
-                          color: color,
-                          size: 22,
-                        ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                      title: Text(
-                        item['title'] as String,
+                      child: Text(
+                        tag,
                         style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      subtitle: Text(
-                        item['subtitle'] as String,
-                        style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                           color: Color(0xFF64748B),
                         ),
                       ),
-                      trailing: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF94A3B8),
-                        size: 20,
-                      ),
-                      onTap: item['action'] as VoidCallback?,
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isTwoCol = constraints.maxWidth >= 340;
+                  final itemWidth = isTwoCol
+                      ? (constraints.maxWidth - 12) / 2
+                      : constraints.maxWidth;
+
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: items.map((item) {
+                      final color = item['color'] as Color;
+                      final action = item['action'] as VoidCallback?;
+
+                      return SizedBox(
+                        width: itemWidth,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.07),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                              BoxShadow(
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(18),
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                action?.call();
+                              },
+                              borderRadius: BorderRadius.circular(18),
+                              splashColor: color.withValues(alpha: 0.1),
+                              highlightColor: color.withValues(alpha: 0.05),
+                              child: Padding(
+                                padding: const EdgeInsets.all(13),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                color.withValues(alpha: 0.18),
+                                                color.withValues(alpha: 0.08),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: color.withValues(alpha: 0.2),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            item['icon'] as IconData,
+                                            color: color,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF8FAFC),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 13,
+                                            color: color,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      item['title'] as String,
+                                      style: const TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF0F172A),
+                                        letterSpacing: -0.2,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      item['subtitle'] as String,
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF64748B),
+                                        height: 1.25,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
             ],
           );
         }),
@@ -3448,12 +3737,31 @@ class ConsoleCategoryDetailsPage extends StatefulWidget {
 class _ConsoleCategoryDetailsPageState
     extends State<ConsoleCategoryDetailsPage> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+  bool _isSearchExpanded = false;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _toggleSearch() {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isSearchExpanded = !_isSearchExpanded;
+      if (!_isSearchExpanded) {
+        _searchController.clear();
+        _searchQuery = '';
+      }
+    });
+    if (_isSearchExpanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _searchFocusNode.requestFocus();
+      });
+    }
   }
 
   @override
@@ -3498,16 +3806,71 @@ class _ConsoleCategoryDetailsPageState
             backgroundColor: Colors.transparent,
             appBar: AppBar(
               iconTheme: const IconThemeData(color: Colors.white),
-              title: Text(
-                widget.sectionTitle,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 17,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              centerTitle: true,
+              title: _isSearchExpanded
+                  ? Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        autofocus: true,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        cursorColor: Colors.white,
+                        decoration: InputDecoration(
+                          hintText: 'Search in ${widget.sectionTitle}...',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontSize: 13,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: Colors.white70,
+                            size: 18,
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.cancel_rounded,
+                                    color: Colors.white70,
+                                    size: 16,
+                                  ),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val;
+                          });
+                        },
+                      ),
+                    )
+                  : Text(
+                      widget.sectionTitle,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+              centerTitle: !_isSearchExpanded,
               elevation: 0,
               flexibleSpace: Container(
                 decoration: BoxDecoration(
@@ -3530,8 +3893,41 @@ class _ConsoleCategoryDetailsPageState
                   color: Colors.white,
                   size: 18,
                 ),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  if (_isSearchExpanded) {
+                    setState(() {
+                      _isSearchExpanded = false;
+                      _searchController.clear();
+                      _searchQuery = '';
+                    });
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
               ),
+              actions: [
+                if (!_isSearchExpanded)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.search_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    tooltip: 'Search options',
+                    onPressed: _toggleSearch,
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    tooltip: 'Close search',
+                    onPressed: _toggleSearch,
+                  ),
+                const SizedBox(width: 4),
+              ],
             ),
             body: LayoutBuilder(
               builder: (context, constraints) {
@@ -3633,7 +4029,7 @@ class _ConsoleCategoryDetailsPageState
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  '${widget.items.length} ${widget.items.length == 1 ? "Option" : "Options"}',
+                                  '${filteredItems.length} ${filteredItems.length == 1 ? "Option" : "Options"}',
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w800,
@@ -3647,225 +4043,229 @@ class _ConsoleCategoryDetailsPageState
                       ),
                     ),
 
-                    // Search Bar inside Category if more than 2 items
-                    if (widget.items.length > 2)
+                    if (filteredItems.isEmpty)
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: _searchQuery.isNotEmpty
-                                    ? primaryColor.withValues(alpha: 0.6)
-                                    : const Color(0xFFE2E8F0),
-                                width: 1.2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF0F172A)
-                                      .withValues(alpha: 0.04),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 48,
+                            horizontal: 24,
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF0F172A)
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    Icons.search_off_rounded,
+                                    size: 40,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No options found matching "$_searchQuery"',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF334155),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Try searching with different keywords.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: Color(0xFF94A3B8),
+                                  ),
                                 ),
                               ],
                             ),
-                            child: TextField(
-                              controller: _searchController,
-                              onChanged: (val) {
-                                setState(() {
-                                  _searchQuery = val;
-                                });
-                              },
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF0F172A),
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Search in ${widget.sectionTitle}...',
-                                hintStyle: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.search_rounded,
-                                  color: primaryColor,
-                                  size: 18,
-                                ),
-                                suffixIcon: _searchQuery.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(
-                                          Icons.cancel_rounded,
-                                          color: Color(0xFF94A3B8),
-                                          size: 16,
+                          ),
+                        ),
+                      )
+                    else
+                      // 2-column Grid of Executive Item Action Cards
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 30),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 14,
+                            mainAxisSpacing: 14,
+                            childAspectRatio: childAspectRatio,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final item = filteredItems[index];
+                              return InkWell(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  if (item.title == 'Privacy Policy') {
+                                    widget.launchPrivacyPolicy();
+                                  } else {
+                                    widget.navigateToScreen(item.title);
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.white,
+                                        Color.alphaBlend(
+                                          item.color.withValues(alpha: 0.04),
+                                          Colors.white,
                                         ),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          setState(() => _searchQuery = '');
-                                        },
-                                      )
-                                    : null,
-                                border: InputBorder.none,
-                                contentPadding:
-                                    const EdgeInsets.symmetric(vertical: 11),
-                              ),
-                            ),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: item.color.withValues(alpha: 0.16),
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF0F172A)
+                                            .withValues(alpha: 0.04),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                      BoxShadow(
+                                        color: item.color.withValues(alpha: 0.08),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      // Top Row: Vibrant Colored Solid Gradient Icon + Arrow Pill
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 42,
+                                            height: 42,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: [
+                                                  item.color,
+                                                  Color.alphaBlend(
+                                                    Colors.black
+                                                        .withValues(alpha: 0.15),
+                                                    item.color,
+                                                  ),
+                                                ],
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(13),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: item.color
+                                                      .withValues(alpha: 0.35),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 3),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Center(
+                                              child: Icon(
+                                                item.icon,
+                                                color: Colors.white,
+                                                size: 21,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: item.color
+                                                  .withValues(alpha: 0.09),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: item.color
+                                                    .withValues(alpha: 0.16),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              Icons.arrow_forward_ios_rounded,
+                                              size: 8.5,
+                                              color: item.color,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+
+                                      // Bottom Text
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.title,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0F172A),
+                                              letterSpacing: -0.3,
+                                              height: 1.2,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            item.subtitle,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF64748B),
+                                              height: 1.2,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                            childCount: filteredItems.length,
                           ),
                         ),
                       ),
-
-                    // 2-column Grid of Executive Item Action Cards
-                    SliverPadding(
-                      padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 30),
-                      sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: childAspectRatio,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final item = filteredItems[index];
-                            return InkWell(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                if (item.title == 'Privacy Policy') {
-                                  widget.launchPrivacyPolicy();
-                                } else {
-                                  widget.navigateToScreen(item.title);
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(22),
-                              child: Container(
-                                padding: const EdgeInsets.all(15),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(22),
-                                  border: Border.all(
-                                    color: const Color(0xFFE2E8F0),
-                                    width: 1.2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF0F172A)
-                                          .withValues(alpha: 0.04),
-                                      blurRadius: 14,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                    BoxShadow(
-                                      color:
-                                          item.color.withValues(alpha: 0.05),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    // Top Row
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Container(
-                                          width: 44,
-                                          height: 44,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                item.color
-                                                    .withValues(alpha: 0.16),
-                                                item.color
-                                                    .withValues(alpha: 0.07),
-                                              ],
-                                            ),
-                                            borderRadius:
-                                                BorderRadius.circular(14),
-                                            border: Border.all(
-                                              color: item.color
-                                                  .withValues(alpha: 0.24),
-                                              width: 1.2,
-                                            ),
-                                          ),
-                                          child: Center(
-                                            child: Icon(
-                                              item.icon,
-                                              color: item.color,
-                                              size: 23,
-                                            ),
-                                          ),
-                                        ),
-                                        Container(
-                                          width: 28,
-                                          height: 28,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF8FAFC),
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                            border: Border.all(
-                                              color: const Color(0xFFE2E8F0),
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.arrow_outward_rounded,
-                                              size: 14,
-                                              color: Color(0xFF94A3B8),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-                                    // Bottom Text
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.title,
-                                          style: const TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: Color(0xFF0F172A),
-                                            letterSpacing: -0.3,
-                                            height: 1.15,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          item.subtitle,
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF64748B),
-                                            height: 1.15,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                          childCount: filteredItems.length,
-                        ),
-                      ),
-                    ),
                   ],
                 );
               },

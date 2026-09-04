@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -30,11 +31,8 @@ class SiteScreen extends StatefulWidget {
 class _SiteScreenState extends State<SiteScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  String _siteSearchQuery = '';
-  int _allSitesCurrentPage = 1;
-  final int _allSitesItemsPerPage = 10;
 
-  // Site Details Controllers
+  // Site Details Controllers (New Setup)
   final TextEditingController _siteNameController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _latitudeController = TextEditingController();
@@ -44,7 +42,7 @@ class _SiteScreenState extends State<SiteScreen>
   String? _projectCategory;
   String? _status;
 
-  // Project Details Controllers
+  // Project Details Controllers (New Setup)
   final TextEditingController _projectNameController = TextEditingController();
   final TextEditingController _ownerNameController = TextEditingController();
   final TextEditingController _ownerPhoneController = TextEditingController();
@@ -66,6 +64,42 @@ class _SiteScreenState extends State<SiteScreen>
   bool _isGettingLocation = false;
   bool _isSaving = false;
 
+  // ── UPDATE SITE STATE & CONTROLLERS ───────────────────────────────────────
+  final _updateFormKey = GlobalKey<FormState>();
+  String? _selectedSiteDocId;
+  String? _selectedSiteId;
+  String? _selectedSiteName;
+  String? _selectedProjectId;
+  bool _isLoadingSiteData = false;
+  bool _isUpdating = false;
+  bool _isGettingUpdateLocation = false;
+
+  final TextEditingController _updateSiteNameController = TextEditingController();
+  final TextEditingController _updateLocationController = TextEditingController();
+  final TextEditingController _updateLatitudeController = TextEditingController();
+  final TextEditingController _updateLongitudeController = TextEditingController();
+  DateTime? _updateStartDate;
+  DateTime? _updateEndDate;
+  String? _updateProjectCategory;
+  String? _updateStatus;
+  DateTime? _updateActualStartDate;
+  DateTime? _updateActualEndDate;
+
+  bool _updateIsContractWork = false;
+  final TextEditingController _updateContractorNameController = TextEditingController();
+  final TextEditingController _updateContractorBudgetController = TextEditingController();
+  DateTime? _updateContractStartDate;
+  DateTime? _updateContractEndDate;
+
+  final TextEditingController _updateProjectNameController = TextEditingController();
+  final TextEditingController _updateOwnerNameController = TextEditingController();
+  final TextEditingController _updateOwnerPhoneController = TextEditingController();
+  final TextEditingController _updateProjectBudgetController = TextEditingController();
+  final TextEditingController _updateAmountPaidController = TextEditingController();
+  String? _updateProjectSubCategory;
+  String? _updateProjectStage;
+  String? _updateProjectContract;
+  String? _updateProjectStatus;
 
   TabController? _tabController;
 
@@ -89,6 +123,18 @@ class _SiteScreenState extends State<SiteScreen>
     _amountPaidController.dispose();
     _contractorNameController.dispose();
     _contractorBudgetController.dispose();
+
+    _updateSiteNameController.dispose();
+    _updateLocationController.dispose();
+    _updateLatitudeController.dispose();
+    _updateLongitudeController.dispose();
+    _updateContractorNameController.dispose();
+    _updateContractorBudgetController.dispose();
+    _updateProjectNameController.dispose();
+    _updateOwnerNameController.dispose();
+    _updateOwnerPhoneController.dispose();
+    _updateProjectBudgetController.dispose();
+    _updateAmountPaidController.dispose();
     super.dispose();
   }
 
@@ -207,6 +253,419 @@ class _SiteScreenState extends State<SiteScreen>
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
+  }
+
+  // ── UPDATE SITE HELPERS & LOGIC ───────────────────────────────────────────
+  DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    if (val is Timestamp) return val.toDate();
+    if (val is DateTime) return val;
+    if (val is String && val.trim().isNotEmpty) {
+      return DateTime.tryParse(val.trim());
+    }
+    return null;
+  }
+
+  Future<void> _selectUpdateDate(BuildContext context, bool isStartDate) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: isStartDate
+          ? (_updateStartDate ?? DateTime.now())
+          : (_updateEndDate ?? DateTime.now()),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isStartDate) {
+          _updateStartDate = picked;
+          if (_updateEndDate != null && _updateEndDate!.isBefore(picked)) {
+            _updateEndDate = null;
+          }
+        } else {
+          _updateEndDate = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _loadSiteForUpdate(String docId) async {
+    setState(() {
+      _selectedSiteDocId = docId;
+      _isLoadingSiteData = true;
+    });
+
+    try {
+      final siteDoc = await FirestoreService.getCollection('Site').doc(docId).get();
+      if (!siteDoc.exists) {
+        setState(() => _isLoadingSiteData = false);
+        return;
+      }
+
+      final siteData = siteDoc.data() ?? {};
+      _selectedSiteId = (siteData['siteId'] as String?) ?? docId;
+      _selectedSiteName = (siteData['siteName'] as String?) ?? '';
+
+      _updateSiteNameController.text = _selectedSiteName ?? '';
+      _updateLocationController.text = (siteData['location'] as String?) ?? '';
+      _updateLatitudeController.text = siteData['latitude']?.toString() ?? '';
+      _updateLongitudeController.text = siteData['longitude']?.toString() ?? '';
+      _updateProjectCategory = (siteData['projectCategory'] as String?) ?? '';
+      if (_updateProjectCategory != null && _updateProjectCategory!.isEmpty) {
+        _updateProjectCategory = null;
+      }
+      _updateStatus = (siteData['status'] as String?) ?? '';
+      if (_updateStatus != null && _updateStatus!.isEmpty) {
+        _updateStatus = null;
+      }
+
+      _updateStartDate = _parseDate(siteData['startDate']);
+      _updateEndDate = _parseDate(siteData['endDate']);
+      _updateActualStartDate = _parseDate(siteData['actualStartDate'] ?? siteData['actualStateDate']);
+      _updateActualEndDate = _parseDate(siteData['actualEndDate']);
+
+      _updateIsContractWork = siteData['isContractWork'] == true;
+      _updateContractorNameController.text = (siteData['contractorName'] as String?) ?? '';
+      _updateContractorBudgetController.text = siteData['contractorBudget']?.toString() ?? '';
+      _updateContractStartDate = _parseDate(siteData['contractStartDate']);
+      _updateContractEndDate = _parseDate(siteData['contractEndDate']);
+
+      // Also look for linked project document
+      _selectedProjectId = null;
+      final projectQuery = await FirestoreService.getCollection('projects')
+          .where('siteId', isEqualTo: docId)
+          .limit(1)
+          .get();
+
+      Map<String, dynamic> projData = {};
+      if (projectQuery.docs.isNotEmpty) {
+        _selectedProjectId = projectQuery.docs.first.id;
+        projData = projectQuery.docs.first.data();
+      } else {
+        // Try matching by siteId string
+        final altQuery = await FirestoreService.getCollection('projects')
+            .where('siteId', isEqualTo: _selectedSiteId)
+            .limit(1)
+            .get();
+        if (altQuery.docs.isNotEmpty) {
+          _selectedProjectId = altQuery.docs.first.id;
+          projData = altQuery.docs.first.data();
+        }
+      }
+
+      if (projData.isNotEmpty) {
+        _updateProjectNameController.text =
+            (projData['projectName'] as String?) ?? _selectedSiteName ?? '';
+        _updateOwnerNameController.text = (projData['ownerName'] as String?) ?? '';
+        _updateOwnerPhoneController.text = (projData['ownerPhoneNumber'] as String?) ?? '';
+        _updateProjectBudgetController.text = projData['projectBudget']?.toString() ?? '';
+        _updateAmountPaidController.text = projData['amountPaid']?.toString() ?? '';
+        _updateProjectSubCategory = (projData['projectSubCategory'] as String?) ?? '';
+        if (_updateProjectSubCategory != null && _updateProjectSubCategory!.isEmpty) {
+          _updateProjectSubCategory = null;
+        }
+        _updateProjectStage = (projData['projectStage'] as String?) ?? '';
+        if (_updateProjectStage != null && _updateProjectStage!.isEmpty) {
+          _updateProjectStage = null;
+        }
+        _updateProjectContract = (projData['projectContract'] as String?) ?? '';
+        if (_updateProjectContract != null && _updateProjectContract!.isEmpty) {
+          _updateProjectContract = null;
+        }
+        _updateProjectStatus = (projData['currentStatus'] ?? projData['status']) as String?;
+
+        _updateActualStartDate ??=
+            _parseDate(projData['actualStateDate'] ?? projData['actualStartDate']);
+        _updateActualEndDate ??= _parseDate(projData['actualEndDate']);
+        if (!_updateIsContractWork && projData['isContractWork'] == true) {
+          _updateIsContractWork = true;
+          _updateContractorNameController.text = (projData['contractorName'] as String?) ?? '';
+          _updateContractorBudgetController.text =
+              projData['contractorBudget']?.toString() ?? '';
+          _updateContractStartDate = _parseDate(projData['contractStartDate']);
+          _updateContractEndDate = _parseDate(projData['contractEndDate']);
+        }
+      } else {
+        _updateProjectNameController.text = _selectedSiteName ?? '';
+        _updateOwnerNameController.clear();
+        _updateOwnerPhoneController.clear();
+        _updateProjectBudgetController.clear();
+        _updateAmountPaidController.clear();
+        _updateProjectSubCategory = null;
+        _updateProjectStage = null;
+        _updateProjectContract = null;
+        _updateProjectStatus = null;
+      }
+    } catch (e) {
+      debugPrint('Error loading site for update: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingSiteData = false);
+    }
+  }
+
+  Future<void> _getCurrentUpdateLocation() async {
+    setState(() => _isGettingUpdateLocation = true);
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _isGettingUpdateLocation = false);
+        await _showEnableLocationDialog();
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw 'Location permissions are denied';
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Location permissions are permanently denied';
+      }
+
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
+
+      if (position == null) {
+        throw 'Failed to acquire location signal.';
+      }
+
+      String address = '';
+      if (kIsWeb) {
+        address = 'Web Location';
+      } else {
+        try {
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+          if (placemarks.isNotEmpty) {
+            Placemark place = placemarks.first;
+            address = [
+              place.street,
+              place.locality,
+              place.administrativeArea,
+              place.country,
+            ].where((part) => part?.isNotEmpty ?? false).join(', ');
+          }
+        } catch (_) {
+          address =
+              'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+        }
+      }
+
+      setState(() {
+        _updateLatitudeController.text = position!.latitude.toStringAsFixed(6);
+        _updateLongitudeController.text = position.longitude.toStringAsFixed(6);
+        if (_updateLocationController.text.isEmpty ||
+            _updateLocationController.text == 'Web Location') {
+          _updateLocationController.text = address;
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error getting location: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGettingUpdateLocation = false);
+    }
+  }
+
+  Future<void> _updateSiteAndProject() async {
+    if (_selectedSiteDocId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a site to update.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (!(_updateFormKey.currentState?.validate() ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill out all required fields.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isUpdating = true);
+
+    try {
+      final siteName = _updateSiteNameController.text.trim();
+      final location = _updateLocationController.text.trim();
+      final latitude = _updateLatitudeController.text.trim();
+      final longitude = _updateLongitudeController.text.trim();
+      final projectName = _updateProjectNameController.text.trim().isEmpty
+          ? siteName
+          : _updateProjectNameController.text.trim();
+
+      // 1. Update Site document
+      final siteUpdateData = {
+        'siteName': siteName,
+        'location': location,
+        'latitude': latitude.isNotEmpty ? double.tryParse(latitude) : null,
+        'longitude': longitude.isNotEmpty ? double.tryParse(longitude) : null,
+        'projectCategory': _updateProjectCategory ?? '',
+        'startDate': _updateStartDate != null
+            ? DateFormat('yyyy-MM-dd').format(_updateStartDate!)
+            : '',
+        'endDate': _updateEndDate != null
+            ? DateFormat('yyyy-MM-dd').format(_updateEndDate!)
+            : '',
+        'status': _updateStatus,
+        'actualStartDate': _updateActualStartDate != null
+            ? Timestamp.fromDate(_updateActualStartDate!)
+            : null,
+        'actualEndDate': _updateActualEndDate != null
+            ? Timestamp.fromDate(_updateActualEndDate!)
+            : null,
+        'isContractWork': _updateIsContractWork,
+        'contractorName':
+            _updateIsContractWork ? _updateContractorNameController.text.trim() : null,
+        'contractorBudget': _updateIsContractWork
+            ? (double.tryParse(_updateContractorBudgetController.text) ?? 0.0)
+            : null,
+        'contractStartDate': _updateContractStartDate != null
+            ? Timestamp.fromDate(_updateContractStartDate!)
+            : null,
+        'contractEndDate': _updateContractEndDate != null
+            ? Timestamp.fromDate(_updateContractEndDate!)
+            : null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await FirestoreService.getCollection('Site')
+          .doc(_selectedSiteDocId)
+          .update(siteUpdateData);
+
+      // 2. Update linked project document
+      final double budget =
+          double.tryParse(_updateProjectBudgetController.text) ?? 0.0;
+      final double amountPaid =
+          double.tryParse(_updateAmountPaidController.text) ?? 0.0;
+
+      final projectUpdateData = {
+        'projectName': projectName,
+        'ownerName': _updateOwnerNameController.text.trim(),
+        'ownerPhoneNumber': _updateOwnerPhoneController.text.trim(),
+        'projectBudget': budget,
+        'amountPaid': amountPaid,
+        'projectCategory': _updateProjectCategory ?? '',
+        'projectSubCategory': _updateProjectSubCategory ?? '',
+        'projectContract': _updateProjectContract ?? '',
+        'projectStage': _updateProjectStage ?? '',
+        'currentStatus': _updateProjectStatus ?? _updateStatus,
+        'status': _updateProjectStatus ?? _updateStatus,
+        'siteName': siteName,
+        'siteLocation': location,
+        'plannedStartDate': _updateStartDate != null
+            ? Timestamp.fromDate(_updateStartDate!)
+            : null,
+        'plannedEndDate': _updateEndDate != null
+            ? Timestamp.fromDate(_updateEndDate!)
+            : null,
+        'actualStateDate': _updateActualStartDate != null
+            ? Timestamp.fromDate(_updateActualStartDate!)
+            : null,
+        'actualEndDate': _updateActualEndDate != null
+            ? Timestamp.fromDate(_updateActualEndDate!)
+            : null,
+        'contractStartDate': _updateContractStartDate != null
+            ? Timestamp.fromDate(_updateContractStartDate!)
+            : null,
+        'contractEndDate': _updateContractEndDate != null
+            ? Timestamp.fromDate(_updateContractEndDate!)
+            : null,
+        'isContractWork': _updateIsContractWork,
+        'contractorName':
+            _updateIsContractWork ? _updateContractorNameController.text.trim() : null,
+        'contractorBudget': _updateIsContractWork
+            ? (double.tryParse(_updateContractorBudgetController.text) ?? 0.0)
+            : null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (_selectedProjectId != null) {
+        await FirestoreService.getCollection('projects')
+            .doc(_selectedProjectId)
+            .update(projectUpdateData);
+      } else {
+        // Query by siteId
+        final query = await FirestoreService.getCollection('projects')
+            .where('siteId', isEqualTo: _selectedSiteDocId)
+            .get();
+        for (final doc in query.docs) {
+          await doc.reference.update(projectUpdateData);
+        }
+      }
+
+      // Notification
+      try {
+        await NotificationService.notifySiteCreatedOrUpdated(
+          siteId: _selectedSiteId ?? _selectedSiteDocId!,
+          siteName: siteName,
+          location: location,
+          projectName: projectName,
+          isCreated: false,
+        );
+      } catch (notifErr) {
+        debugPrint('Notification error on update: $notifErr');
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Site "${_selectedSiteId ?? siteName}" updated successfully!',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update Site: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
   }
 
   Future<String> _getNextSiteId(String siteName) async {
@@ -728,327 +1187,681 @@ class _SiteScreenState extends State<SiteScreen>
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
 
-    return PopScope(
-      canPop: widget.onBack == null && Navigator.canPop(context),
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (widget.onBack != null) {
-          widget.onBack!();
-        } else if (Navigator.canPop(context)) {
-          Navigator.pop(context);
-        }
-      },
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: widget.hideAppBar
-            ? null
-            : AppBar(
-                iconTheme: const IconThemeData(color: Colors.white),
-                automaticallyImplyLeading: false,
-                leading: (widget.showBackButton ||
-                        widget.onBack != null ||
-                        Navigator.canPop(context))
-                    ? IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white, size: 18),
-                        onPressed: () {
-                          if (widget.onBack != null) {
-                            widget.onBack!();
-                          } else if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          }
-                        },
-                      )
-                    : null,
-                title: const Text(
-                  'Project & Site Setup',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                centerTitle: true,
-                elevation: 0,
-                flexibleSpace: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.getDarkAccent(primaryColor),
-                        Color.alphaBlend(
-                          primaryColor.withValues(alpha: 0.35),
-                          AppTheme.getDarkAccent(primaryColor),
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
+        final dynamicGradientColors = AppTheme.getBackgroundGradientColors(
+          primaryColor,
+        );
+
+        return PopScope(
+          canPop: widget.onBack == null && Navigator.canPop(context),
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            if (widget.onBack != null) {
+              widget.onBack!();
+            } else if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: dynamicGradientColors,
+                stops: const [0.0, 0.35, 0.7, 1.0],
+              ),
+            ),
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: SafeArea(
+                bottom: false,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isMobile ? double.infinity : 650,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (!widget.hideAppBar) ...[
+                          // Top Header
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            child: Row(
+                              children: [
+                                if ((widget.showBackButton &&
+                                        Navigator.canPop(context)) ||
+                                    widget.onBack != null)
+                                  InkWell(
+                                    onTap: () {
+                                      HapticFeedback.lightImpact();
+                                      if (widget.onBack != null) {
+                                        widget.onBack!();
+                                      } else if (Navigator.canPop(context)) {
+                                        Navigator.pop(context);
+                                      }
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      width: 38,
+                                      height: 38,
+                                      margin: const EdgeInsets.only(right: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 1.2,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFF0F172A)
+                                                .withValues(alpha: 0.05),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_back_ios_new_rounded,
+                                        size: 16,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Text(
+                                            'Project & Site Setup',
+                                            style: TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFF0F172A),
+                                              letterSpacing: -0.5,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: primaryColor.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              'Setup',
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.w800,
+                                                color: primaryColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      const Text(
+                                        'Configure parameters, location & budget',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Segmented Pill Switcher Tabs
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 6,
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: AnimatedBuilder(
+                                animation: _tabController!,
+                                builder: (context, _) {
+                                  final currentIndex = _tabController!.index;
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            _tabController!.animateTo(0);
+                                            setState(() {});
+                                          },
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            padding: const EdgeInsets.symmetric(vertical: 9),
+                                            decoration: BoxDecoration(
+                                              gradient: currentIndex == 0
+                                                  ? LinearGradient(
+                                                      colors: [primaryColor, darkAccent],
+                                                      begin: Alignment.topLeft,
+                                                      end: Alignment.bottomRight,
+                                                    )
+                                                  : null,
+                                              borderRadius: BorderRadius.circular(12),
+                                              boxShadow: currentIndex == 0
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: primaryColor.withValues(alpha: 0.35),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(0, 3),
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                'New Setup',
+                                                style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: currentIndex == 0
+                                                      ? FontWeight.w800
+                                                      : FontWeight.w600,
+                                                  color: currentIndex == 0
+                                                      ? Colors.white
+                                                      : const Color(0xFF64748B),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            _tabController!.animateTo(1);
+                                            setState(() {});
+                                          },
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            padding: const EdgeInsets.symmetric(vertical: 9),
+                                            decoration: BoxDecoration(
+                                              gradient: currentIndex == 1
+                                                  ? LinearGradient(
+                                                      colors: [primaryColor, darkAccent],
+                                                      begin: Alignment.topLeft,
+                                                      end: Alignment.bottomRight,
+                                                    )
+                                                  : null,
+                                              borderRadius: BorderRadius.circular(12),
+                                              boxShadow: currentIndex == 1
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: primaryColor.withValues(alpha: 0.35),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(0, 3),
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                'Update Site',
+                                                style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: currentIndex == 1
+                                                      ? FontWeight.w800
+                                                      : FontWeight.w600,
+                                                  color: currentIndex == 1
+                                                      ? Colors.white
+                                                      : const Color(0xFF64748B),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        Expanded(
+                          child: TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _buildNewSiteTab(primaryColor, darkAccent),
+                              _buildUpdateSiteTab(primaryColor, darkAccent),
+                            ],
+                          ),
                         ),
                       ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
                     ),
                   ),
                 ),
-                bottom: TabBar(
-                  controller: _tabController,
-                  indicatorColor: Colors.white,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white70,
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                  tabs: const [
-                    Tab(text: 'New Setup'),
-                    Tab(text: 'All Sites'),
-                  ],
-                ),
-              ),
-        body: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isMobile ? double.infinity : 650,
-              ),
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildNewSiteTab(),
-                  _buildAllSiteTab(),
-                ],
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   // ── NEW SITE TAB ──────────────────────────────────────────────────────────
-  Widget _buildNewSiteTab() {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
+  Widget _buildNewSiteTab(Color primaryColor, Color darkAccent) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
       physics: const BouncingScrollPhysics(),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // SECTION 1: SITE DETAILS
-            _buildSectionHeader(
-              title: '1. Site Details',
-              subtitle: 'Basic site information & geographical location',
-              icon: Icons.location_city_rounded,
-              color: primaryColor,
-            ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _siteNameController,
-              label: 'Site Name *',
-              hintText: 'e.g. Green Valley Site',
-              validator: (value) =>
-                  value?.trim().isEmpty ?? true ? 'Please enter site name' : null,
-              onChanged: (val) {
-                if (_projectNameController.text.isEmpty ||
-                    _siteNameController.text.startsWith(_projectNameController.text)) {
-                  _projectNameController.text = val;
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _locationController,
-                    label: 'Location / Address *',
-                    hintText: 'Enter site address or fetch GPS',
+            // ── BENTO CARD 1: SITE DETAILS ──────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(
+                    title: '1. Site Details',
+                    subtitle: 'Basic site information & geographical coordinates',
+                    icon: Icons.location_city_rounded,
+                    color: primaryColor,
+                  ),
+                  const SizedBox(height: 18),
+                  _buildTextField(
+                    controller: _siteNameController,
+                    label: 'Site Name *',
+                    hintText: 'e.g. Green Valley Site',
+                    primaryColor: primaryColor,
                     validator: (value) =>
-                        value?.trim().isEmpty ?? true ? 'Please enter location' : null,
+                        value?.trim().isEmpty ?? true ? 'Please enter site name' : null,
+                    onChanged: (val) {
+                      if (_projectNameController.text.isEmpty ||
+                          _siteNameController.text.startsWith(_projectNameController.text)) {
+                        _projectNameController.text = val;
+                      }
+                    },
                   ),
-                ),
-                const SizedBox(width: 10),
-                Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: IconButton.filledTonal(
-                    iconSize: 22,
-                    tooltip: 'Get Current Location',
-                    style: IconButton.styleFrom(
-                      backgroundColor: primaryColor.withValues(alpha: 0.12),
-                      foregroundColor: primaryColor,
-                      padding: const EdgeInsets.all(12),
-                    ),
-                    icon: _isGettingLocation
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: primaryColor,
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _locationController,
+                          label: 'Location / Address *',
+                          hintText: 'Enter site address or fetch GPS',
+                          primaryColor: primaryColor,
+                          validator: (value) =>
+                              value?.trim().isEmpty ?? true ? 'Please enter location' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 1),
+                        child: InkWell(
+                          onTap: _isGettingLocation ? null : _getCurrentLocation,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  primaryColor.withValues(alpha: 0.15),
+                                  primaryColor.withValues(alpha: 0.06),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: primaryColor.withValues(alpha: 0.25),
+                                width: 1,
+                              ),
                             ),
-                          )
-                        : const Icon(Icons.gps_fixed_rounded),
-                    onPressed: _isGettingLocation ? null : _getCurrentLocation,
+                            child: Center(
+                              child: _isGettingLocation
+                                  ? SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: primaryColor,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.gps_fixed_rounded,
+                                      color: primaryColor,
+                                      size: 22,
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _latitudeController,
-                    label: 'Latitude',
-                    hintText: 'Latitude coordinates',
-                    keyboardType: TextInputType.number,
-                    readOnly: true,
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _latitudeController,
+                          label: 'Latitude',
+                          hintText: 'Coordinates',
+                          primaryColor: primaryColor,
+                          keyboardType: TextInputType.number,
+                          readOnly: true,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _longitudeController,
+                          label: 'Longitude',
+                          hintText: 'Coordinates',
+                          primaryColor: primaryColor,
+                          keyboardType: TextInputType.number,
+                          readOnly: true,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildTextField(
-                    controller: _longitudeController,
-                    label: 'Longitude',
-                    hintText: 'Longitude coordinates',
-                    keyboardType: TextInputType.number,
-                    readOnly: true,
+                  const SizedBox(height: 16),
+                  FutureBuilder<List<String>>(
+                    future: fetchProjectCategories(),
+                    builder: (context, snapshot) {
+                      final categories = snapshot.data ?? [];
+                      return _buildDropdown(
+                        value: _projectCategory,
+                        items: categories,
+                        label: 'Project Category',
+                        hint: 'Select Category',
+                        primaryColor: primaryColor,
+                        onChanged: (val) => setState(() => _projectCategory = val),
+                      );
+                    },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            FutureBuilder<List<String>>(
-              future: fetchProjectCategories(),
-              builder: (context, snapshot) {
-                final categories = snapshot.data ?? [];
-                return _buildDropdown(
-                  value: _projectCategory,
-                  items: categories,
-                  label: 'Project Category',
-                  hint: 'Select Category',
-                  onChanged: (val) => setState(() => _projectCategory = val),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDateField(
-                    label: 'Site Start Date',
-                    date: _startDate,
-                    onTap: () => _selectDate(context, true),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildDateField(
+                          label: 'Site Start Date',
+                          date: _startDate,
+                          primaryColor: primaryColor,
+                          onTap: () => _selectDate(context, true),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildDateField(
+                          label: 'Site End Date',
+                          date: _endDate,
+                          primaryColor: primaryColor,
+                          onTap: () => _selectDate(context, false),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildDateField(
-                    label: 'Site End Date',
-                    date: _endDate,
-                    onTap: () => _selectDate(context, false),
+                  const SizedBox(height: 16),
+                  FutureBuilder<List<String>>(
+                    future: fetchProjectStatus(),
+                    builder: (context, snapshot) {
+                      final statusList = snapshot.data ?? [];
+                      return _buildDropdown(
+                        value: _status,
+                        items: statusList,
+                        label: 'Site Status',
+                        hint: 'Select Status',
+                        primaryColor: primaryColor,
+                        onChanged: (val) => setState(() => _status = val),
+                      );
+                    },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            FutureBuilder<List<String>>(
-              future: fetchProjectStatus(),
-              builder: (context, snapshot) {
-                final statusList = snapshot.data ?? [];
-                return _buildDropdown(
-                  value: _status,
-                  items: statusList,
-                  label: 'Site Status',
-                  hint: 'Select Status',
-                  onChanged: (val) => setState(() => _status = val),
-                );
-              },
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildDateField(
+                          label: 'Actual Start Date',
+                          date: _actualStartDate,
+                          primaryColor: primaryColor,
+                          onTap: () async {
+                            final date = await _pickCustomDate(_actualStartDate);
+                            if (date != null) setState(() => _actualStartDate = date);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildDateField(
+                          label: 'Actual End Date',
+                          date: _actualEndDate,
+                          primaryColor: primaryColor,
+                          onTap: () async {
+                            final date = await _pickCustomDate(_actualEndDate);
+                            if (date != null) setState(() => _actualEndDate = date);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
 
-            const SizedBox(height: 32),
-            const Divider(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // SECTION 2: PROJECT DETAILS
-            _buildSectionHeader(
-              title: '2. Project Details',
-              subtitle: 'Financial, owner, & contract parameters for this project',
-              icon: Icons.work_rounded,
-              color: Colors.indigo,
-            ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _projectNameController,
-              label: 'Project Name *',
-              hintText: 'e.g. Green Valley Villa Construction',
-              validator: (value) =>
-                  value?.trim().isEmpty ?? true ? 'Please enter project name' : null,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _ownerNameController,
-                    label: 'Owner Name',
-                    hintText: 'Client / Owner full name',
+            // ── BENTO CARD 2: CONTRACT WORK ─────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildTextField(
-                    controller: _ownerPhoneController,
-                    label: 'Owner Phone',
-                    hintText: 'Contact number',
-                    keyboardType: TextInputType.phone,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.handshake_rounded,
+                          color: primaryColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '2. Contract Work',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            Text(
+                              'Third-party contractor allocation',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _isContractWork,
+                        activeThumbColor: primaryColor,
+                        onChanged: (val) => setState(() => _isContractWork = val),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  if (_isContractWork) ...[
+                    const SizedBox(height: 18),
+                    _buildTextField(
+                      controller: _contractorNameController,
+                      label: 'Contractor Name',
+                      hintText: 'e.g. Apex Builders Ltd',
+                      primaryColor: primaryColor,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _contractorBudgetController,
+                      label: 'Contractor Budget (₹)',
+                      hintText: 'e.g. 500000',
+                      primaryColor: primaryColor,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDateField(
+                            label: 'Contract Start',
+                            date: _contractStartDate,
+                            primaryColor: primaryColor,
+                            onTap: () async {
+                              final date = await _pickCustomDate(_contractStartDate);
+                              if (date != null) setState(() => _contractStartDate = date);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildDateField(
+                            label: 'Contract End',
+                            date: _contractEndDate,
+                            primaryColor: primaryColor,
+                            onTap: () async {
+                              final date = await _pickCustomDate(_contractEndDate);
+                              if (date != null) setState(() => _contractEndDate = date);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ),
+
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _projectBudgetController,
-                    label: 'Project Budget (₹)',
-                    hintText: 'Total budget',
-                    keyboardType: TextInputType.number,
+
+            // ── BENTO CARD 3: PROJECT CONFIGURATION ───────────────────────────
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildTextField(
-                    controller: _amountPaidController,
-                    label: 'Advance Paid (₹)',
-                    hintText: 'Initial payment',
-                    keyboardType: TextInputType.number,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(
+                    title: '3. Project Configuration',
+                    subtitle: 'Linked project metadata, stage & budget',
+                    icon: Icons.architecture_rounded,
+                    color: primaryColor,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: FutureBuilder<List<String>>(
+                  const SizedBox(height: 18),
+                  _buildTextField(
+                    controller: _projectNameController,
+                    label: 'Project Name *',
+                    hintText: 'e.g. Tower A Construction',
+                    primaryColor: primaryColor,
+                    validator: (val) =>
+                        val?.trim().isEmpty ?? true ? 'Please enter project name' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  FutureBuilder<List<String>>(
                     future: fetchProjectSubCategories(),
                     builder: (context, snapshot) {
-                      final subCats = snapshot.data ?? [];
+                      final subCategories = snapshot.data ?? [];
                       return _buildDropdown(
                         value: _projectSubCategory,
-                        items: subCats,
-                        label: 'Sub Category',
-                        hint: 'Select Sub Category',
+                        items: subCategories,
+                        label: 'Project Sub-Category',
+                        hint: 'Select Sub-Category',
+                        primaryColor: primaryColor,
                         onChanged: (val) => setState(() => _projectSubCategory = val),
                       );
                     },
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: FutureBuilder<List<String>>(
+                  const SizedBox(height: 16),
+                  FutureBuilder<List<String>>(
                     future: fetchProjectStages(),
                     builder: (context, snapshot) {
                       final stages = snapshot.data ?? [];
@@ -1057,675 +1870,981 @@ class _SiteScreenState extends State<SiteScreen>
                         items: stages,
                         label: 'Project Stage',
                         hint: 'Select Stage',
+                        primaryColor: primaryColor,
                         onChanged: (val) => setState(() => _projectStage = val),
                       );
                     },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: FutureBuilder<List<String>>(
+                  const SizedBox(height: 16),
+                  FutureBuilder<List<String>>(
                     future: fetchProjectContracts(),
                     builder: (context, snapshot) {
                       final contracts = snapshot.data ?? [];
                       return _buildDropdown(
                         value: _projectContract,
                         items: contracts,
-                        label: 'Contract Type',
-                        hint: 'Select Contract',
+                        label: 'Project Contract Type',
+                        hint: 'Select Contract Type',
+                        primaryColor: primaryColor,
                         onChanged: (val) => setState(() => _projectContract = val),
                       );
                     },
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: FutureBuilder<List<String>>(
-                    future: fetchProjectStatus(),
-                    builder: (context, snapshot) {
-                      final statusList = snapshot.data ?? [];
-                      return _buildDropdown(
-                        value: _projectStatus,
-                        items: statusList,
-                        label: 'Project Status',
-                        hint: 'Select Status',
-                        onChanged: (val) => setState(() => _projectStatus = val),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDateField(
-                    label: 'Actual Start Date',
-                    date: _actualStartDate,
-                    onTap: () async {
-                      final date = await _pickCustomDate(_actualStartDate);
-                      if (date != null) setState(() => _actualStartDate = date);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildDateField(
-                    label: 'Actual End Date',
-                    date: _actualEndDate,
-                    onTap: () async {
-                      final date = await _pickCustomDate(_actualEndDate);
-                      if (date != null) setState(() => _actualEndDate = date);
-                    },
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-            // CONTRACT WORK TOGGLE & FIELDS
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: primaryColor.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: primaryColor.withValues(alpha: 0.15),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.handshake_rounded, color: Colors.teal),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Is Contract Work?',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _projectBudgetController,
+                          label: 'Estimated Budget (₹)',
+                          hintText: 'e.g. 2500000',
+                          primaryColor: primaryColor,
+                          keyboardType: TextInputType.number,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _amountPaidController,
+                          label: 'Advance / Paid (₹)',
+                          hintText: 'e.g. 500000',
+                          primaryColor: primaryColor,
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
                   ),
-                  Switch(
-                    value: _isContractWork,
-                    activeThumbColor: primaryColor,
-                    onChanged: (val) => setState(() => _isContractWork = val),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _ownerNameController,
+                          label: 'Client / Owner Name',
+                          hintText: 'e.g. John Doe',
+                          primaryColor: primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _ownerPhoneController,
+                          label: 'Client Phone',
+                          hintText: 'e.g. 9876543210',
+                          primaryColor: primaryColor,
+                          keyboardType: TextInputType.phone,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
 
-            if (_isContractWork) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _contractorNameController,
-                      label: 'Contractor Name',
-                      hintText: 'e.g. ABC Contractors',
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _contractorBudgetController,
-                      label: 'Contractor Budget (₹)',
-                      hintText: 'Budget allocated',
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDateField(
-                      label: 'Contract Start Date',
-                      date: _contractStartDate,
-                      onTap: () async {
-                        final date = await _pickCustomDate(_contractStartDate);
-                        if (date != null) setState(() => _contractStartDate = date);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildDateField(
-                      label: 'Contract End Date',
-                      date: _contractEndDate,
-                      onTap: () async {
-                        final date = await _pickCustomDate(_contractEndDate);
-                        if (date != null) setState(() => _contractEndDate = date);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            const SizedBox(height: 24),
 
-            const SizedBox(height: 36),
-
-            // SUBMIT BUTTON
-            SizedBox(
+            // ── SUBMIT BUTTON ───────────────────────────────────────────────
+            Container(
               width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _saveSiteAndProject,
-                icon: const Icon(Icons.check_circle_rounded, size: 22),
-                label: Text(
-                  _isSaving ? 'SAVING...' : 'CREATE SITE & PROJECT',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
+              height: 54,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  colors: [primaryColor, darkAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.35),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
                   ),
-                  elevation: 4,
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _isSaving ? null : _saveSiteAndProject,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Center(
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'CREATE SITE & PROJECT',
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAllSiteTab() {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirestoreService.getCollection('Site').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+  // ── UPDATE SITE TAB ───────────────────────────────────────────────────────
+  Widget _buildUpdateSiteTab(Color primaryColor, Color darkAccent) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── SITE SELECTION BENTO CARD ────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white, width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          );
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text(
-                'Error loading sites: ${snapshot.error}',
-                style: const TextStyle(color: Color(0xFF0A183D)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionHeader(
+                  title: 'Select Site',
+                  subtitle: 'Choose an existing site to view and modify parameters',
+                  icon: Icons.edit_location_alt_rounded,
+                  color: primaryColor,
+                ),
+                const SizedBox(height: 18),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirestoreService.getCollection('Site').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                          ),
+                        ),
+                      );
+                    }
+                    final docs = snapshot.data?.docs ?? [];
+                    if (docs.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, color: Colors.orange, size: 18),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No sites found to update. Create a new site first.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return DropdownButtonFormField<String>(
+                      key: ValueKey(_selectedSiteDocId),
+                      initialValue: _selectedSiteDocId != null &&
+                              docs.any((d) => d.id == _selectedSiteDocId)
+                          ? _selectedSiteDocId
+                          : null,
+                      isExpanded: true,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Choose Construction Site *',
+                        labelStyle: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: primaryColor,
+                        ),
+                        hintText: 'Select a site to edit...',
+                        hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
+                        prefixIcon: Icon(Icons.location_city_rounded, color: primaryColor, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: primaryColor,
+                            width: 1.8,
+                          ),
+                        ),
+                      ),
+                      items: docs.map((doc) {
+                        final data = (doc.data() as Map<String, dynamic>?) ?? {};
+                        final sId = (data['siteId'] as String?) ?? doc.id;
+                        final sName = (data['siteName'] as String?) ?? 'Unnamed Site';
+                        return DropdownMenuItem<String>(
+                          value: doc.id,
+                          child: Text(
+                            '$sId — $sName',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (docId) {
+                        if (docId != null) {
+                          _loadSiteForUpdate(docId);
+                        }
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── LOADING INDICATOR ─────────────────────────────────────────────
+          if (_isLoadingSiteData)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-            ),
-          );
-        }
-
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Loading site parameters...',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          // ── NO SITE SELECTED EMPTY STATE ──────────────────────────────────
+          else if (_selectedSiteDocId == null)
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: primaryColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.location_city_rounded,
-                      size: 48,
+                      Icons.touch_app_rounded,
+                      size: 40,
                       color: primaryColor,
                     ),
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'No Sites Found',
+                    'No Site Selected',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0A183D),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Create your first construction site in the "New Setup" tab.',
+                    'Please select a construction site from the dropdown above to load and update its values.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey.shade600,
+                      height: 1.4,
                     ),
                   ),
                 ],
               ),
-            ),
-          );
-        }
-
-        // Filter sites by search query if any
-        final filteredSites = docs.where((doc) {
-          final data = (doc.data() as Map<String, dynamic>?) ?? {};
-          final name = (data['siteName'] ?? '').toString().toLowerCase();
-          final id = (data['siteId'] ?? doc.id).toString().toLowerCase();
-          final loc = (data['location'] ?? '').toString().toLowerCase();
-          final cat = (data['projectCategory'] ?? '').toString().toLowerCase();
-
-          final query = _siteSearchQuery.trim().toLowerCase();
-          return query.isEmpty ||
-              name.contains(query) ||
-              id.contains(query) ||
-              loc.contains(query) ||
-              cat.contains(query);
-        }).toList();
-
-        final totalItems = filteredSites.length;
-        final totalPages = (totalItems / _allSitesItemsPerPage).ceil().clamp(1, 999999);
-        if (_allSitesCurrentPage > totalPages) {
-          _allSitesCurrentPage = totalPages;
-        }
-        final startIndex = (totalItems == 0) ? 0 : (_allSitesCurrentPage - 1) * _allSitesItemsPerPage;
-        final endIndex = (startIndex + _allSitesItemsPerPage).clamp(0, totalItems);
-        final paginatedSites = filteredSites.sublist(startIndex, endIndex);
-
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // Search Bar & Count Header
-              Row(
+            )
+          // ── EDITABLE FORM ─────────────────────────────────────────────────
+          else
+            Form(
+              key: _updateFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Container(
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
+                  // ── ACTIVE SITE INDICATOR BANNER ──────────────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          primaryColor.withValues(alpha: 0.12),
+                          primaryColor.withValues(alpha: 0.04),
                         ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      child: TextField(
-                        onChanged: (val) {
-                          setState(() {
-                            _siteSearchQuery = val;
-                            _allSitesCurrentPage = 1;
-                          });
-                        },
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0A183D),
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search sites by name, ID, location...',
-                          hintStyle: TextStyle(
-                            fontSize: 12.5,
-                            color: Colors.grey.shade500,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: primaryColor,
-                            size: 18,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 11),
-                        ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: primaryColor.withValues(alpha: 0.35),
+                        width: 1.2,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: primaryColor,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryColor.withValues(alpha: 0.3),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: primaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primaryColor.withValues(alpha: 0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            _selectedSiteId ?? 'SITE',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _selectedSiteName ?? 'Selected Site',
+                                style: const TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Currently modifying values for this site only',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check_rounded,
+                            color: Color(0xFF10B981),
+                            size: 16,
+                          ),
                         ),
                       ],
                     ),
-                    child: Text(
-                      '${filteredSites.length} Sites',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
 
-              // Sites Cards List
-              Expanded(
-                child: filteredSites.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No matching sites found',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      )
-                    : ListView.separated(
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: paginatedSites.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final doc = paginatedSites[index];
-                          final data = (doc.data() as Map<String, dynamic>?) ?? {};
-                          return _buildSiteCard(context, doc.id, data);
-                        },
-                      ),
-              ),
+                  const SizedBox(height: 16),
 
-              // Pagination Bar
-              _buildPaginationControls(
-                currentPage: _allSitesCurrentPage,
-                totalPages: totalPages,
-                totalItems: totalItems,
-                itemsPerPage: _allSitesItemsPerPage,
-                darkCardBg: primaryColor,
-                primaryColor: primaryColor,
-                onPageChanged: (newPage) {
-                  setState(() => _allSitesCurrentPage = newPage);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPaginationControls({
-    required int currentPage,
-    required int totalPages,
-    required int totalItems,
-    required int itemsPerPage,
-    required Color darkCardBg,
-    required Color primaryColor,
-    required Function(int) onPageChanged,
-  }) {
-    if (totalItems == 0) return const SizedBox.shrink();
-
-    final startItem = (currentPage - 1) * itemsPerPage + 1;
-    final endItem = (currentPage * itemsPerPage).clamp(1, totalItems);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Text(
-            'Showing $startItem–$endItem of $totalItems',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            icon: Icon(
-              Icons.first_page_rounded,
-              size: 20,
-              color: currentPage > 1 ? primaryColor : Colors.grey.shade300,
-            ),
-            onPressed: currentPage > 1 ? () => onPageChanged(1) : null,
-            tooltip: 'First Page',
-          ),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            icon: Icon(
-              Icons.chevron_left_rounded,
-              size: 20,
-              color: currentPage > 1 ? primaryColor : Colors.grey.shade300,
-            ),
-            onPressed: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
-            tooltip: 'Previous Page',
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              color: primaryColor,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.25),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Text(
-              '$currentPage / $totalPages',
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            icon: Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: currentPage < totalPages ? primaryColor : Colors.grey.shade300,
-            ),
-            onPressed: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
-            tooltip: 'Next Page',
-          ),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            icon: Icon(
-              Icons.last_page_rounded,
-              size: 20,
-              color: currentPage < totalPages ? primaryColor : Colors.grey.shade300,
-            ),
-            onPressed: currentPage < totalPages ? () => onPageChanged(totalPages) : null,
-            tooltip: 'Last Page',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSiteCard(BuildContext context, String docId, Map<String, dynamic> data) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
-    final siteId = (data['siteId'] as String?) ?? docId;
-    final siteName = (data['siteName'] as String?) ?? 'Unnamed Site';
-    final location = (data['location'] as String?) ?? 'No location provided';
-    final category = (data['projectCategory'] as String?) ?? '';
-    final status = (data['status'] as String?) ?? 'In Progress';
-
-    final isCompleted = status.toLowerCase() == 'completed';
-    final statusColor = isCompleted ? const Color(0xFF10B981) : const Color(0xFF3B82F6);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0A183D).withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Row: Site ID Badge + Status Chip
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(alpha: 0.25),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    siteId,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-                if (category.isNotEmpty) ...[
-                  const SizedBox(width: 8),
+                  // ── BENTO CARD 1: SITE DETAILS ────────────────────────────
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: primaryColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      category,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: primaryColor,
-                      ),
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        status,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionHeader(
+                          title: '1. Site Details',
+                          subtitle: 'Basic site information & geographical coordinates',
+                          icon: Icons.location_city_rounded,
+                          color: primaryColor,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 18),
+                        _buildTextField(
+                          controller: _updateSiteNameController,
+                          label: 'Site Name *',
+                          hintText: 'e.g. Green Valley Site',
+                          primaryColor: primaryColor,
+                          validator: (value) =>
+                              value?.trim().isEmpty ?? true ? 'Please enter site name' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _updateLocationController,
+                                label: 'Location / Address *',
+                                hintText: 'Enter site address or fetch GPS',
+                                primaryColor: primaryColor,
+                                validator: (value) =>
+                                    value?.trim().isEmpty ?? true ? 'Please enter location' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 1),
+                              child: InkWell(
+                                onTap: _isGettingUpdateLocation ? null : _getCurrentUpdateLocation,
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        primaryColor.withValues(alpha: 0.15),
+                                        primaryColor.withValues(alpha: 0.06),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: primaryColor.withValues(alpha: 0.25),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: _isGettingUpdateLocation
+                                        ? SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: primaryColor,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.gps_fixed_rounded,
+                                            color: primaryColor,
+                                            size: 22,
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _updateLatitudeController,
+                                label: 'Latitude',
+                                hintText: 'Coordinates',
+                                primaryColor: primaryColor,
+                                keyboardType: TextInputType.number,
+                                readOnly: true,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _updateLongitudeController,
+                                label: 'Longitude',
+                                hintText: 'Coordinates',
+                                primaryColor: primaryColor,
+                                keyboardType: TextInputType.number,
+                                readOnly: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        FutureBuilder<List<String>>(
+                          future: fetchProjectCategories(),
+                          builder: (context, snapshot) {
+                            final categories = snapshot.data ?? [];
+                            return _buildDropdown(
+                              value: _updateProjectCategory,
+                              items: categories,
+                              label: 'Project Category',
+                              hint: 'Select Category',
+                              primaryColor: primaryColor,
+                              onChanged: (val) => setState(() => _updateProjectCategory = val),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDateField(
+                                label: 'Site Start Date',
+                                date: _updateStartDate,
+                                primaryColor: primaryColor,
+                                onTap: () => _selectUpdateDate(context, true),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildDateField(
+                                label: 'Site End Date',
+                                date: _updateEndDate,
+                                primaryColor: primaryColor,
+                                onTap: () => _selectUpdateDate(context, false),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        FutureBuilder<List<String>>(
+                          future: fetchProjectStatus(),
+                          builder: (context, snapshot) {
+                            final statusList = snapshot.data ?? [];
+                            return _buildDropdown(
+                              value: _updateStatus,
+                              items: statusList,
+                              label: 'Site Status',
+                              hint: 'Select Status',
+                              primaryColor: primaryColor,
+                              onChanged: (val) => setState(() => _updateStatus = val),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDateField(
+                                label: 'Actual Start Date',
+                                date: _updateActualStartDate,
+                                primaryColor: primaryColor,
+                                onTap: () async {
+                                  final date = await _pickCustomDate(_updateActualStartDate);
+                                  if (date != null) setState(() => _updateActualStartDate = date);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildDateField(
+                                label: 'Actual End Date',
+                                date: _updateActualEndDate,
+                                primaryColor: primaryColor,
+                                onTap: () async {
+                                  final date = await _pickCustomDate(_updateActualEndDate);
+                                  if (date != null) setState(() => _updateActualEndDate = date);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
 
-            // Site Name
-            Text(
-              siteName,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0A183D),
-                letterSpacing: -0.3,
+                  const SizedBox(height: 16),
+
+                  // ── BENTO CARD 2: CONTRACT WORK ───────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.handshake_rounded,
+                                color: primaryColor,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '2. Contract Work',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Third-party contractor allocation',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _updateIsContractWork,
+                              activeThumbColor: primaryColor,
+                              onChanged: (val) => setState(() => _updateIsContractWork = val),
+                            ),
+                          ],
+                        ),
+                        if (_updateIsContractWork) ...[
+                          const SizedBox(height: 18),
+                          _buildTextField(
+                            controller: _updateContractorNameController,
+                            label: 'Contractor Name',
+                            hintText: 'e.g. Apex Builders Ltd',
+                            primaryColor: primaryColor,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _updateContractorBudgetController,
+                            label: 'Contractor Budget (₹)',
+                            hintText: 'e.g. 500000',
+                            primaryColor: primaryColor,
+                            keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildDateField(
+                                  label: 'Contract Start',
+                                  date: _updateContractStartDate,
+                                  primaryColor: primaryColor,
+                                  onTap: () async {
+                                    final date = await _pickCustomDate(_updateContractStartDate);
+                                    if (date != null) setState(() => _updateContractStartDate = date);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildDateField(
+                                  label: 'Contract End',
+                                  date: _updateContractEndDate,
+                                  primaryColor: primaryColor,
+                                  onTap: () async {
+                                    final date = await _pickCustomDate(_updateContractEndDate);
+                                    if (date != null) setState(() => _updateContractEndDate = date);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── BENTO CARD 3: PROJECT CONFIGURATION ─────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionHeader(
+                          title: '3. Project Configuration',
+                          subtitle: 'Linked project metadata, stage & budget',
+                          icon: Icons.architecture_rounded,
+                          color: primaryColor,
+                        ),
+                        const SizedBox(height: 18),
+                        _buildTextField(
+                          controller: _updateProjectNameController,
+                          label: 'Project Name *',
+                          hintText: 'e.g. Tower A Construction',
+                          primaryColor: primaryColor,
+                          validator: (val) =>
+                              val?.trim().isEmpty ?? true ? 'Please enter project name' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        FutureBuilder<List<String>>(
+                          future: fetchProjectSubCategories(),
+                          builder: (context, snapshot) {
+                            final subCategories = snapshot.data ?? [];
+                            return _buildDropdown(
+                              value: _updateProjectSubCategory,
+                              items: subCategories,
+                              label: 'Project Sub-Category',
+                              hint: 'Select Sub-Category',
+                              primaryColor: primaryColor,
+                              onChanged: (val) => setState(() => _updateProjectSubCategory = val),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        FutureBuilder<List<String>>(
+                          future: fetchProjectStages(),
+                          builder: (context, snapshot) {
+                            final stages = snapshot.data ?? [];
+                            return _buildDropdown(
+                              value: _updateProjectStage,
+                              items: stages,
+                              label: 'Project Stage',
+                              hint: 'Select Stage',
+                              primaryColor: primaryColor,
+                              onChanged: (val) => setState(() => _updateProjectStage = val),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        FutureBuilder<List<String>>(
+                          future: fetchProjectContracts(),
+                          builder: (context, snapshot) {
+                            final contracts = snapshot.data ?? [];
+                            return _buildDropdown(
+                              value: _updateProjectContract,
+                              items: contracts,
+                              label: 'Project Contract Type',
+                              hint: 'Select Contract Type',
+                              primaryColor: primaryColor,
+                              onChanged: (val) => setState(() => _updateProjectContract = val),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _updateProjectBudgetController,
+                                label: 'Estimated Budget (₹)',
+                                hintText: 'e.g. 2500000',
+                                primaryColor: primaryColor,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _updateAmountPaidController,
+                                label: 'Advance / Paid (₹)',
+                                hintText: 'e.g. 500000',
+                                primaryColor: primaryColor,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _updateOwnerNameController,
+                                label: 'Client / Owner Name',
+                                hintText: 'e.g. John Doe',
+                                primaryColor: primaryColor,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _updateOwnerPhoneController,
+                                label: 'Client Phone',
+                                hintText: 'e.g. 9876543210',
+                                primaryColor: primaryColor,
+                                keyboardType: TextInputType.phone,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── UPDATE BUTTON ─────────────────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        colors: [primaryColor, darkAccent],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.35),
+                          blurRadius: 14,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isUpdating ? null : _updateSiteAndProject,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Center(
+                          child: _isUpdating
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.save_rounded, color: Colors.white, size: 20),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'UPDATE SITE',
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
-            const SizedBox(height: 6),
-
-            // Location Row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.location_on_rounded,
-                  size: 16,
-                  color: Color(0xFFEF4444),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    location,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF64748B),
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  // -------------------- HELPER REUSABLE WIDGETS --------------------
+  // ── HELPER REUSABLE WIDGETS ───────────────────────────────────────────────
   Widget _buildSectionHeader({
     required String title,
     required String subtitle,
@@ -1740,7 +2859,7 @@ class _SiteScreenState extends State<SiteScreen>
             color: color.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: color, size: 22),
+          child: Icon(icon, color: color, size: 20),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1751,8 +2870,8 @@ class _SiteScreenState extends State<SiteScreen>
                 title,
                 style: const TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0A183D),
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
                   letterSpacing: -0.3,
                 ),
               ),
@@ -1774,12 +2893,14 @@ class _SiteScreenState extends State<SiteScreen>
     required TextEditingController controller,
     required String label,
     required String hintText,
+    Color? primaryColor,
     String? Function(String?)? validator,
     TextInputType keyboardType = TextInputType.text,
     bool readOnly = false,
     void Function(String)? onChanged,
   }) {
-    final theme = Theme.of(context);
+    final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1787,8 +2908,8 @@ class _SiteScreenState extends State<SiteScreen>
           label,
           style: const TextStyle(
             fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0A183D),
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF334155),
           ),
         ),
         const SizedBox(height: 6),
@@ -1801,33 +2922,26 @@ class _SiteScreenState extends State<SiteScreen>
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF0A183D),
+            color: Color(0xFF0F172A),
           ),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade500),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             filled: true,
-            fillColor: readOnly
-                ? Colors.grey.shade100
-                : Colors.white,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFFCBD5E1),
-              ),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFFCBD5E1),
-              ),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: theme.primaryColor,
+                color: effectivePrimary,
                 width: 1.8,
               ),
             ),
@@ -1842,9 +2956,11 @@ class _SiteScreenState extends State<SiteScreen>
     required List<String> items,
     required String label,
     required String hint,
+    Color? primaryColor,
     required void Function(String?) onChanged,
   }) {
     final isValidValue = value != null && items.contains(value);
+    final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1853,8 +2969,8 @@ class _SiteScreenState extends State<SiteScreen>
           label,
           style: const TextStyle(
             fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0A183D),
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF334155),
           ),
         ),
         const SizedBox(height: 6),
@@ -1864,23 +2980,25 @@ class _SiteScreenState extends State<SiteScreen>
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF0A183D),
+            color: Color(0xFF0F172A),
           ),
           decoration: InputDecoration(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFFCBD5E1),
-              ),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFFCBD5E1),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: effectivePrimary,
+                width: 1.8,
               ),
             ),
           ),
@@ -1904,8 +3022,9 @@ class _SiteScreenState extends State<SiteScreen>
     required String label,
     required DateTime? date,
     required VoidCallback onTap,
+    Color? primaryColor,
   }) {
-    final theme = Theme.of(context);
+    final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
     final formattedDate =
         date == null ? 'Select Date' : DateFormat('dd MMM yyyy').format(date);
 
@@ -1916,8 +3035,8 @@ class _SiteScreenState extends State<SiteScreen>
           label,
           style: const TextStyle(
             fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0A183D),
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF334155),
           ),
         ),
         const SizedBox(height: 6),
@@ -1927,11 +3046,9 @@ class _SiteScreenState extends State<SiteScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: theme.cardColor,
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: theme.dividerColor.withValues(alpha: 0.2),
-              ),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Row(
               children: [
@@ -1941,14 +3058,14 @@ class _SiteScreenState extends State<SiteScreen>
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: date == null ? FontWeight.normal : FontWeight.w600,
-                      color: date == null ? Colors.grey.shade400 : Colors.black87,
+                      color: date == null ? Colors.grey.shade400 : const Color(0xFF0F172A),
                     ),
                   ),
                 ),
                 Icon(
                   Icons.calendar_today_rounded,
                   size: 18,
-                  color: theme.primaryColor,
+                  color: effectivePrimary,
                 ),
               ],
             ),
@@ -1958,3 +3075,4 @@ class _SiteScreenState extends State<SiteScreen>
     );
   }
 }
+

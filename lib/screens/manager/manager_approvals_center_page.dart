@@ -29,21 +29,15 @@ class ManagerApprovalsCenterPage extends StatefulWidget {
 
 class _ManagerApprovalsCenterPageState
     extends State<ManagerApprovalsCenterPage> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isMobile = Responsive.isMobile(context);
+
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
-        final darkAccent = AppTheme.getDarkAccent(primaryColor);
+        final dynamicGradientColors =
+            AppTheme.getBackgroundGradientColors(primaryColor);
 
         return PopScope(
           canPop: widget.onBack == null && Navigator.canPop(context),
@@ -55,98 +49,98 @@ class _ManagerApprovalsCenterPageState
               Navigator.pop(context);
             }
           },
-          child: Scaffold(
-            backgroundColor: const Color(0xFFF8FAFC),
-            appBar: widget.hideAppBar
-                ? null
-                : AppBar(
-                    iconTheme: const IconThemeData(color: Colors.white),
-                    automaticallyImplyLeading: false,
-                    leading: (widget.showBackButton ||
-                            widget.onBack != null ||
-                            Navigator.canPop(context))
-                        ? IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            onPressed: () {
-                              if (widget.onBack != null) {
-                                widget.onBack!();
-                              } else if (Navigator.canPop(context)) {
-                                Navigator.pop(context);
-                              }
-                            },
-                          )
-                        : null,
-                    title: const Text(
-                      'Approvals',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                        letterSpacing: -0.3,
-                      ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: dynamicGradientColors,
+                stops: const [0.0, 0.35, 0.7, 1.0],
+              ),
+            ),
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: SafeArea(
+                bottom: false,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isMobile ? double.infinity : 680,
                     ),
-                    centerTitle: true,
-                    elevation: 0,
-                    flexibleSpace: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            darkAccent,
-                            Color.alphaBlend(
-                              primaryColor.withValues(alpha: 0.35),
-                              darkAccent,
-                            ),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                    ),
-                  ),
-            body: SafeArea(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: Responsive.maxContentWidth,
-                  ),
-                  child: ListView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                    children: [
-                      // Quick Search Bar
-                      _buildSearchBar(primaryColor),
-                      const SizedBox(height: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Executive Header
+                        if (!widget.hideAppBar)
+                          _buildHeader(context, primaryColor),
 
-                      // Section Title
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          'Select Approval Category',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                            letterSpacing: -0.2,
+                        // Main Scrollable Content
+                        Expanded(
+                          child: ListView(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 115),
+                            children: [
+                              // Hero Stat Overview Banner
+                              _buildApprovalSummaryBanner(primaryColor),
+                              const SizedBox(height: 18),
+
+                              // Section Header
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Approval Modules',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: const Color(0xFFE2E8F0),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.grid_view_rounded,
+                                          size: 13,
+                                          color: primaryColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '4 Workflows',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: primaryColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // 2x2 Bento Cards Grid / Modules
+                              _buildCategoryBentoGrid(context, primaryColor),
+                              const SizedBox(height: 24),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // 4 Clean, Easily Findable Category Cards
-                      _buildCategoryCardsList(context, primaryColor),
-                      const SizedBox(height: 20),
-
-                      // Recent Pending Requisitions Preview
-                      _buildPendingQuickPreview(context, primaryColor),
-                      const SizedBox(height: 24),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -157,66 +151,388 @@ class _ManagerApprovalsCenterPageState
     );
   }
 
-  // --- SEARCH BAR ---
-  Widget _buildSearchBar(Color primaryColor) {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  // --- HEADER ---
+  Widget _buildHeader(BuildContext context, Color primaryColor) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          if ((widget.showBackButton && Navigator.canPop(context)) ||
+              widget.onBack != null)
+            InkWell(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                if (widget.onBack != null) {
+                  widget.onBack!();
+                } else if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 38,
+                height: 38,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 16,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Approvals',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: primaryColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Desk',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Review & authorize site operational requests',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (val) {
-          setState(() => _searchQuery = val.trim().toLowerCase());
-        },
-        style: const TextStyle(
-          fontSize: 13.5,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF0F172A),
-        ),
-        decoration: InputDecoration(
-          hintText: 'Search payment, material, tools, workforce...',
-          hintStyle: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade400,
-            fontWeight: FontWeight.w400,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: primaryColor,
-            size: 20,
-          ),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 16),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
+    );
+  }
+
+  // --- EXECUTIVE SUMMARY STATS BANNER ---
+  Widget _buildApprovalSummaryBanner(Color primaryColor) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreService.getCollection('siteMaterialsRequest').snapshots(),
+      builder: (context, matSnap) {
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirestoreService.getCollection('siteSupervisorEntries').snapshots(),
+          builder: (context, paySnap) {
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirestoreService.getCollection('siteToolsRequest').snapshots(),
+              builder: (context, toolSnap) {
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirestoreService.siteSupervisorProjectStageSchedule.snapshots(),
+                  builder: (context, wfSnap) {
+                    int matCount = 0;
+                    if (matSnap.hasData) {
+                      matCount = matSnap.data!.docs.where((d) {
+                        final stage = ApprovalWorkflowService.parseStatus(d.data()['status']);
+                        return stage == ApprovalStage.pendingManagerReview ||
+                            stage == ApprovalStage.pendingManagerClearance;
+                      }).length;
+                    }
+
+                    int payCount = 0;
+                    if (paySnap.hasData) {
+                      payCount = paySnap.data!.docs.where((d) {
+                        final stage = ApprovalWorkflowService.parseStatus(d.data()['status']);
+                        return stage == ApprovalStage.pendingManagerReview ||
+                            stage == ApprovalStage.pendingManagerClearance;
+                      }).length;
+                    }
+
+                    int toolCount = 0;
+                    if (toolSnap.hasData) {
+                      toolCount = toolSnap.data!.docs.where((d) {
+                        final stage = ApprovalWorkflowService.parseStatus(d.data()['status']);
+                        return stage == ApprovalStage.pendingManagerReview ||
+                            stage == ApprovalStage.pendingManagerClearance;
+                      }).length;
+                    }
+
+                    int wfCount = 0;
+                    if (wfSnap.hasData) {
+                      wfCount = wfSnap.data!.docs.where((d) {
+                        final status = d.data()['status']?.toString() ??
+                            d.data()['approvalStatus']?.toString();
+                        final stage = ApprovalWorkflowService.parseStatus(status);
+                        return stage == ApprovalStage.pendingManagerReview ||
+                            stage == ApprovalStage.pendingManagerClearance;
+                      }).length;
+                    }
+
+                    final totalPending = matCount + payCount + toolCount + wfCount;
+
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primaryColor.withValues(alpha: 0.08),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
+                          ),
+                          BoxShadow(
+                            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      primaryColor,
+                                      AppTheme.getDarkAccent(primaryColor),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: primaryColor.withValues(alpha: 0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.verified_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Text(
+                                          'Pending Requisitions',
+                                          style: TextStyle(
+                                            fontSize: 14.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0F172A),
+                                            letterSpacing: -0.2,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: totalPending > 0
+                                                ? const Color(0xFFEF4444)
+                                                    .withValues(alpha: 0.12)
+                                                : const Color(0xFF10B981)
+                                                    .withValues(alpha: 0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            totalPending > 0
+                                                ? '$totalPending Action Required'
+                                                : 'All Cleared',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: totalPending > 0
+                                                  ? const Color(0xFFEF4444)
+                                                  : const Color(0xFF10B981),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      totalPending > 0
+                                          ? 'Total $totalPending requests awaiting managerial approval'
+                                          : 'No overdue requests pending review right now',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                          const SizedBox(height: 12),
+
+                          // 4 Quick Mini Stat Chips
+                          Row(
+                            children: [
+                              _buildMiniStatBadge(
+                                label: 'Payment',
+                                count: payCount,
+                                color: const Color(0xFF059669),
+                              ),
+                              const SizedBox(width: 8),
+                              _buildMiniStatBadge(
+                                label: 'Material',
+                                count: matCount,
+                                color: const Color(0xFFE11D48),
+                              ),
+                              const SizedBox(width: 8),
+                              _buildMiniStatBadge(
+                                label: 'Tools',
+                                count: toolCount,
+                                color: const Color(0xFFD97706),
+                              ),
+                              const SizedBox(width: 8),
+                              _buildMiniStatBadge(
+                                label: 'Workforce',
+                                count: wfCount,
+                                color: const Color(0xFF6366F1),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
                   },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMiniStatBadge({
+    required String label,
+    required int count,
+    required Color color,
+  }) {
+    final hasPending = count > 0;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        decoration: BoxDecoration(
+          color: hasPending
+              ? color.withValues(alpha: 0.08)
+              : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: hasPending
+                ? color.withValues(alpha: 0.25)
+                : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: hasPending ? color : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w600,
+                color: hasPending ? color : const Color(0xFF94A3B8),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // --- 4 CLEAN CATEGORY CARDS ---
-  Widget _buildCategoryCardsList(BuildContext context, Color primaryColor) {
+  // --- 2X2 BENTO CARDS GRID ---
+  Widget _buildCategoryBentoGrid(BuildContext context, Color primaryColor) {
     final categories = [
-      _ApprovalItem(
-        title: 'Site Payment Requests',
-        subtitle: 'Approve site expenses, contractor & supervisor payments',
+      _ApprovalCategoryData(
+        id: 'Payments',
+        title: 'Site Payments',
+        categoryTag: 'Finance',
+        subtitle: 'Expenses, contractor invoices & supervisor claims',
         icon: Icons.payments_rounded,
         color: const Color(0xFF059669), // Emerald
         stream: FirestoreService.getCollection('siteSupervisorEntries').snapshots(),
@@ -235,9 +551,11 @@ class _ManagerApprovalsCenterPageState
           );
         },
       ),
-      _ApprovalItem(
-        title: 'Material Requests',
-        subtitle: 'Authorize raw materials & supply orders for sites',
+      _ApprovalCategoryData(
+        id: 'Materials',
+        title: 'Material Orders',
+        categoryTag: 'Supplies',
+        subtitle: 'Authorize cement, steel, sand & raw requisitions',
         icon: Icons.inventory_2_rounded,
         color: const Color(0xFFE11D48), // Rose Red
         stream: FirestoreService.getCollection('siteMaterialsRequest').snapshots(),
@@ -256,9 +574,11 @@ class _ManagerApprovalsCenterPageState
           );
         },
       ),
-      _ApprovalItem(
-        title: 'Tools Requests',
-        subtitle: 'Approve equipment movements & tools return requests',
+      _ApprovalCategoryData(
+        id: 'Tools',
+        title: 'Tools & Plant',
+        categoryTag: 'Machinery',
+        subtitle: 'Equipment allocation, machine dispatch & returns',
         icon: Icons.construction_rounded,
         color: const Color(0xFFD97706), // Amber
         stream: FirestoreService.getCollection('siteToolsRequest').snapshots(),
@@ -277,14 +597,17 @@ class _ManagerApprovalsCenterPageState
           );
         },
       ),
-      _ApprovalItem(
-        title: 'Workforce Requests',
-        subtitle: 'Review labour allocation & contractor work schedules',
+      _ApprovalCategoryData(
+        id: 'Workforce',
+        title: 'Workforce & Stages',
+        categoryTag: 'Operations',
+        subtitle: 'Labour allocation, contractors & stage sign-offs',
         icon: Icons.groups_rounded,
         color: const Color(0xFF6366F1), // Indigo
         stream: FirestoreService.siteSupervisorProjectStageSchedule.snapshots(),
         pendingCountCalc: (snap) => snap.docs.where((d) {
-          final status = d.data()['status']?.toString() ?? d.data()['approvalStatus']?.toString();
+          final status = d.data()['status']?.toString() ??
+              d.data()['approvalStatus']?.toString();
           final stage = ApprovalWorkflowService.parseStatus(status);
           return stage == ApprovalStage.pendingManagerReview ||
               stage == ApprovalStage.pendingManagerClearance;
@@ -301,159 +624,257 @@ class _ManagerApprovalsCenterPageState
       ),
     ];
 
-    final filtered = categories.where((cat) {
-      if (_searchQuery.isEmpty) return true;
-      return cat.title.toLowerCase().contains(_searchQuery) ||
-          cat.subtitle.toLowerCase().contains(_searchQuery);
-    }).toList();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTwoCol = constraints.maxWidth >= 340;
+        final itemWidth = isTwoCol
+            ? (constraints.maxWidth - 12) / 2
+            : constraints.maxWidth;
 
-    if (filtered.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Column(
-          children: [
-            Icon(Icons.search_off_rounded, size: 36, color: Colors.grey.shade400),
-            const SizedBox(height: 8),
-            const Text(
-              'No matching approval category',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: filtered.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final item = filtered[index];
-        return _buildSimpleCategoryCard(context, item);
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: categories.map((cat) {
+            return SizedBox(
+              width: itemWidth,
+              child: _buildBentoCardModule(context, cat),
+            );
+          }).toList(),
+        );
       },
     );
   }
 
-  Widget _buildSimpleCategoryCard(BuildContext context, _ApprovalItem item) {
+  // --- MODERN BENTO CARD MODULE ---
+  Widget _buildBentoCardModule(
+    BuildContext context,
+    _ApprovalCategoryData item,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white,
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
+            color: item.color.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
             color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-            blurRadius: 8,
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
           onTap: item.onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
+          splashColor: item.color.withValues(alpha: 0.1),
+          highlightColor: item.color.withValues(alpha: 0.05),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            child: Row(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Icon Box
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: item.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    item.icon,
-                    color: item.color,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-
-                // Title & Subtitle
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                          letterSpacing: -0.2,
+                // Top Row: Icon Box + Live Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            item.color.withValues(alpha: 0.18),
+                            item.color.withValues(alpha: 0.08),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: item.color.withValues(alpha: 0.2),
+                          width: 1,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.subtitle,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
-                          height: 1.25,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      child: Icon(
+                        item.icon,
+                        color: item.color,
+                        size: 22,
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
+                    ),
+                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: item.stream,
+                      builder: (context, snapshot) {
+                        final count = snapshot.hasData
+                            ? item.pendingCountCalc(snapshot.data!)
+                            : 0;
 
-                // Live Pending Pill & Arrow
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: item.stream,
-                  builder: (context, snapshot) {
-                    final count = snapshot.hasData
-                        ? item.pendingCountCalc(snapshot.data!)
-                        : 0;
-
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (count > 0)
-                          Container(
+                        if (count == 0) {
+                          return Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 7,
+                              vertical: 3,
                             ),
-                            margin: const EdgeInsets.only(right: 8),
                             decoration: BoxDecoration(
-                              color: item.color.withValues(alpha: 0.12),
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(
-                              '$count Pending',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: item.color,
-                              ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_rounded,
+                                  size: 11,
+                                  color: Color(0xFF10B981),
+                                ),
+                                SizedBox(width: 2),
+                                Text(
+                                  'Clear',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                ),
+                              ],
                             ),
+                          );
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3.5,
                           ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                item.color,
+                                item.color.withValues(alpha: 0.85),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: item.color.withValues(alpha: 0.35),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$count Pending',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Title
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+
+                // Subtitle
+                Text(
+                  item.subtitle,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
+                    height: 1.3,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+
+                // Action Footer Pill
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        item.categoryTag,
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Open',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: item.color,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
                         Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 14,
-                          color: Colors.grey.shade400,
+                          Icons.arrow_forward_rounded,
+                          size: 13,
+                          color: item.color,
                         ),
                       ],
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -462,170 +883,12 @@ class _ManagerApprovalsCenterPageState
       ),
     );
   }
-
-  // --- RECENT PENDING PREVIEW ---
-  Widget _buildPendingQuickPreview(BuildContext context, Color primaryColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            'Recent Pending Requests',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
-              letterSpacing: -0.2,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirestoreService.getCollection('siteMaterialsRequest')
-              .limit(3)
-              .snapshots(),
-          builder: (context, snapshot) {
-            final docs = snapshot.data?.docs ?? [];
-            final pendingDocs = docs.where((doc) {
-              final status =
-                  (doc.data()['status'] ?? '').toString().toLowerCase();
-              return status.contains('process') || status.contains('pending');
-            }).toList();
-
-            if (pendingDocs.isEmpty) {
-              return Container(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle_rounded,
-                      color: Color(0xFF16A34A),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'All material & tool requests are up to date.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return Column(
-              children: pendingDocs.map((doc) {
-                final data = doc.data();
-                final reqId = data['matReqId'] ?? doc.id;
-                final siteId = data['siteId'] ?? 'N/A';
-                final stage = data['projectStage'] ?? 'N/A';
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE11D48).withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_rounded,
-                          color: Color(0xFFE11D48),
-                          size: 14,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Request $reqId',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            Text(
-                              'Site: $siteId • $stage',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF64748B),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          foregroundColor: const Color(0xFFE11D48),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const ManagerMaterialApprovalScreen(),
-                            ),
-                          );
-                        },
-                        child: const Row(
-                          children: [
-                            Text(
-                              'Review',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            SizedBox(width: 2),
-                            Icon(Icons.arrow_forward_ios_rounded, size: 10),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            );
-          },
-        ),
-      ],
-    );
-  }
 }
 
-class _ApprovalItem {
+class _ApprovalCategoryData {
+  final String id;
   final String title;
+  final String categoryTag;
   final String subtitle;
   final IconData icon;
   final Color color;
@@ -633,8 +896,10 @@ class _ApprovalItem {
   final int Function(QuerySnapshot<Map<String, dynamic>>) pendingCountCalc;
   final VoidCallback onTap;
 
-  _ApprovalItem({
+  _ApprovalCategoryData({
+    required this.id,
     required this.title,
+    required this.categoryTag,
     required this.subtitle,
     required this.icon,
     required this.color,

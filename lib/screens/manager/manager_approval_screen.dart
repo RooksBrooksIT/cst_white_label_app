@@ -481,50 +481,93 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
+              // Drag Handle
               Center(
                 child: Container(
-                  width: 40,
-                  height: 4,
+                  width: 44,
+                  height: 4.5,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
               const SizedBox(height: 14),
 
-              // Title Header
+              // Title Header Row
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Workforce Request $reqId',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF0F172A),
-                        ),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
                       ),
-                      Text(
-                        'Site $siteId • Stage: $projectStage • By: $supervisor',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF64748B),
+                      borderRadius: BorderRadius.circular(13),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.engineering_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Workforce Request #$reqId',
+                          style: const TextStyle(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            _buildModalTagPill(Icons.location_on_rounded, 'Site: $siteId', primaryColor),
+                            _buildModalTagPill(Icons.layers_rounded, 'Stage: $projectStage', const Color(0xFF6366F1)),
+                            _buildModalTagPill(Icons.person_rounded, 'By: $supervisor', const Color(0xFF059669)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(ctx),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
               // Full Stepper
               ApprovalLifecycleStepper(
@@ -541,13 +584,14 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Duration', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          const Text('Duration', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
                           Text('$reqDays Working Days', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                         ],
                       ),
@@ -558,13 +602,14 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Est. Wages', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          const Text('Est. Wages', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
                           Text(_currencyFormat.format(estimatedPayment), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                         ],
                       ),
@@ -601,9 +646,16 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -662,6 +714,32 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
     );
   }
 
+  Widget _buildModalTagPill(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons(
     BuildContext ctx,
     Map<String, dynamic> data,
@@ -676,13 +754,22 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
       return Row(
         children: [
           Expanded(
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFEF4444),
-                side: const BorderSide(color: Color(0xFFFCA5A5)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+            child: TextButton.icon(
+              icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFDC2626)),
+              label: const Text(
+                'Reject',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFFFEF2F2),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(color: Color(0xFFFECACA)),
                 ),
               ),
               onPressed: () => _showRejectDialog(
@@ -691,30 +778,42 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                 supervisorName: supervisorName,
                 isOrgReject: false,
               ),
-              child: const Text(
-                'Reject',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             flex: 2,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-              label: const Text(
-                'Verify & Forward to Org',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
                 ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.28),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              onPressed: () => _showForwardToOrgDialog(ctx, docId),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                label: const Text(
+                  'Verify & Forward to Org',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: () => _showForwardToOrgDialog(ctx, docId),
+              ),
             ),
           ),
         ],
@@ -725,13 +824,22 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
       return Row(
         children: [
           Expanded(
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFEF4444),
-                side: const BorderSide(color: Color(0xFFFCA5A5)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+            child: TextButton.icon(
+              icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFDC2626)),
+              label: const Text(
+                'Reject',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFFFEF2F2),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(color: Color(0xFFFECACA)),
                 ),
               ),
               onPressed: () => _showRejectDialog(
@@ -740,30 +848,42 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
                 supervisorName: supervisorName,
                 isOrgReject: true,
               ),
-              child: const Text(
-                'Reject',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             flex: 2,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.check_circle_rounded, size: 16),
-              label: const Text(
-                'Authorize & Send to Manager',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B5CF6),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
                 ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.28),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              onPressed: () => _showOrgApproveDialog(ctx, docId, supervisorName),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.check_circle_rounded, size: 16),
+                label: const Text(
+                  'Authorize & Send to Manager',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: () => _showOrgApproveDialog(ctx, docId, supervisorName),
+              ),
             ),
           ),
         ],
@@ -771,8 +891,21 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
     }
 
     if (stage == ApprovalStage.pendingManagerClearance && isManager) {
-      return SizedBox(
+      return Container(
         width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF10B981), Color(0xFF059669)],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.28),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
         child: ElevatedButton.icon(
           icon: const Icon(Icons.verified_rounded, size: 18),
           label: const Text(
@@ -780,11 +913,12 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF10B981),
+            backgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
+            shadowColor: Colors.transparent,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
             ),
           ),
           onPressed: () => _showFinalClearanceDialog(ctx, docId, supervisorName),

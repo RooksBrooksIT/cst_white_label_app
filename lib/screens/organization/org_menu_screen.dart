@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
@@ -23,7 +22,6 @@ class OrgMenuScreen extends StatefulWidget {
 }
 
 class _OrgMenuScreenState extends State<OrgMenuScreen> {
-  String _orgCode = 'Loading...';
   String _subscriptionPlan = 'Loading...';
   String _subscriptionExpiry = '';
   bool _isSubscriptionActive = false;
@@ -38,75 +36,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     try {
       if (!FirestoreService.isReady) {
         await FirestoreService.initialize();
-      }
-
-      String? code;
-
-      // 1. SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      final cachedPrefCode = prefs.getString('referral_code')?.trim();
-      if (cachedPrefCode != null && cachedPrefCode.isNotEmpty && cachedPrefCode != 'Not Set') {
-        code = cachedPrefCode;
-      }
-
-      // 2. data/referralCode doc
-      if (code == null || code.isEmpty) {
-        try {
-          final referralDoc = await FirestoreService.referralDoc.get();
-          if (referralDoc.exists) {
-            final refData = referralDoc.data()!;
-            code = (refData['referralCode'] ?? refData['orgReferralCode'] ?? refData['code'])?.toString().trim();
-          }
-        } catch (_) {}
-      }
-
-      // 3. data/admin doc
-      if (code == null || code.isEmpty) {
-        try {
-          final adminDoc = await FirestoreService.orgDataDoc.get();
-          if (adminDoc.exists) {
-            final adminData = adminDoc.data()!;
-            code = (adminData['referralCode'] ?? adminData['orgReferralCode'] ?? adminData['code'])?.toString().trim();
-          }
-        } catch (_) {}
-      }
-
-      // 4. Root organisation doc
-      if (code == null || code.isEmpty) {
-        try {
-          final rootDoc = await FirestoreService.rootOrgDoc.get();
-          if (rootDoc.exists) {
-            final rootData = rootDoc.data()!;
-            code = (rootData['referralCode'] ?? rootData['orgReferralCode'] ?? rootData['code'])?.toString().trim();
-          }
-        } catch (_) {}
-      }
-
-      // 5. Legacy data/referral doc
-      if (code == null || code.isEmpty) {
-        try {
-          final legacyDoc = await FirebaseFirestore.instance
-              .collection('organisation')
-              .doc(FirestoreService.currentOrgId)
-              .collection('data')
-              .doc('referral')
-              .get();
-          if (legacyDoc.exists) {
-            final legacyData = legacyDoc.data()!;
-            code = (legacyData['referralCode'] ?? legacyData['orgReferralCode'] ?? legacyData['code'])?.toString().trim();
-          }
-        } catch (_) {}
-      }
-
-      // 6. Auto-generate and persist if not found for this organization
-      if (code == null || code.isEmpty) {
-        code = 'CST-${FirestoreService.currentOrgId.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '').padRight(6, 'X').substring(0, 6)}';
-      }
-
-      if (mounted) {
-        setState(() {
-          _orgCode = code ?? 'CST-ORG';
-        });
       }
 
       // Fetch subscription status
@@ -162,8 +91,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
           child: Column(
             children: [
-              _buildReferralSection(theme),
-              const SizedBox(height: 20),
               _buildSettingsSection(theme),
               const SizedBox(height: 20),
               _buildSubscriptionSection(theme),
@@ -218,128 +145,6 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         ),
       ),
       body: content,
-    );
-  }
-
-  Widget _buildReferralSection(ThemeData theme) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: theme.primaryColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.share_rounded,
-                  color: theme.primaryColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Referral Program',
-                style: TextStyle(
-                  color: Color(0xFF0A183D),
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Share these codes with your team members to register them under your organization.',
-            style: TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 13,
-              height: 1.35,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildCodeRow('REFERRAL', _orgCode, theme),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCodeRow(String label, String code, ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF64748B),
-            letterSpacing: 0.8,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                code,
-                style: TextStyle(
-                  color: theme.primaryColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.0,
-                ),
-              ),
-              InkWell(
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: code));
-                  AppTheme.showSuccessToast(context, '$label code copied!');
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: theme.primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.copy_rounded,
-                    color: theme.primaryColor,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
