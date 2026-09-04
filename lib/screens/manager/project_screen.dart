@@ -144,8 +144,8 @@ class _ProjectScreenState extends State<ProjectScreen>
               totalSiteExpense +
               totalIncentiveExpenses +
               totalContractorExpense;
-          final amountPaid = (doc.data()['amountPaid'] ?? 0).toDouble();
-          final balanceAmount = amountPaid - amountSpent;
+          final projectBudget = (doc.data()['projectBudget'] ?? 0).toDouble();
+          final balanceAmount = projectBudget - amountSpent;
           await FirestoreService.getCollection('projects').doc(doc.id).update({
             'amountSpent': amountSpent,
             'amountBalance': balanceAmount,
@@ -224,14 +224,15 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   void _setupAmountListeners() {
+    _projectBudgetController.addListener(_calculateBalance);
     _amountPaidController.addListener(_calculateBalance);
     _amountSpentController.addListener(_calculateBalance);
   }
 
   void _calculateBalance() {
-    final paid = double.tryParse(_amountPaidController.text) ?? 0;
+    final budget = double.tryParse(_projectBudgetController.text) ?? 0;
     final spent = double.tryParse(_amountSpentController.text) ?? 0;
-    final balance = paid - spent;
+    final balance = budget - spent;
     _balanceAmountController.text = balance.toStringAsFixed(2);
   }
 
@@ -1687,13 +1688,13 @@ class _ProjectScreenState extends State<ProjectScreen>
           totalIncentiveExpenses +
           totalContractorExpense;
       _amountSpentController.text = amountSpent.toStringAsFixed(2);
-      final paid = double.tryParse(_amountPaidController.text) ?? 0;
-      final balance = paid - amountSpent;
+      final budget = double.tryParse(_projectBudgetController.text) ?? 0;
+      final balance = budget - amountSpent;
       _balanceAmountController.text = balance.toStringAsFixed(2);
     } else {
       _amountSpentController.text = '0.00';
-      final paid = double.tryParse(_amountPaidController.text) ?? 0;
-      _balanceAmountController.text = paid.toStringAsFixed(2);
+      final budget = double.tryParse(_projectBudgetController.text) ?? 0;
+      _balanceAmountController.text = budget.toStringAsFixed(2);
     }
   }
 

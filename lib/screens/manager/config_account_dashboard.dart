@@ -75,7 +75,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   String _selectedKpiPeriod = 'Today';
   Timer? _carouselTimer;
 
-  final TextEditingController _dashboardSearchController = TextEditingController();
+  final TextEditingController _dashboardSearchController =
+      TextEditingController();
   final FocusNode _dashboardSearchFocusNode = FocusNode();
   String _dashboardSearchQuery = '';
   bool _isDashboardSearchOpen = false;
@@ -84,12 +85,16 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _notificationsStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _sitesStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _projectsStream;
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _siteSupervisorMapStream;
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _materialRequestsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>>
+  _siteSupervisorMapStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>>
+  _materialRequestsStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _siteScheduleStream;
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _supervisorRequestsStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>>
+  _supervisorRequestsStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _expensesStream;
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _supervisorEntriesStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>>
+  _supervisorEntriesStream;
 
   static final Map<String, Map<String, dynamic>> _categoryMetadata = {
     "Blueprints & Expenses": {
@@ -118,12 +123,14 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       "color": const Color(0xFF14B8A6),
     },
     "Vehicle Management": {
-      "subtitle": "Fleet specifications, vehicle details, drivers & stock inventory",
+      "subtitle":
+          "Fleet specifications, vehicle details, drivers & stock inventory",
       "icon": Icons.directions_car_rounded,
       "color": const Color(0xFFEF4444),
     },
     "Workforce Management": {
-      "subtitle": "Workers, labour directory, contractor management & site mapping",
+      "subtitle":
+          "Workers, labour directory, contractor management & site mapping",
       "icon": Icons.people_rounded,
       "color": const Color(0xFFF57C00),
     },
@@ -190,10 +197,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         Colors.pink,
       ),
       DashboardItem(
-        'Tools Master',
+        'Tools Availability',
         Icons.handyman_rounded,
         const Color(0xFF3B82F6),
-        'Tools inventory database',
+        'Tools stock database',
         const Color(0xFF3B82F6),
       ),
       DashboardItem(
@@ -305,7 +312,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFF8B5CF6),
       ),
       DashboardItem(
-        'Labour',
+        'Labour Category Config',
         Icons.engineering_rounded,
         Colors.brown,
         'Labour directory and wages setup',
@@ -353,9 +360,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
   void _initStreams() {
     _notificationsStream = NotificationService.streamForRole(role: 'manager');
-    _sitesStream = FirestoreService.getCollection(
-      'Site',
-    ).snapshots();
+    _sitesStream = FirestoreService.getCollection('Site').snapshots();
     _projectsStream = FirestoreService.projects.snapshots();
     _siteSupervisorMapStream = FirestoreService.getCollection(
       'siteSupervisorMap',
@@ -371,7 +376,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     _expensesStream = FirestoreService.getCollection(
       'totalSiteExpensesPerDay',
     ).snapshots();
-    _supervisorEntriesStream = FirestoreService.siteSupervisorEntries.snapshots();
+    _supervisorEntriesStream = FirestoreService.siteSupervisorEntries
+        .snapshots();
   }
 
   void _startAutoPlayCarousel() {
@@ -401,10 +407,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     _currentUserRole = auth.userRole;
 
     if (_currentUserRole == UserRole.organization) {
-      final orgName = (auth.userData['org_name'] ??
-              auth.userData['username'] ??
-              'Organization Administrator')
-          .toString();
+      final orgName =
+          (auth.userData['org_name'] ??
+                  auth.userData['username'] ??
+                  'Organization Administrator')
+              .toString();
       if (mounted) {
         setState(() {
           _managerName = orgName;
@@ -416,14 +423,15 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
     if (_currentUserRole == UserRole.manager) {
       final data = auth.userData;
-      String name = (data['FullName'] ??
-              data['fullName'] ??
-              data['UserName'] ??
-              data['username'] ??
-              'Manager')
+      String name =
+          (data['FullName'] ??
+                  data['fullName'] ??
+                  data['UserName'] ??
+                  data['username'] ??
+                  'Manager')
+              .toString();
+      String desig = (data['Designation'] ?? data['designation'] ?? '')
           .toString();
-      String desig =
-          (data['Designation'] ?? data['designation'] ?? '').toString();
 
       if (mounted) {
         setState(() {
@@ -439,22 +447,19 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             .trim();
         if (username.isNotEmpty) {
           // 1. Try 'manager' collection
-          final managerQuery = await FirestoreService.getCollection('manager')
-              .where('UserName', isEqualTo: username)
-              .limit(1)
-              .get();
+          final managerQuery = await FirestoreService.getCollection(
+            'manager',
+          ).where('UserName', isEqualTo: username).limit(1).get();
           if (managerQuery.docs.isNotEmpty) {
             final docData = managerQuery.docs.first.data();
-            final fetchedFullName = (docData['FullName'] ??
-                    docData['fullName'] ??
-                    '')
-                .toString()
-                .trim();
-            final fetchedDesig = (docData['Designation'] ??
-                    docData['designation'] ??
-                    '')
-                .toString()
-                .trim();
+            final fetchedFullName =
+                (docData['FullName'] ?? docData['fullName'] ?? '')
+                    .toString()
+                    .trim();
+            final fetchedDesig =
+                (docData['Designation'] ?? docData['designation'] ?? '')
+                    .toString()
+                    .trim();
 
             if (mounted) {
               setState(() {
@@ -472,16 +477,14 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               .get();
           if (configQuery.docs.isNotEmpty) {
             final docData = configQuery.docs.first.data();
-            final fetchedFullName = (docData['FullName'] ??
-                    docData['fullName'] ??
-                    '')
-                .toString()
-                .trim();
-            final fetchedDesig = (docData['Designation'] ??
-                    docData['designation'] ??
-                    '')
-                .toString()
-                .trim();
+            final fetchedFullName =
+                (docData['FullName'] ?? docData['fullName'] ?? '')
+                    .toString()
+                    .trim();
+            final fetchedDesig =
+                (docData['Designation'] ?? docData['designation'] ?? '')
+                    .toString()
+                    .trim();
 
             if (mounted) {
               setState(() {
@@ -496,8 +499,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       }
     }
   }
-
-
 
   @override
   void dispose() {
@@ -656,7 +657,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
     final roleLabel = isOrgUser
         ? 'Organization Admin'
-        : (_managerDesignation.isNotEmpty ? _managerDesignation : 'Management Console');
+        : (_managerDesignation.isNotEmpty
+              ? _managerDesignation
+              : 'Management Console');
 
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 16),
@@ -830,8 +833,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 builder: (context, snapshot) {
                   final count = snapshot.hasData
                       ? snapshot.data!.docs
-                          .where((d) => d.data()['isRead'] != true)
-                          .length
+                            .where((d) => d.data()['isRead'] != true)
+                            .length
                       : 0;
 
                   return Stack(
@@ -923,7 +926,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const OrgMenuScreen(standalone: true),
+                      builder: (context) =>
+                          const OrgMenuScreen(standalone: true),
                     ),
                   );
                 },
@@ -1116,10 +1120,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     final now = DateTime.now();
                     for (var entry in allSiteDocsMap.entries) {
                       final data = entry.value;
-                      final s = (data['currentStatus'] ?? data['status'] ?? 'OnProgress')
-                          .toString()
-                          .trim()
-                          .toLowerCase();
+                      final s =
+                          (data['currentStatus'] ??
+                                  data['status'] ??
+                                  'OnProgress')
+                              .toString()
+                              .trim()
+                              .toLowerCase();
 
                       final endDate = _parseFlexibleDate(
                         data['actualEndDate'] ??
@@ -1129,21 +1136,25 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                             data['contractEndDate'],
                       );
 
-                      final isCompleted = s.contains('complete') ||
+                      final isCompleted =
+                          s.contains('complete') ||
                           s.contains('finish') ||
                           s.contains('closed') ||
                           s.contains('done');
-                      final isPlanning = !isCompleted &&
+                      final isPlanning =
+                          !isCompleted &&
                           (s.contains('plan') ||
                               s.contains('draft') ||
                               s.contains('upcoming') ||
                               s.contains('setup'));
-                      final isOnHold = !isCompleted &&
+                      final isOnHold =
+                          !isCompleted &&
                           (s.contains('hold') ||
                               s.contains('pending') ||
                               s.contains('pause') ||
                               s.contains('suspend'));
-                      final isOverdue = !isCompleted &&
+                      final isOverdue =
+                          !isCompleted &&
                           (s.contains('delay') ||
                               s.contains('overdue') ||
                               (endDate != null &&
@@ -1166,10 +1177,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                       final sp = (data['amountSpent'] is num
                           ? (data['amountSpent'] as num).toDouble()
                           : (data['spent'] is num
-                              ? (data['spent'] as num).toDouble()
-                              : (double.tryParse(
-                                      data['amountSpent']?.toString() ?? '') ??
-                                  0.0)));
+                                ? (data['spent'] as num).toDouble()
+                                : (double.tryParse(
+                                        data['amountSpent']?.toString() ?? '',
+                                      ) ??
+                                      0.0)));
                       totalAmountSpent += sp;
                     }
 
@@ -1189,53 +1201,69 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                       stream: _materialRequestsStream,
                       builder: (context, matSnap) {
-                        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        return StreamBuilder<
+                          QuerySnapshot<Map<String, dynamic>>
+                        >(
                           stream: _siteScheduleStream,
                           builder: (context, wsSnap) {
-                            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                            return StreamBuilder<
+                              QuerySnapshot<Map<String, dynamic>>
+                            >(
                               stream: _supervisorRequestsStream,
                               builder: (context, supSnap) {
                                 int pendingApprovalsCount = 0;
                                 if (matSnap.hasData) {
-                                  pendingApprovalsCount += matSnap.data!.docs.where((d) {
-                                    final s = (d.data()['status'] ?? 'Processing')
-                                        .toString()
-                                        .toLowerCase();
-                                    return s.contains('pending') ||
-                                        s.contains('processing');
-                                  }).length;
+                                  pendingApprovalsCount += matSnap.data!.docs
+                                      .where((d) {
+                                        final s =
+                                            (d.data()['status'] ?? 'Processing')
+                                                .toString()
+                                                .toLowerCase();
+                                        return s.contains('pending') ||
+                                            s.contains('processing');
+                                      })
+                                      .length;
                                 }
                                 if (wsSnap.hasData) {
-                                  pendingApprovalsCount += wsSnap.data!.docs.where((d) {
-                                    final s = (d.data()['approvalStatus'] ??
-                                            d.data()['status'] ??
-                                            'Pending')
-                                        .toString()
-                                        .toLowerCase();
-                                    return s.contains('pending') ||
-                                        s.contains('processing');
-                                  }).length;
+                                  pendingApprovalsCount += wsSnap.data!.docs
+                                      .where((d) {
+                                        final s =
+                                            (d.data()['approvalStatus'] ??
+                                                    d.data()['status'] ??
+                                                    'Pending')
+                                                .toString()
+                                                .toLowerCase();
+                                        return s.contains('pending') ||
+                                            s.contains('processing');
+                                      })
+                                      .length;
                                 }
                                 if (supSnap.hasData) {
-                                  pendingApprovalsCount += supSnap.data!.docs.where((d) {
-                                    final s = (d.data()['status'] ?? 'Pending')
-                                        .toString()
-                                        .toLowerCase();
-                                    return s.contains('pending') ||
-                                        s.contains('processing');
-                                  }).length;
+                                  pendingApprovalsCount += supSnap.data!.docs
+                                      .where((d) {
+                                        final s =
+                                            (d.data()['status'] ?? 'Pending')
+                                                .toString()
+                                                .toLowerCase();
+                                        return s.contains('pending') ||
+                                            s.contains('processing');
+                                      })
+                                      .length;
                                 }
 
-                                final displayPending = pendingApprovalsCount < 10
+                                final displayPending =
+                                    pendingApprovalsCount < 10
                                     ? '0$pendingApprovalsCount'
                                     : '$pendingApprovalsCount';
 
                                 return StreamBuilder<
-                                    QuerySnapshot<Map<String, dynamic>>>(
+                                  QuerySnapshot<Map<String, dynamic>>
+                                >(
                                   stream: _supervisorEntriesStream,
                                   builder: (context, entrySnap) {
                                     return StreamBuilder<
-                                        QuerySnapshot<Map<String, dynamic>>>(
+                                      QuerySnapshot<Map<String, dynamic>>
+                                    >(
                                       stream: _expensesStream,
                                       builder: (context, expSnap) {
                                         double computedExpenses = 0.0;
@@ -1243,39 +1271,48 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                         // 1. Ingest detailed daily supervisor & site entries
                                         if (entrySnap.hasData &&
                                             entrySnap.data!.docs.isNotEmpty) {
-                                          for (var doc in entrySnap.data!.docs) {
+                                          for (var doc
+                                              in entrySnap.data!.docs) {
                                             final data = doc.data();
                                             double amount = 0.0;
                                             if (data['totalAmount'] is num) {
-                                              amount = (data['totalAmount'] as num)
-                                                  .toDouble();
+                                              amount =
+                                                  (data['totalAmount'] as num)
+                                                      .toDouble();
                                             } else if (data['amount'] is num) {
                                               amount = (data['amount'] as num)
                                                   .toDouble();
                                             } else {
-                                              amount = double.tryParse(
-                                                      data['totalAmount']
-                                                              ?.toString() ??
-                                                          '') ??
-                                                  (double.tryParse(data['amount']
-                                                              ?.toString() ??
-                                                          '') ??
+                                              amount =
+                                                  double.tryParse(
+                                                    data['totalAmount']
+                                                            ?.toString() ??
+                                                        '',
+                                                  ) ??
+                                                  (double.tryParse(
+                                                        data['amount']
+                                                                ?.toString() ??
+                                                            '',
+                                                      ) ??
                                                       0.0);
                                             }
 
                                             if (amount > 0) {
                                               final docDateStr =
-                                                  (data['date'] ?? '').toString();
-                                              final docDate = _parseFlexibleDate(
-                                                data['updatedAt'] ??
-                                                    data['createdAt'] ??
-                                                    data['timestamp'] ??
-                                                    docDateStr,
-                                              );
+                                                  (data['date'] ?? '')
+                                                      .toString();
+                                              final docDate =
+                                                  _parseFlexibleDate(
+                                                    data['updatedAt'] ??
+                                                        data['createdAt'] ??
+                                                        data['timestamp'] ??
+                                                        docDateStr,
+                                                  );
                                               if (_isDateInPeriod(
-                                                  docDate,
-                                                  docDateStr,
-                                                  _selectedKpiPeriod)) {
+                                                docDate,
+                                                docDateStr,
+                                                _selectedKpiPeriod,
+                                              )) {
                                                 computedExpenses += amount;
                                               }
                                             }
@@ -1288,64 +1325,75 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                           for (var doc in expSnap.data!.docs) {
                                             final data = doc.data();
                                             double amount = 0.0;
-                                            if (data['totalAllExpenses'] is num) {
+                                            if (data['totalAllExpenses']
+                                                is num) {
                                               amount =
-                                                  (data['totalAllExpenses'] as num)
+                                                  (data['totalAllExpenses']
+                                                          as num)
                                                       .toDouble();
                                             } else {
-                                              final sExp = (data['totalSiteExpense']
+                                              final sExp =
+                                                  (data['totalSiteExpense']
                                                       is num
                                                   ? (data['totalSiteExpense']
-                                                          as num)
-                                                      .toDouble()
+                                                            as num)
+                                                        .toDouble()
                                                   : (double.tryParse(
                                                           data['totalSiteExpense']
                                                                   ?.toString() ??
-                                                              '') ??
-                                                      0.0));
-                                              final mExp = (data['totalMgrExpense']
+                                                              '',
+                                                        ) ??
+                                                        0.0));
+                                              final mExp =
+                                                  (data['totalMgrExpense']
                                                       is num
                                                   ? (data['totalMgrExpense']
-                                                          as num)
-                                                      .toDouble()
+                                                            as num)
+                                                        .toDouble()
                                                   : (double.tryParse(
                                                           data['totalMgrExpense']
                                                                   ?.toString() ??
-                                                              '') ??
-                                                      0.0));
-                                              final oExp = (data['totalOrgExpense']
+                                                              '',
+                                                        ) ??
+                                                        0.0));
+                                              final oExp =
+                                                  (data['totalOrgExpense']
                                                       is num
                                                   ? (data['totalOrgExpense']
-                                                          as num)
-                                                      .toDouble()
+                                                            as num)
+                                                        .toDouble()
                                                   : (double.tryParse(
                                                           data['totalOrgExpense']
                                                                   ?.toString() ??
-                                                              '') ??
-                                                      0.0));
+                                                              '',
+                                                        ) ??
+                                                        0.0));
                                               final cExp =
                                                   (data['totalContractorExpense']
-                                                          is num
-                                                      ? (data['totalContractorExpense']
-                                                              as num)
-                                                          .toDouble()
-                                                      : (double.tryParse(data[
-                                                                      'totalContractorExpense']
+                                                      is num
+                                                  ? (data['totalContractorExpense']
+                                                            as num)
+                                                        .toDouble()
+                                                  : (double.tryParse(
+                                                          data['totalContractorExpense']
                                                                   ?.toString() ??
-                                                              '') ??
-                                                          0.0));
-                                              final iExp = (data[
-                                                          'totalIncentiveExpenses']
+                                                              '',
+                                                        ) ??
+                                                        0.0));
+                                              final iExp =
+                                                  (data['totalIncentiveExpenses']
                                                       is num
                                                   ? (data['totalIncentiveExpenses']
-                                                          as num)
-                                                      .toDouble()
-                                                  : (double.tryParse(data[
-                                                                  'totalIncentiveExpenses']
-                                                              ?.toString() ??
-                                                          '') ??
-                                                      0.0));
-                                              amount = sExp +
+                                                            as num)
+                                                        .toDouble()
+                                                  : (double.tryParse(
+                                                          data['totalIncentiveExpenses']
+                                                                  ?.toString() ??
+                                                              '',
+                                                        ) ??
+                                                        0.0));
+                                              amount =
+                                                  sExp +
                                                   mExp +
                                                   oExp +
                                                   cExp +
@@ -1354,17 +1402,20 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
                                             if (amount > 0) {
                                               final docDateStr =
-                                                  (data['date'] ?? '').toString();
-                                              final docDate = _parseFlexibleDate(
-                                                data['updatedAt'] ??
-                                                    data['createdAt'] ??
-                                                    data['timestamp'] ??
-                                                    docDateStr,
-                                              );
+                                                  (data['date'] ?? '')
+                                                      .toString();
+                                              final docDate =
+                                                  _parseFlexibleDate(
+                                                    data['updatedAt'] ??
+                                                        data['createdAt'] ??
+                                                        data['timestamp'] ??
+                                                        docDateStr,
+                                                  );
                                               if (_isDateInPeriod(
-                                                  docDate,
-                                                  docDateStr,
-                                                  _selectedKpiPeriod)) {
+                                                docDate,
+                                                docDateStr,
+                                                _selectedKpiPeriod,
+                                              )) {
                                                 if (computedExpenses == 0.0) {
                                                   computedExpenses += amount;
                                                 }
@@ -1377,8 +1428,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                             _selectedKpiPeriod == 'All Time') {
                                           computedExpenses = totalAmountSpent;
                                         }
-
-
 
                                         // Carousel Slides (Approvals & Project Stages)
                                         final slides = [
@@ -1407,7 +1456,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                               child: PageView.builder(
                                                 controller: _kpiPageController,
                                                 onPageChanged: (index) {
-                                                  _currentKpiPageNotifier.value =
+                                                  _currentKpiPageNotifier
+                                                          .value =
                                                       index % slides.length;
                                                   _startAutoPlayCarousel();
                                                 },
@@ -1417,8 +1467,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                                   return Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                    ),
+                                                          horizontal: 4,
+                                                        ),
                                                     child: slides[slideIndex],
                                                   );
                                                 },
@@ -1437,14 +1487,14 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                                 return Row(
                                                   mainAxisAlignment:
                                                       MainAxisAlignment.center,
-                                                  children: List.generate(
-                                                      slides.length, (index) {
+                                                  children: List.generate(slides.length, (
+                                                    index,
+                                                  ) {
                                                     final isSelected =
                                                         activeIndex == index;
                                                     return GestureDetector(
                                                       onTap: () {
-                                                        HapticFeedback
-                                                            .selectionClick();
+                                                        HapticFeedback.selectionClick();
                                                         if (_kpiPageController
                                                             .hasClients) {
                                                           final currentTotalPage =
@@ -1454,50 +1504,62 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                                                   .round();
                                                           final currentMod =
                                                               currentTotalPage %
-                                                                  slides.length;
+                                                              slides.length;
                                                           final targetPage =
                                                               currentTotalPage +
-                                                                  (index -
-                                                                      currentMod);
+                                                              (index -
+                                                                  currentMod);
                                                           _kpiPageController
                                                               .animateToPage(
-                                                            targetPage,
-                                                            duration: const Duration(
-                                                                milliseconds: 450),
-                                                            curve: Curves
-                                                                .easeInOutCubic,
-                                                          );
+                                                                targetPage,
+                                                                duration:
+                                                                    const Duration(
+                                                                      milliseconds:
+                                                                          450,
+                                                                    ),
+                                                                curve: Curves
+                                                                    .easeInOutCubic,
+                                                              );
                                                         }
                                                         _startAutoPlayCarousel();
                                                       },
                                                       child: AnimatedContainer(
-                                                        duration: const Duration(
-                                                            milliseconds: 280),
-                                                        curve: Curves.easeOutCubic,
-                                                        margin: const EdgeInsets
-                                                            .symmetric(
-                                                            horizontal: 3),
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 280,
+                                                            ),
+                                                        curve:
+                                                            Curves.easeOutCubic,
+                                                        margin:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 3,
+                                                            ),
                                                         padding:
                                                             EdgeInsets.symmetric(
-                                                          horizontal: isSelected
-                                                              ? 12
-                                                              : 6,
-                                                          vertical: 5,
-                                                        ),
+                                                              horizontal:
+                                                                  isSelected
+                                                                  ? 12
+                                                                  : 6,
+                                                              vertical: 5,
+                                                            ),
                                                         decoration: BoxDecoration(
                                                           color: isSelected
                                                               ? primaryColor
                                                               : Colors.white
-                                                                  .withValues(
-                                                                      alpha: 0.6),
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.6,
+                                                                    ),
                                                           borderRadius:
-                                                              BorderRadius
-                                                                  .circular(20),
+                                                              BorderRadius.circular(
+                                                                20,
+                                                              ),
                                                           border: Border.all(
                                                             color: isSelected
                                                                 ? primaryColor
                                                                 : const Color(
-                                                                    0xFFE2E8F0),
+                                                                    0xFFE2E8F0,
+                                                                  ),
                                                             width: 1,
                                                           ),
                                                           boxShadow: isSelected
@@ -1505,13 +1567,16 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                                                   BoxShadow(
                                                                     color: primaryColor
                                                                         .withValues(
-                                                                            alpha:
-                                                                                0.25),
-                                                                    blurRadius: 6,
+                                                                          alpha:
+                                                                              0.25,
+                                                                        ),
+                                                                    blurRadius:
+                                                                        6,
                                                                     offset:
                                                                         const Offset(
-                                                                            0,
-                                                                            2),
+                                                                          0,
+                                                                          2,
+                                                                        ),
                                                                   ),
                                                                 ]
                                                               : null,
@@ -1523,23 +1588,25 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                                             Container(
                                                               width: 6,
                                                               height: 6,
-                                                              decoration:
-                                                                  BoxDecoration(
+                                                              decoration: BoxDecoration(
                                                                 shape: BoxShape
                                                                     .circle,
-                                                                color: isSelected
-                                                                    ? Colors.white
+                                                                color:
+                                                                    isSelected
+                                                                    ? Colors
+                                                                          .white
                                                                     : const Color(
-                                                                        0xFF94A3B8),
+                                                                        0xFF94A3B8,
+                                                                      ),
                                                               ),
                                                             ),
                                                             if (isSelected) ...[
                                                               const SizedBox(
-                                                                  width: 5),
+                                                                width: 5,
+                                                              ),
                                                               Text(
                                                                 titles[index],
-                                                                style:
-                                                                    const TextStyle(
+                                                                style: const TextStyle(
                                                                   color: Colors
                                                                       .white,
                                                                   fontSize: 11,
@@ -1549,7 +1616,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                                                   letterSpacing:
                                                                       0.2,
                                                                 ),
-                                                             ),
+                                                              ),
                                                             ],
                                                           ],
                                                         ),
@@ -2212,7 +2279,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                            color: const Color(
+                              0xFF0F172A,
+                            ).withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 3),
                           ),
@@ -2251,51 +2320,53 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               ),
               itemBuilder: (context, index) {
                 final entry = filteredCategoryEntries[index];
-              final meta = _categoryMetadata[entry.key] ?? {
-                "subtitle": "Management options and settings",
-                "icon": entry.value.isNotEmpty
-                    ? entry.value.first.icon
-                    : Icons.sentiment_satisfied_alt_rounded,
-                "color": primaryColor,
-              };
-              final isStatic = meta["isStatic"] as bool? ?? false;
-              final IconData categoryIcon = meta["icon"] as IconData;
-              final String subtitle = meta["subtitle"] as String;
-              final Color accentColor =
-                  (meta["color"] as Color?) ?? primaryColor;
+                final meta =
+                    _categoryMetadata[entry.key] ??
+                    {
+                      "subtitle": "Management options and settings",
+                      "icon": entry.value.isNotEmpty
+                          ? entry.value.first.icon
+                          : Icons.sentiment_satisfied_alt_rounded,
+                      "color": primaryColor,
+                    };
+                final isStatic = meta["isStatic"] as bool? ?? false;
+                final IconData categoryIcon = meta["icon"] as IconData;
+                final String subtitle = meta["subtitle"] as String;
+                final Color accentColor =
+                    (meta["color"] as Color?) ?? primaryColor;
 
-              return _buildConstructionActionCard(
-                title: entry.key,
-                subtitle: isStatic
-                    ? subtitle
-                    : '${entry.value.length} options • $subtitle',
-                icon: categoryIcon,
-                accentColor: accentColor,
-                count: isStatic ? null : entry.value.length,
-                isStatic: isStatic,
-                onTap: isStatic
-                    ? () {}
-                    : () {
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ConsoleCategoryDetailsPage(
-                              sectionTitle: entry.key,
-                              items: entry.value,
-                              managerName: _managerName,
-                              metadata: meta,
-                              navigateToScreen: (title) =>
-                                  _navigateToScreen(context, title),
-                              launchPrivacyPolicy: () =>
-                                  _launchPrivacyPolicy(context),
+                return _buildConstructionActionCard(
+                  title: entry.key,
+                  subtitle: isStatic
+                      ? subtitle
+                      : '${entry.value.length} options • $subtitle',
+                  icon: categoryIcon,
+                  accentColor: accentColor,
+                  count: isStatic ? null : entry.value.length,
+                  isStatic: isStatic,
+                  onTap: isStatic
+                      ? () {}
+                      : () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ConsoleCategoryDetailsPage(
+                                sectionTitle: entry.key,
+                                items: entry.value,
+                                managerName: _managerName,
+                                metadata: meta,
+                                navigateToScreen: (title) =>
+                                    _navigateToScreen(context, title),
+                                launchPrivacyPolicy: () =>
+                                    _launchPrivacyPolicy(context),
+                              ),
                             ),
-                          ),
-                        );
-                      },
-              );
-            },
-          ),
+                          );
+                        },
+                );
+              },
+            ),
         ],
       ),
     );
@@ -2503,10 +2574,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    primaryColor,
-                    darkAccent,
-                  ],
+                  colors: [primaryColor, darkAccent],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -2660,11 +2728,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.fact_check_rounded,
             'color': const Color(0xFF10B981),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ManagerMaterialApprovalScreen(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ManagerMaterialApprovalScreen(),
+              ),
+            ),
           },
           {
             'title': 'Supervisor Setup',
@@ -2672,11 +2740,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.badge_rounded,
             'color': const Color(0xFF6366F1),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SiteSupervisorConfig(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => const SiteSupervisorConfig()),
+            ),
           },
           {
             'title': 'Site-Supervisor Map',
@@ -2684,11 +2750,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.map_rounded,
             'color': const Color(0xFFEC4899),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SiteSupervisorMapScreen(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => SiteSupervisorMapScreen()),
+            ),
           },
           {
             'title': 'New Project Setup',
@@ -2696,11 +2760,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.add_business_rounded,
             'color': const Color(0xFF0284C7),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ProjectSetupWizard(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => const ProjectSetupWizard()),
+            ),
           },
         ],
       },
@@ -2715,23 +2777,19 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.inventory_2_rounded,
             'color': const Color(0xFF059669),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MaterialScreen(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => const MaterialScreen()),
+            ),
           },
           {
-            'title': 'Tools Master',
+            'title': 'Tools Availability',
             'subtitle': 'Equipment catalog and asset IDs',
             'icon': Icons.handyman_rounded,
             'color': const Color(0xFF3B82F6),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ToolMasterPage(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => const ToolMasterPage()),
+            ),
           },
           {
             'title': 'Tools Movement',
@@ -2739,11 +2797,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.sync_alt_rounded,
             'color': const Color(0xFF8B5CF6),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ToolsMovementPage(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => ToolsMovementPage()),
+            ),
           },
           {
             'title': 'Labour Directory',
@@ -2751,11 +2807,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.engineering_rounded,
             'color': const Color(0xFFF59E0B),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => LabourScreen(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => LabourScreen()),
+            ),
           },
           {
             'title': 'Workers Config',
@@ -2763,11 +2817,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.groups_rounded,
             'color': const Color(0xFFEA580C),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const WorkersConfigPage(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => const WorkersConfigPage()),
+            ),
           },
           {
             'title': 'Vehicle Fleet',
@@ -2775,11 +2827,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.directions_car_rounded,
             'color': const Color(0xFFEF4444),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const VehicleDetailsPage(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => const VehicleDetailsPage()),
+            ),
           },
         ],
       },
@@ -2794,12 +2844,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.tune_rounded,
             'color': const Color(0xFF475569),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const ProjectConfigurationScreen(initialIndex: 0),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    const ProjectConfigurationScreen(initialIndex: 0),
+              ),
+            ),
           },
           {
             'title': 'Contractor Reports',
@@ -2807,11 +2857,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.picture_as_pdf_rounded,
             'color': const Color(0xFFDC2626),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ContractorReportPage(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => const ContractorReportPage()),
+            ),
           },
           if (_currentUserRole == UserRole.organization)
             {
@@ -2820,11 +2868,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               'icon': Icons.admin_panel_settings_rounded,
               'color': const Color(0xFF0F172A),
               'action': () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OrgMenuScreen(standalone: true),
-                    ),
-                  ),
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const OrgMenuScreen(standalone: true),
+                ),
+              ),
             },
           {
             'title': 'Contact Support',
@@ -2832,11 +2880,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             'icon': Icons.support_agent_rounded,
             'color': const Color(0xFF0D9488),
             'action': () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ContactSupportScreen(),
-                  ),
-                ),
+              context,
+              MaterialPageRoute(builder: (_) => const ContactSupportScreen()),
+            ),
           },
         ],
       },
@@ -2852,10 +2898,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white,
-              width: 1.5,
-            ),
+            border: Border.all(color: Colors.white, width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: primaryColor.withValues(alpha: 0.08),
@@ -2934,8 +2977,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF10B981)
-                                    .withValues(alpha: 0.12),
+                                color: const Color(
+                                  0xFF10B981,
+                                ).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: const Text(
@@ -2973,7 +3017,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                            color: const Color(
+                              0xFFEF4444,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
@@ -3093,10 +3139,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 1.5,
-                            ),
+                            border: Border.all(color: Colors.white, width: 1.5),
                             boxShadow: [
                               BoxShadow(
                                 color: color.withValues(alpha: 0.07),
@@ -3104,7 +3147,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                 offset: const Offset(0, 4),
                               ),
                               BoxShadow(
-                                color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+                                color: const Color(
+                                  0xFF0F172A,
+                                ).withValues(alpha: 0.02),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
@@ -3143,10 +3188,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
                                             ),
-                                            borderRadius:
-                                                BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                             border: Border.all(
-                                              color: color.withValues(alpha: 0.2),
+                                              color: color.withValues(
+                                                alpha: 0.2,
+                                              ),
                                               width: 1,
                                             ),
                                           ),
@@ -3239,8 +3287,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Site-Supervisor Map': SiteSupervisorMapScreen(),
       'Material': const MaterialScreen(),
       'Update Project': const ProjectScreen(hideAppBar: false),
-      'Labour': LabourScreen(),
-      'Tools Master': ToolMasterPage(),
+      'Labour Category Config': LabourScreen(),
+      'Tools Availability': const ToolMasterPage(),
+      'Tools Master': const ToolMasterPage(),
       'Tools Movement': ToolsMovementPage(),
       'Manager Expenses': const ManagerExpenses(hideAppBar: false),
       'Manager Daily Site Entry': ManagerSiteEntryPage(
@@ -3350,7 +3399,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            color: const Color(
+                              0xFF10B981,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
@@ -3560,7 +3611,9 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           return key;
         }
         if (cleanDocId.isNotEmpty &&
-            (cleanDocId == k || cleanDocId.contains(k) || k.contains(cleanDocId))) {
+            (cleanDocId == k ||
+                cleanDocId.contains(k) ||
+                k.contains(cleanDocId))) {
           return key;
         }
         if (cleanName.isNotEmpty && sName.isNotEmpty && cleanName == sName) {
@@ -3657,8 +3710,11 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     final todayStr2 = DateFormat('dd-MM-yyyy').format(now);
     final todayStr3 = DateFormat('d-M-yyyy').format(now);
     final todayStr4 = DateFormat('dd/MM/yyyy').format(now);
-    final startOfWeek = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
     final startOfMonth = DateTime(now.year, now.month, 1);
 
     DateTime? effectiveDate = docDate ?? _parseFlexibleDate(docDateStr);
@@ -3678,14 +3734,16 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       return false;
     } else if (period == 'This Week') {
       if (effectiveDate != null) {
-        return effectiveDate
-            .isAfter(startOfWeek.subtract(const Duration(seconds: 1)));
+        return effectiveDate.isAfter(
+          startOfWeek.subtract(const Duration(seconds: 1)),
+        );
       }
       return true;
     } else if (period == 'This Month') {
       if (effectiveDate != null) {
-        return effectiveDate
-            .isAfter(startOfMonth.subtract(const Duration(seconds: 1)));
+        return effectiveDate.isAfter(
+          startOfMonth.subtract(const Duration(seconds: 1)),
+        );
       }
       return true;
     }
@@ -3767,31 +3825,37 @@ class _ConsoleCategoryDetailsPageState
   @override
   Widget build(BuildContext context) {
     final hPad = Responsive.horizontalPadding(context);
-    final meta = widget.metadata ?? {
-      "subtitle": "Management options and settings",
-      "icon": widget.items.isNotEmpty
-          ? widget.items.first.icon
-          : Icons.sentiment_satisfied_alt_rounded,
-    };
+    final meta =
+        widget.metadata ??
+        {
+          "subtitle": "Management options and settings",
+          "icon": widget.items.isNotEmpty
+              ? widget.items.first.icon
+              : Icons.sentiment_satisfied_alt_rounded,
+        };
 
     final String subtitle = meta["subtitle"] as String;
     final IconData categoryIcon = meta["icon"] as IconData;
 
     final rawQuery = _searchQuery.trim().toLowerCase();
-    final filteredItems = (rawQuery.isEmpty
-        ? List<DashboardItem>.from(widget.items)
-        : widget.items.where((item) {
-            return item.title.toLowerCase().contains(rawQuery) ||
-                item.subtitle.toLowerCase().contains(rawQuery);
-          }).toList())
-      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    final filteredItems =
+        (rawQuery.isEmpty
+              ? List<DashboardItem>.from(widget.items)
+              : widget.items.where((item) {
+                  return item.title.toLowerCase().contains(rawQuery) ||
+                      item.subtitle.toLowerCase().contains(rawQuery);
+                }).toList())
+          ..sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+          );
 
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
         final darkAccent = AppTheme.getDarkAccent(primaryColor);
-        final dynamicGradientColors =
-            AppTheme.getBackgroundGradientColors(primaryColor);
+        final dynamicGradientColors = AppTheme.getBackgroundGradientColors(
+          primaryColor,
+        );
 
         return Container(
           decoration: BoxDecoration(
@@ -3851,8 +3915,9 @@ class _ConsoleCategoryDetailsPageState
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 10),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                          ),
                         ),
                         onChanged: (val) {
                           setState(() {
@@ -3957,8 +4022,9 @@ class _ConsoleCategoryDetailsPageState
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF0F172A)
-                                    .withValues(alpha: 0.04),
+                                color: const Color(
+                                  0xFF0F172A,
+                                ).withValues(alpha: 0.04),
                                 blurRadius: 10,
                                 offset: const Offset(0, 3),
                               ),
@@ -4061,8 +4127,9 @@ class _ConsoleCategoryDetailsPageState
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF0F172A)
-                                            .withValues(alpha: 0.05),
+                                        color: const Color(
+                                          0xFF0F172A,
+                                        ).withValues(alpha: 0.05),
                                         blurRadius: 10,
                                         offset: const Offset(0, 4),
                                       ),
@@ -4105,165 +4172,171 @@ class _ConsoleCategoryDetailsPageState
                         sliver: SliverGrid(
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 14,
-                            mainAxisSpacing: 14,
-                            childAspectRatio: childAspectRatio,
-                          ),
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final item = filteredItems[index];
-                              return InkWell(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  if (item.title == 'Privacy Policy') {
-                                    widget.launchPrivacyPolicy();
-                                  } else {
-                                    widget.navigateToScreen(item.title);
-                                  }
-                                },
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.all(14),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: 14,
+                                mainAxisSpacing: 14,
+                                childAspectRatio: childAspectRatio,
+                              ),
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final item = filteredItems[index];
+                            return InkWell(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                if (item.title == 'Privacy Policy') {
+                                  widget.launchPrivacyPolicy();
+                                } else {
+                                  widget.navigateToScreen(item.title);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.white,
+                                      Color.alphaBlend(
+                                        item.color.withValues(alpha: 0.04),
                                         Colors.white,
-                                        Color.alphaBlend(
-                                          item.color.withValues(alpha: 0.04),
-                                          Colors.white,
-                                        ),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: item.color.withValues(alpha: 0.16),
-                                      width: 1.2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF0F172A)
-                                            .withValues(alpha: 0.04),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                      BoxShadow(
-                                        color: item.color.withValues(alpha: 0.08),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 2),
                                       ),
                                     ],
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      // Top Row: Vibrant Colored Solid Gradient Icon + Arrow Pill
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          Container(
-                                            width: 42,
-                                            height: 42,
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                                colors: [
-                                                  item.color,
-                                                  Color.alphaBlend(
-                                                    Colors.black
-                                                        .withValues(alpha: 0.15),
-                                                    item.color,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: item.color.withValues(alpha: 0.16),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFF0F172A,
+                                      ).withValues(alpha: 0.04),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                    BoxShadow(
+                                      color: item.color.withValues(alpha: 0.08),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    // Top Row: Vibrant Colored Solid Gradient Icon + Arrow Pill
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 42,
+                                          height: 42,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                item.color,
+                                                Color.alphaBlend(
+                                                  Colors.black.withValues(
+                                                    alpha: 0.15,
                                                   ),
-                                                ],
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(13),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: item.color
-                                                      .withValues(alpha: 0.35),
-                                                  blurRadius: 8,
-                                                  offset: const Offset(0, 3),
+                                                  item.color,
                                                 ),
                                               ],
                                             ),
-                                            child: Center(
-                                              child: Icon(
-                                                item.icon,
-                                                color: Colors.white,
-                                                size: 21,
-                                              ),
+                                            borderRadius: BorderRadius.circular(
+                                              13,
                                             ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: item.color.withValues(
+                                                  alpha: 0.35,
+                                                ),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
                                           ),
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: item.color
-                                                  .withValues(alpha: 0.09),
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                              border: Border.all(
-                                                color: item.color
-                                                    .withValues(alpha: 0.16),
-                                                width: 1,
-                                              ),
-                                            ),
+                                          child: Center(
                                             child: Icon(
-                                              Icons.arrow_forward_ios_rounded,
-                                              size: 8.5,
-                                              color: item.color,
+                                              item.icon,
+                                              color: Colors.white,
+                                              size: 21,
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: item.color.withValues(
+                                              alpha: 0.09,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: item.color.withValues(
+                                                alpha: 0.16,
+                                              ),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            Icons.arrow_forward_ios_rounded,
+                                            size: 8.5,
+                                            color: item.color,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
 
-                                      // Bottom Text
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            item.title,
-                                            style: const TextStyle(
-                                              fontSize: 13.5,
-                                              fontWeight: FontWeight.w800,
-                                              color: Color(0xFF0F172A),
-                                              letterSpacing: -0.3,
-                                              height: 1.2,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
+                                    // Bottom Text
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.title,
+                                          style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0F172A),
+                                            letterSpacing: -0.3,
+                                            height: 1.2,
                                           ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            item.subtitle,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: Color(0xFF64748B),
-                                              height: 1.2,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          item.subtitle,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF64748B),
+                                            height: 1.2,
                                           ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              );
-                            },
-                            childCount: filteredItems.length,
-                          ),
+                              ),
+                            );
+                          }, childCount: filteredItems.length),
                         ),
                       ),
                   ],

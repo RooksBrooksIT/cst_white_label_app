@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/services/approval_workflow_service.dart';
@@ -500,57 +501,66 @@ class _ManagerMaterialApprovalScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                stageColor.withValues(alpha: 0.18),
-                                stageColor.withValues(alpha: 0.08),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  stageColor.withValues(alpha: 0.18),
+                                  stageColor.withValues(alpha: 0.08),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: stageColor.withValues(alpha: 0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.inventory_2_rounded,
+                              color: stageColor,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Request #$reqId',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
+                                    letterSpacing: -0.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Site: $siteId',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: stageColor.withValues(alpha: 0.2),
-                              width: 1,
                             ),
                           ),
-                          child: Icon(
-                            Icons.inventory_2_rounded,
-                            color: stageColor,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Request #$reqId',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            Text(
-                              'Site: $siteId',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3.5),
@@ -1197,42 +1207,238 @@ class _ManagerMaterialApprovalScreenState
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          onPressed: () => _showFinalClearanceDialog(ctx, docId, supervisorName),
+          onPressed: () => _showFinalClearanceDialog(
+            ctx,
+            docId,
+            supervisorName,
+            materials: data['materials'] as List?,
+            siteId: data['siteId']?.toString(),
+          ),
         ),
       );
     }
 
     // If already approved
     if (stage == ApprovalStage.approved) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFBBF7D0)),
-        ),
-        child: const Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
-              SizedBox(width: 6),
-              Text(
-                'Request is fully Approved & Released',
-                style: TextStyle(
-                  color: Color(0xFF15803D),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12.5,
-                ),
+      final arrivalStatus = (data['arrivalConfirmationStatus'] ?? '').toString().toLowerCase();
+      final isArrivalConfirmed = arrivalStatus == 'confirmed';
+      final arrivalConfirmedBy = (data['arrivalConfirmedBy'] ?? supervisorName).toString();
+      final rawArrivalDate = data['arrivalConfirmedAt'];
+      String arrivalDateStr = '';
+      if (rawArrivalDate is Timestamp) {
+        arrivalDateStr = DateFormat('MMM dd, yyyy • hh:mm a').format(rawArrivalDate.toDate());
+      } else if (rawArrivalDate is String && rawArrivalDate.isNotEmpty) {
+        arrivalDateStr = rawArrivalDate;
+      }
+      final arrivalProofImg = (data['arrivalProofImageUrl'] ?? '').toString();
+      final arrivalRemarks = (data['arrivalConfirmationRemarks'] ?? '').toString();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: const Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Request is fully Approved & Released',
+                    style: TextStyle(
+                      color: Color(0xFF15803D),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isArrivalConfirmed ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isArrivalConfirmed ? const Color(0xFF86EFAC) : const Color(0xFFFCD34D),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      isArrivalConfirmed ? Icons.verified_rounded : Icons.local_shipping_rounded,
+                      size: 16,
+                      color: isArrivalConfirmed ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        isArrivalConfirmed
+                            ? 'Site Arrival Confirmed by Supervisor'
+                            : 'Awaiting Physical Arrival Confirmation',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: isArrivalConfirmed ? const Color(0xFF166534) : const Color(0xFF92400E),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isArrivalConfirmed ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isArrivalConfirmed ? 'RECEIVED' : 'IN TRANSIT',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          color: isArrivalConfirmed ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (isArrivalConfirmed) ...[
+                  Text(
+                    'Confirmed by: $arrivalConfirmedBy ${arrivalDateStr.isNotEmpty ? '• $arrivalDateStr' : ''}',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF14532D),
+                    ),
+                  ),
+                  if (arrivalRemarks.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Remarks: $arrivalRemarks',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                  ],
+                  if (arrivalProofImg.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => _showImagePreviewDialog(ctx, arrivalProofImg),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              arrivalProofImg,
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                width: 44,
+                                height: 44,
+                                color: Colors.grey.shade200,
+                                child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Arrival Proof Photo',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF166534),
+                                ),
+                              ),
+                              Text(
+                                'Tap to inspect photo',
+                                style: TextStyle(fontSize: 10, color: Color(0xFF15803D)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ] else ...[
+                  Text(
+                    'Material dispatched from central inventory. Awaiting site intake confirmation & photo proof from $supervisorName.',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF78350F)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       );
     }
 
     return const SizedBox.shrink();
+  }
+
+  void _showImagePreviewDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                onPressed: () => Navigator.pop(ctx),
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+              ),
+            ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                },
+                errorBuilder: (_, _, _) => Container(
+                  padding: const EdgeInsets.all(32),
+                  color: Colors.white,
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.broken_image_rounded, size: 48, color: Colors.grey),
+                      SizedBox(height: 8),
+                      Text('Failed to load image preview'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // --- ACTION DIALOGS ---
@@ -1348,7 +1554,13 @@ class _ManagerMaterialApprovalScreenState
     );
   }
 
-  void _showFinalClearanceDialog(BuildContext sheetCtx, String docId, String supName) {
+  void _showFinalClearanceDialog(
+    BuildContext sheetCtx,
+    String docId,
+    String supName, {
+    List<dynamic>? materials,
+    String? siteId,
+  }) {
     final remarksController = TextEditingController();
     showDialog(
       context: context,
@@ -1392,6 +1604,8 @@ class _ManagerMaterialApprovalScreenState
                 managerId: _currentUserId,
                 remarks: remarksController.text.trim(),
                 supervisorName: supName,
+                materials: materials,
+                siteId: siteId,
               );
               messenger.showSnackBar(
                 const SnackBar(content: Text('Final clearance completed! Supervisor notified.')),
