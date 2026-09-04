@@ -9,10 +9,14 @@ import 'package:demo_cst/utils/responsive.dart';
 
 class ManagerSitesListPage extends StatefulWidget {
   final String initialFilter;
+  final bool showBackButton;
+  final VoidCallback? onBack;
 
   const ManagerSitesListPage({
     super.key,
     this.initialFilter = 'All',
+    this.showBackButton = true,
+    this.onBack,
   });
 
   @override
@@ -184,35 +188,44 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                       child: Row(
                         children: [
-                          InkWell(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.pop(context);
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              width: 38,
-                              height: 38,
-                              margin: const EdgeInsets.only(right: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.03),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.arrow_back_ios_new_rounded,
-                                size: 16,
-                                color: Color(0xFF0F172A),
+                          if ((widget.showBackButton &&
+                                  Navigator.canPop(context)) ||
+                              widget.onBack != null)
+                            InkWell(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                if (widget.onBack != null) {
+                                  widget.onBack!();
+                                } else if (Navigator.canPop(context)) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: const Color(0xFFE2E8F0)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.03),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  size: 16,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
                             ),
-                          ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: const [

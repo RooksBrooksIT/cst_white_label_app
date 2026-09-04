@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/services/subscription_limit_service.dart';
 
@@ -451,6 +452,19 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
       await FirestoreService.getCollection(
         'manager',
       ).doc(managerId).set(managerData);
+
+      // Trigger real-time push and in-app notification for Manager creation
+      try {
+        await NotificationService.notifyManagerAccountCreated(
+          managerName: _fullNameController.text.trim(),
+          managerId: managerId,
+          username: username,
+          designation: _selectedDesignation ?? 'Manager',
+          department: _selectedDepartment ?? 'Operations',
+        );
+      } catch (notifErr) {
+        debugPrint('Error triggering manager creation notification: $notifErr');
+      }
 
       _showSuccessDialog();
       _resetForm();

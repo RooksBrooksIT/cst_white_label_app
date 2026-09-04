@@ -310,10 +310,25 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
         const SnackBar(content: Text('Tools returned successfully')),
       );
 
-      // Notify the organisation about tools return
+      // Notify the manager and organisation about tools return
+      await NotificationService.notifyManager(
+        title: '🛠️ Tools Return Initiated',
+        body: '${_supervisorNameController.text} initiated a tools return #$trId from $_selectedSiteId.',
+        requestType: 'tools',
+        requestId: trId,
+        docId: docId,
+        siteId: _selectedSiteId,
+        senderRole: 'Supervisor',
+        senderName: _supervisorNameController.text,
+      );
+
       await NotificationService.notifyOrganisation(
         title: '🛠️ Tools Return Request',
         body: '${_supervisorNameController.text} initiated a tools return (ID: $trId) from $_selectedSiteId.',
+        requestType: 'tools',
+        requestId: trId,
+        docId: docId,
+        siteId: _selectedSiteId,
         data: {
           'type': 'tools_return',
           'trId': trId,

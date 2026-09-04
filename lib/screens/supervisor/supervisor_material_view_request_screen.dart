@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
+import 'package:demo_cst/widgets/approval_lifecycle_stepper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -25,7 +26,6 @@ class _SupervisorMaterialViewRequestScreenState
   final TextEditingController _searchCtrl = TextEditingController();
   String _statusFilter = 'All';
   List<String> _assignedSiteNames = [];
-  bool _isLoadingSites = true;
 
   @override
   void initState() {
@@ -48,14 +48,9 @@ class _SupervisorMaterialViewRequestScreenState
       if (mounted) {
         setState(() {
           _assignedSiteNames = names;
-          _isLoadingSites = false;
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingSites = false);
-      }
-    }
+    } catch (_) {}
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _queryStream() {
@@ -310,6 +305,10 @@ class _SupervisorMaterialViewRequestScreenState
                       projectStage: projectStage,
                       supervisorName: supervisorName,
                       materials: materials,
+                      history: (data['approvalHistory'] is List)
+                          ? (data['approvalHistory'] as List)
+                          : null,
+                      rejectionReason: data['rejectionReason']?.toString(),
                     );
                   },
                 );
@@ -543,6 +542,8 @@ class _RequestCard extends StatelessWidget {
   final String projectStage;
   final String supervisorName;
   final List materials;
+  final List<dynamic>? history;
+  final String? rejectionReason;
 
   const _RequestCard({
     required this.matReqId,
@@ -553,22 +554,9 @@ class _RequestCard extends StatelessWidget {
     required this.projectStage,
     required this.supervisorName,
     required this.materials,
+    this.history,
+    this.rejectionReason,
   });
-
-  Color _statusColor(BuildContext context, String s) {
-    switch (s.toLowerCase()) {
-      case 'approved':
-        return Colors.green; // Semantic success
-      case 'rejected':
-        return Theme.of(context).colorScheme.error;
-      case 'immediate':
-        return Colors.orange; // Semantic warning
-      case 'processing':
-        return Theme.of(context).colorScheme.secondary;
-      default:
-        return Colors.grey;
-    }
-  }
 
   IconData _statusIcon(String s) {
     switch (s.toLowerCase()) {
@@ -686,7 +674,17 @@ class _RequestCard extends StatelessWidget {
                   label: 'Supervisor',
                   value: supervisorName,
                 ),
+                const SizedBox(height: 14),
+
+                // Multi-Stage Visual Lifecycle Stepper
+                ApprovalLifecycleStepper(
+                  status: status,
+                  history: history,
+                  isCompact: false,
+                  rejectionReason: rejectionReason,
+                ),
                 const SizedBox(height: 16),
+
                 // Materials Section
                 Text(
                   'Materials Requested',

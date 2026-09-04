@@ -781,6 +781,457 @@ exports.sendNewSubscriptionInvoice = functions.region("us-central1").https.onCal
   }
 });
 
+// =============================================================================
+// REAL-TIME PUSH NOTIFICATION ENGINE (FCM ADMIN SDK)
+// =============================================================================
+
+/**
+ * Processes a newly created notification document and dispatches real-time push notifications
+ * using Firebase Cloud Messaging (FCM) Admin SDK to all active recipient devices.
+ */
+async function processNotificationAndSendPush(notificationData, docRef) {
+  try {
+    const {
+      title,
+      body,
+      targetRole, // 'supervisor', 'manager', 'organisation', 'all'
+      forSupervisorName,
+      forSupervisorId,
+      forManagerName,
+      forOrgId,
+      orgId: directOrgId,
+      requestType,
+      requestId,
+      docId,
+      siteId,
+      siteName,
+      status,
+      data: customData = {},
+    } = notificationData || {};
+
+    if (!title || !body) {
+      logger.warn("Notification skipped: Missing title or body", notificationData);
+      return;
+    }
+
+    const orgId = forOrgId || directOrgId || "";
+    const db = admin.firestore();
+    const tokens = new Set();
+    const tokenDocRefs = [];
+
+    // 1. Search in /organisation/{orgId}/fcmTokens if orgId is present
+    if (orgId && orgId !== "uninitialized") {
+      try {
+        let q = db.collection("organisation").doc(orgId).collection("fcmTokens");
+
+        if (targetRole === "supervisor") {
+          q = q.where("userType", "==", "supervisor");
+        } else if (targetRole === "manager") {
+          q = q.where("userType", "in", ["manager", "organisation", "config"]);
+        } else if (targetRole === "organisation") {
+          q = q.where("userType", "in", ["organisation", "config"]);
+        }
+
+        const orgSnap = await q.get();
+        for (const doc of orgSnap.docs) {
+          const d = doc.data();
+          const t = d.token;
+          const uName = (d.userName || "").trim();
+          const uId = (d.userId || doc.id).trim();
+
+          let match = true;
+          if (targetRole === "supervisor") {
+            const reqSupName = (forSupervisorName || "").trim();
+            const reqSupId = (forSupervisorId || "").trim();
+            if (reqSupName || reqSupId) {
+              match = (reqSupName && (uName === reqSupName || uId === reqSupName)) ||
+                      (reqSupId && (uId === reqSupId || uName === reqSupId));
+            }
+          } else if (targetRole === "manager" && forManagerName) {
+            const reqMgrName = (forManagerName || "").trim();
+            if (reqMgrName) {
+              match = (uName === reqMgrName || uId === reqMgrName);
+            }
+          }
+
+          if (t && match) {
+            tokens.add(t);
+            tokenDocRefs.push(doc.ref);
+          }
+        }
+      } catch (e) {
+        logger.warn(`Error querying org fcmTokens for ${orgId}:`, e.message);
+      }
+    }
+
+    // 2. Search in global fcmTokens if no tokens found yet or for broad delivery
+    if (tokens.size === 0) {
+      try {
+        let globalQuery = db.collection("fcmTokens");
+        if (targetRole === "supervisor") {
+          globalQuery = globalQuery.where("userType", "==", "supervisor");
+        } else if (targetRole === "manager") {
+          globalQuery = globalQuery.where("userType", "in", ["manager", "organisation", "config"]);
+        } else if (targetRole === "organisation") {
+          globalQuery = globalQuery.where("userType", "in", ["organisation", "config"]);
+        }
+
+        const globalSnap = await globalQuery.get();
+        for (const doc of globalSnap.docs) {
+          const d = doc.data();
+          const t = d.token;
+          const uName = (d.userName || "").trim();
+          const uId = (d.userId || doc.id).trim();
+
+          let match = true;
+          if (targetRole === "supervisor") {
+            const reqSupName = (forSupervisorName || "").trim();
+            const reqSupId = (forSupervisorId || "").trim();
+            if (reqSupName || reqSupId) {
+              match = (reqSupName && (uName === reqSupName || uId === reqSupName)) ||
+                      (reqSupId && (uId === reqSupId || uName === reqSupId));
+            }
+          } else if (targetRole === "manager" && forManagerName) {
+            const reqMgrName = (forManagerName || "").trim();
+            if (reqMgrName) {
+              match = (uName === reqMgrName || uId === reqMgrName);
+            }
+          }
+
+          if (t && match) {
+            tokens.add(t);
+            tokenDocRefs.push(doc.ref);
+          }
+        }
+      } catch (e) {
+        logger.warn("Error querying global fcmTokens:", e.message);
+      }
+    }
+
+    const tokenList = Array.from(tokens);
+    logger.info(`Found ${tokenList.length} FCM token(s) for notification "${title}" (Role: ${targetRole})`);
+
+    if (tokenList.length === 0) {
+      if (docRef) {
+        await docRef.update({
+          pushDelivered: false,
+          deliveryNote: "No active FCM tokens found for target recipient",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    // Prepare sanitize data payload (all values must be strings for FCM data payload)
+    const stringData = {
+      click_action: "FLUTTER_NOTIFICATION_CLICK",
+      id: String(requestId || docId || Date.now()),
+      title: String(title),
+      body: String(body),
+      targetRole: String(targetRole || ""),
+      requestType: String(requestType || ""),
+      requestId: String(requestId || ""),
+      docId: String(docId || ""),
+      siteId: String(siteId || ""),
+      siteName: String(siteName || ""),
+      status: String(status || ""),
+      orgId: String(orgId || ""),
+    };
+
+    if (customData && typeof customData === "object") {
+      for (const [k, v] of Object.entries(customData)) {
+        if (v !== undefined && v !== null) {
+          stringData[k] = typeof v === "string" ? v : JSON.stringify(v);
+        }
+      }
+    }
+
+    // Build the high-priority Multicast message for instant background delivery
+    const message = {
+      tokens: tokenList,
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: stringData,
+      android: {
+        priority: "high",
+        ttl: 86400 * 1000, // 24 hours
+        notification: {
+          channelId: "cst_high_importance_channel",
+          sound: "default",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          priority: "high",
+          visibility: "public",
+          notificationCount: 1,
+        },
+      },
+      apns: {
+        headers: {
+          "apns-priority": "10",
+        },
+        payload: {
+          aps: {
+            alert: {
+              title: title,
+              body: body,
+            },
+            sound: "default",
+            badge: 1,
+            contentAvailable: true,
+          },
+        },
+      },
+    };
+
+    const response = await admin.messaging().sendEachForMulticast(message);
+    logger.info(`FCM Multicast result: ${response.successCount} succeeded, ${response.failureCount} failed`);
+
+    // Clean up stale / invalid registration tokens automatically
+    if (response.failureCount > 0) {
+      const tokensToDelete = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success && resp.error) {
+          const code = resp.error.code;
+          if (
+            code === "messaging/invalid-registration-token" ||
+            code === "messaging/registration-token-not-registered"
+          ) {
+            tokensToDelete.push(tokenDocRefs[idx]);
+          }
+        }
+      });
+
+      if (tokensToDelete.length > 0) {
+        logger.info(`Cleaning up ${tokensToDelete.length} invalid/expired FCM tokens.`);
+        await Promise.all(tokensToDelete.map((ref) => (ref ? ref.delete().catch(() => {}) : Promise.resolve())));
+      }
+    }
+
+    if (docRef) {
+      await docRef.update({
+        pushDelivered: response.successCount > 0,
+        successCount: response.successCount,
+        failureCount: response.failureCount,
+        deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+    }
+  } catch (err) {
+    logger.error("processNotificationAndSendPush error:", err);
+  }
+}
+
+/**
+ * 4. Firestore Trigger: onNotificationCreated
+ * Automatically fires in real-time when any notification document is written to /notifications/{id}
+ */
+exports.onNotificationCreated = functions.region("us-central1").firestore
+  .document("notifications/{notificationId}")
+  .onCreate(async (snap, context) => {
+    logger.info(`Triggered onNotificationCreated for doc: ${context.params.notificationId}`);
+    return processNotificationAndSendPush(snap.data(), snap.ref);
+  });
+
+/**
+ * 5. Firestore Trigger: onOrgNotificationCreated
+ * Automatically fires in real-time when any notification is written to /organisation/{orgId}/notifications/{id}
+ */
+exports.onOrgNotificationCreated = functions.region("us-central1").firestore
+  .document("organisation/{orgId}/notifications/{notificationId}")
+  .onCreate(async (snap, context) => {
+    logger.info(`Triggered onOrgNotificationCreated for org: ${context.params.orgId}, doc: ${context.params.notificationId}`);
+    return processNotificationAndSendPush({ ...snap.data(), orgId: context.params.orgId }, snap.ref);
+  });
+
+/**
+ * 6. Callable Cloud Function: sendPushNotification
+ * Allows authorized client calls to trigger direct push notifications
+ */
+exports.sendPushNotification = functions.region("us-central1").https.onCall(async (data, context) => {
+  try {
+    const payload = data || {};
+    await processNotificationAndSendPush(payload, null);
+    return { success: true };
+  } catch (err) {
+    logger.error("sendPushNotification error:", err);
+    throw new HttpsError("internal", err.message || "Failed to dispatch push notification");
+  }
+});
+
+/**
+ * Core processor for scheduled notifications.
+ * Scans /scheduled_notifications for due items, delivers push, updates in-app records,
+ * and handles recurring (daily/weekly) schedules with atomic write locks.
+ */
+async function executeScheduledNotificationsScan() {
+  const db = admin.firestore();
+  const now = new Date();
+  const nowTimestamp = admin.firestore.Timestamp.fromDate(now);
+
+  logger.info(`Starting scheduled notifications scan at: ${now.toISOString()}`);
+
+  try {
+    const querySnap = await db.collection("scheduled_notifications")
+      .where("status", "==", "pending")
+      .where("scheduledAt", "<=", nowTimestamp)
+      .limit(50)
+      .get();
+
+    if (querySnap.empty) {
+      logger.info("No due scheduled notifications found.");
+      return { processed: 0 };
+    }
+
+    logger.info(`Found ${querySnap.size} scheduled notification(s) due for delivery.`);
+    let processedCount = 0;
+
+    for (const doc of querySnap.docs) {
+      const data = doc.data();
+      const docRef = doc.ref;
+
+      // Atomic lock: claim document to prevent duplicate execution
+      const claimed = await db.runTransaction(async (transaction) => {
+        const freshDoc = await transaction.get(docRef);
+        if (!freshDoc.exists || freshDoc.data().status !== "pending") {
+          return false;
+        }
+        transaction.update(docRef, {
+          status: "processing",
+          processingStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+
+      if (!claimed) {
+        logger.info(`Skipping doc ${doc.id}, already claimed by another worker.`);
+        continue;
+      }
+
+      try {
+        // 1. Send FCM Push Notification
+        await processNotificationAndSendPush(data, null);
+
+        // 2. Also write an in-app notification record so it appears in notification lists
+        const inAppRecord = {
+          app_id: data.app_id || "cst-app",
+          title: data.title,
+          body: data.body,
+          targetRole: data.targetRole || "all",
+          forSupervisorName: data.forSupervisorName || null,
+          forSupervisorId: data.forSupervisorId || null,
+          forManagerName: data.forManagerName || null,
+          forOrgId: data.orgId || data.forOrgId || "",
+          orgId: data.orgId || data.forOrgId || "",
+          requestType: data.requestType || "scheduled_alert",
+          requestId: data.id || doc.id,
+          docId: data.id || doc.id,
+          siteId: data.siteId || "",
+          siteName: data.siteName || "",
+          status: "scheduled_delivered",
+          senderRole: data.createdByRole || "System",
+          senderName: data.createdByName || "eBricks Automated Schedule",
+          isRead: false,
+          isScheduled: true,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          data: data.data || {},
+        };
+
+        await db.collection("notifications").add(inAppRecord);
+
+        if (data.orgId && data.orgId !== "uninitialized") {
+          await db.collection("organisation").doc(data.orgId).collection("notifications").add(inAppRecord);
+        }
+
+        // 3. Handle Recurring Reschedule or Completion
+        const repeat = (data.repeat || "none").toLowerCase();
+        const deliveredCount = (data.deliveredCount || 0) + 1;
+
+        if (repeat === "daily") {
+          // Schedule for next day same time
+          const currentSched = data.scheduledAt ? data.scheduledAt.toDate() : now;
+          const nextDate = new Date(currentSched.getTime() + 24 * 60 * 60 * 1000);
+          // If nextDate is still in the past, push it to tomorrow from now
+          const targetDate = nextDate <= now ? new Date(now.getTime() + 24 * 60 * 60 * 1000) : nextDate;
+
+          await docRef.update({
+            status: "pending",
+            scheduledAt: admin.firestore.Timestamp.fromDate(targetDate),
+            lastDeliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+            deliveredCount: deliveredCount,
+          });
+          logger.info(`Daily schedule ${doc.id} rescheduled to: ${targetDate.toISOString()}`);
+        } else if (repeat === "weekly") {
+          // Schedule for next week same time
+          const currentSched = data.scheduledAt ? data.scheduledAt.toDate() : now;
+          const nextDate = new Date(currentSched.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const targetDate = nextDate <= now ? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) : nextDate;
+
+          await docRef.update({
+            status: "pending",
+            scheduledAt: admin.firestore.Timestamp.fromDate(targetDate),
+            lastDeliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+            deliveredCount: deliveredCount,
+          });
+          logger.info(`Weekly schedule ${doc.id} rescheduled to: ${targetDate.toISOString()}`);
+        } else {
+          // One-time schedule completed
+          await docRef.update({
+            status: "delivered",
+            deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastDeliveredAt: admin.firestore.FieldValue.serverTimestamp(),
+            deliveredCount: deliveredCount,
+          });
+          logger.info(`One-time schedule ${doc.id} marked as delivered.`);
+        }
+
+        processedCount++;
+      } catch (sendErr) {
+        logger.error(`Failed to execute schedule ${doc.id}:`, sendErr);
+        await docRef.update({
+          status: "failed",
+          lastError: sendErr.message || "Execution error",
+          failedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }).catch(() => {});
+      }
+    }
+
+    return { processed: processedCount };
+  } catch (err) {
+    logger.error("executeScheduledNotificationsScan error:", err);
+    throw err;
+  }
+}
+
+/**
+ * 7. Scheduled Cron Trigger: processScheduledNotifications
+ * Automatically executes every 5 minutes (Asia/Kolkata) to process due scheduled notifications
+ */
+exports.processScheduledNotifications = functions.region("us-central1")
+  .pubsub.schedule("every 5 minutes")
+  .timeZone("Asia/Kolkata")
+  .onRun(async (context) => {
+    logger.info("Executing scheduled cron job: processScheduledNotifications");
+    const result = await executeScheduledNotificationsScan();
+    logger.info("Cron job result:", result);
+    return null;
+  });
+
+/**
+ * 8. Callable Cloud Function: triggerScheduledNotifications
+ * Allows instant manual/client triggering of the scheduled notifications worker
+ */
+exports.triggerScheduledNotifications = functions.region("us-central1").https.onCall(async (data, context) => {
+  try {
+    const result = await executeScheduledNotificationsScan();
+    return { success: true, ...result };
+  } catch (err) {
+    logger.error("triggerScheduledNotifications callable error:", err);
+    throw new HttpsError("internal", err.message || "Failed to run scheduled notifications scan");
+  }
+});
+
+
 
 
 

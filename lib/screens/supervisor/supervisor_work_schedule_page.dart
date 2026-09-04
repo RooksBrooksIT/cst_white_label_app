@@ -445,11 +445,26 @@ class _SupervisorWorkSchedulePageState
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Notify the organisation about the new work schedule request
+      // Notify the manager and organisation about the new work schedule request
+      await NotificationService.notifyManager(
+        title: '📅 New Work Schedule Submitted',
+        body: '$supervisorName (Site: $siteId) submitted Work Schedule #$wsReqId for $projectStage.',
+        requestType: 'workforce',
+        requestId: wsReqId,
+        docId: docId,
+        siteId: siteId,
+        status: 'pending_manager_review',
+        senderRole: 'Supervisor',
+        senderName: supervisorName,
+      );
+
       await NotificationService.notifyOrganisation(
         title: '📅 New Work Schedule Request',
-        body:
-            '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
+        body: '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
+        requestType: 'workforce',
+        requestId: wsReqId,
+        docId: docId,
+        siteId: siteId,
         data: {
           'type': 'work_schedule',
           'wsReqId': wsReqId,

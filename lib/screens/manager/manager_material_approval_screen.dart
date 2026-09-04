@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/notification_service.dart';
+import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/approval_workflow_service.dart';
+import 'package:demo_cst/widgets/approval_lifecycle_stepper.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class ManagerMaterialApprovalScreen extends StatefulWidget {
@@ -21,10 +23,22 @@ class _ManagerMaterialApprovalScreenState
 
   Color get primaryColor => Theme.of(context).colorScheme.primary;
 
+  String get _currentUserName {
+    final ud = AuthService().userData;
+    return ud['name'] ?? ud['userName'] ?? ud['email'] ?? 'Manager';
+  }
+
+  String get _currentUserId {
+    final ud = AuthService().userData;
+    return ud['userId'] ?? ud['id'] ?? '';
+  }
+
+  UserRole get _currentUserRole => AuthService().userRole;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -42,12 +56,16 @@ class _ManagerMaterialApprovalScreenState
     final isDesktop = screenWidth >= 1024;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'Material Request Approval',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          'Material Request Approvals',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -67,7 +85,8 @@ class _ManagerMaterialApprovalScreenState
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -76,7 +95,8 @@ class _ManagerMaterialApprovalScreenState
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: isDesktop ? 850.0 : (isTablet ? 680.0 : double.infinity),
+              maxWidth:
+                  isDesktop ? 850.0 : (isTablet ? 680.0 : double.infinity),
             ),
             child: Column(
               children: [
@@ -84,23 +104,28 @@ class _ManagerMaterialApprovalScreenState
                 Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                    border:
+                        Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
                   ),
                   child: TabBar(
                     controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
                     tabs: const [
-                      Tab(text: "PENDING"),
+                      Tab(text: "1. MGR REVIEW"),
+                      Tab(text: "2. ORG APPROVAL"),
+                      Tab(text: "3. MGR CLEARANCE"),
                       Tab(text: "APPROVED"),
                     ],
                     labelColor: primaryColor,
                     labelStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
                     ),
                     unselectedLabelColor: const Color(0xFF64748B),
                     unselectedLabelStyle: const TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: 12.5,
                     ),
                     indicatorColor: primaryColor,
                     indicatorWeight: 3,
@@ -109,18 +134,19 @@ class _ManagerMaterialApprovalScreenState
 
                 // Search Bar
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: TextField(
                     controller: _searchController,
                     onChanged: (v) =>
                         setState(() => _searchQuery = v.trim().toLowerCase()),
                     style: const TextStyle(
-                      color: Color(0xFF0A183D),
+                      color: Color(0xFF0F172A),
                       fontWeight: FontWeight.w600,
-                      fontSize: 13.5,
+                      fontSize: 13,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Search Material Requests...',
+                      hintText:
+                          'Search Material Requests by ID, Site, Supervisor...',
                       hintStyle: TextStyle(
                         color: Colors.grey.shade400,
                         fontSize: 12.5,
@@ -128,11 +154,12 @@ class _ManagerMaterialApprovalScreenState
                       prefixIcon: Icon(
                         Icons.search_rounded,
                         color: primaryColor,
-                        size: 20,
+                        size: 18,
                       ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, color: Color(0xFF64748B)),
+                              icon: const Icon(Icons.clear_rounded,
+                                  color: Color(0xFF64748B), size: 16),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _searchQuery = '');
@@ -141,18 +168,22 @@ class _ManagerMaterialApprovalScreenState
                           : null,
                       filled: true,
                       fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFE2E8F0)),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFE2E8F0)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: primaryColor, width: 1.8),
+                        borderSide:
+                            BorderSide(color: primaryColor, width: 1.6),
                       ),
                     ),
                   ),
@@ -163,8 +194,24 @@ class _ManagerMaterialApprovalScreenState
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      _buildRequestsList('Processing'),
-                      _buildRequestsList('Approved'),
+                      _buildRequestsList(
+                        targetStage: ApprovalStage.pendingManagerReview,
+                        emptyMessage: 'No requests waiting for Manager Review',
+                      ),
+                      _buildRequestsList(
+                        targetStage: ApprovalStage.pendingOrgApproval,
+                        emptyMessage:
+                            'No requests waiting for Organization Approval',
+                      ),
+                      _buildRequestsList(
+                        targetStage: ApprovalStage.pendingManagerClearance,
+                        emptyMessage:
+                            'No requests waiting for Final Manager Clearance',
+                      ),
+                      _buildRequestsList(
+                        targetStage: ApprovalStage.approved,
+                        emptyMessage: 'No approved material requests found',
+                      ),
                     ],
                   ),
                 ),
@@ -176,187 +223,214 @@ class _ManagerMaterialApprovalScreenState
     );
   }
 
-  Widget _buildRequestsList(String status) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirestoreService.getCollection(
-        'siteMaterialsRequest',
-      ).orderBy('date', descending: true).snapshots(),
+  Widget _buildRequestsList({
+    required ApprovalStage targetStage,
+    required String emptyMessage,
+  }) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreService.getCollection('siteMaterialsRequest').snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
         if (snapshot.hasError) {
-          return const Center(
+          return Center(
             child: Text(
-              'Error loading requests',
-              style: TextStyle(color: Colors.red),
+              'Error loading requests: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
             ),
           );
         }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator(color: primaryColor));
-        }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState(status);
-        }
+        final docs = snapshot.data?.docs ?? [];
+        final filteredDocs = docs.where((doc) {
+          final data = doc.data();
+          final status = data['status']?.toString();
+          final stage = ApprovalWorkflowService.parseStatus(status);
 
-        final docs = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final docStatus = (data['status'] ?? '').toString().toLowerCase();
-          if (docStatus != status.toLowerCase()) return false;
+          if (stage != targetStage) return false;
 
           if (_searchQuery.isEmpty) return true;
-          final searchStr =
-              '${data['matReqId']} ${data['siteId']} ${data['projectName']} ${data['supervisorName']}'
-                  .toLowerCase();
-          return searchStr.contains(_searchQuery);
+
+          final reqId = (data['matReqId'] ?? doc.id).toString().toLowerCase();
+          final siteId = (data['siteId'] ?? '').toString().toLowerCase();
+          final supervisor =
+              (data['supervisorName'] ?? '').toString().toLowerCase();
+          final stageName =
+              (data['projectStage'] ?? '').toString().toLowerCase();
+
+          return reqId.contains(_searchQuery) ||
+              siteId.contains(_searchQuery) ||
+              supervisor.contains(_searchQuery) ||
+              stageName.contains(_searchQuery);
         }).toList();
 
-        if (docs.isEmpty) {
-          return _buildEmptyState(status);
+        if (filteredDocs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inventory_2_outlined,
+                    size: 48, color: Colors.grey.shade400),
+                const SizedBox(height: 10),
+                Text(
+                  emptyMessage,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         return ListView.builder(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          itemCount: docs.length,
+          itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
-            final data = docs[index].data() as Map<String, dynamic>;
-            final docId = docs[index].id;
-            return _buildRequestCard(data, docId);
+            final doc = filteredDocs[index];
+            return _buildRequestCard(doc.data(), doc.id, targetStage);
           },
         );
       },
     );
   }
 
-  Widget _buildEmptyState(String status) {
-    final displayStatus = status.toLowerCase() == 'processing' ? 'Pending' : status;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.inventory_2_rounded,
-              size: 64,
-              color: Color(0xFFCBD5E1),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No $displayStatus Requests Found',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0A183D),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'No material requests are currently in this list.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildRequestCard(
+    Map<String, dynamic> data,
+    String docId,
+    ApprovalStage stage,
+  ) {
+    final reqId = data['matReqId'] ?? docId;
+    final siteId = data['siteId'] ?? 'N/A';
+    final supervisor = data['supervisorName'] ?? 'Supervisor';
+    final projectStage = data['projectStage'] ?? 'N/A';
+    final date = data['date'] ?? '';
+    final materials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
+    final history = List<dynamic>.from(data['approvalHistory'] ?? []);
+    final status = data['status']?.toString();
 
-  Widget _buildRequestCard(Map<String, dynamic> data, String docId) {
-    final status = data['status'] ?? 'Processing';
-
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: InkWell(
+        onTap: () => _showRequestDetailsModal(data, docId, stage),
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _showRequestDetails(data, docId),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Top Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.inventory_rounded,
-                            color: primaryColor,
-                            size: 20,
-                          ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            data['matReqId'] ?? 'REQ-N/A',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0A183D),
-                              fontSize: 15,
-                            ),
-                          ),
+                        child: Icon(Icons.inventory_2_rounded,
+                            color: primaryColor, size: 16),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Request $reqId',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _getStageColor(stage).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildStatusBadge(status),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _infoRow(Icons.place_rounded, data['siteId'] ?? 'Unknown Site'),
-              _infoRow(Icons.assignment_rounded, data['projectName'] ?? 'No Project'),
-              _infoRow(Icons.person_rounded, data['supervisorName'] ?? 'No Supervisor'),
-              const Divider(height: 20, color: Color(0xFFE2E8F0)),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.format_list_bulleted_rounded,
-                    size: 16,
-                    color: Color(0xFF64748B),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    "${(data['materials'] as List?)?.length ?? 0} Items",
-                    style: const TextStyle(
-                      color: Color(0xFF0A183D),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Spacer(),
-                  Flexible(
                     child: Text(
-                      data['date'] ?? '',
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                      ApprovalWorkflowService.getStatusDisplayText(status),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: _getStageColor(stage),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: primaryColor,
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Site & Supervisor info
+              Text(
+                'Site: $siteId • Supervisor: $supervisor',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Stage: $projectStage • ${materials.length} Items Requested • $date',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Visual Stepper
+              ApprovalLifecycleStepper(
+                status: status,
+                history: history,
+                isCompact: true,
+              ),
+              const SizedBox(height: 10),
+
+              // Quick Action Button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.visibility_rounded, size: 14),
+                    label: const Text(
+                      'Review & Actions',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor.withValues(alpha: 0.4)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                    ),
+                    onPressed: () =>
+                        _showRequestDetailsModal(data, docId, stage),
                   ),
                 ],
               ),
@@ -367,218 +441,608 @@ class _ManagerMaterialApprovalScreenState
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    final isApproved = status.toLowerCase() == 'approved';
-    final color = isApproved ? const Color(0xFF10B981) : Colors.amber.shade900;
-    final displayStatus = status.toLowerCase() == 'processing' ? 'Pending' : status;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: isApproved
-            ? const Color(0xFF10B981).withValues(alpha: 0.15)
-            : Colors.amber.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        displayStatus.toUpperCase(),
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
-        ),
-      ),
+  // --- DETAILS & ACTION MODAL ---
+  void _showRequestDetailsModal(
+    Map<String, dynamic> data,
+    String docId,
+    ApprovalStage stage,
+  ) {
+    final reqId = data['matReqId'] ?? docId;
+    final siteId = data['siteId'] ?? 'N/A';
+    final supervisor = data['supervisorName'] ?? 'Supervisor';
+    final projectStage = data['projectStage'] ?? 'N/A';
+    final materials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
+    final history = List<dynamic>.from(data['approvalHistory'] ?? []);
+    final status = data['status']?.toString();
+
+    final isOrgUser = _currentUserRole == UserRole.organization;
+    final isManagerUser = _currentUserRole == UserRole.manager || !isOrgUser;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.88,
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Title Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Material Request $reqId',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        'Site $siteId • Stage: $projectStage • By: $supervisor',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Full Stepper
+              ApprovalLifecycleStepper(
+                status: status,
+                history: history,
+                isCompact: false,
+              ),
+              const SizedBox(height: 14),
+
+              // Materials List Header
+              const Text(
+                'Requested Material Items',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Materials Items
+              Expanded(
+                child: ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: materials.length,
+                  separatorBuilder: (c, i) => const SizedBox(height: 6),
+                  itemBuilder: (c, i) {
+                    final mat = materials[i];
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  mat['materialName'] ?? 'Item',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  'Unit: ${mat['materialUnit'] ?? 'Nos'}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Qty: ${mat['materialQty'] ?? 0}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Action Buttons based on stage and role
+              _buildActionButtons(ctx, data, docId, stage, isManagerUser, isOrgUser),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _infoRow(IconData icon, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
+  Widget _buildActionButtons(
+    BuildContext ctx,
+    Map<String, dynamic> data,
+    String docId,
+    ApprovalStage stage,
+    bool isManager,
+    bool isOrg,
+  ) {
+    final supervisorName = data['supervisorName']?.toString() ?? 'Supervisor';
+
+    // 1. Manager Initial Review (Stage 1)
+    if (stage == ApprovalStage.pendingManagerReview && isManager) {
+      return Row(
         children: [
-          Icon(icon, size: 16, color: primaryColor),
-          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF0A183D),
-                fontWeight: FontWeight.w700,
-                fontSize: 13.5,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFEF4444),
+                side: const BorderSide(color: Color(0xFFFCA5A5)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
+              onPressed: () => _showRejectDialog(
+                ctx,
+                docId: docId,
+                supervisorName: supervisorName,
+                isOrgReject: false,
+              ),
+              child: const Text(
+                'Reject',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
             ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+              label: const Text(
+                'Verify & Forward to Org',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => _showForwardToOrgDialog(ctx, docId),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 2. Organization Authorization (Stage 2)
+    if (stage == ApprovalStage.pendingOrgApproval && isOrg) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFEF4444),
+                side: const BorderSide(color: Color(0xFFFCA5A5)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => _showRejectDialog(
+                ctx,
+                docId: docId,
+                supervisorName: supervisorName,
+                isOrgReject: true,
+              ),
+              child: const Text(
+                'Reject',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.check_circle_rounded, size: 16),
+              label: const Text(
+                'Authorize & Send to Manager',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8B5CF6),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => _showOrgApproveDialog(ctx, docId, supervisorName),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 3. Manager Final Clearance (Stage 3)
+    if (stage == ApprovalStage.pendingManagerClearance && isManager) {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          icon: const Icon(Icons.verified_rounded, size: 18),
+          label: const Text(
+            'Complete Final Clearance & Release to Site',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF10B981),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: () => _showFinalClearanceDialog(ctx, docId, supervisorName),
+        ),
+      );
+    }
+
+    // If already approved
+    if (stage == ApprovalStage.approved) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFBBF7D0)),
+        ),
+        child: const Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
+              SizedBox(width: 6),
+              Text(
+                'Request is fully Approved & Released',
+                style: TextStyle(
+                  color: Color(0xFF15803D),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  // --- ACTION DIALOGS ---
+
+  void _showForwardToOrgDialog(BuildContext sheetCtx, String docId) {
+    final remarksController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Forward to Organization'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add verification remarks before forwarding to the Organization for final budget authorization:',
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: remarksController,
+              decoration: InputDecoration(
+                hintText: 'e.g. Stock verified; approved for procurement.',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(dlgCtx);
+              Navigator.pop(sheetCtx);
+              await ApprovalWorkflowService.managerVerifyAndForward(
+                collectionName: 'siteMaterialsRequest',
+                docId: docId,
+                managerName: _currentUserName,
+                managerId: _currentUserId,
+                remarks: remarksController.text.trim(),
+              );
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Request verified & forwarded to Organization!')),
+              );
+            },
+            child: const Text('Forward', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  void _showRequestDetails(Map<String, dynamic> data, String docId) {
-    final materials = List<Map<String, dynamic>>.from(data['materials'] ?? []);
-    final isProcessing = (data['status'] ?? '').toString().toLowerCase() == 'processing';
-
-    showModalBottomSheet(
+  void _showOrgApproveDialog(BuildContext sheetCtx, String docId, String supName) {
+    final remarksController = TextEditingController();
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 700.0),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          data['matReqId'] ?? 'Request Details',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0A183D),
-                            fontSize: 18,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _infoRow(Icons.calendar_today_rounded, data['date'] ?? ''),
-                  _infoRow(Icons.person_rounded, data['supervisorName'] ?? ''),
-                  _infoRow(Icons.place_rounded, data['siteId'] ?? ''),
-                  const SizedBox(height: 20),
-                  Text(
-                    'REQUESTED MATERIALS',
-                    style: TextStyle(
-                      letterSpacing: 1.1,
-                      color: primaryColor,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: materials.length,
-                      separatorBuilder: (_, index) => const Divider(
-                        height: 1,
-                        color: Color(0xFFE2E8F0),
-                      ),
-                      itemBuilder: (c, i) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          materials[i]['materialName'] ?? 'Unknown',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0A183D),
-                            fontSize: 14.5,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '${materials[i]['materialQty']} ${materials[i]['materialUnit']}',
-                          style: const TextStyle(
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                        trailing: _buildPriorityChip(
-                          materials[i]['priority'] ?? 'Normal',
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (isProcessing) ...[
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.check_circle_rounded, size: 20),
-                        label: const Text(
-                          'APPROVE REQUEST',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () async {
-                          final nav = Navigator.of(ctx);
-                          await FirestoreService.getCollection(
-                            'siteMaterialsRequest',
-                          ).doc(docId).update({'status': 'Approved'});
-
-                          final supName =
-                              data['supervisorName']?.toString() ?? '';
-                          final reqId = data['matReqId']?.toString() ?? '';
-                          final siteId = data['siteId']?.toString() ?? '';
-                          if (supName.isNotEmpty) {
-                            await NotificationService.notifySupervisor(
-                              supervisorName: supName,
-                              title: '✅ Material Request Approved',
-                              body: 'Your material request $reqId for Site $siteId has been approved by the organization.',
-                              data: {
-                                'type': 'material_approval',
-                                'matReqId': reqId,
-                                'siteId': siteId,
-                                'status': 'Approved',
-                              },
-                            );
-                          }
-
-                          nav.pop();
-                        },
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+      builder: (dlgCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Authorize Request'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Authorize this requisition. It will return to the Manager for final physical clearance and release:',
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
             ),
-          ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: remarksController,
+              decoration: InputDecoration(
+                hintText: 'e.g. Authorized by HQ. Manager may dispatch.',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              maxLines: 2,
+            ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6)),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(dlgCtx);
+              Navigator.pop(sheetCtx);
+              await ApprovalWorkflowService.orgApprove(
+                collectionName: 'siteMaterialsRequest',
+                docId: docId,
+                orgUserName: _currentUserName,
+                orgUserId: _currentUserId,
+                remarks: remarksController.text.trim(),
+                supervisorName: supName,
+              );
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Request authorized and returned to Manager for clearance!')),
+              );
+            },
+            child: const Text('Authorize', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPriorityChip(String priority) {
-    final isHigh = priority.toLowerCase() == 'high';
-    final color = isHigh ? Colors.red.shade700 : primaryColor;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        priority.toUpperCase(),
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
+  void _showFinalClearanceDialog(BuildContext sheetCtx, String docId, String supName) {
+    final remarksController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Complete Final Clearance'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Complete final approval and release the requested materials for immediate dispatch to the site:',
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: remarksController,
+              decoration: InputDecoration(
+                hintText: 'e.g. Materials packed and dispatched via vehicle #12.',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              maxLines: 2,
+            ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(dlgCtx);
+              Navigator.pop(sheetCtx);
+              await ApprovalWorkflowService.managerFinalClearance(
+                collectionName: 'siteMaterialsRequest',
+                docId: docId,
+                managerName: _currentUserName,
+                managerId: _currentUserId,
+                remarks: remarksController.text.trim(),
+                supervisorName: supName,
+              );
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Final clearance completed! Supervisor notified.')),
+              );
+            },
+            child: const Text('Release & Approve', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
+  }
+
+  void _showRejectDialog(
+    BuildContext sheetCtx, {
+    required String docId,
+    required String supervisorName,
+    required bool isOrgReject,
+  }) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Reject Request', style: TextStyle(color: Color(0xFFDC2626))),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Please provide the reason for declining this requisition:',
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                hintText: 'e.g. Items currently not needed for this stage.',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a rejection reason.')),
+                );
+                return;
+              }
+
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(dlgCtx);
+              Navigator.pop(sheetCtx);
+
+              if (isOrgReject) {
+                await ApprovalWorkflowService.orgReject(
+                  collectionName: 'siteMaterialsRequest',
+                  docId: docId,
+                  orgUserName: _currentUserName,
+                  orgUserId: _currentUserId,
+                  reason: reason,
+                  supervisorName: supervisorName,
+                );
+              } else {
+                await ApprovalWorkflowService.managerReject(
+                  collectionName: 'siteMaterialsRequest',
+                  docId: docId,
+                  managerName: _currentUserName,
+                  managerId: _currentUserId,
+                  reason: reason,
+                  supervisorName: supervisorName,
+                );
+              }
+
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Request has been rejected and parties notified.')),
+              );
+            },
+            child: const Text('Reject Request', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getStageColor(ApprovalStage stage) {
+    switch (stage) {
+      case ApprovalStage.pendingManagerReview:
+        return const Color(0xFF2563EB);
+      case ApprovalStage.pendingOrgApproval:
+        return const Color(0xFF8B5CF6);
+      case ApprovalStage.pendingManagerClearance:
+        return const Color(0xFFF59E0B);
+      case ApprovalStage.approved:
+        return const Color(0xFF10B981);
+      case ApprovalStage.rejectedByManager:
+      case ApprovalStage.rejectedByOrg:
+        return const Color(0xFFEF4444);
+    }
   }
 }

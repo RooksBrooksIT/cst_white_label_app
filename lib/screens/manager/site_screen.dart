@@ -7,11 +7,21 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/services/subscription_limit_service.dart';
 
 class SiteScreen extends StatefulWidget {
-  const SiteScreen({super.key});
+  final bool hideAppBar;
+  final bool showBackButton;
+  final VoidCallback? onBack;
+
+  const SiteScreen({
+    super.key,
+    this.hideAppBar = false,
+    this.showBackButton = true,
+    this.onBack,
+  });
 
   @override
   State<SiteScreen> createState() => _SiteScreenState();
@@ -490,6 +500,19 @@ class _SiteScreenState extends State<SiteScreen>
           .doc(createdSiteDocId)
           .set(siteData);
 
+      // Trigger real-time notification to Organization
+      try {
+        await NotificationService.notifySiteCreatedOrUpdated(
+          siteId: nextSiteId,
+          siteName: siteName,
+          location: location,
+          projectName: projectName,
+          isCreated: true,
+        );
+      } catch (notifErr) {
+        debugPrint('Error triggering site creation notification: $notifErr');
+      }
+
       // 4. Save Project (with Rollback safety if Project fails)
       try {
         final projectsSnapshot =
@@ -708,60 +731,90 @@ class _SiteScreenState extends State<SiteScreen>
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Site & Project Setup',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.getDarkAccent(primaryColor),
-                Color.alphaBlend(
-                  primaryColor.withValues(alpha: 0.35),
-                  AppTheme.getDarkAccent(primaryColor),
+    return PopScope(
+      canPop: widget.onBack == null && Navigator.canPop(context),
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (widget.onBack != null) {
+          widget.onBack!();
+        } else if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: widget.hideAppBar
+            ? null
+            : AppBar(
+                iconTheme: const IconThemeData(color: Colors.white),
+                automaticallyImplyLeading: false,
+                leading: (widget.showBackButton ||
+                        widget.onBack != null ||
+                        Navigator.canPop(context))
+                    ? IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white, size: 18),
+                        onPressed: () {
+                          if (widget.onBack != null) {
+                            widget.onBack!();
+                          } else if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          }
+                        },
+                      )
+                    : null,
+                title: const Text(
+                  'Project & Site Setup',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold),
                 ),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 15,
-          ),
-          tabs: const [
-            Tab(text: 'New Setup'),
-            Tab(text: 'All Sites'),
-          ],
-        ),
-      ),
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: isMobile ? double.infinity : 650,
-            ),
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildNewSiteTab(),
-                _buildAllSiteTab(),
-              ],
+                centerTitle: true,
+                elevation: 0,
+                flexibleSpace: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.getDarkAccent(primaryColor),
+                        Color.alphaBlend(
+                          primaryColor.withValues(alpha: 0.35),
+                          AppTheme.getDarkAccent(primaryColor),
+                        ),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+                bottom: TabBar(
+                  controller: _tabController,
+                  indicatorColor: Colors.white,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  indicatorWeight: 3,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                  tabs: const [
+                    Tab(text: 'New Setup'),
+                    Tab(text: 'All Sites'),
+                  ],
+                ),
+              ),
+        body: SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? double.infinity : 650,
+              ),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildNewSiteTab(),
+                  _buildAllSiteTab(),
+                ],
+              ),
             ),
           ),
         ),

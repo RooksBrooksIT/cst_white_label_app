@@ -1,9 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:demo_cst/services/approval_workflow_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class MaterialRequestForm extends StatefulWidget {
@@ -46,13 +45,14 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   Color get darkAccent => AppTheme.getDarkAccent(primaryColor);
   Color get errorColor => Theme.of(context).colorScheme.error;
 
-  // Material dropdown data
+  // Material dropdown data from 'materials' collection
   List<Map<String, dynamic>> materialDocs = [];
   List<String> materialDescriptions = [];
+  bool _isLoadingMaterialsList = true;
 
   DateTime? selectedDate;
 
-  // Section 2 Controllers
+  // Section 2: Required Materials Controllers
   String? selectedMaterial;
   final TextEditingController quantityController = TextEditingController();
   final TextEditingController unitController = TextEditingController();
@@ -145,21 +145,168 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   }
 
   Future<void> _fetchMaterialsFromFirestore() async {
+    if (mounted) setState(() => _isLoadingMaterialsList = true);
     try {
-      final snapshot = await FirestoreService.getCollection(
-        'materialCategories',
-      ).get();
-      materialDocs = snapshot.docs.map((doc) => doc.data()).toList();
-      materialDescriptions = materialDocs
-          .map(
-            (m) =>
-                (m['matCategory'] ?? m['materialName'] ?? '').toString().trim(),
-          )
-          .where((desc) => desc.isNotEmpty)
-          .toList();
-      setState(() {});
+      final Set<String> nameSet = {};
+      final List<Map<String, dynamic>> allMatDocs = [];
+
+      // 1. Primary: Fetch from 'materials' collection
+      try {
+        final matSnap = await FirestoreService.getCollection('materials').get();
+        for (final doc in matSnap.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ??
+                  data['materialname'] ??
+                  data['name'] ??
+                  data['matCategory'] ??
+                  '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty && !nameSet.contains(name)) {
+            nameSet.add(name);
+            allMatDocs.add({
+              'docId': doc.id,
+              'materialName': name,
+              'materialId': data['materialId'] ?? doc.id,
+              'materialUnit': (data['materialUnit'] ??
+                      data['unit'] ??
+                      data['matUnit'] ??
+                      '')
+                  .toString()
+                  .trim(),
+              'materialCategory': (data['materialCategory'] ??
+                      data['matCategory'] ??
+                      '')
+                  .toString()
+                  .trim(),
+              'materialSubCategory':
+                  (data['materialSubCategory'] ?? '').toString().trim(),
+              'unitPrice': data['materialPrice'] ?? data['unitPrice'] ?? '',
+              'rawData': data,
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching from materials: $e');
+      }
+
+      // 2. Secondary: Fetch from 'Materials' collection (capitalized)
+      if (allMatDocs.isEmpty) {
+        try {
+          final matCapitalSnap =
+              await FirestoreService.getCollection('Materials').get();
+          for (final doc in matCapitalSnap.docs) {
+            final data = doc.data();
+            final name = (data['materialName'] ??
+                    data['materialname'] ??
+                    data['name'] ??
+                    data['matCategory'] ??
+                    '')
+                .toString()
+                .trim();
+            if (name.isNotEmpty && !nameSet.contains(name)) {
+              nameSet.add(name);
+              allMatDocs.add({
+                'docId': doc.id,
+                'materialName': name,
+                'materialId': data['materialId'] ?? doc.id,
+                'materialUnit': (data['materialUnit'] ??
+                        data['unit'] ??
+                        data['matUnit'] ??
+                        '')
+                    .toString()
+                    .trim(),
+                'materialCategory': (data['materialCategory'] ??
+                        data['matCategory'] ??
+                        '')
+                    .toString()
+                    .trim(),
+                'materialSubCategory':
+                    (data['materialSubCategory'] ?? '').toString().trim(),
+                'unitPrice': data['materialPrice'] ?? data['unitPrice'] ?? '',
+                'rawData': data,
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching from Materials: $e');
+        }
+      }
+
+      // 3. Fallback: Fetch from 'materialCategories' and 'materialsavailablity'
+      try {
+        final catSnap =
+            await FirestoreService.getCollection('materialCategories').get();
+        for (final doc in catSnap.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ??
+                  data['matCategory'] ??
+                  data['name'] ??
+                  '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty && !nameSet.contains(name)) {
+            nameSet.add(name);
+            allMatDocs.add({
+              'docId': doc.id,
+              'materialName': name,
+              'materialId': data['materialId'] ?? doc.id,
+              'materialUnit': (data['materialUnit'] ?? data['matUnit'] ?? '')
+                  .toString()
+                  .trim(),
+              'materialCategory':
+                  (data['matCategory'] ?? '').toString().trim(),
+              'rawData': data,
+            });
+          }
+        }
+      } catch (_) {}
+
+      try {
+        final availSnap =
+            await FirestoreService.getCollection('materialsavailablity').get();
+        for (final doc in availSnap.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ??
+                  data['materialname'] ??
+                  data['name'] ??
+                  '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty && !nameSet.contains(name)) {
+            nameSet.add(name);
+            allMatDocs.add({
+              'docId': doc.id,
+              'materialName': name,
+              'materialId': doc.id,
+              'materialUnit':
+                  (data['materialUnit'] ?? data['unit'] ?? '').toString().trim(),
+              'rawData': data,
+            });
+          }
+        }
+      } catch (_) {}
+
+      // Sort alphabetically
+      allMatDocs.sort(
+        (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
+              (b['materialName'] as String).toLowerCase(),
+            ),
+      );
+
+      final descriptions =
+          allMatDocs.map((m) => m['materialName'] as String).toList();
+
+      if (mounted) {
+        setState(() {
+          materialDocs = allMatDocs;
+          materialDescriptions = descriptions;
+          _isLoadingMaterialsList = false;
+        });
+      }
     } catch (e) {
-      // Optional error handling
+      debugPrint('Error fetching materials: $e');
+      if (mounted) setState(() => _isLoadingMaterialsList = false);
     }
   }
 
@@ -175,54 +322,34 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   }
 
   Future<void> _onMaterialChanged(String? value) async {
-    unitController.text = '';
     setState(() {
       selectedMaterial = value;
     });
-    if (value != null) {
+
+    if (value != null && value.isNotEmpty) {
       final mat = materialDocs.firstWhere(
-        (m) =>
-            (m['matCategory'] ?? m['materialName'] ?? '').toString().trim() ==
-            value,
+        (m) => (m['materialName'] ?? '').toString().trim() == value.trim(),
         orElse: () => {},
       );
-      final unitRef = mat['materialUnit'];
-      if (unitRef != null && unitRef.toString().isNotEmpty) {
-        if (unitRef is String && unitRef.startsWith('materialUnits/')) {
-          try {
-            final unitSnap = await FirebaseFirestore.instance
-                .doc(unitRef)
-                .get();
-            if (unitSnap.exists && unitSnap.data() != null) {
-              final unitData = unitSnap.data() as Map<String, dynamic>;
-              final unitName = unitData['name']?.toString() ?? '';
-              if (unitName.isNotEmpty) {
-                setState(() {
-                  unitController.text = unitName;
-                });
-              }
-            }
-          } catch (e) {
-            // Optional error handling
-          }
-        } else if (unitRef is DocumentReference) {
-          try {
-            final unitSnap = await unitRef.get();
-            if (unitSnap.exists && unitSnap.data() != null) {
-              final unitData = unitSnap.data() as Map<String, dynamic>;
-              final unitName = unitData['name']?.toString() ?? '';
-              if (unitName.isNotEmpty) {
-                setState(() {
-                  unitController.text = unitName;
-                });
-              }
-            }
-          } catch (e) {
-            // Optional error handling
-          }
+
+      final unitVal = (mat['materialUnit'] ?? '').toString().trim();
+      if (unitVal.isNotEmpty) {
+        final matchedUnit = unitDropdownItems.firstWhere(
+          (u) => u.toLowerCase() == unitVal.toLowerCase(),
+          orElse: () => '',
+        );
+        if (matchedUnit.isNotEmpty) {
+          setState(() {
+            selectedUnit = matchedUnit;
+            unitController.text = matchedUnit;
+          });
         } else {
           setState(() {
-            unitController.text = unitRef.toString();
+            if (!unitDropdownItems.contains(unitVal)) {
+              unitDropdownItems.add(unitVal);
+            }
+            selectedUnit = unitVal;
+            unitController.text = unitVal;
           });
         }
       }
@@ -364,7 +491,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         "projectName": projectName,
         "projectStage": projectStageController.text.trim(),
         "supervisorName": supervisorName,
-        "status": "Processing",
+        "supervisorId": widget.supervisorId,
         "materials": materials,
       };
 
@@ -375,21 +502,14 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         datePart = DateFormat('yyyyMMdd').format(DateTime.now());
       }
       final docId = "${siteId}_$datePart";
-      await reqCollection.doc(docId).set(data);
 
-      final materialNames = addedMaterials
-          .map((mat) => mat['material'])
-          .join(', ');
-
-      await NotificationService.notifyOrganisation(
-        title: '📦 New Material Request',
-        body: '$supervisorName (Site: $siteId) requested $matReqId. Items: $materialNames',
-        data: {
-          'type': 'material_request',
-          'matReqId': matReqId,
-          'siteId': siteId,
-          'supervisorName': supervisorName,
-        },
+      await ApprovalWorkflowService.submitRequest(
+        collectionName: 'siteMaterialsRequest',
+        docId: docId,
+        baseData: data,
+        supervisorName: supervisorName,
+        supervisorId: widget.supervisorId,
+        initialRemarks: 'Requisition for ${materials.length} material items for $projectName ($siteId)',
       );
 
       if (!mounted) return;
@@ -406,7 +526,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             ],
           ),
           content: Text(
-            'Material Request $matReqId has been successfully submitted to Organization for approval.',
+            'Material Request $matReqId has been successfully submitted to Manager for review.',
             style: const TextStyle(fontSize: 14),
           ),
           actions: [
@@ -712,8 +832,20 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     );
   }
 
-  /// Card 2: Material Entry Form
+  /// Card 2: Required Materials Section
   Widget _buildMaterialEntryCard(Color darkAccent) {
+    // Look up category & subcategory details for selected material
+    final selectedMatData = materialDocs.firstWhere(
+      (m) =>
+          (m['materialName'] ?? '').toString().trim() ==
+          (selectedMaterial ?? '').trim(),
+      orElse: () => {},
+    );
+    final matCategory =
+        selectedMatData['materialCategory']?.toString() ?? '';
+    final matSubCategory =
+        selectedMatData['materialSubCategory']?.toString() ?? '';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -731,21 +863,104 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildCardTitle(
-            icon: Icons.add_shopping_cart_rounded,
-            iconColor: primaryColor,
-            title: 'Add Required Material',
+          Row(
+            children: [
+              _buildCardTitle(
+                icon: Icons.inventory_2_rounded,
+                iconColor: primaryColor,
+                title: 'Required Materials',
+              ),
+              const Spacer(),
+              if (_isLoadingMaterialsList)
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: primaryColor,
+                  ),
+                )
+              else
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${materialDescriptions.length} Available',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: primaryColor,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 14),
 
-          // Material Dropdown
+          // Required Material Dropdown (Fetched from Materials collection)
           _buildFormDropdown<String>(
-            label: "Select Material",
+            label: "Select Required Material",
+            hint: _isLoadingMaterialsList
+                ? "Loading materials catalogue..."
+                : "Choose material (e.g. cement_ppc)",
             icon: Icons.category_rounded,
             value: selectedMaterial,
             items: materialDescriptions,
             onChanged: _onMaterialChanged,
           ),
+
+          // Optional info tags for the selected material
+          if (matCategory.isNotEmpty || matSubCategory.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (matCategory.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Category: $matCategory',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF475569),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                if (matSubCategory.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Sub-Category: $matSubCategory',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF475569),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
 
           // Unit & Quantity Row
@@ -791,7 +1006,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               onPressed: _addMaterial,
               icon: const Icon(Icons.add_rounded, size: 20),
               label: const Text(
-                "Add Material to List",
+                "Add Material to Request",
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
@@ -1153,10 +1368,19 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     required T? value,
     required List<T> items,
     required ValueChanged<T?> onChanged,
+    String? hint,
   }) {
+    final T? safeValue = (value != null && items.contains(value)) ? value : null;
+
     return DropdownButtonFormField<T>(
       isExpanded: true,
-      initialValue: value,
+      initialValue: safeValue,
+      hint: hint != null
+          ? Text(
+              hint,
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            )
+          : null,
       style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
       decoration: InputDecoration(
         labelText: label,
@@ -1165,7 +1389,8 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         filled: true,
         fillColor: Colors.grey.shade50,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Color(0xFFE2E8F0)),

@@ -12,6 +12,7 @@ import 'package:demo_cst/screens/organization/organization_expenses.dart';
 import 'package:demo_cst/screens/organization/org_approvals_menu_page.dart';
 import 'package:demo_cst/screens/organization/org_materials_tools_inventory_page.dart';
 import 'package:demo_cst/screens/organization/org_notification_page.dart';
+import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/screens/organization/org_menu_screen.dart';
@@ -62,9 +63,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
   }
 
   void _initStreams() {
-    _notificationsStream = FirestoreService.getCollection(
-      'notifications',
-    ).snapshots();
+    _notificationsStream = NotificationService.streamForRole(role: 'organisation');
     _sitesStream = FirestoreService.getCollection(
       'Site',
     ).snapshots();
@@ -374,7 +373,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 stream: _notificationsStream,
                 builder: (context, snapshot) {
                   final count = snapshot.hasData
-                      ? snapshot.data!.docs.length
+                      ? snapshot.data!.docs
+                          .where((d) => d.data()['isRead'] != true)
+                          .length
                       : 0;
 
                   return Stack(
