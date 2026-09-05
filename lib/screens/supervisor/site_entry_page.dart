@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:demo_cst/services/expense_service.dart';
 import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/material_inventory_service.dart';
 import 'package:demo_cst/widgets/glass_card.dart';
 import 'package:demo_cst/widgets/glass_button.dart';
 import 'package:demo_cst/utils/app_theme.dart';
@@ -28,7 +29,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   List<Map<String, dynamic>> materials = [];
   List<Map<String, dynamic>> labours = [];
   String? selectedMaterial;
-  int materialQty = 0;
+  num materialQty = 0;
   final materialQtyController = TextEditingController(text: '0');
   String? selectedLabour;
   int labourQty = 0;
@@ -55,6 +56,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   bool isSaving = false;
   Map<String, num> materialPrices = {};
   Map<String, num> labourSalaries = {};
+
+  // Site Material Pool State
+  List<SiteMaterialPoolItem> sitePoolItems = [];
+  bool isLoadingSitePool = false;
 
   // Project Phase dropdown state
   List<String> projectPhases = [];
@@ -131,6 +136,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     _fetchLabourOptions();
     _fetchSupervisorData();
     _fetchProjectPhases();
+    _fetchSiteMaterialPool();
   }
 
   Future<void> _fetchProjectPhases() async {
@@ -249,6 +255,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                 : (projectPhases.isNotEmpty ? projectPhases.first : null);
           }
         });
+        _fetchSiteMaterialPool();
       }
     } catch (e) {
       debugPrint('Error fetching supervisor data in site_entry_page: $e');
@@ -273,23 +280,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     try {
       final orgId = getOrgId();
 
-      // 1. Fetch materialCategories to build a lookup map
-      final categoriesSnapshot = await FirebaseFirestore.instance
-          .collection('organisation')
-          .doc(orgId)
-          .collection('materialCategories')
-          .get();
-      final categoryMap = <String, String>{};
-      for (var doc in categoriesSnapshot.docs) {
-        final data = doc.data();
-        final name = (data['matCategory'] ?? '').toString().trim();
-        if (name.isNotEmpty) {
-          categoryMap[doc.reference.path] = name;
-          categoryMap[doc.id] = name;
-        }
-      }
-
-      // 2. Fetch materials from organisation/{orgId}/materials
+      // Fetch materials from organisation/{orgId}/materials
       final snapshot = await FirebaseFirestore.instance
           .collection('organisation')
           .doc(orgId)
@@ -299,36 +290,18 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data.containsKey('materialName')) {
-          final catRef = data['materialName'];
-          String? resolvedCategory;
-          if (catRef is DocumentReference) {
-            resolvedCategory =
-                categoryMap[catRef.path] ?? categoryMap[catRef.id];
-          } else if (catRef is String && catRef.isNotEmpty) {
-            resolvedCategory =
-                categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
+        final name = (data['materialName'] ?? data['name'] ?? '').toString().trim();
+        if (name.isNotEmpty) {
+          options.add(name);
+          final priceRaw = data['materialPrice'];
+          num price = 0;
+          if (priceRaw is num) {
+            price = priceRaw;
+          } else if (priceRaw is String) {
+            price =
+                num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           }
-          final name =
-              (resolvedCategory ??
-                      data['materialName'] ??
-                      data['materialName'] ??
-                      catRef?.toString() ??
-                      '')
-                  .toString()
-                  .trim();
-          if (name.isNotEmpty) {
-            options.add(name);
-            final priceRaw = data['materialPrice'];
-            num price = 0;
-            if (priceRaw is num) {
-              price = priceRaw;
-            } else if (priceRaw is String) {
-              price =
-                  num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-            }
-            prices[name] = price;
-          }
+          prices[name] = price;
         }
       }
       setState(() {
@@ -430,11 +403,134 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     }
   }
 
-  void _addMaterial() {
-    int qty = int.tryParse(materialQtyController.text) ?? 0;
-    if (selectedMaterial != null && qty > 0) {
+  Future<void> _fetchSiteMaterialPool() async {
+    if (siteCode.isEmpty) {
+      if (mounted) {
+        setState(() {
+          sitePoolItems = [];
+        });
+      }
+      return;
+    }
+    if (mounted) {
       setState(() {
-        materials.add({'type': selectedMaterial!, 'quantity': qty});
+        isLoadingSitePool = true;
+      });
+    }
+    try {
+      final pool = await MaterialInventoryService.fetchSiteMaterialPool(siteCode);
+      if (!mounted) return;
+      setState(() {
+        sitePoolItems = pool;
+        isLoadingSitePool = false;
+        if (pool.isNotEmpty) {
+          final withStock = pool.where((p) => p.remainingQty > 0).toList();
+          if (withStock.isNotEmpty) {
+            selectedMaterial = withStock.first.materialName;
+          } else {
+            selectedMaterial = pool.first.materialName;
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('Error fetching site material pool in site_entry_page: $e');
+      if (mounted) {
+        setState(() {
+          isLoadingSitePool = false;
+        });
+      }
+    }
+  }
+
+  SiteMaterialPoolItem? get _currentPoolItem {
+    if (selectedMaterial == null) return null;
+    final lowName = selectedMaterial!.toLowerCase().trim();
+    for (var item in sitePoolItems) {
+      if (item.materialName.toLowerCase().trim() == lowName) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  num _getAvailableStock(SiteMaterialPoolItem item) {
+    num inCart = 0;
+    for (var m in materials) {
+      final name = (m['materialName'] ?? m['type'] ?? '').toString().toLowerCase().trim();
+      if (name == item.materialName.toLowerCase().trim()) {
+        inCart += (m['quantity'] as num? ?? 0);
+      }
+    }
+    final remaining = item.remainingQty - inCart;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  List<String> get _availableMaterialNames {
+    if (sitePoolItems.isNotEmpty) {
+      final names = <String>[];
+      for (var p in sitePoolItems) {
+        if (!names.contains(p.materialName)) {
+          names.add(p.materialName);
+        }
+      }
+      for (var opt in materialOptions) {
+        if (!names.any((n) => n.toLowerCase() == opt.toLowerCase())) {
+          names.add(opt);
+        }
+      }
+      return names;
+    }
+    return materialOptions;
+  }
+
+  void _addMaterial() {
+    final enteredQty = num.tryParse(materialQtyController.text) ?? 0;
+    if (selectedMaterial == null || enteredQty <= 0) return;
+
+    final poolItem = _currentPoolItem;
+    if (poolItem != null) {
+      final avail = _getAvailableStock(poolItem);
+      if (enteredQty > avail) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Insufficient material! Only $avail ${poolItem.unit} is currently available at this site.',
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+      final rate = (poolItem.effectiveUnitRate > 0)
+          ? poolItem.effectiveUnitRate
+          : (materialPrices[poolItem.materialName] ?? materialPrices[selectedMaterial ?? ''] ?? 0).toDouble();
+      final totalCost = (enteredQty * rate);
+      setState(() {
+        materials.add({
+          'type': poolItem.materialName,
+          'materialName': poolItem.materialName,
+          'quantity': enteredQty,
+          'unit': poolItem.unit,
+          'category': poolItem.category,
+          'unitPrice': rate,
+          'amount': totalCost,
+        });
+        materialQty = 0;
+        materialQtyController.text = '0';
+      });
+    } else {
+      final price = materialPrices[selectedMaterial!] ?? 0;
+      final totalCost = (enteredQty * price);
+      setState(() {
+        materials.add({
+          'type': selectedMaterial!,
+          'materialName': selectedMaterial!,
+          'quantity': enteredQty,
+          'unit': 'Units',
+          'category': 'General Material',
+          'unitPrice': price,
+          'amount': totalCost,
+        });
         materialQty = 0;
         materialQtyController.text = '0';
       });
@@ -464,7 +560,15 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     });
   }
 
-  String _calculateMaterialAmount(String material, int qty) {
+  String _calculateMaterialAmount(String material, num qty) {
+    for (var m in materials) {
+      if ((m['materialName'] ?? m['type']) == material) {
+        final amt = m['amount'];
+        if (amt != null && amt is num) {
+          return '₹${amt.toStringAsFixed(0)}';
+        }
+      }
+    }
     final price = materialPrices[material] ?? 0;
     return '₹${(price * qty).toStringAsFixed(0)}';
   }
@@ -475,19 +579,24 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   }
 
   int _getTotalAmount() {
-    int total = 0;
+    num total = 0;
     for (var m in materials) {
-      final price = materialPrices[m['type'] ?? ''] ?? 0;
-      total += (price * (m['quantity'] ?? 0)).toInt();
+      final amt = m['amount'];
+      if (amt != null && amt is num) {
+        total += amt;
+      } else {
+        final price = materialPrices[m['type'] ?? ''] ?? 0;
+        total += (price * (m['quantity'] ?? 0));
+      }
     }
     for (var l in labours) {
       final salary = labourSalaries[l['type'] ?? ''] ?? 0;
-      total += (salary * (l['count'] ?? 0)).toInt();
+      total += (salary * (l['count'] ?? 0));
     }
-    total += int.tryParse(foodCost.text) ?? 0;
-    total += int.tryParse(transportCost.text) ?? 0;
-    total += int.tryParse(fuelCost.text) ?? 0;
-    return total;
+    total += num.tryParse(foodCost.text) ?? 0;
+    total += num.tryParse(transportCost.text) ?? 0;
+    total += num.tryParse(fuelCost.text) ?? 0;
+    return total.round();
   }
 
   Future<void> _saveToFirestore() async {
@@ -514,11 +623,14 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     List<Map<String, dynamic>> newMaterials = materials
         .map(
           (m) => {
-            "type": m['type'] ?? '',
+            "type": (m['type'] ?? m['materialName'] ?? '').toString(),
+            "materialName": (m['materialName'] ?? m['type'] ?? '').toString(),
             "quantity": m['quantity'] ?? 0,
-            "unitPrice": materialPrices[m['type'] ?? ''] ?? 0,
-            "amount":
-                (materialPrices[m['type'] ?? ''] ?? 0) * (m['quantity'] ?? 0),
+            "unit": (m['unit'] ?? 'Units').toString(),
+            "category": (m['category'] ?? '').toString(),
+            "unitPrice": m['unitPrice'] ?? materialPrices[m['type'] ?? ''] ?? 0,
+            "amount": m['amount'] ??
+                ((m['unitPrice'] ?? materialPrices[m['type'] ?? ''] ?? 0) * (m['quantity'] ?? 0)),
           },
         )
         .toList();
@@ -561,6 +673,28 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
           isSaving = false;
         });
         return;
+      }
+
+      // Record universal material consumption in inventory service
+      if (materials.isNotEmpty) {
+        final consumedItems = materials.map((m) => {
+          'materialName': (m['materialName'] ?? m['type']).toString(),
+          'quantity': m['quantity'] as num,
+          'unit': (m['unit'] ?? 'Units').toString(),
+          'category': (m['category'] ?? '').toString(),
+          'unitPrice': (m['unitPrice'] ?? materialPrices[m['type']] ?? 0) as num,
+          'remarks': 'Daily consumption at $siteCode by ${widget.userName}',
+        }).toList();
+
+        await MaterialInventoryService.recordDailyMaterialConsumption(
+          siteId: siteCode,
+          siteName: siteLocation,
+          date: dateIso,
+          supervisorId: supervisorId ?? '',
+          supervisorName: widget.userName,
+          consumedMaterials: consumedItems,
+          remarks: 'Daily consumption at $siteCode by ${widget.userName}',
+        );
       }
 
       Map<String, dynamic> data;
@@ -687,6 +821,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       } else {
         await actualColl.doc(actualDocId).set({...actualData, "actDays": 1});
       }
+      await _fetchSiteMaterialPool();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Entry saved successfully!')),
@@ -716,6 +851,44 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         color: isDark ? Colors.white : const Color(0xFF0A183D),
         letterSpacing: -0.4,
       ),
+    );
+  }
+
+  Widget _buildStockMetric({
+    required String label,
+    required String value,
+    required bool isDark,
+    bool highlight = false,
+    bool isWarning = false,
+  }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+            color: isWarning
+                ? const Color(0xFFDC2626)
+                : highlight
+                    ? (isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor)
+                    : (isDark ? Colors.white : const Color(0xFF0F172A)),
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 
@@ -878,10 +1051,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                     ),
                     DataCell(
                       SizedBox(
-                        width: 60,
+                        width: 70,
                         child: Text(
-                          '${m['quantity'] ?? 0}',
+                          '${m['quantity'] ?? 0} ${m['unit'] ?? ''}'.trim(),
                           style: TextStyle(fontSize: 12, color: bodyTextColor),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
@@ -1261,6 +1435,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                       ? projectPhases.first
                                                       : null);
                                           });
+                                          _fetchSiteMaterialPool();
                                         },
                                 ),
                               ),
@@ -1369,10 +1544,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                 children: [
                                   Expanded(
                                     flex: 3,
-                                    child: isLoadingMaterials
+                                    child: isLoadingMaterials || isLoadingSitePool
                                         ? const Center(
-                                            child:
-                                                CircularProgressIndicator(),
+                                            child: SizedBox(
+                                              height: 24,
+                                              width: 24,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            ),
                                           )
                                         : materialError != null
                                         ? Padding(
@@ -1390,7 +1568,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                'Search & Select Material',
+                                                'Select Material from Site Stock',
                                                 style: TextStyle(
                                                   color: labelColor,
                                                   fontWeight: FontWeight.w700,
@@ -1405,8 +1583,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                   fontSize: 14,
                                                 ),
                                                 decoration: InputDecoration(
-                                                  hintText:
-                                                      'Search Material...',
+                                                  hintText: 'Search Material...',
                                                   hintStyle: TextStyle(
                                                     color: labelColor,
                                                     fontWeight: FontWeight.w600,
@@ -1427,45 +1604,26 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                   filled: true,
                                                   fillColor: fieldBg,
                                                   isDense: true,
-                                                  contentPadding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 12,
-                                                        horizontal: 14,
-                                                      ),
+                                                  contentPadding: const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                    horizontal: 14,
+                                                  ),
                                                 ),
                                                 onChanged: (query) {
                                                   setState(() {
-                                                    final q = query
-                                                        .toLowerCase();
-                                                    final filtered =
-                                                        materialOptions
-                                                            .where(
-                                                              (item) => item
-                                                                  .toLowerCase()
-                                                                  .startsWith(
-                                                                    q,
-                                                                  ),
-                                                            )
-                                                            .toList();
-                                                    filtered.sort(
-                                                      (a, b) => a
-                                                          .toLowerCase()
-                                                          .compareTo(
-                                                            b.toLowerCase(),
-                                                          ),
-                                                    );
+                                                    final q = query.toLowerCase();
+                                                    final filtered = _availableMaterialNames
+                                                        .where((item) => item.toLowerCase().contains(q))
+                                                        .toList();
+                                                    filtered.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
                                                     if (filtered.isNotEmpty) {
-                                                      selectedMaterial =
-                                                          filtered.contains(
-                                                            selectedMaterial,
-                                                          )
+                                                      selectedMaterial = filtered.contains(selectedMaterial)
                                                           ? selectedMaterial
                                                           : filtered.first;
                                                     } else {
                                                       selectedMaterial = null;
                                                     }
-                                                    _filteredMaterialOptions =
-                                                        filtered;
+                                                    _filteredMaterialOptions = filtered;
                                                   });
                                                 },
                                               ),
@@ -1485,56 +1643,75 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                     color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
                                                   ),
                                                   border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(14),
+                                                    borderRadius: BorderRadius.circular(14),
                                                     borderSide: BorderSide(color: borderColor, width: 1.0),
                                                   ),
                                                   enabledBorder: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(14),
+                                                    borderRadius: BorderRadius.circular(14),
                                                     borderSide: BorderSide(color: borderColor, width: 1.0),
                                                   ),
                                                   focusedBorder: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(14),
+                                                    borderRadius: BorderRadius.circular(14),
                                                     borderSide: BorderSide(color: primaryColor, width: 1.8),
                                                   ),
                                                   filled: true,
                                                   fillColor: fieldBg,
                                                   isDense: true,
-                                                  contentPadding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 12,
-                                                        horizontal: 14,
-                                                      ),
+                                                  contentPadding: const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                    horizontal: 14,
+                                                  ),
                                                 ),
-                                                items:
-                                                    (_filteredMaterialOptions ??
-                                                            materialOptions)
-                                                        .map(
-                                                          (
+                                                items: (_filteredMaterialOptions ?? _availableMaterialNames)
+                                                    .map((item) {
+                                                  final pItem = sitePoolItems.cast<SiteMaterialPoolItem?>().firstWhere(
+                                                    (p) => p != null && p.materialName.toLowerCase().trim() == item.toLowerCase().trim(),
+                                                    orElse: () => null,
+                                                  );
+                                                  return DropdownMenuItem<String>(
+                                                    value: item,
+                                                    child: Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
                                                             item,
-                                                          ) => DropdownMenuItem(
-                                                            value: item,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            style: TextStyle(
+                                                              fontSize: 13.5,
+                                                              color: textColor,
+                                                              fontWeight: FontWeight.w700,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        if (pItem != null) ...[
+                                                          const SizedBox(width: 6),
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                            decoration: BoxDecoration(
+                                                              color: pItem.remainingQty > 0
+                                                                  ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                                                  : const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                                              borderRadius: BorderRadius.circular(6),
+                                                            ),
                                                             child: Text(
-                                                              item,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
+                                                              pItem.remainingQty > 0
+                                                                  ? '${pItem.remainingQty} ${pItem.unit}'
+                                                                  : '0 (Empty)',
                                                               style: TextStyle(
-                                                                fontSize: 14,
-                                                                color: textColor,
-                                                                fontWeight: FontWeight.w700,
+                                                                fontSize: 10.5,
+                                                                fontWeight: FontWeight.w800,
+                                                                color: pItem.remainingQty > 0
+                                                                    ? const Color(0xFF10B981)
+                                                                    : const Color(0xFFEF4444),
                                                               ),
                                                             ),
                                                           ),
-                                                        )
-                                                        .toList(),
-                                                onChanged: (value) =>
-                                                    setState(
-                                                      () => selectedMaterial =
-                                                          value,
+                                                        ],
+                                                      ],
                                                     ),
+                                                  );
+                                                }).toList(),
+                                                onChanged: (value) => setState(() => selectedMaterial = value),
                                               ),
                                             ],
                                           ),
@@ -1543,11 +1720,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   Expanded(
                                     flex: 2,
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Qty',
+                                          'Used Qty',
                                           style: TextStyle(
                                             color: labelColor,
                                             fontWeight: FontWeight.w700,
@@ -1578,38 +1754,37 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                             filled: true,
                                             fillColor: fieldBg,
                                             isDense: true,
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  vertical: 12,
-                                                  horizontal: 14,
-                                                ),
+                                            contentPadding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                              horizontal: 14,
+                                            ),
                                           ),
-                                          keyboardType: TextInputType.number,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                           onChanged: (value) {
                                             setState(() {
-                                              materialQty =
-                                                  int.tryParse(value) ?? 0;
+                                              materialQty = num.tryParse(value) ?? 0;
                                             });
                                           },
                                         ),
                                         const SizedBox(height: 6),
                                         Builder(
                                           builder: (context) {
-                                            final price =
-                                                materialPrices[selectedMaterial ??
-                                                    ''] ??
-                                                0;
+                                            final poolItem = _currentPoolItem;
+                                            final price = (poolItem != null && poolItem.effectiveUnitRate > 0)
+                                                ? poolItem.effectiveUnitRate
+                                                : (materialPrices[selectedMaterial ?? ''] ?? (poolItem != null ? (materialPrices[poolItem.materialName] ?? 0) : 0)).toDouble();
                                             final qty = materialQty;
                                             final total = price * qty;
                                             return Text(
                                               '$qty × ₹${price.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
                                               style: TextStyle(
-                                                fontSize: 12,
+                                                fontSize: 11.5,
                                                 color: total > 0
                                                     ? const Color(0xFF10B981)
                                                     : labelColor,
                                                 fontWeight: FontWeight.w700,
                                               ),
+                                              overflow: TextOverflow.ellipsis,
                                             );
                                           },
                                         ),
@@ -1620,16 +1795,156 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               );
                             },
                           ),
+                          // Live Material Stock Balance & Calculation Card
+                          Builder(
+                            builder: (context) {
+                              final poolItem = _currentPoolItem;
+                              if (poolItem == null) return const SizedBox.shrink();
+                              final availStock = _getAvailableStock(poolItem);
+                              final enteredQty = num.tryParse(materialQtyController.text) ?? 0;
+                              final isOverLimit = enteredQty > availStock;
+                              final balanceAfter = availStock - enteredQty;
+                              final rate = (poolItem.effectiveUnitRate > 0)
+                                  ? poolItem.effectiveUnitRate
+                                  : (materialPrices[poolItem.materialName] ?? materialPrices[selectedMaterial ?? ''] ?? 0).toDouble();
+                              final consumptionVal = enteredQty * rate;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 12.0),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isOverLimit
+                                        ? const Color(0xFFFEF2F2)
+                                        : (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC)),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: isOverLimit
+                                          ? const Color(0xFFEF4444)
+                                          : (isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0)),
+                                      width: isOverLimit ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.inventory_2_outlined,
+                                                size: 16,
+                                                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Site Stock Balance',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: availStock > 0
+                                                  ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                                  : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              availStock > 0 ? '$availStock ${poolItem.unit} Available' : 'Out of Stock',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                color: availStock > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _buildStockMetric(
+                                              label: 'Effective Rate',
+                                              value: '₹${poolItem.effectiveUnitRate.toStringAsFixed(2)} / ${poolItem.unit}',
+                                              isDark: isDark,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: _buildStockMetric(
+                                              label: 'Usage Value',
+                                              value: '₹${consumptionVal.toStringAsFixed(2)}',
+                                              isDark: isDark,
+                                              highlight: true,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: _buildStockMetric(
+                                              label: 'Balance After',
+                                              value: '${balanceAfter < 0 ? 0 : balanceAfter} ${poolItem.unit}',
+                                              isDark: isDark,
+                                              isWarning: isOverLimit,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (isOverLimit) ...[
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                'Insufficient material. Only $availStock ${poolItem.unit} is currently available at this site.',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFFDC2626),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                           const SizedBox(height: 16),
                           Row(
                             children: [
                               Expanded(
-                                child: GlassButton(
-                                  label: 'Add Material',
-                                  icon: Icons.add,
-                                  onPressed: isLoadingMaterials || materialOptions.isEmpty
-                                      ? null
-                                      : _addMaterial,
+                                child: Builder(
+                                  builder: (context) {
+                                    final poolItem = _currentPoolItem;
+                                    final availStock = poolItem != null ? _getAvailableStock(poolItem) : double.infinity;
+                                    final enteredQty = num.tryParse(materialQtyController.text) ?? 0;
+                                    final isOverLimit = poolItem != null && enteredQty > availStock;
+                                    final isOutOfStock = poolItem != null && availStock <= 0;
+                                    final isDisabled = isLoadingMaterials ||
+                                        isLoadingSitePool ||
+                                        _availableMaterialNames.isEmpty ||
+                                        enteredQty <= 0 ||
+                                        isOverLimit ||
+                                        isOutOfStock;
+
+                                    return GlassButton(
+                                      label: 'Add Material Usage',
+                                      icon: Icons.add,
+                                      onPressed: isDisabled ? null : _addMaterial,
+                                    );
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),

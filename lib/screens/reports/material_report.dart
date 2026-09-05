@@ -97,7 +97,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
 
       final list = items.map((item) {
         return MaterialInventorySummary(
-          materialName: item.displayName.isNotEmpty ? item.displayName : item.materialName,
+          materialName: item.materialName,
           category: item.category,
           subCategory: item.subCategory,
           unit: item.unit,

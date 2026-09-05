@@ -158,7 +158,6 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           final name = (data['materialName'] ??
                   data['materialname'] ??
                   data['name'] ??
-                  data['matCategory'] ??
                   '')
               .toString()
               .trim();
@@ -200,7 +199,6 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             final name = (data['materialName'] ??
                     data['materialname'] ??
                     data['name'] ??
-                    data['matCategory'] ??
                     '')
                 .toString()
                 .trim();
@@ -232,35 +230,6 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           debugPrint('Error fetching from Materials: $e');
         }
       }
-
-      // 3. Fallback: Fetch from 'materialCategories' and 'materialsavailablity'
-      try {
-        final catSnap =
-            await FirestoreService.getCollection('materialCategories').get();
-        for (final doc in catSnap.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ??
-                  data['matCategory'] ??
-                  data['name'] ??
-                  '')
-              .toString()
-              .trim();
-          if (name.isNotEmpty && !nameSet.contains(name)) {
-            nameSet.add(name);
-            allMatDocs.add({
-              'docId': doc.id,
-              'materialName': name,
-              'materialId': data['materialId'] ?? doc.id,
-              'materialUnit': (data['materialUnit'] ?? data['matUnit'] ?? '')
-                  .toString()
-                  .trim(),
-              'materialCategory':
-                  (data['matCategory'] ?? '').toString().trim(),
-              'rawData': data,
-            });
-          }
-        }
-      } catch (_) {}
 
       try {
         final availSnap =

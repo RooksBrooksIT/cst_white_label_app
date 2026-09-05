@@ -1,0 +1,29 @@
+# Firebase Cloud Functions Environment Variables for PayU Gateway
+
+# Environment Mode: sandbox or production
+PAYU_ENVIRONMENT=production
+
+# PayU Test Credentials
+PAYU_TEST_MERCHANT_ID=9193759
+PAYU_TEST_KEY=GZrAha
+PAYU_TEST_SALT=xpfwrDGBXY4sR5Y8O4xU8OB0seurgJMi
+PAYU_TEST_PAY_URL=https://test.payu.in/_payment
+
+# PayU Production Credentials
+PAYU_PROD_MERCHANT_ID=13573851
+PAYU_PROD_KEY=a912BZ
+PAYU_PROD_SALT=jgo9fpvFX8DO2QtQDaWJHvz4JByS8ytC
+PAYU_PROD_PAY_URL=https://secure.payu.in/_payment
+
+# Callback URLs
+PAYU_SURL="https://us-central1-cst-whitelabel-app.cloudfunctions.net/payuWebhook"
+PAYU_FURL="https://us-central1-cst-whitelabel-app.cloudfunctions.net/payuWebhook"
+
+# Gmail SMTP Email Service Configuration
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=support@rookstechnologies.com
+EMAIL_PASSWORD=
+EMAIL_FROM="Rooks & Brooks Support <support@rookstechnologies.com>"
+EMAIL_MOCK_MODE=false

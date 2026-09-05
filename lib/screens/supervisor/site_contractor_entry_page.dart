@@ -49,8 +49,6 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
 
   List<String> materialOptions = [];
   List<String> labourOptions = [];
-  List<String>? _filteredMaterialOptions;
-  List<String>? _filteredLabourOptions;
   bool isLoadingMaterials = true;
   bool isLoadingLabours = true;
   String? materialError;
@@ -153,45 +151,13 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       materialError = null;
     });
     try {
-      // 1. Fetch materialCategories to build a lookup map
-      final categoriesSnapshot = await FirestoreService.getCollection(
-        'materialCategories',
-      ).get();
-      final categoryMap = <String, String>{};
-      for (var doc in categoriesSnapshot.docs) {
-        final data = doc.data();
-        final name = (data['matCategory'] ?? '').toString().trim();
-        if (name.isNotEmpty) {
-          categoryMap[doc.reference.path] = name;
-          categoryMap[doc.id] = name;
-        }
-      }
-
-      // 2. Fetch specific materials
+      // Fetch materials from materials collection
       final snapshot = await FirestoreService.getCollection('materials').get();
       final options = <String>[];
       final prices = <String, num>{};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-
-        // Resolve materialCategory reference
-        String? resolvedCategory;
-        final catRef = data['materialCategory'];
-        if (catRef is DocumentReference) {
-          resolvedCategory = categoryMap[catRef.path] ?? categoryMap[catRef.id];
-        } else if (catRef is String && catRef.isNotEmpty) {
-          resolvedCategory =
-              categoryMap[catRef] ?? categoryMap[catRef.split('/').last];
-        }
-
-        // Fallback if not resolved
-        final name =
-            (resolvedCategory ??
-                    data['materialName'] ??
-                    data['matCategory'] ??
-                    '')
-                .toString()
-                .trim();
+        final name = (data['materialName'] ?? data['name'] ?? '').toString().trim();
         if (name.isNotEmpty) {
           options.add(name);
           final priceRaw = data['materialPrice'];

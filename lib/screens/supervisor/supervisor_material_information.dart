@@ -342,7 +342,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           mapByDocOrName[key] = {
             'materialId': item.docId,
             'materialName': key,
-            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
+            'displayName': key,
             'unit': item.unit,
             'count': item.companyAvailableCount,
           };
@@ -351,8 +351,8 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
 
       final list = mapByDocOrName.values.toList();
       list.sort(
-        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-              (b['displayName'] as String).toLowerCase(),
+        (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
+              (b['materialName'] as String).toLowerCase(),
             ),
       );
 
@@ -417,7 +417,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           mapByDocOrName[key] = {
             'materialId': item.docId,
             'materialName': key,
-            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
+            'displayName': key,
             'unit': item.unit,
             'count': siteEntry.availableCount,
           };
@@ -426,8 +426,8 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
 
       final list = mapByDocOrName.values.toList();
       list.sort(
-        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-              (b['displayName'] as String).toLowerCase(),
+        (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
+              (b['materialName'] as String).toLowerCase(),
             ),
       );
 
@@ -2409,7 +2409,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           ),
           items: effectiveList.map((material) {
             final materialName = (material['materialName'] ?? '').toString();
-            final displayName = (material['displayName'] ?? materialName).toString();
             final count =
                 _parseCount(material['count'] ?? material['availableCount']);
 
@@ -2420,7 +2419,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      displayName.isNotEmpty ? displayName : materialName,
+                      materialName,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 13.5,

@@ -328,6 +328,16 @@ class FirestoreService {
   get siteSupervisorProjectStageActual =>
       getCollection('siteSupervisorProjectStageActual');
 
+  // Universal Material Allocation & Consumption Collections
+  static CollectionReference<Map<String, dynamic>>
+  get siteMaterialAllocations => getCollection('siteMaterialAllocations');
+  static CollectionReference<Map<String, dynamic>>
+  get siteMaterialPool => getCollection('siteMaterialPool');
+  static CollectionReference<Map<String, dynamic>>
+  get materialTransactions => getCollection('materialTransactions');
+  static CollectionReference<Map<String, dynamic>>
+  get dailyMaterialConsumptions => getCollection('dailyMaterialConsumptions');
+
   /// Generates a unique 6-digit alphanumeric referral code.
   static Future<String> generateUniqueReferralCode() async {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

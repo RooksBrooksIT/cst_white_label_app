@@ -1422,29 +1422,36 @@ class _ManagerExpensesState extends State<ManagerExpenses>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.analytics_rounded,
+                          color: Colors.white, size: 20),
                     ),
-                    child: const Icon(Icons.analytics_rounded,
-                        color: Colors.white, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Expense Audit & Activity Summary',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Expense Audit & Summary',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
