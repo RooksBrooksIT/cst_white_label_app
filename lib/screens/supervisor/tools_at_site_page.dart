@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
+import 'package:demo_cst/screens/supervisor/supervisor_tools_view_request_screen.dart';
 
 class ToolsAtSitePage extends StatefulWidget {
   final String supervisorId;
@@ -703,6 +704,21 @@ class _ToolsAtSitePageState extends State<ToolsAtSitePage> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.fact_check_rounded, color: Colors.white, size: 20),
+            tooltip: 'Tool Requisitions & Arrivals',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorToolsViewRequestScreen(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(

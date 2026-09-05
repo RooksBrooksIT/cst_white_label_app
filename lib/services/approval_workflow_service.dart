@@ -505,6 +505,28 @@ class ApprovalWorkflowService {
       }
     }
 
+    // If it's a tools request and not already transferred, execute company-to-site stock movement
+    if (!isAlreadyTransferred &&
+        collectionName.toLowerCase().contains('tool') &&
+        targetSiteId.isNotEmpty) {
+      final reqTools = (reqData['tools'] as List?) ?? [];
+      final reqId = (reqData['toolReqId'] ?? docId).toString();
+      if (reqTools.isNotEmpty) {
+        try {
+          await _transferToolsCompanyToSite(
+            tools: reqTools,
+            siteId: targetSiteId,
+            managerName: managerName,
+            supervisorName: targetSupervisor,
+            projectName: targetProjectName,
+            reqId: reqId,
+          );
+        } catch (tErr) {
+          debugPrint('Tools stock transfer error during clearance: $tErr');
+        }
+      }
+    }
+
     final updates = {
       if (additionalUpdates != null) ...additionalUpdates,
       'status': statusApproved,
@@ -523,13 +545,18 @@ class ApprovalWorkflowService {
 
     final reqType = getRequestType(collectionName);
     final reqTypeName = getRequestTypeDisplayName(reqType);
+    final isTool = reqType == 'tools';
 
     // Real-time notification to Supervisor confirming final release!
     if (supervisorName != null && supervisorName.isNotEmpty) {
       await NotificationService.notifySupervisor(
         supervisorName: supervisorName,
-        title: '🎉 $reqTypeName Approved & Released!',
-        body: 'Manager $managerName completed final clearance for $reqTypeName #$docId. Material released – awaiting arrival confirmation.',
+        title: isTool
+            ? '🚚 Tools Requisition Approved & Dispatched!'
+            : '🎉 $reqTypeName Approved & Released!',
+        body: isTool
+            ? 'Manager $managerName approved and dispatched Tools Requisition #$docId. Tools dispatched – awaiting arrival confirmation.'
+            : 'Manager $managerName completed final clearance for $reqTypeName #$docId. Material released – awaiting arrival confirmation.',
         requestType: reqType,
         requestId: docId,
         docId: docId,
@@ -539,6 +566,135 @@ class ApprovalWorkflowService {
         senderName: managerName,
         remarks: remarks,
       );
+    }
+  }
+
+  /// Internal helper to execute atomic company-to-site tool stock movement.
+  static Future<void> _transferToolsCompanyToSite({
+    required List<dynamic> tools,
+    required String siteId,
+    required String managerName,
+    required String supervisorName,
+    String? projectName,
+    String? reqId,
+  }) async {
+    final now = DateTime.now();
+    final dateStr = DateFormat('ddMMyyyy_HHmmss').format(now);
+    final docId = '${siteId}_$dateStr';
+    String tmId = 'TM001';
+
+    try {
+      final snapshot = await FirestoreService.getCollection('toolsMovement')
+          .orderBy('tmId', descending: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final lastTmId = snapshot.docs.first['tmId'] as String?;
+        if (lastTmId != null && lastTmId.startsWith('TM')) {
+          final lastNum = int.tryParse(lastTmId.substring(2)) ?? 0;
+          tmId = 'TM${(lastNum + 1).toString().padLeft(3, '0')}';
+        }
+      }
+    } catch (_) {}
+
+    final formattedDate =
+        '${DateFormat('MMMM d, yyyy at hh:mm:ss a').format(now)} UTC+5:30';
+
+    final toolsList = <Map<String, dynamic>>[];
+
+    for (final t in tools) {
+      if (t is Map) {
+        final tMap = Map<String, dynamic>.from(t);
+        final toolCode = (tMap['toolCode'] ?? tMap['toolId'] ?? '').toString().trim();
+        final toolName = (tMap['toolName'] ?? toolCode).toString().trim();
+        final rawCount = tMap['toolCount'] ?? tMap['count'] ?? tMap['quantity'] ?? 0;
+        final int enteredCount = (rawCount is num)
+            ? rawCount.toInt()
+            : (int.tryParse(rawCount.toString()) ?? 0);
+
+        if (toolCode.isNotEmpty && enteredCount > 0) {
+          toolsList.add({
+            'toolId': tMap['toolId'] ?? toolCode,
+            'toolCode': toolCode,
+            'toolName': toolName,
+            'toolCount': enteredCount,
+          });
+
+          // 1. Decrement toolsAtCompany
+          try {
+            final companyQuery = await FirestoreService.getCollection('toolsAtCompany')
+                .where('toolCode', isEqualTo: toolCode)
+                .limit(1)
+                .get();
+
+            if (companyQuery.docs.isNotEmpty) {
+              await companyQuery.docs.first.reference.update({
+                'availableCount': FieldValue.increment(-enteredCount),
+              });
+            }
+          } catch (_) {}
+
+          // 2. Increment toolsAtSite
+          try {
+            final siteDocRef = FirestoreService.getCollection('toolsAtSite').doc(toolCode);
+            await siteDocRef.set({'toolCode': toolCode}, SetOptions(merge: true));
+            await siteDocRef.update({
+              'availableCount': FieldValue.increment(enteredCount),
+            });
+          } catch (_) {}
+
+          // 3. Update toolsInventory availableCountAtSites
+          try {
+            final invDocRef = FirestoreService.getCollection('toolsInventory').doc(toolCode);
+            final isoString = now.toIso8601String();
+            await FirestoreService.runTransaction((transaction) async {
+              final snap = await transaction.get(invDocRef);
+              if (!snap.exists) {
+                transaction.set(invDocRef, {
+                  'toolCode': toolCode,
+                  'availableCountAtSites': {siteId: enteredCount},
+                  'lastUpdated': isoString,
+                });
+              } else {
+                final data = snap.data() as Map<String, dynamic>;
+                final Map<String, dynamic> availableCountAtSites =
+                    Map<String, dynamic>.from(data['availableCountAtSites'] ?? {});
+                final currentSiteCount = (availableCountAtSites[siteId] as int?) ?? 0;
+                final newSiteCount = currentSiteCount + enteredCount;
+                if (newSiteCount <= 0) {
+                  availableCountAtSites.remove(siteId);
+                } else {
+                  availableCountAtSites[siteId] = newSiteCount;
+                }
+                transaction.update(invDocRef, {
+                  'availableCountAtSites': availableCountAtSites,
+                  'lastUpdated': isoString,
+                });
+              }
+            });
+          } catch (_) {}
+        }
+      }
+    }
+
+    if (toolsList.isNotEmpty) {
+      try {
+        final movementData = {
+          'tmId': tmId,
+          'date': formattedDate,
+          'mgrName': managerName,
+          'supervisorName': supervisorName,
+          'mtSiteId': siteId,
+          'projectName': projectName ?? '',
+          'tools': toolsList,
+          if (reqId != null && reqId.isNotEmpty) 'reqId': reqId,
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+        await FirestoreService.getCollection('toolsMovement').doc(docId).set(movementData);
+      } catch (e) {
+        debugPrint('Failed to save toolsMovement record: $e');
+      }
     }
   }
 
@@ -640,6 +796,95 @@ class ApprovalWorkflowService {
       title: '📦 $reqTypeName Arrival Confirmed',
       body: '$supervisorName (Site: ${targetSiteId.isNotEmpty ? targetSiteId : 'N/A'}) confirmed physical arrival & uploaded proof photo for $reqTypeName #$displayReqId.',
       requestType: reqType,
+      requestId: displayReqId,
+      docId: docId,
+      siteId: targetSiteId,
+      status: statusApproved,
+      senderRole: 'Supervisor',
+      senderName: supervisorName,
+      remarks: remarks,
+    );
+  }
+
+  // ===========================================================================
+  // STAGE 5 (POST-RELEASE): SUPERVISOR TOOLS ARRIVAL CONFIRMATION
+  // ===========================================================================
+
+  /// Call when the requesting Supervisor confirms physical arrival of equipment/tools at the site with proof image.
+  static Future<void> supervisorConfirmToolArrival({
+    required String collectionName,
+    required String docId,
+    required String supervisorName,
+    String? supervisorId,
+    required String proofImageUrl,
+    String? remarks,
+    String? siteId,
+    String? toolReqId,
+    List<dynamic>? tools,
+  }) async {
+    final auditEntry = createAuditEntry(
+      step: '5. Tool Arrival Confirmation',
+      action: 'Tool Arrival Confirmed',
+      actorRole: 'Supervisor',
+      actorName: supervisorName,
+      actorId: supervisorId,
+      remarks: (remarks != null && remarks.isNotEmpty)
+          ? '$remarks (Proof photo verified)'
+          : 'Tools & equipment physically received and verified at site. Proof photo uploaded.',
+    );
+
+    final reqRef = FirestoreService.getCollection(collectionName).doc(docId);
+    final reqSnap = await reqRef.get();
+    final reqData = reqSnap.data() ?? {};
+
+    final isAlreadyTransferred = (reqData['isStockTransferred'] == true);
+    final rawTools = tools ?? (reqData['tools'] as List?) ?? [];
+    final targetSiteId = (siteId != null && siteId.isNotEmpty)
+        ? siteId
+        : (reqData['siteId'] ?? '').toString();
+    final targetProjectName = (reqData['projectName'] ?? '').toString();
+    final targetManagerName = (reqData['finalApprovedBy'] ?? reqData['managerName'] ?? '').toString();
+    final displayReqId = (toolReqId != null && toolReqId.isNotEmpty)
+        ? toolReqId
+        : (reqData['toolReqId'] ?? docId).toString();
+
+    // Idempotent safeguard: If not previously transferred during clearance, transfer tools now once
+    if (!isAlreadyTransferred && rawTools.isNotEmpty && targetSiteId.isNotEmpty) {
+      try {
+        await _transferToolsCompanyToSite(
+          tools: rawTools,
+          siteId: targetSiteId,
+          managerName: targetManagerName,
+          supervisorName: supervisorName,
+          projectName: targetProjectName,
+          reqId: displayReqId,
+        );
+      } catch (invErr) {
+        debugPrint('Tools transfer arrival sync error: $invErr');
+      }
+    }
+
+    final updates = {
+      'arrivalConfirmationStatus': 'confirmed',
+      'arrivalConfirmedBy': supervisorName,
+      'arrivalConfirmedById': supervisorId ?? '',
+      'arrivalConfirmedAt': FieldValue.serverTimestamp(),
+      'arrivalProofImageUrl': proofImageUrl,
+      if (remarks != null && remarks.isNotEmpty)
+        'arrivalConfirmationRemarks': remarks,
+      'isStockTransferred': true,
+      'stockTransferredAt': reqData['stockTransferredAt'] ?? FieldValue.serverTimestamp(),
+      'approvalHistory': FieldValue.arrayUnion([auditEntry]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    await reqRef.update(updates);
+
+    // Real-time notification to Manager(s) confirming tools arrival on site!
+    await NotificationService.notifyManager(
+      title: '🚚 Tool Arrival Confirmed',
+      body: '$supervisorName (Site: ${targetSiteId.isNotEmpty ? targetSiteId : 'N/A'}) confirmed physical arrival & uploaded proof photo for Tools Requisition #$displayReqId.',
+      requestType: 'tools',
       requestId: displayReqId,
       docId: docId,
       siteId: targetSiteId,

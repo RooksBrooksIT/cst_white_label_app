@@ -116,223 +116,242 @@ class _SupervisorMaterialViewRequestScreenState
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
+          constraints: BoxConstraints(
+            maxWidth: isMobile ? double.infinity : 600,
+          ),
           child: Column(
             children: [
-          if (!FirestoreService.isReady)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: cs.errorContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Firestore is not initialized. Please re-login.',
-                style: TextStyle(color: cs.onErrorContainer),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          _buildSearchAndFilter(cs),
-          const SizedBox(height: 8),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _queryStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
-                    ),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, color: cs.error, size: 64),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error loading requests',
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.6),
-                            fontSize: 16,
-                          ),
+              if (!FirestoreService.isReady)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Firestore is not initialized. Please re-login.',
+                    style: TextStyle(color: cs.onErrorContainer),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              _buildSearchAndFilter(cs),
+              const SizedBox(height: 8),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _queryStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                         ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
-                          child: Text(
-                            snapshot.error.toString(),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: cs.error.withValues(alpha: 0.7),
-                              fontSize: 12,
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              color: cs.error,
+                              size: 64,
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error loading requests',
+                              style: TextStyle(
+                                color: cs.onSurface.withValues(alpha: 0.6),
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                              ),
+                              child: Text(
+                                snapshot.error.toString(),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: cs.error.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                }
+                      );
+                    }
 
-                final docs = snapshot.data?.docs ?? [];
+                    final docs = snapshot.data?.docs ?? [];
 
-                if (docs.isEmpty) {
-                  return _buildEmptyState(cs);
-                }
+                    if (docs.isEmpty) {
+                      return _buildEmptyState(cs);
+                    }
 
-                final search = _searchCtrl.text.trim().toLowerCase();
+                    final search = _searchCtrl.text.trim().toLowerCase();
 
-                final filtered = docs.where((d) {
-                  final data = d.data();
+                    final filtered = docs.where((d) {
+                      final data = d.data();
 
-                  final documentSupervisorName =
-                      (data['supervisorName'] ??
-                              data['supervisor'] ??
-                              data['Supervisor Name'] ??
-                              data['supervisor_name'] ??
-                              data['Name'] ??
-                              '')
+                      final documentSupervisorName =
+                          (data['supervisorName'] ??
+                                  data['supervisor'] ??
+                                  data['Supervisor Name'] ??
+                                  data['supervisor_name'] ??
+                                  data['Name'] ??
+                                  '')
+                              .toString()
+                              .trim()
+                              .toLowerCase();
+                      final documentSupervisorId = (data['supervisorId'] ?? '')
                           .toString()
                           .trim()
                           .toLowerCase();
-                  final documentSupervisorId = (data['supervisorId'] ?? '')
-                      .toString()
-                      .trim()
-                      .toLowerCase();
 
-                  // Match by ID if available, otherwise by Name
-                  bool supervisorMatch = false;
+                      // Match by ID if available, otherwise by Name
+                      bool supervisorMatch = false;
 
-                  final searchId = widget.supervisorId.trim().toLowerCase();
-                  final searchName = widget.supervisorName.trim().toLowerCase();
+                      final searchId = widget.supervisorId.trim().toLowerCase();
+                      final searchName = widget.supervisorName
+                          .trim()
+                          .toLowerCase();
 
-                  // 1. Check ID Match
-                  if (documentSupervisorId.isNotEmpty && searchId.isNotEmpty) {
-                    supervisorMatch = documentSupervisorId == searchId;
-                  }
+                      // 1. Check ID Match
+                      if (documentSupervisorId.isNotEmpty &&
+                          searchId.isNotEmpty) {
+                        supervisorMatch = documentSupervisorId == searchId;
+                      }
 
-                  // 2. Check Name Match (permissive)
-                  if (!supervisorMatch) {
-                    final List<String> validNames = [
-                      searchName,
-                      ..._assignedSiteNames.map((e) => e.toLowerCase()),
-                    ];
+                      // 2. Check Name Match (permissive)
+                      if (!supervisorMatch) {
+                        final List<String> validNames = [
+                          searchName,
+                          ..._assignedSiteNames.map((e) => e.toLowerCase()),
+                        ];
 
-                    supervisorMatch = validNames.any(
-                      (name) =>
-                          documentSupervisorName == name ||
-                          (documentSupervisorName.isNotEmpty &&
-                              name.isNotEmpty &&
-                              (documentSupervisorName.contains(name) ||
-                                  name.contains(documentSupervisorName))),
-                    );
-                  }
+                        supervisorMatch = validNames.any(
+                          (name) =>
+                              documentSupervisorName == name ||
+                              (documentSupervisorName.isNotEmpty &&
+                                  name.isNotEmpty &&
+                                  (documentSupervisorName.contains(name) ||
+                                      name.contains(documentSupervisorName))),
+                        );
+                      }
 
-                  if (!supervisorMatch) {
-                    return false;
-                  }
+                      if (!supervisorMatch) {
+                        return false;
+                      }
 
-                  final matReqId = (data['matReqId'] ?? '')
-                      .toString()
-                      .toLowerCase();
-                  final status = (data['status'] ?? '')
-                      .toString()
-                      .toLowerCase();
-                  final projectName = (data['projectName'] ?? '')
-                      .toString()
-                      .toLowerCase();
-                  final siteId = (data['siteId'] ?? '')
-                      .toString()
-                      .toLowerCase();
+                      final matReqId = (data['matReqId'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      final status = (data['status'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      final projectName = (data['projectName'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      final siteId = (data['siteId'] ?? '')
+                          .toString()
+                          .toLowerCase();
 
-                  final matchesStatus =
-                      _statusFilter.toLowerCase() == 'all' ||
-                      status == _statusFilter.toLowerCase();
-                  final matchesSearch =
-                      search.isEmpty ||
-                      matReqId.contains(search) ||
-                      status.contains(search) ||
-                      projectName.contains(search) ||
-                      siteId.contains(search);
+                      final matchesStatus =
+                          _statusFilter.toLowerCase() == 'all' ||
+                          status == _statusFilter.toLowerCase();
+                      final matchesSearch =
+                          search.isEmpty ||
+                          matReqId.contains(search) ||
+                          status.contains(search) ||
+                          projectName.contains(search) ||
+                          siteId.contains(search);
 
-                  return matchesStatus && matchesSearch;
-                }).toList();
+                      return matchesStatus && matchesSearch;
+                    }).toList();
 
-                if (filtered.isEmpty) {
-                  return _buildNoResultsState(cs);
-                }
-
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final doc = filtered[index];
-                    final data = doc.data();
-
-                    final String matReqId = (data['matReqId'] ?? '').toString();
-                    final rawDate = data['date'];
-                    String dateStr = '';
-                    if (rawDate is Timestamp) {
-                      dateStr = DateFormat(
-                        'MMM dd, yyyy • hh:mm a',
-                      ).format(rawDate.toDate());
-                    } else if (rawDate is String) {
-                      dateStr = rawDate;
-                    } else {
-                      dateStr = rawDate?.toString() ?? '';
+                    if (filtered.isEmpty) {
+                      return _buildNoResultsState(cs);
                     }
 
-                    final List materials = (data['materials'] is List)
-                        ? (data['materials'] as List)
-                        : const [];
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 16),
+                      itemBuilder: (context, index) {
+                        final doc = filtered[index];
+                        final data = doc.data();
 
-                    final String status = (data['status'] ?? '').toString();
-                    final String projectName = (data['projectName'] ?? '')
-                        .toString();
-                    final String siteId = (data['siteId'] ?? '').toString();
-                    final String projectStage = (data['projectStage'] ?? '')
-                        .toString();
-                    final String supervisorName = (data['supervisorName'] ?? '')
-                        .toString();
-                    final String supervisorId = (data['supervisorId'] ?? '')
-                        .toString();
+                        final String matReqId = (data['matReqId'] ?? '')
+                            .toString();
+                        final rawDate = data['date'];
+                        String dateStr = '';
+                        if (rawDate is Timestamp) {
+                          dateStr = DateFormat(
+                            'MMM dd, yyyy • hh:mm a',
+                          ).format(rawDate.toDate());
+                        } else if (rawDate is String) {
+                          dateStr = rawDate;
+                        } else {
+                          dateStr = rawDate?.toString() ?? '';
+                        }
 
-                    return _RequestCard(
-                      docId: doc.id,
-                      matReqId: matReqId,
-                      date: dateStr,
-                      status: status,
-                      projectName: projectName,
-                      siteId: siteId,
-                      projectStage: projectStage,
-                      supervisorName: supervisorName,
-                      supervisorId: supervisorId,
-                      currentSupervisorId: widget.supervisorId,
-                      currentSupervisorName: widget.supervisorName,
-                      materials: materials,
-                      history: (data['approvalHistory'] is List)
-                          ? (data['approvalHistory'] as List)
-                          : null,
-                      rejectionReason: data['rejectionReason']?.toString(),
-                      arrivalConfirmationStatus: (data['arrivalConfirmationStatus'] ?? '').toString(),
-                      arrivalConfirmedBy: (data['arrivalConfirmedBy'] ?? '').toString(),
-                      arrivalConfirmedById: (data['arrivalConfirmedById'] ?? '').toString(),
-                      arrivalConfirmedAt: data['arrivalConfirmedAt'],
-                      arrivalProofImageUrl: (data['arrivalProofImageUrl'] ?? '').toString(),
-                      arrivalConfirmationRemarks: (data['arrivalConfirmationRemarks'] ?? '').toString(),
+                        final List materials = (data['materials'] is List)
+                            ? (data['materials'] as List)
+                            : const [];
+
+                        final String status = (data['status'] ?? '').toString();
+                        final String projectName = (data['projectName'] ?? '')
+                            .toString();
+                        final String siteId = (data['siteId'] ?? '').toString();
+                        final String projectStage = (data['projectStage'] ?? '')
+                            .toString();
+                        final String supervisorName =
+                            (data['supervisorName'] ?? '').toString();
+                        final String supervisorId = (data['supervisorId'] ?? '')
+                            .toString();
+
+                        return _RequestCard(
+                          docId: doc.id,
+                          matReqId: matReqId,
+                          date: dateStr,
+                          status: status,
+                          projectName: projectName,
+                          siteId: siteId,
+                          projectStage: projectStage,
+                          supervisorName: supervisorName,
+                          supervisorId: supervisorId,
+                          currentSupervisorId: widget.supervisorId,
+                          currentSupervisorName: widget.supervisorName,
+                          materials: materials,
+                          history: (data['approvalHistory'] is List)
+                              ? (data['approvalHistory'] as List)
+                              : null,
+                          rejectionReason: data['rejectionReason']?.toString(),
+                          arrivalConfirmationStatus:
+                              (data['arrivalConfirmationStatus'] ?? '')
+                                  .toString(),
+                          arrivalConfirmedBy: (data['arrivalConfirmedBy'] ?? '')
+                              .toString(),
+                          arrivalConfirmedById:
+                              (data['arrivalConfirmedById'] ?? '').toString(),
+                          arrivalConfirmedAt: data['arrivalConfirmedAt'],
+                          arrivalProofImageUrl:
+                              (data['arrivalProofImageUrl'] ?? '').toString(),
+                          arrivalConfirmationRemarks:
+                              (data['arrivalConfirmationRemarks'] ?? '')
+                                  .toString(),
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
         ),
       ),
     );
@@ -356,7 +375,9 @@ class _SupervisorMaterialViewRequestScreenState
               style: TextStyle(color: cs.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search requests...',
-                hintStyle: TextStyle(color: cs.onSurface.withValues(alpha: 0.5)),
+                hintStyle: TextStyle(
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
                 filled: true,
                 fillColor: Colors.transparent,
                 contentPadding: const EdgeInsets.symmetric(
@@ -539,7 +560,9 @@ class _FilterChip extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? cs.onPrimary : cs.onSurface.withValues(alpha: 0.7),
+              color: isSelected
+                  ? cs.onPrimary
+                  : cs.onSurface.withValues(alpha: 0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -594,8 +617,10 @@ class _RequestCard extends StatelessWidget {
     this.arrivalConfirmationRemarks = '',
   });
 
-  bool get isApproved => ApprovalWorkflowService.parseStatus(status) == ApprovalStage.approved;
-  bool get isArrivalConfirmed => arrivalConfirmationStatus.toLowerCase() == 'confirmed';
+  bool get isApproved =>
+      ApprovalWorkflowService.parseStatus(status) == ApprovalStage.approved;
+  bool get isArrivalConfirmed =>
+      arrivalConfirmationStatus.toLowerCase() == 'confirmed';
 
   bool get isRequestingSupervisor {
     final cId = currentSupervisorId.trim().toLowerCase();
@@ -604,7 +629,9 @@ class _RequestCard extends StatelessWidget {
 
     final cName = currentSupervisorName.trim().toLowerCase();
     final sName = supervisorName.trim().toLowerCase();
-    if (cName.isNotEmpty && sName.isNotEmpty && (cName == sName || cName.contains(sName) || sName.contains(cName))) {
+    if (cName.isNotEmpty &&
+        sName.isNotEmpty &&
+        (cName == sName || cName.contains(sName) || sName.contains(cName))) {
       return true;
     }
     return false;
@@ -612,7 +639,9 @@ class _RequestCard extends StatelessWidget {
 
   IconData _statusIcon(String s) {
     if (isApproved) {
-      return isArrivalConfirmed ? Icons.verified_rounded : Icons.local_shipping_rounded;
+      return isArrivalConfirmed
+          ? Icons.verified_rounded
+          : Icons.local_shipping_rounded;
     }
     switch (s.toLowerCase()) {
       case 'rejected':
@@ -643,9 +672,13 @@ class _RequestCard extends StatelessWidget {
 
     String displayBadgeText;
     if (isApproved) {
-      displayBadgeText = isArrivalConfirmed ? 'MATERIAL RECEIVED' : 'AWAITING ARRIVAL';
+      displayBadgeText = isArrivalConfirmed
+          ? 'MATERIAL RECEIVED'
+          : 'AWAITING ARRIVAL';
     } else {
-      displayBadgeText = ApprovalWorkflowService.getStatusDisplayText(status).toUpperCase();
+      displayBadgeText = ApprovalWorkflowService.getStatusDisplayText(
+        status,
+      ).toUpperCase();
     }
 
     return GlassCard(
@@ -661,8 +694,8 @@ class _RequestCard extends StatelessWidget {
                 colors: isApproved && isArrivalConfirmed
                     ? [const Color(0xFF059669), const Color(0xFF10B981)]
                     : (isApproved
-                        ? [const Color(0xFFD97706), const Color(0xFFF59E0B)]
-                        : [cs.primary, cs.secondary]),
+                          ? [const Color(0xFFD97706), const Color(0xFFF59E0B)]
+                          : [cs.primary, cs.secondary]),
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
               ),
@@ -823,7 +856,11 @@ class _RequestCard extends StatelessWidget {
                   color: Color(0xFF16A34A),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
               ),
               const SizedBox(width: 8),
               const Expanded(
@@ -857,7 +894,11 @@ class _RequestCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.person_outline_rounded, size: 14, color: Color(0xFF15803D)),
+              const Icon(
+                Icons.person_outline_rounded,
+                size: 14,
+                color: Color(0xFF15803D),
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -875,7 +916,11 @@ class _RequestCard extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF15803D)),
+                const Icon(
+                  Icons.access_time_rounded,
+                  size: 14,
+                  color: Color(0xFF15803D),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   confirmedDateStr,
@@ -911,7 +956,8 @@ class _RequestCard extends StatelessWidget {
           if (arrivalProofImageUrl.isNotEmpty) ...[
             const SizedBox(height: 10),
             GestureDetector(
-              onTap: () => _showImagePreviewDialog(context, arrivalProofImageUrl),
+              onTap: () =>
+                  _showImagePreviewDialog(context, arrivalProofImageUrl),
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
@@ -933,7 +979,11 @@ class _RequestCard extends StatelessWidget {
                           width: 48,
                           height: 48,
                           color: const Color(0xFFE2E8F0),
-                          child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
+                          child: const Icon(
+                            Icons.broken_image,
+                            size: 20,
+                            color: Colors.grey,
+                          ),
                         ),
                       ),
                     ),
@@ -952,7 +1002,11 @@ class _RequestCard extends StatelessWidget {
                         SizedBox(height: 2),
                         Row(
                           children: [
-                            Icon(Icons.zoom_in_rounded, size: 13, color: Color(0xFF15803D)),
+                            Icon(
+                              Icons.zoom_in_rounded,
+                              size: 13,
+                              color: Color(0xFF15803D),
+                            ),
                             SizedBox(width: 3),
                             Text(
                               'Tap to inspect photo',
@@ -1004,7 +1058,11 @@ class _RequestCard extends StatelessWidget {
                   color: Color(0xFFD97706),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 14),
+                child: const Icon(
+                  Icons.local_shipping_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
               ),
               const SizedBox(width: 8),
               const Expanded(
@@ -1052,10 +1110,7 @@ class _RequestCard extends StatelessWidget {
                 icon: const Icon(Icons.camera_alt_rounded, size: 16),
                 label: const Text(
                   'Confirm Material Arrival',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF059669),
@@ -1078,7 +1133,11 @@ class _RequestCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 14, color: Color(0xFFB45309)),
+                  const Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: Color(0xFFB45309),
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -1130,7 +1189,11 @@ class _RequestCard extends StatelessWidget {
               alignment: Alignment.topRight,
               child: IconButton(
                 onPressed: () => Navigator.pop(ctx),
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
               ),
             ),
             ClipRRect(
@@ -1151,7 +1214,11 @@ class _RequestCard extends StatelessWidget {
                   child: const Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.broken_image_rounded, size: 48, color: Colors.grey),
+                      Icon(
+                        Icons.broken_image_rounded,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
                       SizedBox(height: 8),
                       Text('Failed to load image preview'),
                     ],
@@ -1188,7 +1255,8 @@ class _ArrivalConfirmationSheet extends StatefulWidget {
   });
 
   @override
-  State<_ArrivalConfirmationSheet> createState() => _ArrivalConfirmationSheetState();
+  State<_ArrivalConfirmationSheet> createState() =>
+      _ArrivalConfirmationSheetState();
 }
 
 class _ArrivalConfirmationSheetState extends State<_ArrivalConfirmationSheet> {
@@ -1212,9 +1280,9 @@ class _ArrivalConfirmationSheetState extends State<_ArrivalConfirmationSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error selecting image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error selecting image: $e')));
       }
     }
   }
@@ -1268,10 +1336,16 @@ class _ArrivalConfirmationSheetState extends State<_ArrivalConfirmationSheet> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           title: const Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 26),
+              Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF059669),
+                size: 26,
+              ),
               SizedBox(width: 8),
               Text('Arrival Confirmed!'),
             ],
@@ -1419,7 +1493,10 @@ class _ArrivalConfirmationSheetState extends State<_ArrivalConfirmationSheet> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFDCFCE7),
                             borderRadius: BorderRadius.circular(6),
@@ -1500,8 +1577,14 @@ class _ArrivalConfirmationSheetState extends State<_ArrivalConfirmationSheet> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            icon: const Icon(Icons.camera_alt_rounded, size: 16),
-                            label: const Text('Camera', style: TextStyle(fontSize: 12.5)),
+                            icon: const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Camera',
+                              style: TextStyle(fontSize: 12.5),
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF2563EB),
                               side: const BorderSide(color: Color(0xFF93C5FD)),
@@ -1516,8 +1599,14 @@ class _ArrivalConfirmationSheetState extends State<_ArrivalConfirmationSheet> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: OutlinedButton.icon(
-                            icon: const Icon(Icons.photo_library_rounded, size: 16),
-                            label: const Text('Gallery', style: TextStyle(fontSize: 12.5)),
+                            icon: const Icon(
+                              Icons.photo_library_rounded,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Gallery',
+                              style: TextStyle(fontSize: 12.5),
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF059669),
                               side: const BorderSide(color: Color(0xFF86EFAC)),
@@ -1588,7 +1677,10 @@ class _ArrivalConfirmationSheetState extends State<_ArrivalConfirmationSheet> {
                         ),
                         const SizedBox(width: 12),
                         TextButton.icon(
-                          icon: const Icon(Icons.photo_library_outlined, size: 15),
+                          icon: const Icon(
+                            Icons.photo_library_outlined,
+                            size: 15,
+                          ),
                           label: const Text('Choose Another'),
                           onPressed: () => _pickImage(ImageSource.gallery),
                         ),
@@ -1613,8 +1705,12 @@ class _ArrivalConfirmationSheetState extends State<_ArrivalConfirmationSheet> {
             TextField(
               controller: _remarksController,
               decoration: InputDecoration(
-                hintText: 'e.g. Received 200 bags in undamaged condition, vehicle #MH12-3456.',
-                hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                hintText:
+                    'e.g. Received 200 bags in undamaged condition, vehicle #MH12-3456.',
+                hintStyle: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                ),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
                 border: OutlineInputBorder(

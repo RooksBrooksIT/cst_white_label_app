@@ -1,0 +1,476 @@
+====================================================================================================
+               COMPREHENSIVE ARCHITECTURAL & FUNCTIONAL ANALYSIS
+                        TOOLS REQUEST & APPROVAL FLOW
+====================================================================================================
+Project: CST White Label Construction Management Mobile App
+Platform: Flutter (Dart) & Google Cloud Firestore
+Version: 2.0 (Unified Tools Requisition, Movement & Multi-Ledger Inventory Engine)
+Generated: September 2026
+
+----------------------------------------------------------------------------------------------------
+TABLE OF CONTENTS
+----------------------------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY & LIFECYCLE OVERVIEW
+2. END-TO-END FLOW DIAGRAM (ASCII PIPELINE)
+3. USER ROLES & RESPONSIBILITIES
+4. 4-STAGE APPROVAL LIFECYCLE & STATE MACHINE SPECIFICATION
+5. TOOLS INVENTORY ARCHITECTURE & MULTI-LEDGER COLLECTIONS
+6. COMPREHENSIVE SCREEN-BY-SCREEN FUNCTIONALITY & WORKFLOW
+7. REAL-TIME NOTIFICATIONS & AUDIT TRAIL LOGGING
+8. CODEBASE COMPONENT & FILE DIRECTORY MAP
+9. STEP-BY-STEP USER JOURNEYS (DISPATCH, REQUISITION, ARRIVAL CONFIRMATION, RETURN)
+10. DATA SYNCHRONIZATION RULES, EDGE CASES & RESILIENCE
+
+====================================================================================================
+1. EXECUTIVE SUMMARY & LIFECYCLE OVERVIEW
+====================================================================================================
+The Tools & Equipment Management system orchestrates the allocation, requisition, approval, dispatch,
+site tracking, physical arrival confirmation, and return lifecycle of all machinery, power tools, safety equipment,
+and construction assets across active project sites and central company warehouses.
+
+Key Architectural Characteristics:
+- Dual Categorization: Manages both "Organization-Owned" (Org) and "Third-Party Rental" (Rental) equipment.
+- Multi-Tier Governance: Supervisor (Field Needs) -> Manager (Logistical Clearance) -> Organization HQ (Asset Authorization).
+- Post-Release Arrival Confirmation: Mandatory photo proof uploaded by the requesting field Supervisor to confirm physical arrival.
+- Multi-Ledger Stock Distribution: Real-time inventory tracking spanning 4 synchronized collections:
+  1. `tools` (Master Tool Catalog & Global Stock)
+  2. `toolsAtCompany` (Central Warehouse Available Stock)
+  3. `toolsAtSite` (Site-Level Aggregated Working Stock)
+  4. `toolsInventory` (Detailed Site Distribution Map: `{ siteId: allocatedQuantity }`)
+- Full Physical Movement Traceability: Every transfer generates auditable logs in `toolsMovement` (Dispatches)
+  and `toolsReturn` (Returns), complete with unique tracking identifiers (`TM001`, `TR001`), timestamps,
+  and participant signatures.
+
+====================================================================================================
+2. END-TO-END FLOW DIAGRAM (ASCII PIPELINE)
+====================================================================================================
+
+  +----------------------------------------------------------------------------------------+
+  |                               STAGE 1: TOOLS REQUISITION / DISPATCH                     |
+  | [Supervisor / Manager] identifies equipment needed for specific site project stage.   |
+  | Requisition created with Tool ID, Code, Requested Count, Site ID, and Project Phase.   |
+  | Stored in 'siteToolsRequest' (Status: 'pending_manager_review') or direct dispatch.   |
+  +-------------------------------------------+--------------------------------------------+
+                                              |
+                                              v (In-App & Push Notification to Manager)
+  +----------------------------------------------------------------------------------------+
+  |                               STAGE 2: MANAGER TECHNICAL REVIEW                        |
+  | [Project Manager] checks central warehouse availability in `toolsAtCompany`.          |
+  | Verifies site suitability, rental agreements, or maintenance status.                  |
+  | -> Option A: REJECT -> Status: 'rejected_by_manager' (Terminates flow, alerts Super)   |
+  | -> Option B: VERIFY & FORWARD -> Status: 'pending_org_approval' (Step 2)              |
+  +-------------------------------------------+--------------------------------------------+
+                                              |
+                                              v (Notification to Org HQ / Executive)
+  +----------------------------------------------------------------------------------------+
+  |                            STAGE 3: ORGANIZATION HQ AUTHORIZATION                      |
+  | [Organization Admin / HQ] reviews asset value, rental budget, and site priority.       |
+  | -> Option A: REJECT -> Status: 'rejected_by_org' (Terminates flow, alerts Super/Mgr)   |
+  | -> Option B: AUTHORIZE -> Status: 'pending_manager_clearance' (Step 3)                 |
+  +-------------------------------------------+--------------------------------------------+
+                                              |
+                                              v (Notification back to Manager for Clearance)
+  +----------------------------------------------------------------------------------------+
+  |                            STAGE 4: FINAL DISPATCH & RELEASE                           |
+  | [Project Manager] performs final logistics clearance and transport scheduling.         |
+  | Status updated to 'approved' (Approved & Released - Step 4).                          |
+  | Stock movements executed (Idempotent flag: `isStockTransferred` = true):              |
+  |   • Company stock decremented: `toolsAtCompany.availableCount -= Qty`                  |
+  |   • Site stock incremented: `toolsAtSite.availableCount += Qty`                       |
+  |   • Site distribution map updated: `toolsInventory[toolCode].availableCountAtSites`   |
+  |   • Movement record created: `toolsMovement` with ID `TMxxx`                           |
+  +-------------------------------------------+--------------------------------------------+
+                                              |
+                                              v (Notification: Tools dispatched – awaiting arrival confirmation)
+  +----------------------------------------------------------------------------------------+
+  |                    STAGE 5: SUPERVISOR TOOL ARRIVAL CONFIRMATION                        |
+  | [Site Supervisor who requested tools] receives physical shipment on site:              |
+  | 1. Opens approved request in `SupervisorToolsViewRequestScreen`.                        |
+  | 2. Reviews released equipment and quantities.                                          |
+  | 3. Uploads mandatory arrival proof photo (Camera / Gallery).                           |
+  | 4. Confirms physical arrival -> 'arrivalConfirmationStatus' = 'confirmed'.             |
+  | 5. System verifies stock transfer without duplicate deductions.                        |
+  | 6. Audit trail appended to `approvalHistory` (Step 5) & Manager notified.              |
+  +-------------------------------------------+--------------------------------------------+
+                                              |
+                                              v (Site working stock active in ToolsAtSitePage)
+  +----------------------------------------------------------------------------------------+
+  |                            STAGE 6: SITE UTILIZATION & RETURN                          |
+  | [Site Supervisor] utilizes equipment at site (tracked in `ToolsAtSitePage`).           |
+  | When milestone completes, Supervisor/Manager initiates Site-to-Company Return:         |
+  |   • Site stock decremented: `toolsAtSite.availableCount -= Qty`                       |
+  |   • Central stock restored: `toolsAtCompany.availableCount += Qty`                    |
+  |   • Return record created: `toolsReturn` with ID `TRxxx`                               |
+  +----------------------------------------------------------------------------------------+
+
+====================================================================================================
+3. USER ROLES & RESPONSIBILITIES
+====================================================================================================
+
+1. SITE SUPERVISOR (Field Operations)
+   - Inspects live tools inventory deployed at their assigned construction sites (`ToolsAtSitePage`).
+   - Identifies machinery requirements and raises tool requisitions.
+   - Monitors approval pipeline and delivery status in `SupervisorToolsViewRequestScreen`.
+   - Confirms physical tool arrival on site with mandatory proof photo upload.
+   - Initiates return transfers of unused, finished, or damaged tools back to the company warehouse (`SiteToCompanyReturn` / `ToolsMovementPage`).
+
+2. PROJECT MANAGER (Logistics, Stock Allocation & Operations)
+   - Oversees all pending tools requisitions via `ManagerToolsApprovalScreen` and `ManagerApprovalsCenterPage`.
+   - Validates tool availability at base yards and manages maintenance schedules.
+   - Forwards verified requisitions to HQ or rejects non-feasible requests with mandatory reasons.
+   - Executes physical company-to-site equipment dispatch (`ToolsMovementPage`).
+   - Inspects Supervisor arrival confirmation proof photos and timestamps.
+   - Registers new tools into the master catalog and updates base warehouse stock (`ToolMasterPage` / Tools Availability).
+
+3. ORGANIZATION ADMIN / HQ (Asset Owner & Financial Approver)
+   - Reviews and grants high-level authorization for tool requisitions (`ManagerToolsApprovalScreen` / `OrgMaterialsToolsMovementPage`).
+   - Monitors aggregate tool valuation, depreciation, rental overheads, and site-wise distributions (`ToolsInventoryPage` / `OrgMaterialsToolsInventoryPage`).
+   - Enforces company-wide asset accountability and audits movement logs.
+
+====================================================================================================
+4. 4-STAGE APPROVAL LIFECYCLE & STATE MACHINE SPECIFICATION
+====================================================================================================
+
+The tools approval workflow is powered by `ApprovalWorkflowService` using the standard 4-stage pipeline:
+
++-----------------------------+-------+-------------------------+-----------------------------------------+
+| Pipeline State              | Step# | Actor Responsible       | Next Action / Transition                |
++-----------------------------+-------+-------------------------+-----------------------------------------+
+| pending_manager_review      | 1     | Project Manager         | Forward to Org OR Reject by Manager     |
+| pending_org_approval        | 2     | Organization Admin (HQ) | Authorize to Clearance OR Reject by HQ  |
+| pending_manager_clearance   | 3     | Project Manager         | Release & Approve (Final Dispatch)      |
+| approved                    | 4     | Complete / Released     | Stock Transferred to Site (Active)      |
+| rejected_by_manager         | -1    | Terminated              | Flow aborted; Rejection reason logged   |
+| rejected_by_org             | -1    | Terminated              | Flow aborted; Rejection reason logged   |
++-----------------------------+-------+-------------------------+-----------------------------------------+
+
+Rejection Resilience Rules:
+- Rejections at Stage 2 or Stage 3 are terminal: the document status is locked to `rejected_by_manager` or `rejected_by_org`.
+- Rejections require mandatory explanation text (`rejectionReason`).
+- Automated push notifications with the exact reason are dispatched to the Supervisor and Manager.
+- Rejection entries are appended to the permanent `approvalHistory` audit array.
+
+====================================================================================================
+5. TOOLS INVENTORY ARCHITECTURE & MULTI-LEDGER COLLECTIONS
+====================================================================================================
+
+The app implements a multi-ledger distributed inventory model across 7 primary Firestore collections:
+
+1. `tools` (Master Tool Catalog)
+   - Document ID: Auto-generated or `toolCode`
+   - Purpose: Canonical registry of every tool model/type.
+   - Fields:
+     • `toolId` (String): Unique identifier
+     • `toolName` (String): e.g. "Concrete Mixer 10/7", "Demolition Hammer"
+     • `toolCode` (String): Standardized code e.g. "Concrete_Mixer_(Org)"
+     • `toolCategory` (String): e.g. "Heavy Machinery", "Power Tools", "Hand Tools"
+     • `toolOwner` (String): "Org" (Company owned) or "Rental" (Third-party hired)
+     • `toolCount` (int): Total lifetime registered count
+     • `availableCount` (int): Current global unallocated count
+     • `description` (String): Technical specifications / model details
+     • `createdAt` / `updatedAt` (Timestamp)
+
+2. `toolsAtCompany` (Central Warehouse Ledger)
+   - Document ID: Auto-generated or `toolCode`
+   - Purpose: Real-time stock currently physically present at the central base yard/warehouse.
+   - Fields:
+     • `toolCode` (String): Reference to master tool
+     • `toolName` (String): Display name
+     • `toolOwner` (String): "Org" / "Rental"
+     • `availableCount` (int): Quantity available for dispatch to sites
+
+3. `toolsAtSite` (Site Aggregated Ledger)
+   - Document ID: `toolCode`
+   - Purpose: Total count of a particular tool deployed across all field sites.
+   - Fields:
+     • `toolCode` (String): Tool code reference
+     • `availableCount` (int): Global aggregate across all active sites
+
+4. `toolsInventory` (Site-by-Site Granular Distribution Map)
+   - Document ID: `toolCode` (e.g. "Concrete_Mixer_(Org)")
+   - Purpose: Maps the exact quantity of this tool deployed at each individual construction site.
+   - Fields:
+     • `toolCode` (String): Tool code
+     • `availableCountAtSites` (Map<String, int>): Key-value map e.g. `{"SITE_A": 2, "SITE_B": 1}`
+     • `lastUpdated` (String ISO8601): Last movement timestamp
+
+5. `toolsMovement` (Company-to-Site Dispatch Log)
+   - Document ID: `${siteId}_${ddMMyyyy_HHmmss}`
+   - Purpose: Immutable audit log of every outward dispatch.
+   - Fields:
+     • `tmId` (String): Sequential ID (`TM001`, `TM002`...)
+     • `mtSiteId` (String): Destination Site ID
+     • `projectName` (String): Associated project name
+     • `mgrName` (String): Manager authorizing dispatch
+     • `supervisorName` (String): Site Supervisor receiving tools
+     • `date` (String formatted): Timestamp display string
+     • `tools` (List<Map>): `[{'toolId', 'toolCode', 'toolName', 'toolCount': 2}]`
+     • `createdAt` (Timestamp)
+
+6. `toolsReturn` (Site-to-Company Return Log)
+   - Document ID: `${siteId}_${ddMMyyyy_HHmmss}`
+   - Purpose: Immutable audit log of equipment returned from site to central warehouse.
+   - Fields:
+     • `trId` (String): Sequential ID (`TR001`, `TR002`...)
+     • `rfSiteId` (String): Origin Site ID returning equipment
+     • `projectName` (String): Associated project name
+     • `mgrName` (String): Receiving manager
+     • `supervisorName` (String): Returning supervisor
+     • `date` (String formatted): Timestamp display string
+     • `tools` (List<Map>): `[{'toolId', 'toolCode', 'toolName', 'toolCount': 1}]`
+     • `createdAt` (Timestamp)
+
+7. `siteToolsRequest` (Requisition & Arrival Confirmation Documents)
+   - Document ID: Auto-generated or `toolReqId`
+   - Purpose: Requisitions undergoing multi-stage approvals and arrival confirmations.
+   - Fields:
+     • `toolReqId` (String): e.g. "TRQ-101"
+     • `siteId` (String): Target site
+     • `supervisorName` (String): Requesting supervisor
+     • `supervisorId` (String): Requesting supervisor UID
+     • `projectStage` (String): Construction milestone requiring equipment
+     • `tools` (List<Map>): Requested tools list and quantities
+     • `status` (String): Current pipeline state
+     • `isStockTransferred` (bool): Idempotency flag preventing duplicate stock deduction
+     • `arrivalConfirmationStatus` (String): 'confirmed' / 'pending'
+     • `arrivalConfirmedBy` (String): Supervisor display name
+     • `arrivalConfirmedById` (String): Supervisor UID
+     • `arrivalConfirmedAt` (Timestamp): Server timestamp of confirmation
+     • `arrivalProofImageUrl` (String): Cloud Storage URL for delivery proof photo
+     • `arrivalConfirmationRemarks` (String): Optional delivery remarks
+     • `approvalHistory` (List<Map>): Chronological audit trail
+
+====================================================================================================
+6. COMPREHENSIVE SCREEN-BY-SCREEN FUNCTIONALITY & WORKFLOW
+====================================================================================================
+
+A. Manager Tools Approval Screen (`lib/screens/manager/manager_tools_approval_screen.dart`)
+   - 4-Tab Interface:
+     1. "1. MGR REVIEW" (Queries `status == 'pending_manager_review'`)
+     2. "2. ORG APPROVAL" (Queries `status == 'pending_org_approval'`)
+     3. "3. MGR CLEARANCE" (Queries `status == 'pending_manager_clearance'`)
+     4. "APPROVED" (Queries `status == 'approved'`)
+   - Search Bar: Filters by Request ID, Site ID, Supervisor Name, or Tool Name.
+   - Details Modal & Actions:
+     • Stage 1 Action: "Verify & Forward to Org" (Opens verification remarks dialog)
+     • Stage 2 Action: "Authorize Equipment" (Org role approves and sends back to Manager)
+     • Stage 3 Action: "Release & Approve" (Final clearance; triggers warehouse release & stock transfer)
+     • Stage 4 Status & Arrival Inspection:
+       - Displays emerald status card when arrival is confirmed by Supervisor.
+       - Shows confirmation date & time, Supervisor name, and optional remarks.
+       - Proof photo thumbnail with full-screen interactive zoom preview dialog.
+       - Displays amber "Awaiting Physical Tool Arrival Confirmation" badge if pending.
+     • Rejection: Accessible at Stages 1 & 2 via "Reject Request" button with reason prompt.
+   - Lifecycle Stepper: Renders interactive visual timeline displaying all past and upcoming steps.
+
+B. Supervisor Tools Requisitions Screen (`lib/screens/supervisor/supervisor_tools_view_request_screen.dart`)
+   - Dedicated Supervisor interface for tracking tool requisitions.
+   - Filter Chips: `All`, `Pending`, `Approved`, `Rejected`.
+   - Real-time Stream from `siteToolsRequest` scoped to supervisor's assigned sites.
+   - Request Cards with itemized equipment list and quantities.
+   - Tool Arrival Confirmation Card:
+     • Enabled only for the Supervisor who originally requested the tools.
+     • Upload Proof Button (Camera / Gallery photo picker using `AppStorageService`).
+     • Image preview with reselect and delete controls.
+     • Action button: "Confirm Tools Arrived" (disabled until photo is selected).
+     • Interactive arrival confirmation modal with optional remarks field.
+
+C. Approvals Center Dashboard (`lib/screens/manager/manager_approvals_center_page.dart`)
+   - Consolidated executive hub for all 4 approval types (Materials, Payments, Tools, Workforce).
+   - Real-time stream listening to `siteToolsRequest` to display live count of pending tools requests.
+   - Direct shortcut card routing into `ManagerToolsApprovalScreen`.
+
+D. Tools Movement & Transfer Screen (`lib/screens/supervisor/tools_movement_page.dart`)
+   - 3-Tab Operational Interface:
+     1. "COMPANY TO SITE" (Outward Dispatch):
+        - Select Destination Site, Project Name, Manager, Supervisor, and Date.
+        - Tool Selection Dropdown: Queries `tools` and `toolsAtCompany` to show live available warehouse stock.
+        - Quantity Validator: Prevents dispatching more than available warehouse count.
+        - Multi-Tool Staging Table: Allows dispatching multiple equipment items in a single manifest.
+        - On Save: Atomic transaction updating `toolsAtCompany`, `toolsAtSite`, `toolsInventory`, and writing `toolsMovement` log.
+     2. "SITE TO COMPANY" (Return Transfer):
+        - Select Origin Site ID.
+        - Tool Selection: Queries `toolsInventory` for the specific site to show only tools physically at that site.
+        - On Save: Atomic transaction returning stock to `toolsAtCompany`, reducing `toolsAtSite` / `toolsInventory`, and writing `toolsReturn` log.
+     3. "LOGS" (Movement & Return Audit Ledger):
+        - Chronological log of all dispatches (`TMxxx`) and returns (`TRxxx`).
+        - Filter chips: 'All', 'Dispatched', 'Returned'.
+        - Search by ID, Site, or Tool name.
+        - PDF Export: Generates downloadable/printable official transfer manifests using `printing` & `pdf`.
+
+E. Tools at Site Screen (`lib/screens/supervisor/tools_at_site_page.dart`)
+   - Field inventory inspection page for Site Supervisors.
+   - Select Site ID dropdown (auto-populated from `siteSupervisorMap`).
+   - AppBar Action Icon: Direct one-tap navigation to `SupervisorToolsViewRequestScreen`.
+   - Live Tool Cards:
+     • Tool Name, Code, and Ownership Badge (`Org` vs `Rental`).
+     • Active Working Count currently on site.
+     • Category categorization (Machinery, Hand Tools, Safety Gear).
+     • Search & filter controls.
+
+F. Tools Availability Master Configuration (`lib/screens/manager/tools_master_page.dart`)
+   - Manager configuration module for registering equipment and stock updates:
+     1. "NEW" Tab:
+        - Register new tool model/asset.
+        - Select Ownership: `Org` (Company owned) or `Rental` (Hired equipment).
+        - Auto-generates standardized `toolCode` e.g. `Power_Drill_(Rental)`.
+        - Writes initial stock to `tools` and `toolsAtCompany`.
+     2. "UPDATE" Tab:
+        - Clean table view of all registered tools with Ownership chips and current stock.
+        - Quick "+" Action Button: Opens instant stock increment modal to add newly purchased or rented units directly to warehouse stock without manual data re-entry.
+
+G. Tools Inventory Reporting & Analytics
+   - `ToolsInventoryPage` (`lib/screens/reports/tools_inventory_report.dart`):
+     • Merged enterprise report combining `tools`, `toolsAtCompany`, and `toolsAtSite`.
+     • Calculates total company-wide fleet vs. deployed vs. idle units.
+   - `ToolsInventoryDetailsPage` (`lib/screens/manager/tools_inventory_details.dart`):
+     • Deep-dive per tool code showing company warehouse count and exact site distribution breakdown.
+     • PDF report generation and export.
+
+====================================================================================================
+7. REAL-TIME NOTIFICATIONS & AUDIT TRAIL LOGGING
+====================================================================================================
+
+A. Notification Triggers (`NotificationService` & `ApprovalWorkflowService`):
+   1. Request Submitted:
+      - Title: "📋 New Tools Requisition Submitted"
+      - Target: Manager (`requestType: 'tools'`)
+      - Action on Tap: Navigates to `ManagerToolsApprovalScreen` (Tab 1: MGR REVIEW)
+   2. Verified & Forwarded to HQ:
+      - Title: "🏢 Tools Requisition Forwarded for HQ Approval"
+      - Target: Organization HQ (`requestType: 'tools'`)
+      - Action on Tap: Navigates to `ManagerToolsApprovalScreen` (Tab 2: ORG APPROVAL)
+   3. Authorized by HQ:
+      - Title: "✅ Tools Requisition Authorized by HQ"
+      - Target: Manager (`requestType: 'tools'`)
+      - Action on Tap: Navigates to `ManagerToolsApprovalScreen` (Tab 3: MGR CLEARANCE)
+   4. Final Clearance / Dispatched:
+      - Title: "🚚 Tools Requisition Approved & Dispatched!"
+      - Body: "Manager completed final clearance. Tools dispatched – awaiting arrival confirmation."
+      - Target: Supervisor (`requestType: 'tools'`)
+   5. Arrival Confirmed by Supervisor:
+      - Title: "🚚 Tool Arrival Confirmed"
+      - Body: "Supervisor confirmed physical arrival & uploaded proof photo for Tools Requisition."
+      - Target: Manager (`requestType: 'tools'`)
+   6. Rejection (Manager or HQ):
+      - Title: "❌ Tools Requisition Declined"
+      - Target: Supervisor and Manager with exact reason string.
+
+B. Audit Trail Data Structure (`approvalHistory` Array in Firestore):
+   Every lifecycle event appends an audit record:
+   ```json
+   {
+     "step": "5. Tool Arrival Confirmation",
+     "action": "Tool Arrival Confirmed",
+     "actorRole": "Supervisor",
+     "actorName": "John Doe",
+     "actorId": "user_uid_123",
+     "remarks": "Tools physically received in good condition. (Proof photo verified)",
+     "timestamp": "Timestamp(seconds=..., nanoseconds=...)",
+     "dateStr": "Sep 04, 2026 • 05:30 PM"
+   }
+   ```
+
+====================================================================================================
+8. CODEBASE COMPONENT & FILE DIRECTORY MAP
+====================================================================================================
+
+Services & Workflows:
+- `lib/services/approval_workflow_service.dart`: Central state machine, status transition logic, tool dispatch transfer (`_transferToolsCompanyToSite`), and arrival confirmation (`supervisorConfirmToolArrival`).
+- `lib/services/notification_service.dart`: Push & in-app notifications, FCM token saving, and route navigation.
+- `lib/services/app_storage_service.dart`: Secure photo proof upload to Cloud Storage (`category: 'tool_arrival_proof'`).
+- `lib/services/firestore_service.dart`: Firestore multi-tenancy and collection references.
+
+Screens - Approvals & Management:
+- `lib/screens/manager/manager_tools_approval_screen.dart`: 4-tab approval dashboard for Tools requisitions with Arrival Confirmation inspection & photo zoom.
+- `lib/screens/manager/manager_approvals_center_page.dart`: Executive approvals overview center.
+- `lib/screens/manager/tools_master_page.dart`: Tools Availability (Register new tools & quick "+" stock additions).
+- `lib/screens/manager/tools_inventory_details.dart`: Detailed tool distribution and PDF reports.
+
+Screens - Field Operations & Movement:
+- `lib/screens/supervisor/supervisor_tools_view_request_screen.dart`: Supervisor tool request tracking and photo-proof arrival confirmation.
+- `lib/screens/supervisor/tools_movement_page.dart`: Company-to-Site dispatch, Site-to-Company return, Movement logs.
+- `lib/screens/supervisor/tools_at_site_page.dart`: Live tools inventory at construction sites with shortcut to tool requisitions.
+- `lib/screens/supervisor/supervisor_tool_movement.dart`: Site-to-company tool return utility.
+- `lib/screens/supervisor/supervisor_dashboard.dart`: Integrated dashboard navigation for Tool Approvals.
+
+Screens - Organization & Reporting:
+- `lib/screens/organization/org_materials_tools_movement_page.dart`: Org tools movement launcher.
+- `lib/screens/organization/org_materials_tools_inventory_page.dart`: Org tools inventory launcher.
+- `lib/screens/reports/tools_inventory_report.dart`: High-level inventory analytics & fleet status.
+
+Widgets:
+- `lib/widgets/approval_lifecycle_stepper.dart`: Visual timeline stepper widget.
+- `lib/widgets/glass_card.dart` & `lib/widgets/glass_scaffold.dart`: Reusable UI styling.
+
+====================================================================================================
+9. STEP-BY-STEP USER JOURNEYS
+====================================================================================================
+
+Scenario A: Multi-Stage Tools Requisition & Arrival Confirmation
+1. Supervisor raises tool requisition for 2 Demolition Hammers and 3 Power Drills.
+2. Manager receives notification -> Opens `ManagerToolsApprovalScreen` (Tab 1: MGR REVIEW).
+3. Manager enters verification notes and clicks "Verify & Forward to Org" (Step 2: Pending Org Approval).
+4. Organization HQ inspects and clicks "Authorize & Send to Manager" (Step 3: Pending Manager Clearance).
+5. Manager prepares shipment and clicks "Complete Final Clearance & Dispatch Tools":
+   - Company stock decremented in `toolsAtCompany`
+   - Site stock incremented in `toolsAtSite` & `toolsInventory`
+   - Movement log created in `toolsMovement` with `TMxxx` ID
+   - `isStockTransferred` flag set to `true`
+   - Supervisor notified: "Tools dispatched – awaiting arrival confirmation."
+6. Equipment arrives at construction site.
+7. Requesting Supervisor opens `SupervisorToolsViewRequestScreen` -> Finds Approved Requisition:
+   - Sees amber badge: "Awaiting Arrival Confirmation".
+   - Clicks "Confirm Tool Arrival".
+   - Captures delivery challan/tool photo on-site via Camera.
+   - Enters remarks: "Tools received in perfect working order."
+   - Clicks "Confirm Tools Arrived".
+   - Proof uploaded to Cloud Storage; document updated with `arrivalConfirmationStatus = 'confirmed'`.
+   - Audit trail Step 5 logged.
+8. Manager opens `ManagerToolsApprovalScreen` (Tab 4: APPROVED) -> Immediately sees emerald badge "Tools Received / Arrival Confirmed", confirmation timestamp, and taps proof thumbnail to view high-res photo.
+
+Scenario B: Direct Company-to-Site Equipment Dispatch
+1. Manager/Supervisor opens `ToolsMovementPage` -> Tab 1 ("COMPANY TO SITE").
+2. Selects Destination Site (e.g. "SITE_ALPHA") and Project Name.
+3. Selects Tool (e.g. "Demolition Hammer - Org"). The screen dynamically fetches available count (e.g. 5 units).
+4. Enters count (e.g. 2 units) and clicks "Add Tool".
+5. Validates manifest in staging table and clicks "Dispatch Tools".
+6. System atomically updates `toolsAtCompany`, `toolsAtSite`, `toolsInventory`, and generates `TM001`.
+7. Supervisor at "SITE_ALPHA" opens `ToolsAtSitePage` and immediately sees 2 units of Demolition Hammer.
+
+Scenario C: Site-to-Company Equipment Return
+1. Construction phase ends; equipment is ready to be returned to the warehouse.
+2. Supervisor/Manager opens `ToolsMovementPage` -> Tab 2 ("SITE TO COMPANY").
+3. Selects Origin Site ID ("SITE_ALPHA").
+4. Selects Tool: The dropdown filters only tools currently deployed at "SITE_ALPHA" (e.g. 2 Demolition Hammers).
+5. Enters return count (e.g. 2 units) and clicks "Add Tool to Return".
+6. Clicks "Return Tools to Company".
+7. System atomically restores `toolsAtCompany`, decrements `toolsAtSite` and `toolsInventory`, and logs `TR001`.
+8. Both Base Yard and Site ledgers are instantly synchronized.
+
+====================================================================================================
+10. DATA SYNCHRONIZATION RULES, EDGE CASES & RESILIENCE
+====================================================================================================
+
+1. Zero Duplicate Movement Rule:
+   - The `isStockTransferred` boolean flag ensures stock movements (`_transferToolsCompanyToSite`) execute exactly once.
+   - When Supervisor confirms arrival, the system checks `isStockTransferred == true` and bypasses duplicate stock deduction.
+
+2. Over-Allocation Prevention:
+   - The UI strictly enforces `count <= selectedToolAvailableCount` before allowing a tool to be staged.
+   - Server-side Firestore transactions double-check availability during atomic execution.
+
+3. Negative Stock Protection:
+   - When updating `toolsInventory.availableCountAtSites`, if a site's count drops to 0 or less, the site key is cleanly removed from the map to prevent zero/negative clutter.
+
+4. Role-Based Navigation Routing:
+   - Notification taps leverage `NotificationService.navigateToTarget()` to inspect `requestType == 'tools'` and route directly to `ManagerToolsApprovalScreen`.
+
+5. Proof Image Integrity:
+   - Arrival confirmation requires a mandatory photo.
+   - The submit button remains strictly disabled until photo proof is selected.
+   - Images are uploaded through `AppStorageService` into structured storage paths (`tool_arrival_proof/`).
+
+====================================================================================================
+                                      END OF DOCUMENTATION
+====================================================================================================

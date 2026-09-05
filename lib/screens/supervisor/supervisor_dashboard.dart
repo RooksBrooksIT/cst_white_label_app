@@ -17,6 +17,7 @@ import 'package:demo_cst/screens/supervisor/material_at_site_entry_page.dart';
 import 'package:demo_cst/screens/supervisor/tools_at_site_page.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_material_information.dart';
 import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
+import 'package:demo_cst/screens/supervisor/supervisor_tools_view_request_screen.dart';
 import 'package:demo_cst/screens/common/construction_documents.dart';
 import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
 
@@ -1243,6 +1244,21 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               context,
               MaterialPageRoute(
                 builder: (context) => ToolsAtSitePage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Tool Approvals',
+            subtitle: 'Check tool requests & arrival statuses',
+            icon: Icons.fact_check_rounded,
+            color: const Color(0xFF0D9488),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorToolsViewRequestScreen(
                   supervisorId: widget.supervisorId,
                   supervisorName: widget.supervisorName,
                 ),
