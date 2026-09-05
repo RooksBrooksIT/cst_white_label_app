@@ -403,6 +403,13 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     }
   }
 
+  String _formatQty(num qty) {
+    if (qty.truncateToDouble() == qty) {
+      return qty.toInt().toString();
+    }
+    return qty.toString();
+  }
+
   Future<void> _fetchSiteMaterialPool() async {
     if (siteCode.isEmpty) {
       if (mounted) {
@@ -424,11 +431,16 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         sitePoolItems = pool;
         isLoadingSitePool = false;
         if (pool.isNotEmpty) {
-          final withStock = pool.where((p) => p.remainingQty > 0).toList();
-          if (withStock.isNotEmpty) {
-            selectedMaterial = withStock.first.materialName;
-          } else {
-            selectedMaterial = pool.first.materialName;
+          final hasCurrent = selectedMaterial != null &&
+              pool.any((p) => p.materialName.toLowerCase().trim() == selectedMaterial!.toLowerCase().trim() ||
+                  p.displayName.toLowerCase().trim() == selectedMaterial!.toLowerCase().trim());
+          if (!hasCurrent) {
+            final withStock = pool.where((p) => p.remainingQty > 0).toList();
+            if (withStock.isNotEmpty) {
+              selectedMaterial = withStock.first.materialName;
+            } else {
+              selectedMaterial = pool.first.materialName;
+            }
           }
         }
       });
@@ -446,7 +458,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     if (selectedMaterial == null) return null;
     final lowName = selectedMaterial!.toLowerCase().trim();
     for (var item in sitePoolItems) {
-      if (item.materialName.toLowerCase().trim() == lowName) {
+      if (item.materialName.toLowerCase().trim() == lowName ||
+          item.displayName.toLowerCase().trim() == lowName) {
         return item;
       }
     }
@@ -457,7 +470,8 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     num inCart = 0;
     for (var m in materials) {
       final name = (m['materialName'] ?? m['type'] ?? '').toString().toLowerCase().trim();
-      if (name == item.materialName.toLowerCase().trim()) {
+      if (name == item.materialName.toLowerCase().trim() ||
+          name == item.displayName.toLowerCase().trim()) {
         inCart += (m['quantity'] as num? ?? 0);
       }
     }
@@ -494,7 +508,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Insufficient material! Only $avail ${poolItem.unit} is currently available at this site.',
+              'Insufficient material! Only ${_formatQty(avail)} ${poolItem.unit} is currently available at this site.',
             ),
             backgroundColor: Colors.redAccent,
           ),
@@ -821,6 +835,11 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       } else {
         await actualColl.doc(actualDocId).set({...actualData, "actDays": 1});
       }
+      setState(() {
+        materials.clear();
+        materialQty = 0;
+        materialQtyController.text = '0';
+      });
       await _fetchSiteMaterialPool();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1695,7 +1714,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                             ),
                                                             child: Text(
                                                               pItem.remainingQty > 0
-                                                                  ? '${pItem.remainingQty} ${pItem.unit}'
+                                                                  ? '${_formatQty(pItem.remainingQty)} ${pItem.unit}'
                                                                   : '0 (Empty)',
                                                               style: TextStyle(
                                                                 fontSize: 10.5,
@@ -1858,7 +1877,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                             child: Text(
-                                              availStock > 0 ? '$availStock ${poolItem.unit} Available' : 'Out of Stock',
+                                              availStock > 0 ? '${_formatQty(availStock)} ${poolItem.unit} Available' : 'Out of Stock',
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w800,
@@ -1889,7 +1908,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           Expanded(
                                             child: _buildStockMetric(
                                               label: 'Balance After',
-                                              value: '${balanceAfter < 0 ? 0 : balanceAfter} ${poolItem.unit}',
+                                              value: '${_formatQty(balanceAfter < 0 ? 0 : balanceAfter)} ${poolItem.unit}',
                                               isDark: isDark,
                                               isWarning: isOverLimit,
                                             ),
@@ -1904,7 +1923,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                             const SizedBox(width: 6),
                                             Expanded(
                                               child: Text(
-                                                'Insufficient material. Only $availStock ${poolItem.unit} is currently available at this site.',
+                                                'Insufficient material. Only ${_formatQty(availStock)} ${poolItem.unit} is currently available at this site.',
                                                 style: const TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w700,

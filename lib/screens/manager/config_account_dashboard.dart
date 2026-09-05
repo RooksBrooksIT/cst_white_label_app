@@ -21,6 +21,7 @@ import 'package:demo_cst/screens/manager/labour_screen.dart';
 import 'package:demo_cst/screens/manager/manager_approvals_center_page.dart';
 import 'package:demo_cst/screens/manager/manager_expenses.dart';
 import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
+import 'package:demo_cst/screens/manager/manager_petty_cash_page.dart';
 import 'package:demo_cst/screens/manager/manager_site_entry_page.dart';
 import 'package:demo_cst/screens/manager/manager_sites_list_page.dart';
 import 'package:demo_cst/screens/manager/material_screen.dart';
@@ -158,6 +159,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFF2563EB),
         'Track manager expenditure logs',
         const Color(0xFF2563EB),
+      ),
+      DashboardItem(
+        'Petty Cash',
+        Icons.payments_rounded,
+        const Color(0xFF10B981),
+        'Allocations, supervisor balances & reviews',
+        const Color(0xFF10B981),
       ),
     ],
     "Materials & Tools Management": [
@@ -3292,6 +3300,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Tools Master': const ToolMasterPage(),
       'Tools Movement': ToolsMovementPage(),
       'Manager Expenses': const ManagerExpenses(hideAppBar: false),
+      'Petty Cash': const ManagerPettyCashPage(),
+      'Petty Cash Management': const ManagerPettyCashPage(),
       'Manager Daily Site Entry': ManagerSiteEntryPage(
         userName: _managerName,
         userDetails: AuthService().userData,

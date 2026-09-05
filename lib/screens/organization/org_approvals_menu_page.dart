@@ -5,6 +5,7 @@ import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
 import 'package:demo_cst/screens/manager/manager_approval_screen.dart';
 import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
+import 'package:demo_cst/screens/organization/org_petty_cash_page.dart';
 
 class OrgApprovalsMenuPage extends StatelessWidget {
   const OrgApprovalsMenuPage({super.key});
@@ -58,6 +59,21 @@ class OrgApprovalsMenuPage extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const SitePaymentScreen(),
+                ),
+              );
+            },
+          ),
+          _MenuItemData(
+            title: 'Petty Cash Approvals',
+            subtitle: 'Authorize petty cash allocations & replenish funds for supervisors',
+            icon: Icons.account_balance_wallet_rounded,
+            accentColor: const Color(0xFF10B981),
+            badgeText: 'Petty Cash',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OrgPettyCashPage(initialTabIndex: 0),
                 ),
               );
             },

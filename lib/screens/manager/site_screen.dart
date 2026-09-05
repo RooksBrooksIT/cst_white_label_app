@@ -538,12 +538,13 @@ class _SiteScreenState extends State<SiteScreen>
       return;
     }
 
+    final double existingAmount = double.tryParse(
+          _updateAmountPaidController.text.replaceAll(',', ''),
+        ) ??
+        0.0;
+
     final amountController = TextEditingController();
-    final remarksController = TextEditingController();
-    final refController = TextEditingController();
     DateTime paymentDate = DateTime.now();
-    String paymentMode = 'Cash';
-    final modes = ['Cash', 'Bank Transfer', 'UPI / Online', 'Cheque', 'Other'];
     final formKey = GlobalKey<FormState>();
 
     showModalBottomSheet(
@@ -556,11 +557,20 @@ class _SiteScreenState extends State<SiteScreen>
             final theme = Theme.of(context);
             final primaryColor = theme.primaryColor;
 
+            final double newAmount = double.tryParse(
+                  amountController.text.trim().replaceAll(',', ''),
+                ) ??
+                0.0;
+            final double updatedTotal = existingAmount + newAmount;
+
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(ctx).viewInsets.bottom,
               ),
               child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+                ),
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -568,137 +578,84 @@ class _SiteScreenState extends State<SiteScreen>
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
                 child: Form(
                   key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCBD5E1),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: primaryColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  Icons.add_card_rounded,
-                                  color: primaryColor,
-                                  size: 22,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Add Amount Received',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF0A183D),
-                                    ),
-                                  ),
-                                  Text(
-                                    'Site: ${_selectedSiteName ?? _selectedSiteId}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF64748B),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.close_rounded,
-                              size: 20,
-                              color: Color(0xFF64748B),
-                            ),
-                            onPressed: () => Navigator.pop(ctx),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      // Amount Input
-                      TextFormField(
-                        controller: amountController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d+\.?\d{0,2}'),
-                          ),
-                        ],
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Please enter amount';
-                          }
-                          final numVal = double.tryParse(val.trim());
-                          if (numVal == null || numVal <= 0) {
-                            return 'Enter a valid amount > 0';
-                          }
-                          return null;
-                        },
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0A183D),
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Payment Amount (₹) *',
-                          hintText: 'e.g. 50000',
-                          prefixIcon: Icon(
-                            Icons.currency_rupee_rounded,
-                            color: primaryColor,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFCBD5E1),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFCBD5E1),
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      // Payment Date
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: ctx,
-                            initialDate: paymentDate,
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime(2101),
-                          );
-                          if (picked != null) {
-                            setModalState(() => paymentDate = picked);
-                          }
-                        },
-                        child: Container(
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: primaryColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.add_card_rounded,
+                                    color: primaryColor,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Add Amount',
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0A183D),
+                                      ),
+                                    ),
+                                    Text(
+                                      'Site: ${_selectedSiteName ?? _selectedSiteId}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                size: 20,
+                                color: Color(0xFF64748B),
+                              ),
+                              onPressed: () => Navigator.pop(ctx),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+
+                        // 1. Existing Amount (Read-Only)
+                        Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
-                            vertical: 14,
+                            vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
+                            color: const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: const Color(0xFFCBD5E1)),
                           ),
@@ -707,155 +664,330 @@ class _SiteScreenState extends State<SiteScreen>
                             children: [
                               Row(
                                 children: [
-                                  Icon(
-                                    Icons.calendar_today_rounded,
-                                    color: primaryColor,
-                                    size: 18,
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF64748B)
+                                          .withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.lock_outline_rounded,
+                                      size: 15,
+                                      color: Color(0xFF64748B),
+                                    ),
                                   ),
                                   const SizedBox(width: 10),
-                                  const Text(
-                                    'Payment Date: ',
-                                    style: TextStyle(
-                                      fontSize: 13.5,
-                                      color: Color(0xFF64748B),
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                  const Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Existing Amount',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Read-only',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: Color(0xFF94A3B8),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                               Text(
-                                DateFormat('dd MMM yyyy').format(paymentDate),
+                                '₹${NumberFormat('#,##,##0.00', 'en_IN').format(existingAmount)}',
                                 style: const TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0A183D),
+                                  color: Color(0xFF1E293B),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      // Payment Mode Dropdown
-                      DropdownButtonFormField<String>(
-                        initialValue: paymentMode,
-                        items: modes
-                            .map(
-                              (m) => DropdownMenuItem(
-                                value: m,
-                                child: Text(m),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setModalState(() => paymentMode = val);
-                          }
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'Payment Mode',
-                          prefixIcon: Icon(
-                            Icons.payment_rounded,
-                            color: primaryColor,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFCBD5E1),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      // Reference / Transaction ID
-                      TextFormField(
-                        controller: refController,
-                        decoration: InputDecoration(
-                          labelText: 'Reference / Trans. ID (Optional)',
-                          hintText: 'e.g. TXN987654321',
-                          prefixIcon: Icon(
-                            Icons.tag_rounded,
-                            color: primaryColor,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFCBD5E1),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      // Remarks
-                      TextFormField(
-                        controller: remarksController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          labelText: 'Notes / Remarks (Optional)',
-                          hintText: 'e.g. 2nd installment received for foundation',
-                          prefixIcon: Icon(
-                            Icons.notes_rounded,
-                            color: primaryColor,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFCBD5E1),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      // Submit Add Payment Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(
-                            Icons.check_circle_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          label: const Text(
-                            'Save & Add to Amount Received',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14.5,
-                              color: Colors.white,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            elevation: 2,
-                          ),
-                          onPressed: () async {
-                            if (!formKey.currentState!.validate()) return;
-                            final double newAmount =
-                                double.tryParse(amountController.text.trim()) ??
-                                0.0;
-                            if (newAmount <= 0) return;
+                        const SizedBox(height: 14),
 
-                            Navigator.pop(ctx);
-                            await _saveNewReceivedPayment(
-                              amount: newAmount,
-                              date: paymentDate,
-                              mode: paymentMode,
-                              referenceNo: refController.text.trim(),
-                              remarks: remarksController.text.trim(),
-                            );
+                        // 2. New / Additional Amount Input (Editable)
+                        TextFormField(
+                          controller: amountController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,2}'),
+                            ),
+                          ],
+                          onChanged: (_) {
+                            setModalState(() {});
                           },
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Please enter new amount';
+                            }
+                            final numVal = double.tryParse(
+                              val.trim().replaceAll(',', ''),
+                            );
+                            if (numVal == null || numVal <= 0) {
+                              return 'Enter a valid amount > 0';
+                            }
+                            return null;
+                          },
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0A183D),
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'New Amount (₹) *',
+                            hintText: 'e.g. 1000',
+                            prefixIcon: Icon(
+                              Icons.currency_rupee_rounded,
+                              color: primaryColor,
+                            ),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: primaryColor,
+                                width: 2,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 14),
+
+                        // 3. Automatic Calculation Summary Card
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: newAmount > 0
+                                ? const Color(0xFFECFDF5)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: newAmount > 0
+                                  ? const Color(0xFF10B981)
+                                      .withValues(alpha: 0.35)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Existing Amount:',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹${NumberFormat('#,##,##0.00', 'en_IN').format(existingAmount)}',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF475569),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    '+ New Amount:',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    '+ ₹${NumberFormat('#,##,##0.00', 'en_IN').format(newAmount)}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: newAmount > 0
+                                          ? const Color(0xFF059669)
+                                          : const Color(0xFF94A3B8),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(
+                                height: 16,
+                                color: Color(0xFFCBD5E1),
+                              ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calculate_rounded,
+                                        size: 16,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Updated Total:',
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    '₹${NumberFormat('#,##,##0.00', 'en_IN').format(updatedTotal)}',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: newAmount > 0
+                                          ? const Color(0xFF059669)
+                                          : primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Payment Date
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: paymentDate,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2101),
+                            );
+                            if (picked != null) {
+                              setModalState(() => paymentDate = picked);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today_rounded,
+                                      color: primaryColor,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Text(
+                                      'Payment Date: ',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        color: Color(0xFF64748B),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  DateFormat('dd MMM yyyy').format(paymentDate),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+
+                        // Submit Add Payment Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(
+                              Icons.check_circle_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            label: Text(
+                              newAmount > 0
+                                  ? 'Save Updated Total (₹${NumberFormat('#,##,##0.00', 'en_IN').format(updatedTotal)})'
+                                  : 'Save & Update Amount Received',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 2,
+                            ),
+                            onPressed: () async {
+                              if (!formKey.currentState!.validate()) return;
+                              final double enteredNewAmount =
+                                  double.tryParse(
+                                    amountController.text
+                                        .trim()
+                                        .replaceAll(',', ''),
+                                  ) ??
+                                  0.0;
+                              if (enteredNewAmount <= 0) return;
+
+                              Navigator.pop(ctx);
+                              await _saveNewReceivedPayment(
+                                amount: enteredNewAmount,
+                                updatedTotal: updatedTotal,
+                                date: paymentDate,
+                                mode: 'Cash',
+                                referenceNo: '',
+                                remarks: '',
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -868,10 +1000,11 @@ class _SiteScreenState extends State<SiteScreen>
 
   Future<void> _saveNewReceivedPayment({
     required double amount,
+    double? updatedTotal,
     required DateTime date,
-    required String mode,
-    required String referenceNo,
-    required String remarks,
+    String mode = 'Cash',
+    String referenceNo = '',
+    String remarks = '',
   }) async {
     try {
       final entryId = 'PAY_${DateTime.now().millisecondsSinceEpoch}';
@@ -885,13 +1018,16 @@ class _SiteScreenState extends State<SiteScreen>
         'paymentMode': mode,
         'referenceNo': referenceNo,
         'remarks': remarks,
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': Timestamp.now(),
       };
 
       // 1. Add to projectPayments collection
       await FirestoreService.getCollection(
         'projectPayments',
-      ).doc(entryId).set(paymentEntry);
+      ).doc(entryId).set({
+        ...paymentEntry,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
       // 2. Fetch all payments for this site to calculate cumulative total
       final allPaymentsSnapshot = await FirestoreService.getCollection(
@@ -910,37 +1046,50 @@ class _SiteScreenState extends State<SiteScreen>
 
       if (allPaymentsSnapshot.docs.isEmpty) {
         final currentPaid =
-            double.tryParse(_updateAmountPaidController.text) ?? 0.0;
+            double.tryParse(_updateAmountPaidController.text.replaceAll(',', '')) ?? 0.0;
         cumulativeAmountReceived = currentPaid + amount;
+      }
+
+      // If updatedTotal was explicitly computed, ensure cumulative total is at least updatedTotal
+      if (updatedTotal != null && updatedTotal > cumulativeAmountReceived) {
+        cumulativeAmountReceived = updatedTotal;
       }
 
       // 3. Update project document & Site document
       final double budget =
-          double.tryParse(_updateProjectBudgetController.text) ?? 0.0;
+          double.tryParse(_updateProjectBudgetController.text.replaceAll(',', '')) ?? 0.0;
       final double spent =
-          double.tryParse(_updateAmountSpentController.text) ?? 0.0;
+          double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
       final double balance = budget - spent;
 
       if (_selectedProjectId != null && _selectedProjectId!.isNotEmpty) {
-        await FirestoreService.getCollection('projects')
-            .doc(_selectedProjectId)
-            .update({
-          'amountPaid': cumulativeAmountReceived,
-          'amountReceived': cumulativeAmountReceived,
-          'amountBalance': balance,
-          'receivedPayments': FieldValue.arrayUnion([paymentEntry]),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        try {
+          await FirestoreService.getCollection('projects')
+              .doc(_selectedProjectId)
+              .set({
+            'amountPaid': cumulativeAmountReceived,
+            'amountReceived': cumulativeAmountReceived,
+            'amountBalance': balance,
+            'receivedPayments': FieldValue.arrayUnion([paymentEntry]),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (projErr) {
+          debugPrint('Error updating projects doc: $projErr');
+        }
       }
 
       if (_selectedSiteDocId != null) {
-        await FirestoreService.getCollection('Site')
-            .doc(_selectedSiteDocId)
-            .update({
-          'amountPaid': cumulativeAmountReceived,
-          'amountReceived': cumulativeAmountReceived,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        try {
+          await FirestoreService.getCollection('Site')
+              .doc(_selectedSiteDocId)
+              .set({
+            'amountPaid': cumulativeAmountReceived,
+            'amountReceived': cumulativeAmountReceived,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (siteErr) {
+          debugPrint('Error updating Site doc: $siteErr');
+        }
       }
 
       if (!mounted) return;
@@ -959,6 +1108,7 @@ class _SiteScreenState extends State<SiteScreen>
         ),
       );
     } catch (e) {
+      debugPrint('Error in _saveNewReceivedPayment: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -3742,15 +3892,50 @@ class _SiteScreenState extends State<SiteScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Amount Received (₹)',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF334155),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Flexible(
+              child: Text(
+                'Amount Received (₹)',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF334155),
+                ),
+              ),
+            ),
+            if (onHistoryPressed != null)
+              InkWell(
+                onTap: onHistoryPressed,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.history_rounded,
+                        size: 13.5,
+                        color: primaryColor,
+                      ),
+                      const SizedBox(width: 2.5),
+                      Text(
+                        'History',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 6),
         Container(
@@ -3764,34 +3949,21 @@ class _SiteScreenState extends State<SiteScreen>
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 12, right: 4),
-                  child: Text(
-                    controller.text.isEmpty ? '0.00' : controller.text,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
+                  padding: const EdgeInsets.only(left: 12, right: 6),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      controller.text.isEmpty ? '0.00' : controller.text,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                 ),
               ),
-              if (onHistoryPressed != null)
-                IconButton(
-                  icon: Icon(
-                    Icons.history_rounded,
-                    color: primaryColor,
-                    size: 18,
-                  ),
-                  tooltip: 'Payment History',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
-                  ),
-                  onPressed: onHistoryPressed,
-                ),
               Container(
                 margin: const EdgeInsets.only(right: 6, left: 2),
                 child: Material(
@@ -3800,12 +3972,15 @@ class _SiteScreenState extends State<SiteScreen>
                   child: InkWell(
                     onTap: onAddPressed,
                     borderRadius: BorderRadius.circular(8),
-                    child: const Padding(
-                      padding: EdgeInsets.all(6),
-                      child: Icon(
-                        Icons.add_rounded,
-                        color: Colors.white,
-                        size: 18,
+                    child: const Tooltip(
+                      message: 'Add Amount',
+                      child: Padding(
+                        padding: EdgeInsets.all(7),
+                        child: Icon(
+                          Icons.add_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                       ),
                     ),
                   ),

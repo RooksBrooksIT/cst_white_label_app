@@ -20,6 +20,8 @@ class ApprovalWorkflowService {
   static const String statusPendingManagerReview = 'pending_manager_review';
   static const String statusPendingOrgApproval = 'pending_org_approval';
   static const String statusPendingManagerClearance = 'pending_manager_clearance';
+  static const String statusAwaitingConfirmation = 'awaiting_confirmation';
+  static const String statusReceived = 'received';
   static const String statusApproved = 'approved';
   static const String statusRejectedByManager = 'rejected_by_manager';
   static const String statusRejectedByOrg = 'rejected_by_org';
@@ -73,7 +75,16 @@ class ApprovalWorkflowService {
         s == 'pending_clearance') {
       return ApprovalStage.pendingManagerClearance;
     }
-    if (s == statusApproved || s == 'completed' || s == 'released') {
+    if (s == statusAwaitingConfirmation ||
+        s == 'awaiting_confirmation' ||
+        s == 'awaiting_receipt_confirmation') {
+      return ApprovalStage.pendingManagerClearance;
+    }
+    if (s == statusApproved ||
+        s == statusReceived ||
+        s == 'received' ||
+        s == 'completed' ||
+        s == 'released') {
       return ApprovalStage.approved;
     }
     if (s == statusRejectedByManager || s == 'rejected_by_manager') {
@@ -88,6 +99,17 @@ class ApprovalWorkflowService {
 
   /// Returns user-friendly status badge text.
   static String getStatusDisplayText(dynamic rawStatus) {
+    if (rawStatus == null) return 'Pending Manager Review';
+    final s = rawStatus.toString().toLowerCase().trim();
+    if (s == statusAwaitingConfirmation ||
+        s == 'awaiting_confirmation' ||
+        s == 'awaiting_receipt_confirmation') {
+      return 'Awaiting Confirmation';
+    }
+    if (s == statusReceived || s == 'received') {
+      return 'Received / Active';
+    }
+
     final stage = parseStatus(rawStatus);
     switch (stage) {
       case ApprovalStage.pendingManagerReview:
@@ -107,6 +129,14 @@ class ApprovalWorkflowService {
 
   /// Returns the 1-based active pipeline step index (1 to 4), or -1 if rejected.
   static int getStepNumber(dynamic rawStatus) {
+    if (rawStatus != null) {
+      final s = rawStatus.toString().toLowerCase().trim();
+      if (s == statusAwaitingConfirmation ||
+          s == 'awaiting_confirmation' ||
+          s == 'awaiting_receipt_confirmation') {
+        return 4;
+      }
+    }
     final stage = parseStatus(rawStatus);
     switch (stage) {
       case ApprovalStage.pendingManagerReview:

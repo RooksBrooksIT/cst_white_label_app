@@ -345,8 +345,16 @@ class SiteMaterialPoolItem {
     final allocAmt = _parseNum(map['totalAllocatedAmount'] ?? map['allocatedAmount'] ?? map['amount']);
     final consQty = _parseNum(map['consumedQty'] ?? map['usedQty']);
     final consAmt = _parseNum(map['consumedAmount'] ?? map['usedAmount']);
-    final remQty = _parseNum(map['remainingQty'] ?? (allocQty - consQty));
-    final remAmt = _parseNum(map['remainingAmount'] ?? (allocAmt - consAmt));
+    
+    // Available Stock = Total Allocated - Total Consumed
+    double remQty = _parseNum(map['remainingQty']);
+    if (remQty <= 0 || (allocQty > 0 && consQty > 0 && remQty > (allocQty - consQty))) {
+      remQty = (allocQty - consQty).clamp(0.0, double.infinity);
+    }
+    double remAmt = _parseNum(map['remainingAmount']);
+    if (remAmt <= 0 || (allocAmt > 0 && consAmt > 0 && remAmt > (allocAmt - consAmt))) {
+      remAmt = (allocAmt - consAmt).clamp(0.0, double.infinity);
+    }
     final rate = _parseNum(map['effectiveUnitRate'] ?? (allocQty > 0 ? (allocAmt / allocQty) : 0.0));
 
     return SiteMaterialPoolItem(
@@ -670,8 +678,93 @@ class MaterialInventoryService {
     return allocation;
   }
 
+  /// Fetches total recorded consumption for a site across dailyMaterialConsumptions and siteSupervisorEntries.
+  static Future<Map<String, double>> fetchSiteRecordedConsumptions(String siteId) async {
+    final cleanLow = siteId.trim().toLowerCase();
+    if (cleanLow.isEmpty) return {};
+
+    final Map<String, double> map = {};
+
+    try {
+      final dailySnap = await FirestoreService.dailyMaterialConsumptions.get();
+      for (final doc in dailySnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+        final sName = (data['siteName'] ?? '').toString().trim().toLowerCase();
+        final docId = doc.id.toLowerCase();
+
+        final bool isMatch = sId == cleanLow ||
+            (sName.isNotEmpty && sName == cleanLow) ||
+            docId.startsWith('${cleanLow}_') ||
+            (cleanLow.contains('_') && sId.isNotEmpty && (cleanLow.startsWith('${sId}_') || cleanLow.endsWith('_$sId'))) ||
+            (sId.contains('_') && cleanLow.isNotEmpty && (sId.startsWith('${cleanLow}_') || sId.endsWith('_$cleanLow')));
+
+        if (isMatch) {
+          final rawMats = data['materials'];
+          if (rawMats is List) {
+            for (final m in rawMats) {
+              if (m is Map) {
+                final name = (m['materialName'] ?? m['name'] ?? m['displayName'] ?? '').toString().trim().toLowerCase();
+                final qty = (m['usedQuantity'] ?? m['quantity'] as num?)?.toDouble() ??
+                    double.tryParse((m['usedQuantity'] ?? m['quantity'] ?? '0').toString()) ?? 0.0;
+                if (name.isNotEmpty && qty > 0) {
+                  map[name] = (map[name] ?? 0.0) + qty;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching dailyMaterialConsumptions: $e');
+    }
+
+    try {
+      final entriesSnap = await FirestoreService.siteSupervisorEntries.get();
+      final Map<String, double> supervisorEntriesMap = {};
+      for (final doc in entriesSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+        final sName = (data['siteLocation'] ?? '').toString().trim().toLowerCase();
+        final docId = doc.id.toLowerCase();
+
+        final bool isMatch = sId == cleanLow ||
+            (sName.isNotEmpty && sName == cleanLow) ||
+            docId.startsWith('${cleanLow}_') ||
+            (cleanLow.contains('_') && sId.isNotEmpty && (cleanLow.startsWith('${sId}_') || cleanLow.endsWith('_$sId')));
+
+        if (isMatch) {
+          final rawMats = data['materials'];
+          if (rawMats is List) {
+            for (final m in rawMats) {
+              if (m is Map) {
+                final name = (m['materialName'] ?? m['type'] ?? '').toString().trim().toLowerCase();
+                final qty = (m['quantity'] as num?)?.toDouble() ??
+                    double.tryParse((m['quantity'] ?? '0').toString()) ?? 0.0;
+                if (name.isNotEmpty && qty > 0) {
+                  supervisorEntriesMap[name] = (supervisorEntriesMap[name] ?? 0.0) + qty;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      for (final entry in supervisorEntriesMap.entries) {
+        final existing = map[entry.key] ?? 0.0;
+        if (entry.value > existing) {
+          map[entry.key] = entry.value;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking siteSupervisorEntries: $e');
+    }
+
+    return map;
+  }
+
   /// Fetches all materials currently in the Site Material Pool for a site.
-  /// Gracefully falls back to legacy inventory if migration is in progress.
+  /// Dynamically computes Available Stock = Total Allocated/Site Stock - Total Consumed/Used Quantity.
   static Future<List<SiteMaterialPoolItem>> fetchSiteMaterialPool(String siteId) async {
     final cleanSiteId = siteId.trim();
     if (cleanSiteId.isEmpty) return [];
@@ -681,53 +774,228 @@ class MaterialInventoryService {
         await FirestoreService.initialize();
       }
 
-      final query = await FirestoreService.siteMaterialPool
-          .where('siteId', isEqualTo: cleanSiteId)
-          .get();
+      final cleanLow = cleanSiteId.toLowerCase();
 
-      final List<SiteMaterialPoolItem> items = [];
-      final Set<String> foundMatNames = {};
+      // 1. Fetch pool documents matching site (flexible case & docId matching)
+      final poolSnap = await FirestoreService.siteMaterialPool.get();
+      final Map<String, SiteMaterialPoolItem> poolMap = {};
 
-      for (final doc in query.docs) {
-        final item = SiteMaterialPoolItem.fromMap(doc.id, doc.data());
-        items.add(item);
-        foundMatNames.add(item.materialName.toLowerCase());
-      }
+      for (final doc in poolSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? data['siteid'] ?? '').toString().trim().toLowerCase();
+        final sName = (data['siteName'] ?? data['sitename'] ?? '').toString().trim().toLowerCase();
+        final docId = doc.id.toLowerCase();
 
-      // Gracefully fall back to legacy inventory if pool is partially unpopulated
-      final legacyList = await fetchSiteInventory(cleanSiteId);
-      for (final leg in legacyList) {
-        final name = (leg['materialName'] ?? '').toString();
-        if (name.isNotEmpty && !foundMatNames.contains(name.toLowerCase())) {
-          final count = (leg['availableCount'] as num?)?.toDouble() ?? 0.0;
-          if (count > 0) {
-            final unitPrice = (leg['unitPrice'] as num?)?.toDouble() ?? 0.0;
-            items.add(SiteMaterialPoolItem(
-              docId: getSiteMaterialPoolDocId(cleanSiteId, name),
-              siteId: cleanSiteId,
-              siteName: (leg['siteName'] ?? cleanSiteId).toString(),
-              materialName: name,
-              displayName: (leg['displayName'] ?? name).toString(),
-              category: (leg['category'] ?? 'General Material').toString(),
-              subCategory: (leg['subCategory'] ?? '').toString(),
-              unit: (leg['unit'] ?? 'Units').toString(),
-              totalAllocatedQty: count,
-              totalAllocatedAmount: count * unitPrice,
-              consumedQty: 0.0,
-              consumedAmount: 0.0,
-              remainingQty: count,
-              remainingAmount: count * unitPrice,
-              effectiveUnitRate: unitPrice,
-            ));
-          }
+        final bool isMatch = sId == cleanLow ||
+            (sName.isNotEmpty && sName == cleanLow) ||
+            docId.startsWith('${cleanLow}_') ||
+            (cleanLow.contains('_') && sId.isNotEmpty && (cleanLow.startsWith('${sId}_') || cleanLow.endsWith('_$sId'))) ||
+            (sId.contains('_') && cleanLow.isNotEmpty && (sId.startsWith('${cleanLow}_') || sId.endsWith('_$cleanLow')));
+
+        if (isMatch) {
+          final item = SiteMaterialPoolItem.fromMap(doc.id, data);
+          final matKey = item.materialName.toLowerCase().trim();
+          poolMap[matKey] = item;
         }
       }
 
-      items.sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
-      return items;
+      // 2. Fetch recorded consumptions for this site from dailyMaterialConsumptions & siteSupervisorEntries
+      final Map<String, double> recordedConsumptions = await fetchSiteRecordedConsumptions(cleanSiteId);
+
+      // 3. Fetch legacy inventory & master materials to resolve accurate allocated stock and specific units
+      final legacyList = await fetchSiteInventory(cleanSiteId);
+
+      final masterSnap = await FirestoreService.getCollection('materials').get();
+      final Map<String, String> masterUnits = {};
+      final Map<String, double> masterPrices = {};
+      for (final d in masterSnap.docs) {
+        final dData = d.data();
+        final mName = (dData['materialName'] ?? dData['matName'] ?? dData['name'] ?? '').toString().trim().toLowerCase();
+        if (mName.isNotEmpty) {
+          final u = (dData['materialUnit'] ?? dData['unit'] ?? dData['matUnit'] ?? '').toString().trim();
+          if (u.isNotEmpty) masterUnits[mName] = u;
+          final p = (dData['unitPrice'] as num?)?.toDouble() ??
+              double.tryParse((dData['materialPrice'] ?? '0').toString()) ?? 0.0;
+          if (p > 0) masterPrices[mName] = p;
+        }
+      }
+
+      final Map<String, SiteMaterialPoolItem> consolidatedItems = {};
+
+      // Process items present in siteMaterialPool
+      for (final entry in poolMap.entries) {
+        final matKey = entry.key;
+        final p = entry.value;
+
+        // Determine specific unit (prefer 'Bags', etc. over generic 'Units')
+        String resolvedUnit = p.unit;
+        if ((resolvedUnit == 'Units' || resolvedUnit.isEmpty) && masterUnits.containsKey(matKey)) {
+          resolvedUnit = masterUnits[matKey]!;
+        }
+
+        final legMatch = legacyList.firstWhere(
+          (leg) => (leg['materialName'] ?? '').toString().toLowerCase().trim() == matKey,
+          orElse: () => {},
+        );
+        if (legMatch.isNotEmpty) {
+          final legUnit = (legMatch['unit'] ?? '').toString().trim();
+          if (legUnit.isNotEmpty && (resolvedUnit == 'Units' || resolvedUnit.isEmpty)) {
+            resolvedUnit = legUnit;
+          }
+        }
+
+        // Consumption: maximum of poolItem consumedQty and actual recorded consumptions
+        final recordedCons = recordedConsumptions[matKey] ?? 0.0;
+        final double totalConsumed = p.consumedQty > recordedCons ? p.consumedQty : recordedCons;
+
+        // Total allocated stock: maximum of pool totalAllocatedQty and legacy count
+        double totalAlloc = p.totalAllocatedQty;
+        if (legMatch.isNotEmpty) {
+          final legCount = (legMatch['availableCount'] as num?)?.toDouble() ?? 0.0;
+          if (legCount > totalAlloc) {
+            totalAlloc = legCount;
+          }
+        }
+        if (totalAlloc <= 0 && totalConsumed > 0) {
+          totalAlloc = totalConsumed + p.remainingQty;
+        }
+
+        // Available Stock = Total Allocated/Site Stock - Total Consumed/Used Quantity
+        final double remaining = (totalAlloc - totalConsumed).clamp(0.0, double.infinity);
+        final double effectiveRate = p.effectiveUnitRate > 0
+            ? p.effectiveUnitRate
+            : (masterPrices[matKey] ?? 0.0);
+
+        consolidatedItems[matKey] = SiteMaterialPoolItem(
+          docId: p.docId,
+          siteId: cleanSiteId,
+          siteName: p.siteName.isNotEmpty ? p.siteName : cleanSiteId,
+          projectName: p.projectName,
+          materialName: p.materialName,
+          displayName: p.displayName,
+          category: p.category,
+          subCategory: p.subCategory,
+          unit: resolvedUnit.isNotEmpty ? resolvedUnit : 'Units',
+          totalAllocatedQty: totalAlloc,
+          totalAllocatedAmount: totalAlloc * effectiveRate,
+          consumedQty: totalConsumed,
+          consumedAmount: totalConsumed * effectiveRate,
+          remainingQty: remaining,
+          remainingAmount: remaining * effectiveRate,
+          effectiveUnitRate: effectiveRate,
+          lastAllocationDate: p.lastAllocationDate,
+          lastConsumptionDate: p.lastConsumptionDate,
+          updatedAt: p.updatedAt,
+        );
+      }
+
+      // Process legacy items not in poolMap
+      for (final leg in legacyList) {
+        final name = (leg['materialName'] ?? '').toString().trim();
+        if (name.isEmpty) continue;
+        final matKey = name.toLowerCase();
+        if (consolidatedItems.containsKey(matKey)) continue;
+
+        final count = (leg['availableCount'] as num?)?.toDouble() ?? 0.0;
+        final unitPrice = (leg['unitPrice'] as num?)?.toDouble() ?? (masterPrices[matKey] ?? 0.0);
+        String legUnit = (leg['unit'] ?? '').toString().trim();
+        if ((legUnit.isEmpty || legUnit == 'Units') && masterUnits.containsKey(matKey)) {
+          legUnit = masterUnits[matKey]!;
+        }
+
+        final recordedCons = recordedConsumptions[matKey] ?? 0.0;
+        final double totalAlloc = count;
+        // Available Stock = Total Allocated/Site Stock - Total Consumed/Used Quantity
+        final double remaining = (totalAlloc - recordedCons).clamp(0.0, double.infinity);
+
+        if (totalAlloc > 0 || remaining > 0) {
+          consolidatedItems[matKey] = SiteMaterialPoolItem(
+            docId: getSiteMaterialPoolDocId(cleanSiteId, name),
+            siteId: cleanSiteId,
+            siteName: (leg['siteName'] ?? cleanSiteId).toString(),
+            materialName: name,
+            displayName: (leg['displayName'] ?? name).toString(),
+            category: (leg['category'] ?? 'General Material').toString(),
+            subCategory: (leg['subCategory'] ?? '').toString(),
+            unit: legUnit.isNotEmpty ? legUnit : 'Units',
+            totalAllocatedQty: totalAlloc,
+            totalAllocatedAmount: totalAlloc * unitPrice,
+            consumedQty: recordedCons,
+            consumedAmount: recordedCons * unitPrice,
+            remainingQty: remaining,
+            remainingAmount: remaining * unitPrice,
+            effectiveUnitRate: unitPrice,
+          );
+        }
+      }
+
+      final resultList = consolidatedItems.values.toList();
+      resultList.sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+      return resultList;
     } catch (e) {
       debugPrint('Error fetching site material pool for $siteId: $e');
       return [];
+    }
+  }
+
+  /// Syncs site inventory counts to canonical availability and transfer mirrors.
+  static Future<void> _syncCanonicalAvailabilitySiteCount(
+    String siteId,
+    String materialName,
+    int newCount,
+  ) async {
+    try {
+      final docId = getMaterialDocId(materialName);
+      final cleanLow = siteId.trim().toLowerCase();
+
+      for (final collName in ['materialsAvailability', 'materialTransfer']) {
+        final docRef = FirestoreService.getCollection(collName).doc(docId);
+        final snap = await docRef.get();
+        if (snap.exists && snap.data() != null) {
+          final data = snap.data()!;
+          final rawSites = List.from(data['siteInventories'] ?? []);
+          final List<Map<String, dynamic>> updatedSites = [];
+          bool found = false;
+
+          for (final item in rawSites) {
+            if (item is Map) {
+              final sMap = Map<String, dynamic>.from(item);
+              final sId = (sMap['siteId'] ?? '').toString().trim().toLowerCase();
+              final sName = (sMap['siteName'] ?? '').toString().trim().toLowerCase();
+              if (sId == cleanLow || (sName.isNotEmpty && sName == cleanLow)) {
+                sMap['availableCount'] = newCount;
+                sMap['count'] = newCount;
+                sMap['updatedAt'] = DateTime.now().toIso8601String();
+                found = true;
+              }
+              updatedSites.add(sMap);
+            }
+          }
+
+          if (!found) {
+            updatedSites.add({
+              'siteId': siteId,
+              'siteName': siteId,
+              'availableCount': newCount,
+              'count': newCount,
+              'updatedAt': DateTime.now().toIso8601String(),
+            });
+          }
+
+          final totalSiteCount = updatedSites.fold<int>(
+            0,
+            (acc, s) => acc + ((s['availableCount'] as num?)?.toInt() ?? 0),
+          );
+
+          await docRef.set({
+            'siteInventories': updatedSites,
+            'totalSiteCount': totalSiteCount,
+            'lastUpdated': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      }
+    } catch (e) {
+      debugPrint('Error syncing canonical site count: $e');
     }
   }
 
@@ -804,8 +1072,21 @@ class MaterialInventoryService {
       final newConsumedAmt = poolItem.consumedAmount + itemAmount;
       final newRemainingQty = (poolItem.remainingQty - usedQty).clamp(0.0, double.infinity);
       final newRemainingAmt = (poolItem.remainingAmount - itemAmount).clamp(0.0, double.infinity);
+      final totalAlloc = poolItem.totalAllocatedQty > 0
+          ? poolItem.totalAllocatedQty
+          : (poolItem.remainingQty + usedQty);
 
       await poolRef.set({
+        'docId': poolDocId,
+        'siteId': cleanSiteId,
+        'siteName': siteName ?? poolItem.siteName,
+        'materialName': name,
+        'displayName': poolItem.displayName,
+        'category': poolItem.category,
+        'subCategory': poolItem.subCategory,
+        'unit': poolItem.unit,
+        'totalAllocatedQty': totalAlloc,
+        'totalAllocatedAmount': totalAlloc * rate,
         'consumedQty': newConsumedQty,
         'consumedAmount': newConsumedAmt,
         'remainingQty': newRemainingQty,
@@ -841,6 +1122,13 @@ class MaterialInventoryService {
         materialName: name,
         siteCount: newRemainingQty.toInt(),
         displayName: poolItem.displayName,
+      );
+
+      // Sync canonical materialsAvailability & materialTransfer mirrors
+      await _syncCanonicalAvailabilitySiteCount(
+        cleanSiteId,
+        name,
+        newRemainingQty.toInt(),
       );
 
       processedItems.add({

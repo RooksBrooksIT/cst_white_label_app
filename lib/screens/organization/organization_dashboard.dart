@@ -11,6 +11,7 @@ import 'package:demo_cst/screens/organization/org_supervisor_in_site_page.dart';
 import 'package:demo_cst/screens/organization/organization_expenses.dart';
 import 'package:demo_cst/screens/organization/org_approvals_menu_page.dart';
 import 'package:demo_cst/screens/organization/org_materials_tools_inventory_page.dart';
+import 'package:demo_cst/screens/organization/org_petty_cash_page.dart';
 import 'package:demo_cst/screens/organization/org_notification_page.dart';
 import 'package:demo_cst/services/notification_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
@@ -1993,6 +1994,20 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const ManagerConfigScreen(),
+                  ),
+                ),
+              ),
+
+              // 7. Petty Cash Hub
+              _buildConstructionActionCard(
+                title: 'Petty Cash Hub',
+                subtitle: 'Allocations & master ledger',
+                icon: Icons.account_balance_wallet_rounded,
+                accentColor: const Color(0xFF10B981),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OrgPettyCashPage(),
                   ),
                 ),
               ),

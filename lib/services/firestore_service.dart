@@ -338,6 +338,16 @@ class FirestoreService {
   static CollectionReference<Map<String, dynamic>>
   get dailyMaterialConsumptions => getCollection('dailyMaterialConsumptions');
 
+  // Universal Petty Cash Collections
+  static CollectionReference<Map<String, dynamic>>
+  get pettyCashAccounts => getCollection('pettyCashAccounts');
+  static CollectionReference<Map<String, dynamic>>
+  get pettyCashRequests => getCollection('pettyCashRequests');
+  static CollectionReference<Map<String, dynamic>>
+  get pettyCashTransactions => getCollection('pettyCashTransactions');
+  static CollectionReference<Map<String, dynamic>>
+  get pettyCashAuditLogs => getCollection('pettyCashAuditLogs');
+
   /// Generates a unique 6-digit alphanumeric referral code.
   static Future<String> generateUniqueReferralCode() async {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

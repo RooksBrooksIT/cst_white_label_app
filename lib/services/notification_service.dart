@@ -8,6 +8,10 @@ import '../screens/manager/manager_material_approval_screen.dart';
 import '../screens/manager/manager_tools_approval_screen.dart';
 import '../screens/manager/manager_site_payment_approval_page.dart';
 import '../screens/manager/manager_approval_screen.dart';
+import 'auth_service.dart';
+import '../screens/supervisor/supervisor_petty_cash_page.dart';
+import '../screens/manager/manager_petty_cash_page.dart';
+import '../screens/organization/org_petty_cash_page.dart';
 
 /// Handles background FCM messages when the app is terminated/background.
 @pragma('vm:entry-point')
@@ -165,6 +169,30 @@ class NotificationService {
         context,
         MaterialPageRoute(builder: (_) => const ManagerApprovalScreen()),
       );
+    } else if (type.contains('petty_cash') || type.contains('petty')) {
+      final role = AuthService().userRole;
+      final ud = AuthService().userData;
+      if (role == UserRole.supervisor) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SupervisorPettyCashPage(
+              supervisorId: (ud['supervisorId'] ?? '').toString(),
+              supervisorName: (ud['supervisorName'] ?? 'Supervisor').toString(),
+            ),
+          ),
+        );
+      } else if (role == UserRole.organization) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const OrgPettyCashPage()),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ManagerPettyCashPage()),
+        );
+      }
     }
   }
 
@@ -857,17 +885,19 @@ class NotificationService {
   static Future<void> markAsRead(String docId) async {
     try {
       final orgId = FirestoreService.currentOrgId;
-      await FirebaseFirestore.instance
-          .collection('notifications')
-          .doc(docId)
-          .update({'isRead': true})
-          .catchError((_) {});
-
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
-        await FirestoreService.getCollection('notifications')
-            .doc(docId)
-            .update({'isRead': true})
-            .catchError((_) {});
+        final orgDocRef = FirestoreService.getCollection('notifications').doc(docId);
+        final orgDoc = await orgDocRef.get();
+        if (orgDoc.exists) {
+          await orgDocRef.update({'isRead': true});
+          return;
+        }
+      }
+
+      final rootDocRef = FirebaseFirestore.instance.collection('notifications').doc(docId);
+      final rootDoc = await rootDocRef.get();
+      if (rootDoc.exists) {
+        await rootDocRef.update({'isRead': true});
       }
     } catch (e) {
       debugPrint('NotificationService: markAsRead failed: $e');

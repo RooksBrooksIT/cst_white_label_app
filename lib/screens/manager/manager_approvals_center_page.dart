@@ -9,6 +9,7 @@ import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
 import 'package:demo_cst/screens/manager/manager_tools_approval_screen.dart';
 import 'package:demo_cst/screens/manager/manager_site_payment_approval_page.dart';
 import 'package:demo_cst/screens/manager/manager_approval_screen.dart';
+import 'package:demo_cst/screens/manager/manager_petty_cash_page.dart';
 
 class ManagerApprovalsCenterPage extends StatefulWidget {
   final bool hideAppBar;
@@ -618,6 +619,31 @@ class _ManagerApprovalsCenterPageState
             context,
             MaterialPageRoute(
               builder: (context) => const ManagerApprovalScreen(),
+            ),
+          );
+        },
+      ),
+      _ApprovalCategoryData(
+        id: 'PettyCash',
+        title: 'Petty Cash',
+        categoryTag: 'Finance',
+        subtitle: 'Review supervisor requests & allocate petty cash',
+        icon: Icons.account_balance_wallet_rounded,
+        color: const Color(0xFF10B981), // Emerald
+        stream: FirestoreService.pettyCashRequests.snapshots(),
+        pendingCountCalc: (snap) => snap.docs.where((d) {
+          final status = d.data()['status']?.toString();
+          final stage = ApprovalWorkflowService.parseStatus(status);
+          return stage == ApprovalStage.pendingManagerReview ||
+              stage == ApprovalStage.pendingManagerClearance ||
+              status == 'org_approved';
+        }).length,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ManagerPettyCashPage(),
             ),
           );
         },

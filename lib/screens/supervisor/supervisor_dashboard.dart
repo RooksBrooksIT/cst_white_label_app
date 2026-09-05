@@ -20,6 +20,7 @@ import 'package:demo_cst/screens/supervisor/supervisor_tools_view_request_screen
 import 'package:demo_cst/screens/common/construction_documents.dart';
 import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
 import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
+import 'package:demo_cst/screens/supervisor/supervisor_petty_cash_page.dart';
 
 class SupervisorDashboard extends StatefulWidget {
   final String supervisorId;
@@ -68,8 +69,8 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
             Icon(Icons.logout_rounded, color: Colors.redAccent, size: 24),
@@ -81,23 +82,31 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           ],
         ),
         content: const Text(
-          'Are you sure you want to end your active supervisor session and log out?',
-          style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
+          'Are you sure you want to log out?',
+          style: TextStyle(fontSize: 15, color: Color(0xFF475569)),
         ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
             child: const Text(
-              'CANCEL',
+              'Cancel',
               style: TextStyle(
-                color: Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
             ),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.of(dialogContext).pop();
               await AuthService().logout();
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
@@ -110,14 +119,15 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               elevation: 0,
             ),
             child: const Text(
-              'LOGOUT',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              'Yes, Log Out',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
             ),
           ),
         ],
@@ -1119,6 +1129,21 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                   userDetails: {
                     'supervisorId': widget.supervisorId,
                   },
+                ),
+              ),
+            ),
+          ),
+          SubMenuItem(
+            title: 'Petty Cash',
+            subtitle: 'Balances, site expenses & replenishments',
+            icon: Icons.account_balance_wallet_rounded,
+            color: const Color(0xFF10B981),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SupervisorPettyCashPage(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
                 ),
               ),
             ),
