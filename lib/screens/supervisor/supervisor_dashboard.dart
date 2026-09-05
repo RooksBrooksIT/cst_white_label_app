@@ -7,7 +7,6 @@ import 'package:demo_cst/services/auth_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 import 'package:demo_cst/utils/responsive.dart';
 import 'package:demo_cst/screens/common/notification_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_verification_page.dart';
 import 'package:demo_cst/screens/supervisor/material_request_form.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_material_view_request_screen.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_work_schedule_page.dart';
@@ -20,6 +19,7 @@ import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
 import 'package:demo_cst/screens/supervisor/supervisor_tools_view_request_screen.dart';
 import 'package:demo_cst/screens/common/construction_documents.dart';
 import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
+import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
 
 class SupervisorDashboard extends StatefulWidget {
   final String supervisorId;
@@ -1108,15 +1108,17 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         items: [
           SubMenuItem(
             title: 'Supervisor Expenses',
-            subtitle: 'Log and verify daily expenses',
+            subtitle: 'Log and manage daily site expenses',
             icon: Icons.monetization_on_rounded,
             color: primaryColor,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => SupervisorVerificationPage(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
+                builder: (context) => SiteEntryPage(
+                  userName: widget.supervisorName,
+                  userDetails: {
+                    'supervisorId': widget.supervisorId,
+                  },
                 ),
               ),
             ),

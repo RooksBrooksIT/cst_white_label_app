@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -150,18 +151,14 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       final Set<String> nameSet = {};
       final List<Map<String, dynamic>> allMatDocs = [];
 
-      // 1. Primary: Fetch from 'materials' collection
-      try {
-        final matSnap = await FirestoreService.getCollection('materials').get();
-        for (final doc in matSnap.docs) {
+      void processDocs(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+        for (final doc in docs) {
           final data = doc.data();
-          final name = (data['materialName'] ??
-                  data['materialname'] ??
-                  data['name'] ??
-                  data['matCategory'] ??
-                  '')
-              .toString()
-              .trim();
+          // Strictly fetch from the 'materialName' field
+          final dynamic rawName = data['materialName'] ?? data['materialname'];
+          final String name = (rawName ?? '').toString().trim();
+
+          // Do NOT use or display values from Material Categories or fallback to matCategory
           if (name.isNotEmpty && !nameSet.contains(name)) {
             nameSet.add(name);
             allMatDocs.add({
@@ -174,120 +171,33 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                       '')
                   .toString()
                   .trim(),
-              'materialCategory': (data['materialCategory'] ??
-                      data['matCategory'] ??
-                      '')
-                  .toString()
-                  .trim(),
-              'materialSubCategory':
-                  (data['materialSubCategory'] ?? '').toString().trim(),
               'unitPrice': data['materialPrice'] ?? data['unitPrice'] ?? '',
               'rawData': data,
             });
           }
         }
+      }
+
+      // 1. Fetch strictly from 'materials' collection
+      try {
+        final matSnap = await FirestoreService.getCollection('materials').get();
+        processDocs(matSnap.docs);
       } catch (e) {
         debugPrint('Error fetching from materials: $e');
       }
 
-      // 2. Secondary: Fetch from 'Materials' collection (capitalized)
+      // 2. Secondary check for case sensitivity: 'Materials' collection
       if (allMatDocs.isEmpty) {
         try {
           final matCapitalSnap =
               await FirestoreService.getCollection('Materials').get();
-          for (final doc in matCapitalSnap.docs) {
-            final data = doc.data();
-            final name = (data['materialName'] ??
-                    data['materialname'] ??
-                    data['name'] ??
-                    data['matCategory'] ??
-                    '')
-                .toString()
-                .trim();
-            if (name.isNotEmpty && !nameSet.contains(name)) {
-              nameSet.add(name);
-              allMatDocs.add({
-                'docId': doc.id,
-                'materialName': name,
-                'materialId': data['materialId'] ?? doc.id,
-                'materialUnit': (data['materialUnit'] ??
-                        data['unit'] ??
-                        data['matUnit'] ??
-                        '')
-                    .toString()
-                    .trim(),
-                'materialCategory': (data['materialCategory'] ??
-                        data['matCategory'] ??
-                        '')
-                    .toString()
-                    .trim(),
-                'materialSubCategory':
-                    (data['materialSubCategory'] ?? '').toString().trim(),
-                'unitPrice': data['materialPrice'] ?? data['unitPrice'] ?? '',
-                'rawData': data,
-              });
-            }
-          }
+          processDocs(matCapitalSnap.docs);
         } catch (e) {
           debugPrint('Error fetching from Materials: $e');
         }
       }
 
-      // 3. Fallback: Fetch from 'materialCategories' and 'materialsavailablity'
-      try {
-        final catSnap =
-            await FirestoreService.getCollection('materialCategories').get();
-        for (final doc in catSnap.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ??
-                  data['matCategory'] ??
-                  data['name'] ??
-                  '')
-              .toString()
-              .trim();
-          if (name.isNotEmpty && !nameSet.contains(name)) {
-            nameSet.add(name);
-            allMatDocs.add({
-              'docId': doc.id,
-              'materialName': name,
-              'materialId': data['materialId'] ?? doc.id,
-              'materialUnit': (data['materialUnit'] ?? data['matUnit'] ?? '')
-                  .toString()
-                  .trim(),
-              'materialCategory':
-                  (data['matCategory'] ?? '').toString().trim(),
-              'rawData': data,
-            });
-          }
-        }
-      } catch (_) {}
-
-      try {
-        final availSnap =
-            await FirestoreService.getCollection('materialsavailablity').get();
-        for (final doc in availSnap.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ??
-                  data['materialname'] ??
-                  data['name'] ??
-                  '')
-              .toString()
-              .trim();
-          if (name.isNotEmpty && !nameSet.contains(name)) {
-            nameSet.add(name);
-            allMatDocs.add({
-              'docId': doc.id,
-              'materialName': name,
-              'materialId': doc.id,
-              'materialUnit':
-                  (data['materialUnit'] ?? data['unit'] ?? '').toString().trim(),
-              'rawData': data,
-            });
-          }
-        }
-      } catch (_) {}
-
-      // Sort alphabetically
+      // Sort alphabetically by materialName
       allMatDocs.sort(
         (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
               (b['materialName'] as String).toLowerCase(),
@@ -834,18 +744,6 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
 
   /// Card 2: Required Materials Section
   Widget _buildMaterialEntryCard(Color darkAccent) {
-    // Look up category & subcategory details for selected material
-    final selectedMatData = materialDocs.firstWhere(
-      (m) =>
-          (m['materialName'] ?? '').toString().trim() ==
-          (selectedMaterial ?? '').trim(),
-      orElse: () => {},
-    );
-    final matCategory =
-        selectedMatData['materialCategory']?.toString() ?? '';
-    final matSubCategory =
-        selectedMatData['materialSubCategory']?.toString() ?? '';
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -901,66 +799,17 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           ),
           const SizedBox(height: 14),
 
-          // Required Material Dropdown (Fetched from Materials collection)
+          // Required Material Dropdown (Fetched from materials collection)
           _buildFormDropdown<String>(
             label: "Select Required Material",
             hint: _isLoadingMaterialsList
-                ? "Loading materials catalogue..."
-                : "Choose material (e.g. cement_ppc)",
+                ? "Loading materials..."
+                : "Choose material",
             icon: Icons.category_rounded,
             value: selectedMaterial,
             items: materialDescriptions,
             onChanged: _onMaterialChanged,
           ),
-
-          // Optional info tags for the selected material
-          if (matCategory.isNotEmpty || matSubCategory.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                if (matCategory.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Category: $matCategory',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF475569),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                if (matSubCategory.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Sub-Category: $matSubCategory',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF475569),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
           const SizedBox(height: 12),
 
           // Unit & Quantity Row
