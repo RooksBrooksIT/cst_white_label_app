@@ -323,7 +323,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           mapByDocOrName[key] = {
             'materialId': item.docId,
             'materialName': key,
-            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
+            'displayName': key,
             'unit': item.unit,
             'count': item.companyAvailableCount,
           };
@@ -332,8 +332,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
       final list = mapByDocOrName.values.toList();
       list.sort(
-        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-              (b['displayName'] as String).toLowerCase(),
+        (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
+              (b['materialName'] as String).toLowerCase(),
             ),
       );
 
@@ -379,7 +379,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
           mapByDocOrName[key] = {
             'materialId': item.docId,
             'materialName': key,
-            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
+            'displayName': key,
             'unit': item.unit,
             'count': siteEntry.availableCount,
           };
@@ -388,8 +388,8 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
       final list = mapByDocOrName.values.toList();
       list.sort(
-        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-              (b['displayName'] as String).toLowerCase(),
+        (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
+              (b['materialName'] as String).toLowerCase(),
             ),
       );
 
@@ -1868,8 +1868,6 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                   items: validList.map((material) {
                     final materialName =
                         (material['materialName'] ?? '').toString().trim();
-                    final displayName =
-                        (material['displayName'] ?? materialName).toString().trim();
                     final count = _parseCount(material['count']);
 
                     return DropdownMenuItem<String>(
@@ -1878,7 +1876,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              displayName.isNotEmpty ? displayName : materialName,
+                              materialName,
                               style: const TextStyle(
                                 color: Color(0xFF0A183D),
                                 fontWeight: FontWeight.w700,

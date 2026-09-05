@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:demo_cst/services/firestore_service.dart';
+import 'package:demo_cst/services/material_inventory_service.dart';
 import 'package:demo_cst/utils/app_theme.dart';
 
 class MaterialAtSiteEntryPage extends StatefulWidget {
@@ -181,20 +182,45 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
         await FirestoreService.initialize();
       }
 
-      // Fetch from materialTransfer collection
-      final transferSnap = await FirestoreService.getCollection('materialTransfer').get();
-      // Also fetch fallback from materialsAvailability
-      final availSnap = await FirestoreService.getCollection('materialsAvailability').get();
-
       final Map<String, Map<String, dynamic>> siteMaterialsMap = {};
 
+      // 1. Fetch directly from universal siteMaterialPool
+      final poolItems = await MaterialInventoryService.fetchSiteMaterialPool(cleanSiteId);
+      for (final p in poolItems) {
+        final docKey = p.materialName.toLowerCase().trim();
+        siteMaterialsMap[docKey] = {
+          'materialId': p.id,
+          'materialName': p.materialName,
+          'displayName': p.materialName,
+          'category': p.category,
+          'unit': p.unit,
+          'availableCount': p.remainingQty.toInt(),
+          'siteAvailableCount': p.remainingQty.toInt(),
+          'remainingQty': p.remainingQty,
+          'allocatedQty': p.allocatedQty,
+          'consumedQty': p.consumedQty,
+          'effectiveUnitRate': p.effectiveUnitRate,
+          'allocatedAmount': p.allocatedAmount,
+          'consumedAmount': p.consumedAmount,
+          'remainingAmount': p.remainingAmount,
+          'companyAvailableCount': 0,
+          'totalAvailableCount': p.remainingQty.toInt(),
+          'siteId': cleanSiteId,
+          'projectName': '',
+        };
+      }
+
+      // 2. Fallback / Merge with legacy materialTransfer & materialsAvailability
+      final transferSnap = await FirestoreService.getCollection('materialTransfer').get();
+      final availSnap = await FirestoreService.getCollection('materialsAvailability').get();
       final allDocs = [...transferSnap.docs, ...availSnap.docs];
 
       for (final doc in allDocs) {
         final data = doc.data();
         final matName = (data['materialName'] ?? data['displayName'] ?? doc.id).toString().trim();
         if (matName.isEmpty) continue;
-        final docKey = matName.toLowerCase();
+        final docKey = matName.toLowerCase().trim();
+        if (siteMaterialsMap.containsKey(docKey)) continue;
 
         final rawSites = data['siteInventories'];
         if (rawSites is! List) continue;
@@ -205,7 +231,6 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           final sId = (sMap['siteId'] ?? sMap['siteid'] ?? '').toString().trim();
           final sName = (sMap['siteName'] ?? sMap['sitename'] ?? '').toString().trim();
 
-          // Match by siteId or siteName (e.g. ST001_shek) flexibly & case-insensitively
           final cleanLow = cleanSiteId.toLowerCase();
           final sIdLow = sId.toLowerCase();
           final sNameLow = sName.toLowerCase();
@@ -238,6 +263,16 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
               'unit': unit,
               'availableCount': availableCount,
               'siteAvailableCount': availableCount,
+              'remainingQty': availableCount.toDouble(),
+              'allocatedQty': availableCount.toDouble(),
+              'consumedQty': 0.0,
+              'effectiveUnitRate': (data['unitPrice'] as num?)?.toDouble() ??
+                  double.tryParse((data['materialPrice'] ?? '0').toString()) ??
+                  (sMap['unitPrice'] as num?)?.toDouble() ??
+                  0.0,
+              'allocatedAmount': 0.0,
+              'consumedAmount': 0.0,
+              'remainingAmount': 0.0,
               'companyAvailableCount': companyAvailableCount,
               'totalAvailableCount': totalAvailableCount,
               'siteId': sId.isNotEmpty ? sId : cleanSiteId,
@@ -451,6 +486,65 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                   ],
                 ),
               ),
+              if (mat['allocatedQty'] != null && (mat['allocatedQty'] as num) > 0) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Allocated', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${mat['allocatedQty']} $unit',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            if ((mat['allocatedAmount'] as num? ?? 0) > 0)
+                              Text('₹${(mat['allocatedAmount'] as num).toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Consumed', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${mat['consumedQty']} $unit',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                            ),
+                            if ((mat['consumedAmount'] as num? ?? 0) > 0)
+                              Text('₹${(mat['consumedAmount'] as num).toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Effective Rate', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text(
+                              '₹${((mat['effectiveUnitRate'] as num?) ?? 0).toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            Text('per $unit', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
 
               // Site Information details - Site ID only
@@ -848,117 +942,150 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                       color: isAvailable ? const Color(0xFFE2E8F0) : const Color(0xFFFECACA),
                     ),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      // Material Icon
-                      Container(
-                        padding: const EdgeInsets.all(9),
-                        decoration: BoxDecoration(
-                          color: isAvailable
-                              ? const Color(0xFFECFDF5)
-                              : const Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          isAvailable
-                              ? Icons.inventory_2_rounded
-                              : Icons.inventory_2_outlined,
-                          size: 20,
-                          color: isAvailable
-                              ? const Color(0xFF059669)
-                              : const Color(0xFFDC2626),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-
-                      // Material Name
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              matName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            if ((mat['category'] ?? '').toString().isNotEmpty && mat['category'] != 'General Material')
-                              Text(
-                                mat['category'].toString(),
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      // Available Stock Count Badge
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      Row(
                         children: [
+                          // Material Icon
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.all(9),
                             decoration: BoxDecoration(
                               color: isAvailable
                                   ? const Color(0xFFECFDF5)
                                   : const Color(0xFFFEF2F2),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isAvailable
-                                    ? const Color(0xFFA7F3D0)
-                                    : const Color(0xFFFECACA),
-                              ),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  count.toString(),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: isAvailable
-                                        ? const Color(0xFF059669)
-                                        : const Color(0xFFDC2626),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  unit,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                    color: isAvailable
-                                        ? const Color(0xFF047857)
-                                        : const Color(0xFFB91C1C),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            isAvailable ? 'Available Stock' : 'Out of Stock',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
+                            child: Icon(
+                              isAvailable
+                                  ? Icons.inventory_2_rounded
+                                  : Icons.inventory_2_outlined,
+                              size: 20,
                               color: isAvailable
                                   ? const Color(0xFF059669)
                                   : const Color(0xFFDC2626),
                             ),
                           ),
+                          const SizedBox(width: 12),
+
+                          // Material Name
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  matName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                if ((mat['category'] ?? '').toString().isNotEmpty && mat['category'] != 'General Material')
+                                  Text(
+                                    mat['category'].toString(),
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+
+                          // Available Stock Count Badge
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: isAvailable
+                                      ? const Color(0xFFECFDF5)
+                                      : const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isAvailable
+                                        ? const Color(0xFFA7F3D0)
+                                        : const Color(0xFFFECACA),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      count.toString(),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: isAvailable
+                                            ? const Color(0xFF059669)
+                                            : const Color(0xFFDC2626),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      unit,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                        color: isAvailable
+                                            ? const Color(0xFF047857)
+                                            : const Color(0xFFB91C1C),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                isAvailable ? 'Available Stock' : 'Out of Stock',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: isAvailable
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFFDC2626),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: Color(0xFF94A3B8),
+                          ),
                         ],
                       ),
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 18,
-                        color: Color(0xFF94A3B8),
-                      ),
+                      if (mat['allocatedQty'] != null && (mat['allocatedQty'] as num) > 0) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Allocated: ${mat['allocatedQty']} $unit',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                'Consumed: ${mat['consumedQty']} $unit',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+                              ),
+                              if ((mat['effectiveUnitRate'] as num? ?? 0) > 0)
+                                Text(
+                                  'Rate: ₹${(mat['effectiveUnitRate'] as num).toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

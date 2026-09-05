@@ -2507,10 +2507,13 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: badgeColor,
                         borderRadius: BorderRadius.circular(6),
@@ -2519,13 +2522,12 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                         '$planName Plan'.toUpperCase(),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 10.5,
+                          fontSize: 10,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 0.4,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     const Text(
                       'Document Rules',
                       style: TextStyle(
@@ -2610,9 +2612,12 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
             children: [
               const Icon(Icons.analytics_outlined, size: 16, color: Color(0xFF475569)),
               const SizedBox(width: 6),
-              Text(
-                'Site Quota & Status (${usage.siteId})',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF334155)),
+              Expanded(
+                child: Text(
+                  'Site Quota & Status (${usage.siteId})',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF334155)),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

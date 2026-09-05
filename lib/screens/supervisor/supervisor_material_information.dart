@@ -398,26 +398,20 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       final items = await MaterialInventoryService.fetchAllMaterialsInventory();
       final Map<String, MaterialInventoryItem> invMap = {};
       for (final item in items) {
-        final k = item.materialName.trim().toLowerCase();
-        if (k.isNotEmpty && !invMap.containsKey(k)) {
-          invMap[k] = item;
+        final key = item.materialName.trim();
+        if (key.isEmpty) continue;
+        if (!mapByDocOrName.containsKey(key)) {
+          mapByDocOrName[key] = {
+            'materialId': item.docId,
+            'materialName': key,
+            'displayName': key,
+            'unit': item.unit,
+            'count': item.companyAvailableCount,
+          };
         }
       }
 
-      final List<Map<String, dynamic>> list = [];
-      for (final master in masterMaterials) {
-        final matName = master['materialName'] as String;
-        final inv = invMap[matName.toLowerCase()];
-        final count = inv?.companyAvailableCount ?? 0;
-        list.add({
-          'materialId': master['materialId'],
-          'materialName': matName,
-          'displayName': matName, // Display only the actual materialName
-          'unit': master['unit'],
-          'count': count,
-        });
-      }
-
+      final list = mapByDocOrName.values.toList();
       list.sort(
         (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
               (b['materialName'] as String).toLowerCase(),
@@ -467,44 +461,33 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       final items = await MaterialInventoryService.fetchAllMaterialsInventory();
       final Map<String, MaterialInventoryItem> invMap = {};
       for (final item in items) {
-        final k = item.materialName.trim().toLowerCase();
-        if (k.isNotEmpty && !invMap.containsKey(k)) {
-          invMap[k] = item;
+        final key = item.materialName.trim();
+        if (key.isEmpty) continue;
+        final cleanLow = siteId.trim().toLowerCase();
+        final siteEntry = item.siteInventories.firstWhere(
+          (s) {
+            final sIdLow = s.siteId.trim().toLowerCase();
+            final sNameLow = s.siteName.trim().toLowerCase();
+            return sIdLow == cleanLow ||
+                (sNameLow.isNotEmpty && sNameLow == cleanLow) ||
+                (cleanLow.contains('_') && sIdLow.isNotEmpty && (cleanLow.startsWith('$sIdLow' '_') || cleanLow.endsWith('_$sIdLow'))) ||
+                (cleanLow.contains('_') && sNameLow.isNotEmpty && (cleanLow.startsWith('$sNameLow' '_') || cleanLow.endsWith('_$sNameLow'))) ||
+                (sIdLow.contains('_') && cleanLow.isNotEmpty && (sIdLow.startsWith('$cleanLow' '_') || sIdLow.endsWith('_$cleanLow')));
+          },
+          orElse: () => SiteInventoryEntry(siteId: siteId, availableCount: 0),
+        );
+        if (!mapByDocOrName.containsKey(key)) {
+          mapByDocOrName[key] = {
+            'materialId': item.docId,
+            'materialName': key,
+            'displayName': key,
+            'unit': item.unit,
+            'count': siteEntry.availableCount,
+          };
         }
       }
 
-      final cleanLow = siteId.trim().toLowerCase();
-      final List<Map<String, dynamic>> list = [];
-
-      for (final master in masterMaterials) {
-        final matName = master['materialName'] as String;
-        final inv = invMap[matName.toLowerCase()];
-        int count = 0;
-        if (inv != null) {
-          final siteEntry = inv.siteInventories.firstWhere(
-            (s) {
-              final sIdLow = s.siteId.trim().toLowerCase();
-              final sNameLow = s.siteName.trim().toLowerCase();
-              return sIdLow == cleanLow ||
-                  (sNameLow.isNotEmpty && sNameLow == cleanLow) ||
-                  (cleanLow.contains('_') && sIdLow.isNotEmpty && (cleanLow.startsWith('$sIdLow' '_') || cleanLow.endsWith('_$sIdLow'))) ||
-                  (cleanLow.contains('_') && sNameLow.isNotEmpty && (cleanLow.startsWith('$sNameLow' '_') || cleanLow.endsWith('_$sNameLow'))) ||
-                  (sIdLow.contains('_') && cleanLow.isNotEmpty && (sIdLow.startsWith('$cleanLow' '_') || sIdLow.endsWith('_$cleanLow')));
-            },
-            orElse: () => SiteInventoryEntry(siteId: siteId, availableCount: 0),
-          );
-          count = siteEntry.availableCount;
-        }
-
-        list.add({
-          'materialId': master['materialId'],
-          'materialName': matName,
-          'displayName': matName, // Display only the actual materialName
-          'unit': master['unit'],
-          'count': count,
-        });
-      }
-
+      final list = mapByDocOrName.values.toList();
       list.sort(
         (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
               (b['materialName'] as String).toLowerCase(),

@@ -154,11 +154,12 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       void processDocs(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
         for (final doc in docs) {
           final data = doc.data();
-          // Strictly fetch from the 'materialName' field
-          final dynamic rawName = data['materialName'] ?? data['materialname'];
-          final String name = (rawName ?? '').toString().trim();
-
-          // Do NOT use or display values from Material Categories or fallback to matCategory
+          final name = (data['materialName'] ??
+                  data['materialname'] ??
+                  data['name'] ??
+                  '')
+              .toString()
+              .trim();
           if (name.isNotEmpty && !nameSet.contains(name)) {
             nameSet.add(name);
             allMatDocs.add({
@@ -191,13 +192,69 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         try {
           final matCapitalSnap =
               await FirestoreService.getCollection('Materials').get();
-          processDocs(matCapitalSnap.docs);
+          for (final doc in matCapitalSnap.docs) {
+            final data = doc.data();
+            final name = (data['materialName'] ??
+                    data['materialname'] ??
+                    data['name'] ??
+                    '')
+                .toString()
+                .trim();
+            if (name.isNotEmpty && !nameSet.contains(name)) {
+              nameSet.add(name);
+              allMatDocs.add({
+                'docId': doc.id,
+                'materialName': name,
+                'materialId': data['materialId'] ?? doc.id,
+                'materialUnit': (data['materialUnit'] ??
+                        data['unit'] ??
+                        data['matUnit'] ??
+                        '')
+                    .toString()
+                    .trim(),
+                'materialCategory': (data['materialCategory'] ??
+                        data['matCategory'] ??
+                        '')
+                    .toString()
+                    .trim(),
+                'materialSubCategory':
+                    (data['materialSubCategory'] ?? '').toString().trim(),
+                'unitPrice': data['materialPrice'] ?? data['unitPrice'] ?? '',
+                'rawData': data,
+              });
+            }
+          }
         } catch (e) {
           debugPrint('Error fetching from Materials: $e');
         }
       }
 
-      // Sort alphabetically by materialName
+      try {
+        final availSnap =
+            await FirestoreService.getCollection('materialsavailablity').get();
+        for (final doc in availSnap.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ??
+                  data['materialname'] ??
+                  data['name'] ??
+                  '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty && !nameSet.contains(name)) {
+            nameSet.add(name);
+            allMatDocs.add({
+              'docId': doc.id,
+              'materialName': name,
+              'materialId': doc.id,
+              'materialUnit':
+                  (data['materialUnit'] ?? data['unit'] ?? '').toString().trim(),
+              'rawData': data,
+            });
+          }
+        }
+      } catch (_) {}
+
+      // Sort alphabetically
       allMatDocs.sort(
         (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
               (b['materialName'] as String).toLowerCase(),

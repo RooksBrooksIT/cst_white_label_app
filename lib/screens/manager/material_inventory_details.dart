@@ -43,6 +43,7 @@ class _MaterialInventoryDetailsPageState
   String _effectiveCode = '';
   String _effectiveDescription = '';
   List<Map<String, dynamic>> _siteBreakdown = [];
+  List<MaterialTransactionRecord> _auditRecords = [];
 
   Color get primaryColor => Theme.of(context).primaryColor;
 
@@ -124,12 +125,77 @@ class _MaterialInventoryDetailsPageState
           }
         }
 
+        // Fetch siteMaterialPool for enhanced allocation/consumption tracking
+        try {
+          final poolSnap = await FirestoreService.siteMaterialPool
+              .where('materialName', isEqualTo: widget.materialName)
+              .get();
+          final poolMap = <String, Map<String, dynamic>>{};
+          for (var d in poolSnap.docs) {
+            final data = d.data();
+            final sId = (data['siteId'] ?? '').toString().toLowerCase().trim();
+            if (sId.isNotEmpty) {
+              poolMap[sId] = data;
+            }
+          }
+
+          for (var b in breakdown) {
+            final sId = (b['siteId'] ?? '').toString().toLowerCase().trim();
+            if (poolMap.containsKey(sId)) {
+              final pData = poolMap[sId]!;
+              b['allocatedQty'] = (pData['totalAllocatedQty'] as num?)?.toDouble() ?? (b['quantity'] as double);
+              b['consumedQty'] = (pData['consumedQty'] as num?)?.toDouble() ?? 0.0;
+              b['remainingQty'] = (pData['remainingQty'] as num?)?.toDouble() ?? (b['quantity'] as double);
+              b['effectiveUnitRate'] = (pData['effectiveUnitRate'] as num?)?.toDouble() ?? 0.0;
+              b['allocatedAmount'] = (pData['totalAllocatedAmount'] as num?)?.toDouble() ?? 0.0;
+              b['consumedAmount'] = (pData['consumedAmount'] as num?)?.toDouble() ?? 0.0;
+              b['remainingAmount'] = (pData['remainingAmount'] as num?)?.toDouble() ?? 0.0;
+            }
+          }
+
+          for (var entry in poolMap.entries) {
+            final sId = entry.key;
+            final pData = entry.value;
+            if (!breakdown.any((b) => (b['siteId'] ?? '').toString().toLowerCase().trim() == sId)) {
+              final sName = (pData['siteName'] ?? sNameMap[sId] ?? pData['siteId'] ?? sId).toString();
+              final remQty = (pData['remainingQty'] as num?)?.toDouble() ?? 0.0;
+              breakdown.add({
+                'siteId': pData['siteId'] ?? sId,
+                'siteName': sName,
+                'projectName': pData['projectName'] ?? sProjMap[sId] ?? 'Site Project',
+                'quantity': remQty,
+                'lastUpdated': _formatDateStr(pData['updatedAt']),
+                'allocatedQty': (pData['totalAllocatedQty'] as num?)?.toDouble() ?? remQty,
+                'consumedQty': (pData['consumedQty'] as num?)?.toDouble() ?? 0.0,
+                'remainingQty': remQty,
+                'effectiveUnitRate': (pData['effectiveUnitRate'] as num?)?.toDouble() ?? 0.0,
+                'allocatedAmount': (pData['totalAllocatedAmount'] as num?)?.toDouble() ?? 0.0,
+                'consumedAmount': (pData['consumedAmount'] as num?)?.toDouble() ?? 0.0,
+                'remainingAmount': (pData['remainingAmount'] as num?)?.toDouble() ?? 0.0,
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error merging site material pool: $e');
+        }
+
+        // Fetch audit trail records
+        List<MaterialTransactionRecord> auditRecords = [];
+        try {
+          auditRecords = await MaterialInventoryService.fetchMaterialAuditTrail(
+            materialName: widget.materialName,
+          );
+        } catch (e) {
+          debugPrint('Error fetching audit records: $e');
+        }
+
         breakdown.sort((a, b) => (b['quantity'] as double).compareTo(a['quantity'] as double));
 
         if (mounted) {
           setState(() {
             _companyQty = item.companyAvailableCount.toDouble();
             _siteBreakdown = breakdown;
+            _auditRecords = auditRecords;
             _isLoading = false;
           });
         }
@@ -138,6 +204,7 @@ class _MaterialInventoryDetailsPageState
           setState(() {
             _companyQty = 0.0;
             _siteBreakdown = [];
+            _auditRecords = [];
             _isLoading = false;
           });
         }
@@ -766,6 +833,168 @@ class _MaterialInventoryDetailsPageState
                                               ),
                                             ],
                                           ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+
+                            // ── Universal Transaction Audit Trail ───────
+                            const SizedBox(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'TRANSACTION AUDIT TRAIL',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF64748B),
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${_auditRecords.length} Events',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            if (_auditRecords.isEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'No allocations or consumption transactions recorded yet.',
+                                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                  ),
+                                ),
+                              )
+                            else
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _auditRecords.length,
+                                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final tx = _auditRecords[index];
+                                  final isAlloc = tx.transactionType.toUpperCase() == 'ALLOCATION';
+                                  final isCons = tx.transactionType.toUpperCase() == 'CONSUMPTION';
+                                  final badgeColor = isAlloc
+                                      ? const Color(0xFF2563EB)
+                                      : (isCons ? const Color(0xFF10B981) : const Color(0xFFF59E0B));
+                                  final badgeBg = badgeColor.withValues(alpha: 0.12);
+
+                                  return Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: badgeBg,
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Icon(
+                                            isAlloc
+                                                ? Icons.add_circle_outline_rounded
+                                                : (isCons ? Icons.remove_circle_outline_rounded : Icons.swap_horiz_rounded),
+                                            size: 20,
+                                            color: badgeColor,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: badgeBg,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      tx.transactionType,
+                                                      style: TextStyle(
+                                                        fontSize: 10.5,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: badgeColor,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      tx.siteName.isNotEmpty ? tx.siteName : tx.siteId,
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Color(0xFF0F172A),
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                '${tx.date}  •  by ${tx.performedByName}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF64748B),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              '${isCons ? "-" : "+"}${_formatQty(tx.quantity)} ${tx.unit}',
+                                              style: TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w900,
+                                                color: isCons ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                            if (tx.totalAmount > 0)
+                                              Text(
+                                                '₹${_formatQty(tx.totalAmount)}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF64748B),
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ],
                                     ),
