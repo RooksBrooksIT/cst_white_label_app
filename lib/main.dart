@@ -1,5 +1,6 @@
-import 'package:demo_cst/screens/organization/organisation_landing_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:demo_cst/screens/organization/organisation_landing_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:demo_cst/utils/app_theme.dart';
@@ -27,6 +28,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
@@ -59,7 +69,16 @@ class MyApp extends StatelessWidget {
               theme: AppTheme.getTheme(primary),
               navigatorKey: navigatorKey,
               builder: (context, child) {
-                return ConnectivityWrapper(child: child!);
+                return AnnotatedRegion<SystemUiOverlayStyle>(
+                  value: const SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: Brightness.dark,
+                    statusBarBrightness: Brightness.light,
+                    systemNavigationBarColor: Colors.transparent,
+                    systemNavigationBarIconBrightness: Brightness.dark,
+                  ),
+                  child: ConnectivityWrapper(child: child!),
+                );
               },
               // Define initial route
               initialRoute: '/',

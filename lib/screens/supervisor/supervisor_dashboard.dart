@@ -177,6 +177,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           centerTitle: true,
           elevation: 0,
           backgroundColor: Colors.transparent,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+          ),
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(

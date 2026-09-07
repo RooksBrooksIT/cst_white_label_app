@@ -529,9 +529,17 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           primaryColor,
         );
 
-        return Theme(
-          data: AppTheme.getTheme(primaryColor),
-          child: Container(
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+            systemNavigationBarColor: Colors.transparent,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          ),
+          child: Theme(
+            data: AppTheme.getTheme(primaryColor),
+            child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -651,6 +659,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               ),
             ),
           ),
+        ),
         );
       },
     );
