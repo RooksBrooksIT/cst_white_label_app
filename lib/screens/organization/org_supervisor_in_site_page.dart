@@ -129,36 +129,42 @@ class _OrgSupervisorInSitePageState extends State<OrgSupervisorInSitePage> {
                                 for (var d in siteDocs) {
                                   final data = d.data();
                                   final sId = (data['siteId'] ?? d.id).toString().trim();
-                                  if (sId.isNotEmpty) {
-                                    siteMetaMap[sId] = {
-                                      'siteId': sId,
-                                      'siteName': (data['siteName'] ?? data['projectName'] ?? sId).toString(),
-                                      'projectName': (data['projectName'] ?? data['siteName'] ?? '').toString(),
-                                      'location': (data['siteLocation'] ?? data['location'] ?? data['address'] ?? '').toString(),
-                                      'stage': (data['currentStage'] ?? data['projectStage'] ?? data['stage'] ?? '').toString(),
-                                      'status': (data['currentStatus'] ?? data['status'] ?? 'Live').toString(),
-                                      'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? '').toString(),
-                                      'rawData': data,
-                                    };
-                                  }
+                                  final sName = (data['siteName'] ?? data['projectName'] ?? sId).toString().trim();
+                                  final meta = {
+                                    'siteId': sId,
+                                    'docId': d.id,
+                                    'siteName': sName,
+                                    'projectName': (data['projectName'] ?? data['siteName'] ?? '').toString(),
+                                    'location': (data['siteLocation'] ?? data['location'] ?? data['address'] ?? '').toString(),
+                                    'stage': (data['currentStage'] ?? data['projectStage'] ?? data['stage'] ?? '').toString(),
+                                    'status': (data['currentStatus'] ?? data['status'] ?? 'Live').toString(),
+                                    'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? '').toString(),
+                                    'rawData': data,
+                                  };
+                                  if (sId.isNotEmpty) siteMetaMap[sId] = meta;
+                                  if (d.id.isNotEmpty) siteMetaMap[d.id] = meta;
+                                  if (sName.isNotEmpty) siteMetaMap[sName.toLowerCase()] = meta;
                                 }
 
                                 for (var d in projDocs) {
                                   final data = d.data();
                                   final sId = (data['siteId'] ?? d.id).toString().trim();
-                                  if (sId.isNotEmpty) {
-                                    final existing = siteMetaMap[sId];
-                                    siteMetaMap[sId] = {
-                                      'siteId': sId,
-                                      'siteName': existing?['siteName'] ?? (data['siteName'] ?? data['projectName'] ?? sId).toString(),
-                                      'projectName': (data['projectName'] ?? existing?['projectName'] ?? '').toString(),
-                                      'location': (data['siteLocation'] ?? data['location'] ?? existing?['location'] ?? '').toString(),
-                                      'stage': (data['currentStage'] ?? existing?['stage'] ?? '').toString(),
-                                      'status': (data['currentStatus'] ?? data['status'] ?? existing?['status'] ?? 'Live').toString(),
-                                      'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? existing?['supervisor'] ?? '').toString(),
-                                      'rawData': existing?['rawData'] ?? data,
-                                    };
-                                  }
+                                  final sName = (data['siteName'] ?? data['projectName'] ?? sId).toString().trim();
+                                  final existing = siteMetaMap[sId] ?? siteMetaMap[d.id] ?? siteMetaMap[sName.toLowerCase()];
+                                  final meta = {
+                                    'siteId': sId,
+                                    'docId': d.id,
+                                    'siteName': existing?['siteName'] ?? sName,
+                                    'projectName': (data['projectName'] ?? existing?['projectName'] ?? '').toString(),
+                                    'location': (data['siteLocation'] ?? data['location'] ?? existing?['location'] ?? '').toString(),
+                                    'stage': (data['currentStage'] ?? existing?['stage'] ?? '').toString(),
+                                    'status': (data['currentStatus'] ?? data['status'] ?? existing?['status'] ?? 'Live').toString(),
+                                    'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? existing?['supervisor'] ?? '').toString(),
+                                    'rawData': existing?['rawData'] ?? data,
+                                  };
+                                  if (sId.isNotEmpty) siteMetaMap[sId] = meta;
+                                  if (d.id.isNotEmpty) siteMetaMap[d.id] = meta;
+                                  if (sName.isNotEmpty) siteMetaMap[sName.toLowerCase()] = meta;
                                 }
 
                                 // 2. Aggregate Unified Supervisor-to-Site Allocation Data
@@ -864,22 +870,149 @@ class _OrgSupervisorInSitePageState extends State<OrgSupervisorInSitePage> {
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> mapDocs,
     required Map<String, Map<String, dynamic>> siteMetaMap,
   }) {
-    final Map<String, _SupervisorEntry> supervisorMap = {};
+    final List<_SupervisorEntry> unifiedList = [];
+
+    String extractName(Map<String, dynamic> data, String fallback) {
+      final raw = (data['FullName'] ??
+              data['fullName'] ??
+              data['supervisorName'] ??
+              data['name'] ??
+              data['UserName'] ??
+              data['userName'] ??
+              data['supervisor'] ??
+              '')
+          .toString()
+          .trim();
+      if (raw.isNotEmpty && raw != 'null') return raw;
+      return fallback.trim();
+    }
+
+    String extractId(Map<String, dynamic> data, String fallback) {
+      final raw = (data['SupervisorId'] ??
+              data['supervisorId'] ??
+              data['Supervisor ID'] ??
+              data['supervisor ID'] ??
+              data['id'] ??
+              data['code'] ??
+              '')
+          .toString()
+          .trim();
+      if (raw.isNotEmpty && raw != 'null') return raw;
+      return fallback.trim();
+    }
+
+    String extractPhone(Map<String, dynamic> data) {
+      final raw = (data['ContactNo'] ??
+              data['contactNo'] ??
+              data['phoneNumber'] ??
+              data['phone'] ??
+              data['contact'] ??
+              data['mobile'] ??
+              '')
+          .toString()
+          .trim();
+      if (raw.isNotEmpty && raw != 'null') return raw;
+      return '';
+    }
+
+    int findSupervisorIndex({String? id, String? name}) {
+      final cleanId = (id ?? '').trim().toLowerCase();
+      final cleanName = (name ?? '').trim().toLowerCase();
+
+      for (int i = 0; i < unifiedList.length; i++) {
+        final existing = unifiedList[i];
+        final exId = existing.supervisorId.trim().toLowerCase();
+        final exName = existing.supervisorName.trim().toLowerCase();
+
+        // 1. Direct ID match (highest priority)
+        if (cleanId.isNotEmpty && exId.isNotEmpty && cleanId == exId) {
+          return i;
+        }
+        // 2. Direct Name match
+        if (cleanName.isNotEmpty && exName.isNotEmpty && cleanName == exName) {
+          return i;
+        }
+        // 3. Cross match: if cleanName is an ID or cleanId is a Name
+        if (cleanName.isNotEmpty && exId.isNotEmpty && cleanName == exId) {
+          return i;
+        }
+        if (cleanId.isNotEmpty && exName.isNotEmpty && cleanId == exName) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    _SupervisorEntry mergeSupervisors(_SupervisorEntry existing, _SupervisorEntry update) {
+      String chosenName = existing.supervisorName;
+      final exNameMatchesId = existing.supervisorId.isNotEmpty &&
+          existing.supervisorName.toLowerCase() == existing.supervisorId.toLowerCase();
+      final upNameMatchesId = update.supervisorId.isNotEmpty &&
+          update.supervisorName.toLowerCase() == update.supervisorId.toLowerCase();
+
+      if (exNameMatchesId && update.supervisorName.isNotEmpty && !upNameMatchesId) {
+        chosenName = update.supervisorName;
+      } else if (chosenName.isEmpty && update.supervisorName.isNotEmpty) {
+        chosenName = update.supervisorName;
+      }
+
+      final chosenId = existing.supervisorId.isNotEmpty ? existing.supervisorId : update.supervisorId;
+      final chosenPhone = existing.phoneNumber.isNotEmpty ? existing.phoneNumber : update.phoneNumber;
+      final chosenEmail = existing.email.isNotEmpty ? existing.email : update.email;
+      final chosenDesignation = existing.designation.isNotEmpty && existing.designation != 'Site Supervisor'
+          ? existing.designation
+          : (update.designation.isNotEmpty ? update.designation : 'Site Supervisor');
+
+      final isAssigned = existing.isAssigned || update.isAssigned;
+      final chosenSiteId = update.isAssigned && update.siteId.isNotEmpty
+          ? update.siteId
+          : existing.siteId;
+      final chosenSiteName = update.isAssigned && update.siteName.isNotEmpty
+          ? update.siteName
+          : existing.siteName;
+      final chosenProjName = update.isAssigned && update.projectName.isNotEmpty
+          ? update.projectName
+          : existing.projectName;
+      final chosenLocation = update.isAssigned && update.location.isNotEmpty
+          ? update.location
+          : existing.location;
+      final chosenStage = update.isAssigned && update.projectStage.isNotEmpty
+          ? update.projectStage
+          : existing.projectStage;
+      final chosenRawData = update.isAssigned && update.siteRawData != null
+          ? update.siteRawData
+          : existing.siteRawData;
+
+      return _SupervisorEntry(
+        supervisorName: chosenName,
+        supervisorId: chosenId,
+        phoneNumber: chosenPhone,
+        email: chosenEmail,
+        designation: chosenDesignation,
+        siteId: chosenSiteId,
+        siteName: chosenSiteName,
+        projectName: chosenProjName,
+        location: chosenLocation,
+        projectStage: chosenStage,
+        isAssigned: isAssigned,
+        siteRawData: chosenRawData,
+      );
+    }
 
     // 1. Ingest Master Supervisor registrations
     for (var doc in supDocs) {
       final data = doc.data();
-      final name = (data['supervisorName'] ?? data['name'] ?? data['supervisor'] ?? doc.id).toString().trim();
-      final id = (data['supervisorId'] ?? data['id'] ?? data['code'] ?? doc.id).toString().trim();
-      final phone = (data['phoneNumber'] ?? data['phone'] ?? data['contact'] ?? '').toString().trim();
-      final email = (data['email'] ?? '').toString().trim();
-      final designation = (data['designation'] ?? data['role'] ?? 'Site Supervisor').toString().trim();
+      final docId = doc.id.trim();
+      final id = extractId(data, docId);
+      final name = extractName(data, docId);
+      final phone = extractPhone(data);
+      final email = (data['Email'] ?? data['email'] ?? '').toString().trim();
+      final designation = (data['Designation'] ?? data['designation'] ?? data['role'] ?? 'Site Supervisor').toString().trim();
       final assignedSiteId = (data['assignedSite'] ?? data['siteId'] ?? data['site'] ?? '').toString().trim();
 
-      final key = name.toLowerCase();
       final siteMeta = siteMetaMap[assignedSiteId];
 
-      supervisorMap[key] = _SupervisorEntry(
+      final entry = _SupervisorEntry(
         supervisorName: name,
         supervisorId: id,
         phoneNumber: phone,
@@ -893,24 +1026,29 @@ class _OrgSupervisorInSitePageState extends State<OrgSupervisorInSitePage> {
         isAssigned: assignedSiteId.isNotEmpty,
         siteRawData: assignedSiteId.isNotEmpty ? (siteMeta?['rawData'] as Map<String, dynamic>?) : null,
       );
+
+      final idx = findSupervisorIndex(id: id, name: name);
+      if (idx != -1) {
+        unifiedList[idx] = mergeSupervisors(unifiedList[idx], entry);
+      } else {
+        unifiedList.add(entry);
+      }
     }
 
     // 2. Ingest siteSupervisorMap collection docs
     for (var doc in mapDocs) {
       final data = doc.data();
-      final name = (data['supervisor'] ?? data['supervisorName'] ?? '').toString().trim();
-      if (name.isEmpty) continue;
+      final name = extractName(data, '');
+      final supId = extractId(data, '');
+      if (name.isEmpty && supId.isEmpty) continue;
 
-      final sId = (data['site'] ?? data['siteId'] ?? doc.id).toString().trim();
+      final sId = (data['siteId'] ?? data['site'] ?? data['siteName'] ?? '').toString().trim();
       final pName = (data['projectName'] ?? data['project'] ?? '').toString().trim();
       final location = (data['location'] ?? '').toString().trim();
       final stage = (data['projectStage'] ?? data['stage'] ?? '').toString().trim();
-      final phone = (data['phone'] ?? data['phoneNumber'] ?? '').toString().trim();
-      final supId = (data['Supervisor ID'] ?? data['supervisorId'] ?? '').toString().trim();
+      final phone = extractPhone(data);
 
-      final key = name.toLowerCase();
-      final existing = supervisorMap[key];
-      final siteMeta = siteMetaMap[sId];
+      final siteMeta = siteMetaMap[sId] ?? siteMetaMap[sId.toLowerCase()] ?? siteMetaMap[pName.toLowerCase()];
 
       String resolvedSiteName = '';
       if (sId.isNotEmpty) {
@@ -929,64 +1067,74 @@ class _OrgSupervisorInSitePageState extends State<OrgSupervisorInSitePage> {
           ? stage
           : ((siteMeta?['stage'] as String?) ?? '');
 
-      supervisorMap[key] = _SupervisorEntry(
-        supervisorName: existing?.supervisorName ?? name,
-        supervisorId: supId.isNotEmpty ? supId : (existing?.supervisorId ?? ''),
-        phoneNumber: phone.isNotEmpty ? phone : (existing?.phoneNumber ?? ''),
-        email: existing?.email ?? '',
-        designation: existing?.designation ?? 'Site Supervisor',
+      final mappedEntry = _SupervisorEntry(
+        supervisorName: name.isNotEmpty ? name : supId,
+        supervisorId: supId,
+        phoneNumber: phone,
+        email: '',
+        designation: 'Site Supervisor',
         siteId: sId,
         siteName: resolvedSiteName,
         projectName: resolvedProjName,
         location: resolvedLocation,
         projectStage: resolvedStage,
         isAssigned: sId.isNotEmpty,
-        siteRawData: (siteMeta?['rawData'] as Map<String, dynamic>?) ?? existing?.siteRawData,
+        siteRawData: (siteMeta?['rawData'] as Map<String, dynamic>?),
       );
+
+      final idx = findSupervisorIndex(id: supId, name: name);
+      if (idx != -1) {
+        unifiedList[idx] = mergeSupervisors(unifiedList[idx], mappedEntry);
+      } else {
+        unifiedList.add(mappedEntry);
+      }
     }
 
     // 3. Ingest assigned supervisors in Site/projects collections not yet matched
     siteMetaMap.forEach((sId, meta) {
-      final supName = (meta['supervisor'] ?? '').toString().trim();
-      if (supName.isNotEmpty) {
-        final key = supName.toLowerCase();
-        if (!supervisorMap.containsKey(key)) {
-          supervisorMap[key] = _SupervisorEntry(
-            supervisorName: supName,
-            supervisorId: '',
-            phoneNumber: '',
-            email: '',
-            designation: 'Site Supervisor',
-            siteId: sId,
-            siteName: meta['siteName'] ?? sId,
-            projectName: meta['projectName'] ?? '',
-            location: meta['location'] ?? '',
-            projectStage: meta['stage'] ?? '',
-            isAssigned: true,
-            siteRawData: meta['rawData'],
-          );
-        } else if (!supervisorMap[key]!.isAssigned) {
-          final existing = supervisorMap[key]!;
-          supervisorMap[key] = _SupervisorEntry(
-            supervisorName: existing.supervisorName,
-            supervisorId: existing.supervisorId,
-            phoneNumber: existing.phoneNumber,
-            email: existing.email,
-            designation: existing.designation,
-            siteId: sId,
-            siteName: meta['siteName'] ?? sId,
-            projectName: meta['projectName'] ?? '',
-            location: meta['location'] ?? '',
-            projectStage: meta['stage'] ?? '',
-            isAssigned: true,
-            siteRawData: meta['rawData'],
+      final supVal = (meta['supervisor'] ?? meta['supervisorName'] ?? meta['supervisorId'] ?? '').toString().trim();
+      if (supVal.isNotEmpty && supVal != 'null') {
+        final idx = findSupervisorIndex(id: supVal, name: supVal);
+        if (idx != -1) {
+          final existing = unifiedList[idx];
+          if (!existing.isAssigned && sId.isNotEmpty) {
+            unifiedList[idx] = _SupervisorEntry(
+              supervisorName: existing.supervisorName,
+              supervisorId: existing.supervisorId,
+              phoneNumber: existing.phoneNumber,
+              email: existing.email,
+              designation: existing.designation,
+              siteId: sId,
+              siteName: (meta['siteName'] as String?) ?? sId,
+              projectName: (meta['projectName'] as String?) ?? '',
+              location: (meta['location'] as String?) ?? '',
+              projectStage: (meta['stage'] as String?) ?? '',
+              isAssigned: true,
+              siteRawData: meta['rawData'] as Map<String, dynamic>?,
+            );
+          }
+        } else {
+          unifiedList.add(
+            _SupervisorEntry(
+              supervisorName: supVal,
+              supervisorId: '',
+              phoneNumber: '',
+              email: '',
+              designation: 'Site Supervisor',
+              siteId: sId,
+              siteName: (meta['siteName'] as String?) ?? sId,
+              projectName: (meta['projectName'] as String?) ?? '',
+              location: (meta['location'] as String?) ?? '',
+              projectStage: (meta['stage'] as String?) ?? '',
+              isAssigned: true,
+              siteRawData: meta['rawData'] as Map<String, dynamic>?,
+            ),
           );
         }
       }
     });
 
-    final list = supervisorMap.values.toList();
-    list.sort((a, b) {
+    unifiedList.sort((a, b) {
       // Prioritize assigned supervisors first, then sort alphabetically
       if (a.isAssigned != b.isAssigned) {
         return a.isAssigned ? -1 : 1;
@@ -994,7 +1142,7 @@ class _OrgSupervisorInSitePageState extends State<OrgSupervisorInSitePage> {
       return a.supervisorName.toLowerCase().compareTo(b.supervisorName.toLowerCase());
     });
 
-    return list;
+    return unifiedList;
   }
 }
 

@@ -2020,9 +2020,38 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ),
                 ),
               ),
+
+              // 8. Static Emoji Card
+              _buildStaticEmojiCard(),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStaticEmojiCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 14,
+            spreadRadius: 0,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Text(
+          '🏗️',
+          style: TextStyle(
+            fontSize: 42,
+          ),
+        ),
       ),
     );
   }

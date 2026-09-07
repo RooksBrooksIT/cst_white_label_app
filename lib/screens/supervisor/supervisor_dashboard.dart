@@ -267,10 +267,37 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                     ),
                   ),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 60)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],
               ),
             ),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SiteEntryPage(
+                  userName: widget.supervisorName,
+                  userDetails: {
+                    'supervisorId': widget.supervisorId,
+                    ...AuthService().userData,
+                  },
+                ),
+              ),
+            );
+          },
+          backgroundColor: primaryColor,
+          elevation: 4,
+          highlightElevation: 8,
+          shape: const CircleBorder(),
+          tooltip: 'Daily Site Entry',
+          child: const Icon(
+            Icons.add_rounded,
+            color: Colors.white,
+            size: 28,
           ),
         ),
       ),

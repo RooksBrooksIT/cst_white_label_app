@@ -5,6 +5,7 @@ import '../../services/petty_cash_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/approval_workflow_service.dart';
 import '../../utils/app_theme.dart';
+import 'petty_cash_report_pdf_helper.dart';
 
 class OrgPettyCashPage extends StatefulWidget {
   final int initialTabIndex;
@@ -50,6 +51,19 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
     super.dispose();
   }
 
+  Future<void> _downloadPettyCashPdf({
+    String? month,
+    List<PettyCashTransaction>? transactions,
+  }) async {
+    await PettyCashReportPdfHelper.generateAndDownloadPdf(
+      context: context,
+      requests: const [],
+      transactions: transactions,
+      selectedMonth: month,
+      primaryColor: primaryColor,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final darkAccent = AppTheme.getDarkAccent(primaryColor);
@@ -69,6 +83,13 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
         ),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 22),
+            tooltip: 'Download Petty Cash PDF Report',
+            onPressed: () => _downloadPettyCashPdf(month: _selectedMonth),
+          ),
+        ],
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -816,7 +837,31 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
           return const Center(child: CircularProgressIndicator());
         }
 
-        final txns = snapshot.data ?? [];
+        final allTxns = snapshot.data ?? [];
+
+        // Build list of distinct available months (last 12 months + any recorded transactions)
+        final availableMonths = <String>{};
+        final now = DateTime.now();
+        for (int i = 0; i < 12; i++) {
+          final d = DateTime(now.year, now.month - i, 1);
+          availableMonths.add(DateFormat('MMM yyyy').format(d));
+        }
+        for (final t in allTxns) {
+          final dt = t.createdAt ?? t.transactionDate;
+          availableMonths.add(DateFormat('MMM yyyy').format(dt));
+        }
+
+        final monthList = availableMonths.toList();
+        if (!monthList.contains(_selectedMonth)) {
+          _selectedMonth = monthList.first;
+        }
+
+        // Filter transactions for the selected month
+        final txns = allTxns.where((t) {
+          final dt = t.createdAt ?? t.transactionDate;
+          return DateFormat('MMM yyyy').format(dt) == _selectedMonth;
+        }).toList();
+
         double openingAlloc = 0.0;
         double replenishments = 0.0;
         double totalSpent = 0.0;
@@ -857,13 +902,12 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
                         value: _selectedMonth,
                         underline: const SizedBox(),
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: primaryColor),
-                        items: [
-                          DropdownMenuItem(value: _selectedMonth, child: Text(_selectedMonth)),
-                          DropdownMenuItem(
-                            value: DateFormat('MMM yyyy').format(DateTime.now().subtract(const Duration(days: 30))),
-                            child: Text(DateFormat('MMM yyyy').format(DateTime.now().subtract(const Duration(days: 30)))),
-                          ),
-                        ],
+                        items: monthList.map((m) {
+                          return DropdownMenuItem<String>(
+                            value: m,
+                            child: Text(m),
+                          );
+                        }).toList(),
                         onChanged: (v) {
                           if (v != null) setState(() => _selectedMonth = v);
                         },
@@ -878,6 +922,116 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
                   _buildStatementRow('Total Expenses (-)', PettyCashService.formatCurrency(totalSpent), const Color(0xFFDC2626)),
                   const Divider(height: 20),
                   _buildStatementRow('Net Closing Balance', PettyCashService.formatCurrency(closingBal), const Color(0xFF0F172A), isTotal: true),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.picture_as_pdf_rounded, color: primaryColor, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Download Petty Cash Report (PDF)',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Structured table with approval dates, approved amounts, supervisor & manager names, and confirmation status.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _downloadPettyCashPdf(
+                            month: _selectedMonth,
+                            transactions: txns,
+                          ),
+                          icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
+                          label: Text(
+                            'Download $_selectedMonth (PDF)',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 1,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _downloadPettyCashPdf(
+                            month: null,
+                            transactions: allTxns,
+                          ),
+                          icon: Icon(Icons.table_chart_rounded, size: 18, color: primaryColor),
+                          label: Text(
+                            'Download All (PDF)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12.5,
+                              color: primaryColor,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: primaryColor.withValues(alpha: 0.35), width: 1.2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
