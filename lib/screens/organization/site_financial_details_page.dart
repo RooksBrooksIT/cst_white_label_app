@@ -45,6 +45,10 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    if (widget.initialData != null && widget.initialData!.isNotEmpty) {
+      _projectData = Map<String, dynamic>.from(widget.initialData!);
+      _isLoading = false;
+    }
     _fetchFinancialDetails();
   }
 
@@ -55,110 +59,107 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
   }
 
   Future<void> _fetchFinancialDetails() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (_projectData == null) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
-      // 1. Fetch from 'projects' collection
       final projectsCol = FirestoreService.getCollection('projects');
-      final directDoc = await projectsCol.doc(widget.siteId).get();
-      if (directDoc.exists && directDoc.data() != null) {
-        _projectData = directDoc.data();
-      } else {
-        QuerySnapshot<Map<String, dynamic>> projQuery = await projectsCol
-            .where('siteId', isEqualTo: widget.siteId)
-            .limit(1)
-            .get();
+      final siteCol = FirestoreService.getCollection('Site');
+      final totalsCol = FirestoreService.getCollection('totalSiteExpensesPerDay');
 
+      // 1. Fetch initial documents concurrently in parallel
+      final results = await Future.wait([
+        projectsCol.doc(widget.siteId).get(),
+        siteCol.doc(widget.siteId).get(),
+        totalsCol.doc(widget.siteId).get(),
+      ]);
+
+      final directProjDoc = results[0];
+      final directSiteDoc = results[1];
+      final directTotalsDoc = results[2];
+
+      if (directProjDoc.exists && directProjDoc.data() != null) {
+        _projectData = directProjDoc.data();
+      } else {
+        // Query projects collection by siteId / site / siteName if direct id lookup didn't match
+        var projQuery = await projectsCol.where('siteId', isEqualTo: widget.siteId).limit(1).get();
         if (projQuery.docs.isEmpty) {
-          projQuery = await projectsCol
-              .where('site', isEqualTo: widget.siteId)
-              .limit(1)
-              .get();
+          projQuery = await projectsCol.where('site', isEqualTo: widget.siteId).limit(1).get();
         }
         if (projQuery.docs.isEmpty && widget.siteName.isNotEmpty) {
-          projQuery = await projectsCol
-              .where('siteName', isEqualTo: widget.siteName)
-              .limit(1)
-              .get();
+          projQuery = await projectsCol.where('siteName', isEqualTo: widget.siteName).limit(1).get();
         }
 
         if (projQuery.docs.isNotEmpty) {
           _projectData = projQuery.docs.first.data();
+        } else if (directSiteDoc.exists && directSiteDoc.data() != null) {
+          _projectData = directSiteDoc.data();
         } else if (widget.initialData != null) {
           _projectData = widget.initialData;
-        } else {
-          // Fallback to Site collection
-          final siteDoc = await FirestoreService.getCollection('Site')
-              .doc(widget.siteId)
-              .get();
-          if (siteDoc.exists && siteDoc.data() != null) {
-            _projectData = siteDoc.data();
-          }
         }
       }
 
-      // Also overlay Site collection doc if exists to ensure all fields are captured
-      try {
-        final siteDoc = await FirestoreService.getCollection('Site')
-            .doc(widget.siteId)
-            .get();
-        if (siteDoc.exists && siteDoc.data() != null) {
-          final sData = siteDoc.data()!;
-          _projectData ??= {};
-          sData.forEach((k, v) {
-            if (v != null && (_projectData![k] == null || _projectData![k] == 0)) {
-              _projectData![k] = v;
-            }
-          });
-        }
-      } catch (_) {}
-
-      // 2. Fetch from 'totalSiteExpensesPerDay' for category breakdowns
-      try {
-        final totalsDoc = await FirestoreService.getCollection(
-          'totalSiteExpensesPerDay',
-        ).doc(widget.siteId).get();
-        if (totalsDoc.exists && totalsDoc.data() != null) {
-          _siteTotalsData = totalsDoc.data();
-        } else {
-          final queryTotals = await FirestoreService.getCollection('totalSiteExpensesPerDay')
-              .where('siteId', isEqualTo: widget.siteId)
-              .limit(1)
-              .get();
-          if (queryTotals.docs.isNotEmpty) {
-            _siteTotalsData = queryTotals.docs.first.data();
+      // Merge Site doc fields if available
+      if (directSiteDoc.exists && directSiteDoc.data() != null) {
+        final sData = directSiteDoc.data()!;
+        _projectData ??= {};
+        sData.forEach((k, v) {
+          if (v != null && (_projectData![k] == null || _projectData![k] == 0)) {
+            _projectData![k] = v;
           }
-        }
-      } catch (_) {}
-
-      // Background fresh sync if totals data is empty
-      if (_siteTotalsData == null || _siteTotalsData!.isEmpty) {
-        ExpenseService.recalcTotalsAndSyncProject(widget.siteId).then((_) async {
-          if (!mounted) return;
-          try {
-            final refreshedDoc = await FirestoreService.getCollection(
-              'totalSiteExpensesPerDay',
-            ).doc(widget.siteId).get();
-            if (refreshedDoc.exists && refreshedDoc.data() != null) {
-              setState(() {
-                _siteTotalsData = refreshedDoc.data();
-              });
-            }
-          } catch (_) {}
         });
       }
 
-      setState(() {
-        _isLoading = false;
+      // Set category totals if available
+      if (directTotalsDoc.exists && directTotalsDoc.data() != null) {
+        _siteTotalsData = directTotalsDoc.data();
+      } else {
+        final queryTotals = await totalsCol.where('siteId', isEqualTo: widget.siteId).limit(1).get();
+        if (queryTotals.docs.isNotEmpty) {
+          _siteTotalsData = queryTotals.docs.first.data();
+        }
+      }
+
+      // Display data immediately to the user
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+
+      // 2. Perform background fresh recalculation & sync without blocking page render
+      ExpenseService.recalcTotalsAndSyncProject(widget.siteId).then((_) async {
+        if (!mounted) return;
+        try {
+          final refreshedDoc = await totalsCol.doc(widget.siteId).get();
+          final refreshedProj = await projectsCol.doc(widget.siteId).get();
+          if (mounted) {
+            setState(() {
+              if (refreshedDoc.exists && refreshedDoc.data() != null) {
+                _siteTotalsData = refreshedDoc.data();
+              }
+              if (refreshedProj.exists && refreshedProj.data() != null) {
+                final pData = refreshedProj.data()!;
+                _projectData ??= {};
+                pData.forEach((k, v) {
+                  if (v != null) _projectData![k] = v;
+                });
+              }
+            });
+          }
+        } catch (_) {}
       });
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load financial details: $e';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load financial details: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -256,7 +257,8 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     final budget = _parseNum(data['projectBudget'] ?? data['budget']);
     final received = _parseNum(data['amountPaid'] ?? data['paid'] ?? data['amountReceived']);
     final spent = _computeTotalSpent(data);
-    final balance = (budget - received);
+    final customerCashBalance = received - spent;
+    final budgetRemaining = budget - spent;
     final usagePercent = budget > 0 ? ((spent / budget) * 100).clamp(0, 100).toStringAsFixed(1) : '0';
 
     final font = await PdfGoogleFonts.interRegular();
@@ -378,21 +380,28 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
                   ),
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Total Income Received (Paid by Client)', style: pw.TextStyle(font: font, fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Customer Amount Received (Paid by Client)', style: pw.TextStyle(font: font, fontSize: 9))),
                       pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs. ${_formatCurrency(received)}', textAlign: pw.TextAlign.right, style: pw.TextStyle(font: fontBold, fontSize: 9, color: PdfColors.green800))),
                     ],
                   ),
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Total Site Expenses Spent', style: pw.TextStyle(font: font, fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Total Actual Expenses Spent', style: pw.TextStyle(font: font, fontSize: 9))),
                       pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs. ${_formatCurrency(spent)}', textAlign: pw.TextAlign.right, style: pw.TextStyle(font: fontBold, fontSize: 9, color: PdfColors.orange800))),
+                    ],
+                  ),
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.green50),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Balance from Customer Received (Cash in Hand)', style: pw.TextStyle(font: fontBold, fontSize: 10))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs. ${_formatCurrency(customerCashBalance)}', textAlign: pw.TextAlign.right, style: pw.TextStyle(font: fontBold, fontSize: 10, color: customerCashBalance < 0 ? PdfColors.red800 : PdfColors.green900))),
                     ],
                   ),
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.blue50),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Remaining Amount Balance', style: pw.TextStyle(font: fontBold, fontSize: 10))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs. ${_formatCurrency(balance)}', textAlign: pw.TextAlign.right, style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColors.blue900))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Budget Remaining (Total Budget - Expenses)', style: pw.TextStyle(font: fontBold, fontSize: 10))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rs. ${_formatCurrency(budgetRemaining)}', textAlign: pw.TextAlign.right, style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColors.blue900))),
                     ],
                   ),
                   pw.TableRow(
@@ -603,7 +612,8 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     final budget = _parseNum(data['projectBudget'] ?? data['budget']);
     final received = _parseNum(data['amountPaid'] ?? data['paid'] ?? data['amountReceived']);
     final spent = _computeTotalSpent(data);
-    final balance = (budget - received);
+    final customerCashBalance = (received - spent);
+    final budgetRemaining = (budget - spent);
     final status = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
     final statusColor = _getStatusColor(status);
     final category = (data['projectCategory'] ?? 'House').toString();
@@ -647,7 +657,8 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
                   budget: budget,
                   received: received,
                   spent: spent,
-                  balance: balance,
+                  customerCashBalance: customerCashBalance,
+                  budgetRemaining: budgetRemaining,
                   usageRatio: usageRatio,
                   usagePercent: usagePercent,
                   primaryColor: primaryColor,
@@ -746,7 +757,7 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
         controller: _tabController,
         children: [
           // Tab 1: Detailed Breakdown & Category Summary
-          _buildSummaryTab(budget, received, spent, balance, primaryColor),
+          _buildSummaryTab(budget, received, spent, customerCashBalance, budgetRemaining, primaryColor),
 
           // Tab 2: Client Payments / Income
           _buildClientIncomeTab(primaryColor, received),
@@ -915,7 +926,8 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     required double budget,
     required double received,
     required double spent,
-    required double balance,
+    required double customerCashBalance,
+    required double budgetRemaining,
     required double usageRatio,
     required String usagePercent,
     required Color primaryColor,
@@ -958,14 +970,14 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
             childAspectRatio: 2.1,
             children: [
               _buildKpiTile(
-                title: 'Total Budget',
+                title: 'Estimated Budget',
                 amount: '₹ ${_formatCurrency(budget)}',
                 color: const Color(0xFF0284C7),
                 icon: Icons.account_balance_wallet_rounded,
                 bgColor: const Color(0xFFF0F9FF),
               ),
               _buildKpiTile(
-                title: 'Income Received',
+                title: 'Customer Received',
                 amount: '₹ ${_formatCurrency(received)}',
                 color: const Color(0xFF10B981),
                 icon: Icons.arrow_downward_rounded,
@@ -979,15 +991,53 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
                 bgColor: const Color(0xFFFEF2F2),
               ),
               _buildKpiTile(
-                title: 'Remaining Balance',
-                amount: '₹ ${_formatCurrency(balance)}',
-                color: const Color(0xFF8B5CF6),
+                title: 'Balance from Received',
+                amount: '₹ ${_formatCurrency(customerCashBalance)}',
+                color: customerCashBalance < 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
                 icon: Icons.savings_rounded,
-                bgColor: const Color(0xFFF5F3FF),
+                bgColor: customerCashBalance < 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // Budget Remaining Card Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.pie_chart_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                    SizedBox(width: 6),
+                    Text(
+                      'Budget Remaining (Budget - Spent):',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '₹ ${_formatCurrency(budgetRemaining)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
 
           // Budget Utilization Bar
           Row(
@@ -1135,7 +1185,8 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     double budget,
     double received,
     double spent,
-    double balance,
+    double customerCashBalance,
+    double budgetRemaining,
     Color primaryColor,
   ) {
     final totals = _siteTotalsData ?? {};
@@ -1540,101 +1591,179 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
+  double _parseSupervisorDocAmount(Map<String, dynamic> d) {
+    final amt = _parseNum(d['totalAmount'] ?? d['amount']);
+    if (amt > 0) return amt;
+    double sum = 0.0;
+    sum += _parseNum(d['food']);
+    sum += _parseNum(d['fuel']);
+    sum += _parseNum(d['transport']);
+    final labours = d['labours'];
+    if (labours is List) {
+      for (var l in labours) {
+        if (l is Map) {
+          final lAmt = _parseNum(l['amount']);
+          if (lAmt > 0) {
+            sum += lAmt;
+          } else {
+            sum += (_parseNum(l['count']) * _parseNum(l['unitSalary'] ?? l['salary']));
+          }
+        }
+      }
+    }
+    final materials = d['materials'];
+    if (materials is List) {
+      for (var m in materials) {
+        if (m is Map) {
+          final mAmt = _parseNum(m['amount']);
+          if (mAmt > 0) {
+            sum += mAmt;
+          } else {
+            sum += (_parseNum(m['quantity'] ?? m['qty']) * _parseNum(m['unitPrice'] ?? m['price']));
+          }
+        }
+      }
+    }
+    return sum;
+  }
+
   // -------------------- TAB 3: ITEMIZED EXPENSES --------------------
   Widget _buildExpensesTab(Color primaryColor) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirestoreService.getCollection('siteSupervisorEntries')
-          .where('siteId', isEqualTo: widget.siteId)
-          .snapshots(),
+      stream: FirestoreService.getCollection('siteSupervisorEntries').snapshots(),
       builder: (context, supEntriesSnap) {
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirestoreService.organizationEntries
-              .where('siteId', isEqualTo: widget.siteId)
-              .snapshots(),
+          stream: FirestoreService.organizationEntries.snapshots(),
           builder: (context, orgExpSnap) {
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirestoreService.managerEntries
-                  .where('siteId', isEqualTo: widget.siteId)
-                  .snapshots(),
+              stream: FirestoreService.managerEntries.snapshots(),
               builder: (context, mgrExpSnap) {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirestoreService.contractorEntries
-                      .where('siteId', isEqualTo: widget.siteId)
-                      .snapshots(),
+                  stream: FirestoreService.contractorEntries.snapshots(),
                   builder: (context, conExpSnap) {
-                    final List<Map<String, dynamic>> allExpenses = [];
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirestoreService.siteSupervisorIncentives.snapshots(),
+                      builder: (context, incExpSnap) {
+                        final List<Map<String, dynamic>> allExpenses = [];
+                        final siteIdFilter = widget.siteId.trim();
+                        final siteNameFilter = widget.siteName.trim();
 
-                    if (supEntriesSnap.hasData) {
-                      for (var doc in supEntriesSnap.data!.docs) {
-                        final d = doc.data();
-                        final isMgr = d['isManagerEntry'] == true || d['createdBy'] == 'manager';
-                        final isOrg = d['isOrgEntry'] == true || d['createdBy'] == 'manager_org';
-                        final category = isOrg ? 'Organization' : (isMgr ? 'Manager' : 'Supervisor');
-                        allExpenses.add({
-                          'title': d['expenseType'] ?? d['category'] ?? d['materialName'] ?? 'Site Entry',
-                          'amount': _parseNum(d['totalAmount'] ?? d['amount']),
-                          'date': d['date'] ?? d['createdAt'] ?? d['timestamp'],
-                          'category': category,
-                          'vendor': (d['vendorName'] ?? d['supplier'] ?? '').toString(),
-                        });
-                      }
-                    }
+                        bool matchesSite(Map<String, dynamic> d, String docId) {
+                          if (siteIdFilter.isEmpty) return true;
+                          final sId = (d['siteId'] ?? '').toString().trim();
+                          final sSite = (d['site'] ?? '').toString().trim();
+                          final sName = (d['siteName'] ?? '').toString().trim();
+                          final sLoc = (d['siteLocation'] ?? '').toString().trim();
 
-                    if (orgExpSnap.hasData) {
-                      for (var doc in orgExpSnap.data!.docs) {
-                        final d = doc.data();
-                        final bills = d['bills'] as List<dynamic>? ?? [];
-                        if (bills.isNotEmpty) {
-                          for (var b in bills) {
-                            if (b is Map) {
+                          if (sId == siteIdFilter || sSite == siteIdFilter || sName == siteIdFilter || sLoc == siteIdFilter) {
+                            return true;
+                          }
+                          if (siteNameFilter.isNotEmpty && (sId == siteNameFilter || sSite == siteNameFilter || sName == siteNameFilter || sLoc == siteNameFilter)) {
+                            return true;
+                          }
+                          if (docId.startsWith('${siteIdFilter}_') || docId.toLowerCase().startsWith('${siteIdFilter.toLowerCase()}_')) {
+                            return true;
+                          }
+                          return false;
+                        }
+
+                        if (supEntriesSnap.hasData) {
+                          for (var doc in supEntriesSnap.data!.docs) {
+                            final d = doc.data();
+                            if (!matchesSite(d, doc.id)) continue;
+                            final isMgr = d['isManagerEntry'] == true || d['createdBy'] == 'manager';
+                            final isOrg = d['isOrgEntry'] == true || d['createdBy'] == 'manager_org';
+                            final category = isOrg ? 'Organization' : (isMgr ? 'Manager' : 'Supervisor');
+                            final title = d['expenseType'] ??
+                                d['category'] ??
+                                d['materialName'] ??
+                                (d['projectStage'] != null && d['projectStage'].toString().isNotEmpty
+                                    ? 'Site Entry - ${d['projectStage']}'
+                                    : 'Daily Site Entry');
+                            allExpenses.add({
+                              'title': title,
+                              'amount': _parseSupervisorDocAmount(d),
+                              'date': d['date'] ?? d['createdAt'] ?? d['timestamp'],
+                              'category': category,
+                              'vendor': (d['vendorName'] ?? d['supplier'] ?? d['supervisorName'] ?? '').toString(),
+                            });
+                          }
+                        }
+
+                        if (orgExpSnap.hasData) {
+                          for (var doc in orgExpSnap.data!.docs) {
+                            final d = doc.data();
+                            if (!matchesSite(d, doc.id)) continue;
+                            final bills = d['bills'] as List<dynamic>? ?? [];
+                            if (bills.isNotEmpty) {
+                              for (var b in bills) {
+                                if (b is Map) {
+                                  allExpenses.add({
+                                    'title': (b['billNo'] != null && b['billNo'].toString().isNotEmpty)
+                                        ? 'Bill #${b['billNo']}'
+                                        : (d['projectStage'] ?? 'Org Expense'),
+                                    'amount': _parseNum(b['billAmount'] ?? b['amount']),
+                                    'date': b['billDate'] ?? d['entryDate'] ?? d['date'] ?? d['createdAt'],
+                                    'category': 'Organization',
+                                    'vendor': (b['billVendor'] ?? '').toString(),
+                                  });
+                                }
+                              }
+                            } else {
                               allExpenses.add({
-                                'title': (b['billNo'] != null && b['billNo'].toString().isNotEmpty)
-                                    ? 'Bill #${b['billNo']}'
-                                    : (d['projectStage'] ?? 'Org Expense'),
-                                'amount': _parseNum(b['billAmount'] ?? b['amount']),
-                                'date': b['billDate'] ?? d['entryDate'] ?? d['date'] ?? d['createdAt'],
+                                'title': d['projectStage'] ?? d['expenseName'] ?? d['description'] ?? 'Org Expense',
+                                'amount': _parseNum(d['totalAmount'] ?? d['amount']),
+                                'date': d['entryDate'] ?? d['date'] ?? d['createdAt'],
                                 'category': 'Organization',
-                                'vendor': (b['billVendor'] ?? '').toString(),
+                                'vendor': (d['vendorName'] ?? '').toString(),
                               });
                             }
                           }
-                        } else {
-                          allExpenses.add({
-                            'title': d['projectStage'] ?? d['expenseName'] ?? d['description'] ?? 'Org Expense',
-                            'amount': _parseNum(d['totalAmount'] ?? d['amount']),
-                            'date': d['entryDate'] ?? d['date'] ?? d['createdAt'],
-                            'category': 'Organization',
-                            'vendor': (d['vendorName'] ?? '').toString(),
-                          });
                         }
-                      }
-                    }
 
-                    if (mgrExpSnap.hasData) {
-                      for (var doc in mgrExpSnap.data!.docs) {
-                        final d = doc.data();
-                        allExpenses.add({
-                          'title': d['expenseType'] ?? d['category'] ?? d['materialName'] ?? 'Manager Entry',
-                          'amount': _parseNum(d['totalAmount'] ?? d['amount']),
-                          'date': d['date'] ?? d['createdAt'] ?? d['timestamp'],
-                          'category': 'Manager',
-                          'vendor': (d['vendorName'] ?? d['supplier'] ?? '').toString(),
-                        });
-                      }
-                    }
+                        if (mgrExpSnap.hasData) {
+                          for (var doc in mgrExpSnap.data!.docs) {
+                            final d = doc.data();
+                            if (!matchesSite(d, doc.id)) continue;
+                            allExpenses.add({
+                              'title': d['expenseType'] ?? d['category'] ?? d['materialName'] ?? 'Manager Entry',
+                              'amount': _parseNum(d['totalAmount'] ?? d['amount']),
+                              'date': d['date'] ?? d['createdAt'] ?? d['timestamp'],
+                              'category': 'Manager',
+                              'vendor': (d['vendorName'] ?? d['supplier'] ?? '').toString(),
+                            });
+                          }
+                        }
 
-                    if (conExpSnap.hasData) {
-                      for (var doc in conExpSnap.data!.docs) {
-                        final d = doc.data();
-                        allExpenses.add({
-                          'title': d['contractorName'] ?? d['category'] ?? 'Contractor Payment',
-                          'amount': _parseNum(d['totalAmount'] ?? d['amount']),
-                          'date': d['date'] ?? d['createdAt'],
-                          'category': 'Contractor',
-                          'vendor': (d['contractorName'] ?? '').toString(),
-                        });
-                      }
-                    }
+                        if (conExpSnap.hasData) {
+                          for (var doc in conExpSnap.data!.docs) {
+                            final d = doc.data();
+                            if (!matchesSite(d, doc.id)) continue;
+                            allExpenses.add({
+                              'title': d['contractorName'] ?? d['category'] ?? 'Contractor Payment',
+                              'amount': _parseNum(d['totalAmount'] ?? d['amount']),
+                              'date': d['date'] ?? d['createdAt'],
+                              'category': 'Contractor',
+                              'vendor': (d['contractorName'] ?? '').toString(),
+                            });
+                          }
+                        }
+
+                        if (incExpSnap.hasData) {
+                          for (var doc in incExpSnap.data!.docs) {
+                            final d = doc.data();
+                            if (!matchesSite(d, doc.id)) continue;
+                            allExpenses.add({
+                              'title': d['supervisorName'] != null
+                                  ? 'Incentive - ${d['supervisorName']}'
+                                  : (d['role'] != null ? 'Incentive - ${d['role']}' : 'Supervisor Incentive'),
+                              'amount': _parseNum(d['incentiveAmount'] ?? d['amount']),
+                              'date': d['date'] ?? d['createdAt'],
+                              'category': 'Incentive',
+                              'vendor': (d['supervisorName'] ?? '').toString(),
+                            });
+                          }
+                        }
 
                     // Sort newest to oldest
                     allExpenses.sort((a, b) {
@@ -1813,5 +1942,7 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
         );
       },
     );
-  }
+  },
+);
+}
 }

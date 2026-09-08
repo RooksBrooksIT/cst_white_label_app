@@ -4,13 +4,24 @@ import 'firestore_service.dart';
 class ExpenseService {
   // Recalculate all expense category totals and sync with project document
   static Future<void> recalcTotalsAndSyncProject(String siteId) async {
+    if (siteId.isEmpty || siteId == 'uninitialized') return;
     try {
-      // Compute totals from different expense categories
-      final supervisorTotal = await _sumSupervisorExpenses(siteId);
-      final managerTotal = await _sumManagerExpenses(siteId);
-      final organizationTotal = await _sumOrganizationExpenses(siteId);
-      final contractorTotal = await _sumContractorExpenses(siteId);
-      final incentiveTotal = await _sumIncentiveExpenses(siteId);
+      final siteKeys = await _resolveSiteKeys(siteId);
+
+      // Compute totals from all 5 expense categories concurrently in parallel
+      final results = await Future.wait([
+        _sumSupervisorExpenses(siteId, siteKeys),
+        _sumManagerExpenses(siteId, siteKeys),
+        _sumOrganizationExpenses(siteId, siteKeys),
+        _sumContractorExpenses(siteId, siteKeys),
+        _sumIncentiveExpenses(siteId, siteKeys),
+      ]);
+
+      final supervisorTotal = results[0];
+      final managerTotal = results[1];
+      final organizationTotal = results[2];
+      final contractorTotal = results[3];
+      final incentiveTotal = results[4];
 
       final double totalAllExpenses = supervisorTotal +
           managerTotal +
@@ -57,19 +68,38 @@ class ExpenseService {
           SetOptions(merge: true),
         );
 
-        // Update project financial summary if project doc exists
+        // Determine actual customer amount paid across documents
+        double amountPaid = 0.0;
         if (projectRef != null && projectSnap != null && projectSnap.exists) {
           final Map<String, dynamic>? data = projectSnap.data();
-          double amountPaid = 0.0;
-          if (data != null && data['amountPaid'] is num) {
-            amountPaid = (data['amountPaid'] as num).toDouble();
-          } else if (data != null && data['paid'] is num) {
-            amountPaid = (data['paid'] as num).toDouble();
-          } else if (data != null && data['amountReceived'] is num) {
-            amountPaid = (data['amountReceived'] as num).toDouble();
+          if (data != null) {
+            if (data['amountPaid'] is num) {
+              amountPaid = (data['amountPaid'] as num).toDouble();
+            } else if (data['amountReceived'] is num) {
+              amountPaid = (data['amountReceived'] as num).toDouble();
+            } else if (data['paid'] is num) {
+              amountPaid = (data['paid'] as num).toDouble();
+            }
           }
-          final amountBalance = amountPaid - totalAllExpenses;
+        }
 
+        if (amountPaid == 0.0 && siteRef != null && siteSnap != null && siteSnap.exists) {
+          final Map<String, dynamic>? sData = siteSnap.data();
+          if (sData != null) {
+            if (sData['amountPaid'] is num) {
+              amountPaid = (sData['amountPaid'] as num).toDouble();
+            } else if (sData['amountReceived'] is num) {
+              amountPaid = (sData['amountReceived'] as num).toDouble();
+            } else if (sData['paid'] is num) {
+              amountPaid = (sData['paid'] as num).toDouble();
+            }
+          }
+        }
+
+        final amountBalance = amountPaid - totalAllExpenses;
+
+        // Update project financial summary if project doc exists
+        if (projectRef != null && projectSnap != null && projectSnap.exists) {
           txn.update(projectRef, {
             'amountSpent': totalAllExpenses,
             'amountSpend': totalAllExpenses,
@@ -80,21 +110,10 @@ class ExpenseService {
 
         // Also update Site collection document if exists
         if (siteRef != null && siteSnap != null && siteSnap.exists) {
-          final Map<String, dynamic>? sData = siteSnap.data();
-          double sAmountPaid = 0.0;
-          if (sData != null && sData['amountPaid'] is num) {
-            sAmountPaid = (sData['amountPaid'] as num).toDouble();
-          } else if (sData != null && sData['paid'] is num) {
-            sAmountPaid = (sData['paid'] as num).toDouble();
-          } else if (sData != null && sData['amountReceived'] is num) {
-            sAmountPaid = (sData['amountReceived'] as num).toDouble();
-          }
-          final sAmountBalance = sAmountPaid - totalAllExpenses;
-
           txn.update(siteRef, {
             'amountSpent': totalAllExpenses,
             'amountSpend': totalAllExpenses,
-            'amountBalance': sAmountBalance,
+            'amountBalance': amountBalance,
             'updatedAt': FieldValue.serverTimestamp(),
           });
         }
@@ -194,27 +213,143 @@ class ExpenseService {
     }
   }
 
+  // Helper to resolve all possible identifier aliases for a site (docId, siteId, site, siteName)
+  static Future<Set<String>> _resolveSiteKeys(String siteId) async {
+    final siteKeys = <String>{siteId.trim()};
+    try {
+      final pDoc = await _findExistingProjectDocBySiteId(siteId);
+      if (pDoc != null) {
+        final pSnap = await pDoc.get();
+        if (pSnap.exists && pSnap.data() != null) {
+          final d = pSnap.data()!;
+          if (d['siteId'] != null) siteKeys.add(d['siteId'].toString().trim());
+          if (d['site'] != null) siteKeys.add(d['site'].toString().trim());
+          if (d['siteName'] != null) siteKeys.add(d['siteName'].toString().trim());
+          if (d['siteLocation'] != null) siteKeys.add(d['siteLocation'].toString().trim());
+        }
+      }
+      final sDoc = await _findExistingSiteDocBySiteId(siteId);
+      if (sDoc != null) {
+        final sSnap = await sDoc.get();
+        if (sSnap.exists && sSnap.data() != null) {
+          final d = sSnap.data()!;
+          if (d['siteId'] != null) siteKeys.add(d['siteId'].toString().trim());
+          if (d['site'] != null) siteKeys.add(d['site'].toString().trim());
+          if (d['siteName'] != null) siteKeys.add(d['siteName'].toString().trim());
+          if (d['siteLocation'] != null) siteKeys.add(d['siteLocation'].toString().trim());
+        }
+      }
+    } catch (_) {}
+    siteKeys.removeWhere((k) => k.isEmpty);
+    return siteKeys;
+  }
+
+  // Helper to parse numeric amount from any dynamic field or sub-structure
+  static double _parseExpenseAmount(dynamic val, [Map<String, dynamic>? data]) {
+    if (val != null) {
+      if (val is num) return val.toDouble();
+      if (val is String) {
+        final clean = val.replaceAll(',', '').replaceAll('₹', '').trim();
+        final parsed = double.tryParse(clean);
+        if (parsed != null && parsed > 0) return parsed;
+      }
+    }
+    if (data != null) {
+      double sum = 0.0;
+      final food = _parseExpenseAmount(data['food']);
+      final fuel = _parseExpenseAmount(data['fuel']);
+      final transport = _parseExpenseAmount(data['transport']);
+      sum += food + fuel + transport;
+
+      final labours = data['labours'];
+      if (labours is List) {
+        for (var l in labours) {
+          if (l is Map) {
+            final amt = _parseExpenseAmount(l['amount']);
+            if (amt > 0) {
+              sum += amt;
+            } else {
+              final count = _parseExpenseAmount(l['count']);
+              final salary = _parseExpenseAmount(l['unitSalary'] ?? l['salary']);
+              sum += (count * salary);
+            }
+          }
+        }
+      }
+
+      final materials = data['materials'];
+      if (materials is List) {
+        for (var m in materials) {
+          if (m is Map) {
+            final amt = _parseExpenseAmount(m['amount']);
+            if (amt > 0) {
+              sum += amt;
+            } else {
+              final qty = _parseExpenseAmount(m['quantity'] ?? m['qty']);
+              final price = _parseExpenseAmount(m['unitPrice'] ?? m['price']);
+              sum += (qty * price);
+            }
+          }
+        }
+      }
+      if (sum > 0) return sum;
+    }
+    return 0.0;
+  }
+
   // Sum supervisor expenses for the site
-  static Future<double> _sumSupervisorExpenses(String siteId) async {
+  static Future<double> _sumSupervisorExpenses(String siteId, [Set<String>? preResolvedSiteKeys]) async {
     double total = 0.0;
     try {
-      final snapshot = await FirestoreService.siteSupervisorEntries
-          .where('siteId', isEqualTo: siteId)
-          .get();
+      final siteKeys = preResolvedSiteKeys ?? await _resolveSiteKeys(siteId);
+      final Map<String, Map<String, dynamic>> matchedDocs = {};
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        // Skip manager entries entered through manager site entry page
+      for (final key in siteKeys) {
+        final snap1 = await FirestoreService.siteSupervisorEntries
+            .where('siteId', isEqualTo: key)
+            .get();
+        for (final doc in snap1.docs) {
+          matchedDocs[doc.id] = doc.data();
+        }
+
+        final snap2 = await FirestoreService.siteSupervisorEntries
+            .where('site', isEqualTo: key)
+            .get();
+        for (final doc in snap2.docs) {
+          matchedDocs[doc.id] = doc.data();
+        }
+
+        final snap3 = await FirestoreService.siteSupervisorEntries
+            .where('siteName', isEqualTo: key)
+            .get();
+        for (final doc in snap3.docs) {
+          matchedDocs[doc.id] = doc.data();
+        }
+      }
+
+      // Check all entries to match docId prefix e.g. {siteKey}_{ddMMyyyy}
+      try {
+        final allEntriesSnap = await FirestoreService.siteSupervisorEntries.get();
+        for (final doc in allEntriesSnap.docs) {
+          for (final key in siteKeys) {
+            if (doc.id.startsWith('${key}_') ||
+                doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
+              matchedDocs[doc.id] = doc.data();
+            }
+          }
+        }
+      } catch (_) {}
+
+      for (final data in matchedDocs.values) {
+        // Skip manager or org entries recorded in supervisor collection
         if (data['isManagerEntry'] == true ||
             data['createdBy'] == 'manager' ||
             data['isOrgEntry'] == true ||
             data['createdBy'] == 'manager_org') {
           continue;
         }
-        final amount = data['totalAmount'];
-        if (amount is num) {
-          total += amount.toDouble();
-        }
+        final amount = _parseExpenseAmount(data['totalAmount'] ?? data['amount'], data);
+        total += amount;
       }
     } catch (e) {
       print("❌ Error summing supervisor expenses for siteId=$siteId: $e");
@@ -223,47 +358,54 @@ class ExpenseService {
   }
 
   // Sum manager expenses for the site
-  static Future<double> _sumManagerExpenses(String siteId) async {
+  static Future<double> _sumManagerExpenses(String siteId, [Set<String>? preResolvedSiteKeys]) async {
     double total = 0.0;
     try {
-      final snapshot = await FirestoreService.managerExpenseSummary
-          // Document IDs assumed like: {siteId}_{something}
-          .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${siteId}_')
-          .where(FieldPath.documentId, isLessThan: '${siteId}_\uf8ff')
-          .get();
+      final siteKeys = preResolvedSiteKeys ?? await _resolveSiteKeys(siteId);
+      final Map<String, Map<String, dynamic>> matchedDocs = {};
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final amount = data['mgrExpenseTotalAmount'];
-        if (amount is num) {
-          total += amount.toDouble();
+      // 1. Ingest managerExpenseSummary
+      for (final key in siteKeys) {
+        try {
+          final snapshot = await FirestoreService.managerExpenseSummary
+              .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${key}_')
+              .where(FieldPath.documentId, isLessThan: '${key}_\uf8ff')
+              .get();
+          for (final doc in snapshot.docs) {
+            matchedDocs['summary_${doc.id}'] = doc.data();
+          }
+        } catch (_) {}
+      }
+
+      // 2. Ingest managerEntries
+      for (final key in siteKeys) {
+        final managerEntriesSnapshot = await FirestoreService.managerEntries
+            .where('siteId', isEqualTo: key)
+            .get();
+        for (final doc in managerEntriesSnapshot.docs) {
+          matchedDocs['mgr_${doc.id}'] = doc.data();
         }
       }
 
-      // Also sum manager site entry expenses saved in managerEntries
-      final managerEntriesSnapshot = await FirestoreService.managerEntries
-          .where('siteId', isEqualTo: siteId)
-          .get();
-      for (final doc in managerEntriesSnapshot.docs) {
-        final data = doc.data();
-        final amount = data['totalAmount'];
-        if (amount is num) {
-          total += amount.toDouble();
-        }
-      }
-
-      // Maintain backward compatibility with historical manager entries in siteSupervisorEntries
-      final supervisorEntriesSnapshot = await FirestoreService.siteSupervisorEntries
-          .where('siteId', isEqualTo: siteId)
-          .get();
-      for (final doc in supervisorEntriesSnapshot.docs) {
-        final data = doc.data();
-        if (data['isManagerEntry'] == true || data['createdBy'] == 'manager') {
-          final amount = data['totalAmount'];
-          if (amount is num) {
-            total += amount.toDouble();
+      // 3. Ingest manager site entries saved in siteSupervisorEntries
+      for (final key in siteKeys) {
+        final supervisorEntriesSnapshot = await FirestoreService.siteSupervisorEntries
+            .where('siteId', isEqualTo: key)
+            .get();
+        for (final doc in supervisorEntriesSnapshot.docs) {
+          final data = doc.data();
+          if (data['isManagerEntry'] == true || data['createdBy'] == 'manager') {
+            matchedDocs['sup_mgr_${doc.id}'] = data;
           }
         }
+      }
+
+      for (final data in matchedDocs.values) {
+        final amount = _parseExpenseAmount(
+          data['mgrExpenseTotalAmount'] ?? data['totalAmount'] ?? data['amount'],
+          data,
+        );
+        total += amount;
       }
     } catch (e) {
       print("❌ Error summing manager expenses for siteId=$siteId: $e");
@@ -272,52 +414,63 @@ class ExpenseService {
   }
 
   // Sum organization expenses for the site
-  static Future<double> _sumOrganizationExpenses(String siteId) async {
+  static Future<double> _sumOrganizationExpenses(String siteId, [Set<String>? preResolvedSiteKeys]) async {
     double total = 0.0;
     try {
-      // 1. Direct entries in organizationEntries
-      final orgDirectSnap = await FirestoreService.organizationEntries
-          .where('siteId', isEqualTo: siteId)
-          .get();
-      double directOrgTotal = 0.0;
-      for (final doc in orgDirectSnap.docs) {
-        final data = doc.data();
-        final amount = data['totalAmount'] ?? data['amount'];
-        if (amount is num) {
-          directOrgTotal += amount.toDouble();
-        }
-      }
+      final siteKeys = preResolvedSiteKeys ?? await _resolveSiteKeys(siteId);
+      final Map<String, Map<String, dynamic>> matchedDocs = {};
 
-      if (directOrgTotal > 0) {
-        total += directOrgTotal;
-      } else {
-        // Fallback to organizationExpenseSummary
-        final snapshot = await FirestoreService.organizationExpenseSummary
-            // Document IDs assumed like: {siteId}_{something}
-            .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${siteId}_')
-            .where(FieldPath.documentId, isLessThan: '${siteId}_\uf8ff')
+      // 1. Ingest direct organizationEntries
+      for (final key in siteKeys) {
+        final orgDirectSnap = await FirestoreService.organizationEntries
+            .where('siteId', isEqualTo: key)
             .get();
+        for (final doc in orgDirectSnap.docs) {
+          matchedDocs['org_${doc.id}'] = doc.data();
+        }
+      }
 
-        for (final doc in snapshot.docs) {
+      // 2. Fallback to organizationExpenseSummary
+      for (final key in siteKeys) {
+        try {
+          final snapshot = await FirestoreService.organizationExpenseSummary
+              .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${key}_')
+              .where(FieldPath.documentId, isLessThan: '${key}_\uf8ff')
+              .get();
+          for (final doc in snapshot.docs) {
+            matchedDocs['org_sum_${doc.id}'] = doc.data();
+          }
+        } catch (_) {}
+      }
+
+      // 3. Ingest manager site entry organization expenses saved in siteSupervisorEntries
+      for (final key in siteKeys) {
+        final orgEntriesSnapshot = await FirestoreService.siteSupervisorEntries
+            .where('siteId', isEqualTo: key)
+            .get();
+        for (final doc in orgEntriesSnapshot.docs) {
           final data = doc.data();
-          final amount = data['orgExpenseTotalAmount'] ?? data['totalAmount'] ?? data['amount'];
-          if (amount is num) {
-            total += amount.toDouble();
+          if (data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+            matchedDocs['sup_org_${doc.id}'] = data;
           }
         }
       }
 
-      // Also sum manager site entry organization expenses saved in siteSupervisorEntries
-      final orgEntriesSnapshot = await FirestoreService.siteSupervisorEntries
-          .where('siteId', isEqualTo: siteId)
-          .get();
-      for (final doc in orgEntriesSnapshot.docs) {
-        final data = doc.data();
-        if (data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
-          final amount = data['totalAmount'];
-          if (amount is num) {
-            total += amount.toDouble();
+      for (final data in matchedDocs.values) {
+        // Check if bills array exists
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          for (final b in bills) {
+            if (b is Map) {
+              total += _parseExpenseAmount(b['billAmount'] ?? b['amount']);
+            }
           }
+        } else {
+          final amount = _parseExpenseAmount(
+            data['orgExpenseTotalAmount'] ?? data['totalAmount'] ?? data['amount'],
+            data,
+          );
+          total += amount;
         }
       }
     } catch (e) {
@@ -327,19 +480,24 @@ class ExpenseService {
   }
 
   // Sum contractor expenses for the site
-  static Future<double> _sumContractorExpenses(String siteId) async {
+  static Future<double> _sumContractorExpenses(String siteId, [Set<String>? preResolvedSiteKeys]) async {
     double total = 0.0;
     try {
-      final snapshot = await FirestoreService.contractorEntries
-          .where('siteId', isEqualTo: siteId)
-          .get();
+      final siteKeys = preResolvedSiteKeys ?? await _resolveSiteKeys(siteId);
+      final Map<String, Map<String, dynamic>> matchedDocs = {};
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final amount = data['totalAmount'];
-        if (amount is num) {
-          total += amount.toDouble();
+      for (final key in siteKeys) {
+        final snapshot = await FirestoreService.contractorEntries
+            .where('siteId', isEqualTo: key)
+            .get();
+        for (final doc in snapshot.docs) {
+          matchedDocs[doc.id] = doc.data();
         }
+      }
+
+      for (final data in matchedDocs.values) {
+        final amount = _parseExpenseAmount(data['totalAmount'] ?? data['amount'], data);
+        total += amount;
       }
     } catch (e) {
       print("❌ Error summing contractor expenses for siteId=$siteId: $e");
@@ -348,19 +506,35 @@ class ExpenseService {
   }
 
   // Sum incentive expenses for the site
-  static Future<double> _sumIncentiveExpenses(String siteId) async {
+  static Future<double> _sumIncentiveExpenses(String siteId, [Set<String>? preResolvedSiteKeys]) async {
     double total = 0.0;
     try {
-      final snapshot = await FirestoreService.siteSupervisorIncentives
-          .where('siteId', isEqualTo: siteId)
-          .get();
+      final siteKeys = preResolvedSiteKeys ?? await _resolveSiteKeys(siteId);
+      final Map<String, Map<String, dynamic>> matchedDocs = {};
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final amount = data['incentiveAmount'];
-        if (amount is num) {
-          total += amount.toDouble();
+      for (final key in siteKeys) {
+        final snapshot = await FirestoreService.siteSupervisorIncentives
+            .where('siteId', isEqualTo: key)
+            .get();
+        for (final doc in snapshot.docs) {
+          matchedDocs[doc.id] = doc.data();
         }
+
+        try {
+          final snap2 = await FirestoreService.getCollection('supervisorIncentives')
+              .where('siteId', isEqualTo: key)
+              .get();
+          for (final doc in snap2.docs) {
+            matchedDocs[doc.id] = doc.data();
+          }
+        } catch (_) {}
+      }
+
+      for (final data in matchedDocs.values) {
+        final amount = _parseExpenseAmount(
+          data['incentiveAmount'] ?? data['amount'] ?? data['totalAmount'],
+        );
+        total += amount;
       }
     } catch (e) {
       print("❌ Error summing incentive expenses for siteId=$siteId: $e");

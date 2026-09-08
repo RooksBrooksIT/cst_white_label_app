@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -312,9 +312,16 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
 
   Widget _buildFinancialSummary(ThemeData theme) {
     final budget = _parseNum(projectData?['projectBudget']);
-    final received = _parseNum(projectData?['amountPaid']);
-    final spent = _parseNum(projectData?['amountSpent']);
-    final balance = _parseNum(projectData?['amountBalance']);
+    final received = _parseNum(
+      projectData?['amountPaid'] ??
+          projectData?['amountReceived'] ??
+          projectData?['paid'],
+    );
+    final spent = _parseNum(
+      projectData?['amountSpent'] ?? projectData?['amountSpend'],
+    );
+    final customerCashBalance = received - spent;
+    final budgetRemaining = budget - spent;
     final usage = budget > 0 ? (spent / budget * 100).clamp(0, 100) : 0;
 
     return GlassCard(
@@ -330,28 +337,34 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           ),
           const SizedBox(height: 20),
           _buildFinanceTile(
-            'Total Budget',
+            'Estimated Project Budget',
             '₹ $budget',
             theme.colorScheme.primary,
             Icons.account_balance_wallet_outlined,
           ),
           _buildFinanceTile(
-            'Total Received',
+            'Customer Amount Received',
             '₹ $received',
             Colors.green,
             Icons.arrow_downward_rounded,
           ),
           _buildFinanceTile(
-            'Total Spent',
+            'Total Expenses Spent',
             '₹ $spent',
             Colors.orange,
             Icons.arrow_upward_rounded,
           ),
           _buildFinanceTile(
-            'Balance',
-            '₹ $balance',
-            Colors.blue,
+            'Balance from Customer Received',
+            '₹ $customerCashBalance',
+            customerCashBalance >= 0 ? Colors.blue : Colors.red,
             Icons.account_balance_outlined,
+          ),
+          _buildFinanceTile(
+            'Budget Remaining',
+            '₹ $budgetRemaining',
+            budgetRemaining >= 0 ? Colors.teal : Colors.deepOrange,
+            Icons.savings_outlined,
           ),
           const SizedBox(height: 24),
           Text(
@@ -467,9 +480,16 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
     final budget = _parseNum(projectData?['projectBudget']);
-    final spent = _parseNum(projectData?['amountSpent']);
-    final received = _parseNum(projectData?['amountPaid']);
-    final balance = budget - spent;
+    final received = _parseNum(
+      projectData?['amountPaid'] ??
+          projectData?['amountReceived'] ??
+          projectData?['paid'],
+    );
+    final spent = _parseNum(
+      projectData?['amountSpent'] ?? projectData?['amountSpend'],
+    );
+    final customerCashBalance = received - spent;
+    final budgetRemaining = budget - spent;
 
     pdf.addPage(
       pw.MultiPage(
@@ -546,10 +566,11 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
           pw.Table.fromTextArray(
             headers: ['Financial Metric', 'Amount (INR)'],
             data: [
-              ['Total Project Budget', '₹${budget.toStringAsFixed(2)}'],
-              ['Total Amount Received', '₹${received.toStringAsFixed(2)}'],
-              ['Total Amount Spent', '₹${spent.toStringAsFixed(2)}'],
-              ['Remaining Balance', '₹${balance.toStringAsFixed(2)}'],
+              ['Estimated Project Budget', '₹${budget.toStringAsFixed(2)}'],
+              ['Customer Amount Received', '₹${received.toStringAsFixed(2)}'],
+              ['Total Expenses Spent', '₹${spent.toStringAsFixed(2)}'],
+              ['Balance from Customer Received', '₹${customerCashBalance.toStringAsFixed(2)}'],
+              ['Budget Remaining', '₹${budgetRemaining.toStringAsFixed(2)}'],
             ],
             headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold,

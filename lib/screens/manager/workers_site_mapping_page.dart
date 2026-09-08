@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -80,21 +80,42 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     setState(() => _isLoadingWorkers = true);
 
     try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'workersConfig',
-      ).limit(200).get();
+      final querySnapshot = await FirestoreService.getCollection('workersConfig').get();
+
+      final Map<String, Map<String, dynamic>> workersMap = {};
+      final Set<String> seenIdentifiers = {};
+
+      for (final doc in querySnapshot.docs) {
+        final data = doc.data();
+        final id = (data['workerId'] ?? data['id'] ?? doc.id).toString().trim();
+        final name = (data['name'] ?? data['workerName'] ?? data['fullName'] ?? '').toString().trim();
+        final designation = (data['designation'] ?? data['workerDesignation'] ?? data['role'] ?? '').toString().trim();
+        final salary = (data['salary'] ?? data['workerSalary'] ?? data['wage'] ?? '0').toString().trim();
+        final phone = (data['phoneNumber'] ?? data['phone'] ?? data['workerPhone'] ?? data['mobile'] ?? '').toString().trim();
+
+        if (name.isEmpty && id.isEmpty) continue;
+
+        final cleanName = name.isNotEmpty ? name : id;
+        final dedupKey = '${cleanName.toLowerCase()}_${designation.toLowerCase()}';
+
+        if (id.isNotEmpty && !workersMap.containsKey(id) && !seenIdentifiers.contains(dedupKey)) {
+          seenIdentifiers.add(dedupKey);
+          workersMap[id] = {
+            'id': id,
+            'name': cleanName,
+            'designation': designation,
+            'salary': salary,
+            'phoneNumber': phone,
+          };
+        }
+      }
+
+      final list = workersMap.values.toList();
+      list.sort((a, b) => (a['name'] as String).toLowerCase().compareTo((b['name'] as String).toLowerCase()));
+
       if (!mounted) return;
       setState(() {
-        _workers = querySnapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'name': data['name'] ?? '',
-            'designation': data['designation'] ?? '',
-            'salary': data['salary'] ?? '',
-            'phoneNumber': data['phoneNumber'] ?? '',
-          };
-        }).toList();
+        _workers = list;
         _isLoadingWorkers = false;
       });
     } catch (e) {
@@ -117,6 +138,11 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       _selectedSupervisor = null;
       _selectedProjectName = null;
       _selectedWorkersList.clear();
+      _selectedWorkerId = null;
+      _selectedWorkerName = null;
+      _selectedWorkerDesignation = null;
+      _selectedWorkerSalary = null;
+      _selectedWorkerPhone = null;
     });
 
     if (site != null) {
@@ -161,13 +187,19 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Future<void> _loadExistingWorkersForSite(String siteId) async {
     try {
-      final existingDoc = await FirestoreService.getCollection(
+      var existingDoc = await FirestoreService.getCollection(
         'workerSiteMapping',
       ).doc(siteId).get();
 
+      if (!existingDoc.exists) {
+        existingDoc = await FirestoreService.getCollection(
+          'workerSiteMap',
+        ).doc(siteId).get();
+      }
+
       if (!mounted) return;
 
-      if (existingDoc.exists) {
+      if (existingDoc.exists && existingDoc.data() != null) {
         final data = existingDoc.data()!;
         final workersList = data['workers'] as List<dynamic>? ?? [];
 
@@ -175,11 +207,11 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
           _selectedWorkersList = workersList.map((w) {
             final workerMap = Map<String, dynamic>.from(w as Map);
             return {
-              'workerId': workerMap['workerId'] ?? '',
-              'workerName': workerMap['workerName'] ?? '',
-              'workerDesignation': workerMap['workerDesignation'] ?? '',
-              'workerSalary': workerMap['workerSalary'] ?? '',
-              'workerPhone': workerMap['workerPhone'] ?? '',
+              'workerId': (workerMap['workerId'] ?? workerMap['id'] ?? '').toString(),
+              'workerName': (workerMap['workerName'] ?? workerMap['name'] ?? '').toString(),
+              'workerDesignation': (workerMap['workerDesignation'] ?? workerMap['designation'] ?? '').toString(),
+              'workerSalary': (workerMap['workerSalary'] ?? workerMap['salary'] ?? '').toString(),
+              'workerPhone': (workerMap['workerPhone'] ?? workerMap['phoneNumber'] ?? workerMap['phone'] ?? '').toString(),
             };
           }).toList();
         });
@@ -209,16 +241,16 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     if (worker.isNotEmpty) {
       setState(() {
         _selectedWorkerId = workerId;
-        _selectedWorkerName = worker['name'];
-        _selectedWorkerDesignation = worker['designation'];
-        _selectedWorkerSalary = worker['salary'];
-        _selectedWorkerPhone = worker['phoneNumber'];
+        _selectedWorkerName = (worker['name'] ?? '').toString();
+        _selectedWorkerDesignation = (worker['designation'] ?? '').toString();
+        _selectedWorkerSalary = (worker['salary'] ?? '').toString();
+        _selectedWorkerPhone = (worker['phoneNumber'] ?? '').toString();
       });
     }
   }
 
   void _addWorkerToList() {
-    if (_selectedWorkerId == null || _selectedWorkerName == null) {
+    if (_selectedWorkerId == null || _selectedWorkerName == null || _selectedWorkerName!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a worker profile'),
@@ -229,7 +261,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     }
 
     final isAlreadyAdded = _selectedWorkersList.any(
-      (w) => w['workerId'] == _selectedWorkerId || w['workerName'] == _selectedWorkerName,
+      (w) => (w['workerId'] != null && w['workerId'].toString().isNotEmpty && w['workerId'] == _selectedWorkerId) ||
+             (w['workerName'] != null && w['workerName'].toString().isNotEmpty && w['workerName'] == _selectedWorkerName),
     );
 
     if (isAlreadyAdded) {
@@ -286,9 +319,14 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirestoreService.getCollection('workerSiteMapping')
-          .doc(_selectedSite)
-          .set(docData, SetOptions(merge: true));
+      await Future.wait([
+        FirestoreService.getCollection('workerSiteMapping')
+            .doc(_selectedSite)
+            .set(docData, SetOptions(merge: true)),
+        FirestoreService.getCollection('workerSiteMap')
+            .doc(_selectedSite)
+            .set(docData, SetOptions(merge: true)),
+      ]);
 
       if (!mounted) return;
 
@@ -606,10 +644,21 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
   Widget _buildWorkerDropdown(Color primaryColor) {
     final availableWorkers = _workers.where((worker) {
-      return !_selectedWorkersList.any(
-        (selectedWorker) => selectedWorker['workerName'] == worker['name'],
-      );
+      final wId = worker['id']?.toString().trim().toLowerCase() ?? '';
+      final wName = worker['name']?.toString().trim().toLowerCase() ?? '';
+
+      return !_selectedWorkersList.any((selectedWorker) {
+        final sId = selectedWorker['workerId']?.toString().trim().toLowerCase() ?? '';
+        final sName = selectedWorker['workerName']?.toString().trim().toLowerCase() ?? '';
+
+        if (wId.isNotEmpty && sId.isNotEmpty && wId == sId) return true;
+        if (wName.isNotEmpty && sName.isNotEmpty && wName == sName) return true;
+        return false;
+      });
     }).toList();
+
+    final bool isSelectedValid = availableWorkers.any((w) => w['id'] == _selectedWorkerId);
+    final String? currentDropdownValue = isSelectedValid ? _selectedWorkerId : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -630,12 +679,19 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
             border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           child: DropdownButtonFormField<String>(
+            key: ValueKey('worker_dd_${currentDropdownValue}_${availableWorkers.length}'),
             isExpanded: true,
-            initialValue: _selectedWorkerId,
+            initialValue: currentDropdownValue,
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(14),
             decoration: InputDecoration(
-              hintText: 'Choose registered worker',
+              hintText: _isLoadingWorkers
+                  ? 'Loading workers...'
+                  : (availableWorkers.isEmpty
+                      ? (_workers.isEmpty
+                          ? 'No workers registered in system'
+                          : 'All workers already added')
+                      : 'Choose registered worker'),
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 13.5,
@@ -667,9 +723,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                 : availableWorkers.map<DropdownMenuItem<String>>((worker) {
                     final String name = worker['name']?.toString().trim() ?? '';
                     final String des = worker['designation']?.toString().trim() ?? '';
-                    final String displayName = name.isNotEmpty
-                        ? (des.isNotEmpty ? '$name ($des)' : name)
-                        : 'Unnamed (${worker['id']})';
+                    final String displayName = des.isNotEmpty ? '$name ($des)' : name;
                     return DropdownMenuItem<String>(
                       value: worker['id'] as String?,
                       child: Text(
@@ -678,7 +732,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                       ),
                     );
                   }).toList(),
-            onChanged: _onWorkerSelected,
+            onChanged: availableWorkers.isEmpty ? null : _onWorkerSelected,
           ),
         ),
       ],

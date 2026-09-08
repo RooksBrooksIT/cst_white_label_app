@@ -841,13 +841,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                                                     : "Total Expenses"));
 
                                         final displayExpenses = _formatCurrency(computedExpenses);
-                                        final displayBalance = _formatCurrency(availableBalance);
+                                        final displayBalance = _formatCurrency(totalAmountPaid - totalAmountSpent);
+                                        final displayTreasury = _formatCurrency(totalAmountPaid);
 
                                         // Build Carousel Slides
                                         final slides = [
-                                          // Slide 1: Financial Overview (Hero Gradient Card)
+                                          // Slide 1: Financial Overview (Hero Gradient Card - Treasury: Actual Customer Receipts)
                                           _buildHeroBalanceSlide(
                                             context,
+                                            treasuryTotal: displayTreasury,
                                             balance: displayBalance,
                                             expenses: displayExpenses,
                                             expenseLabel: expenseLabel,
@@ -1013,9 +1015,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  // Slide 1: Treasury & Available Balance
+  // Slide 1: Treasury & Available Balance (Strictly Customer Receipts for Treasury)
   Widget _buildHeroBalanceSlide(
     BuildContext context, {
+    required String treasuryTotal,
     required String balance,
     required String expenses,
     required String expenseLabel,
@@ -1115,7 +1118,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               ],
             ),
 
-            // Middle Amount
+            // Middle Amount (Treasury = Total Actual Customer Receipts)
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1124,7 +1127,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Net Available Balance',
+                      'Customer Receipts (Treasury)',
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
@@ -1133,7 +1136,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '₹ $balance',
+                      '₹ $treasuryTotal',
                       style: const TextStyle(
                         fontSize: 27,
                         fontWeight: FontWeight.w900,
@@ -1201,12 +1204,12 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'Live Balance Sync Active',
-                        style: TextStyle(
+                      Text(
+                        'Cash Balance: ₹ $balance',
+                        style: const TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF475569),
+                          color: Color(0xFF166534),
                         ),
                       ),
                     ],

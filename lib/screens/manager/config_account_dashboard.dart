@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -113,7 +113,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       "icon": Icons.assignment_rounded,
       "color": const Color(0xFF0A183D),
     },
-    "Site & Operations": {
+    "Supervisor & Site Operations": {
       "subtitle": "Supervisor profiles, site mappings, and daily logs",
       "icon": Icons.location_city_rounded,
       "color": const Color(0xFFEA580C),
@@ -135,10 +135,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       "icon": Icons.people_rounded,
       "color": const Color(0xFFF57C00),
     },
-    "Coming Soon": {
-      "subtitle": "Exciting new tools and features on the way",
-      "icon": Icons.sentiment_very_satisfied_rounded,
-      "color": const Color(0xFFF59E0B),
+    "Construction Field": {
+      "subtitle": "Smart site AI, 3D BIM & machinery tracking",
+      "icon": Icons.construction_rounded,
+      "color": const Color(0xFFEA580C),
       "isStatic": true,
     },
   };
@@ -234,15 +234,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         'Manage all 5 project settings in one place',
         const Color(0xFF0A183D),
       ),
-      DashboardItem(
-        'Update Project',
-        Icons.work_rounded,
-        Colors.indigo,
-        'Oversee project details',
-        Colors.indigo,
-      ),
     ],
-    "Site & Operations": [
+    "Supervisor & Site Operations": [
       DashboardItem(
         'Manager Daily Site Entry',
         Icons.edit_note_rounded,
@@ -355,7 +348,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFFF57C00),
       ),
     ],
-    "Coming Soon": [],
+    "Construction Field": [],
   };
 
   @override

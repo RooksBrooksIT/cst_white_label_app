@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/services/subscription_limit_service.dart';
@@ -128,16 +129,16 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   void _recalcNewSetupBalance() {
-    final budget = double.tryParse(_projectBudgetController.text.trim().replaceAll(',', '')) ?? 0.0;
     final received = double.tryParse(_amountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
-    final balance = budget - received;
+    final spent = double.tryParse(_amountSpentController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final balance = received - spent;
     _balanceAmountController.text = balance.toStringAsFixed(2);
   }
 
   void _recalcUpdateBalance() {
-    final budget = double.tryParse(_updateProjectBudgetController.text.trim().replaceAll(',', '')) ?? 0.0;
     final received = double.tryParse(_updateAmountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
-    final balance = budget - received;
+    final spent = double.tryParse(_updateAmountSpentController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final balance = received - spent;
     _updateBalanceAmountController.text = balance.toStringAsFixed(2);
   }
 
@@ -1058,9 +1059,9 @@ class _SiteScreenState extends State<SiteScreen>
       }
 
       // 3. Update project document & Site document
-      final double budget =
-          double.tryParse(_updateProjectBudgetController.text.replaceAll(',', '')) ?? 0.0;
-      final double balance = budget - cumulativeAmountReceived;
+      final double spent =
+          double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
+      final double customerCashBalance = cumulativeAmountReceived - spent;
 
       if (_selectedProjectId != null && _selectedProjectId!.isNotEmpty) {
         try {
@@ -1069,7 +1070,7 @@ class _SiteScreenState extends State<SiteScreen>
               .set({
             'amountPaid': cumulativeAmountReceived,
             'amountReceived': cumulativeAmountReceived,
-            'amountBalance': balance,
+            'amountBalance': customerCashBalance,
             'receivedPayments': FieldValue.arrayUnion([paymentEntry]),
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
@@ -1085,6 +1086,7 @@ class _SiteScreenState extends State<SiteScreen>
               .set({
             'amountPaid': cumulativeAmountReceived,
             'amountReceived': cumulativeAmountReceived,
+            'amountBalance': customerCashBalance,
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         } catch (siteErr) {
@@ -1092,11 +1094,17 @@ class _SiteScreenState extends State<SiteScreen>
         }
       }
 
+      // Sync across central ExpenseService
+      final syncSiteId = _selectedSiteDocId ?? _selectedProjectId ?? '';
+      if (syncSiteId.isNotEmpty) {
+        await ExpenseService.recalcTotalsAndSyncProject(syncSiteId);
+      }
+
       if (!mounted) return;
       setState(() {
         _updateAmountPaidController.text =
             cumulativeAmountReceived.toStringAsFixed(2);
-        _updateBalanceAmountController.text = balance.toStringAsFixed(2);
+        _updateBalanceAmountController.text = customerCashBalance.toStringAsFixed(2);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1482,7 +1490,7 @@ class _SiteScreenState extends State<SiteScreen>
           double.tryParse(_updateAmountPaidController.text.replaceAll(',', '')) ?? 0.0;
       final double amountSpent =
           double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
-      final double amountBalance = budget - amountPaid;
+      final double amountBalance = amountPaid - amountSpent;
 
       final projectUpdateData = {
         'projectName': projectName,
@@ -1914,7 +1922,7 @@ class _SiteScreenState extends State<SiteScreen>
             double.tryParse(_projectBudgetController.text.replaceAll(',', '')) ?? 0.0;
         final double amountPaid =
             double.tryParse(_amountPaidController.text.replaceAll(',', '')) ?? 0.0;
-        final double balance = budget - amountPaid;
+        final double balance = amountPaid;
 
         Map<String, dynamic>? initialPaymentEntry;
         if (amountPaid > 0) {
@@ -1998,8 +2006,25 @@ class _SiteScreenState extends State<SiteScreen>
           'totalMgrExpense': 0.0,
           'totalOrgExpense': 0.0,
           'totalSiteExpense': 0.0,
+          'totalContractorExpense': 0.0,
+          'totalIncentiveExpenses': 0.0,
+          'totalAllExpenses': 0.0,
           'createdAt': FieldValue.serverTimestamp(),
         });
+
+        // Ensure Site document is synced with initial financial state
+        await FirestoreService.getCollection('Site')
+            .doc(createdSiteDocId)
+            .set({
+          'amountPaid': amountPaid,
+          'amountReceived': amountPaid,
+          'amountSpent': 0.0,
+          'amountBalance': balance,
+          'projectBudget': budget,
+        }, SetOptions(merge: true));
+
+        // Sync central ExpenseService
+        await ExpenseService.recalcTotalsAndSyncProject(createdSiteDocId);
       } catch (projectError) {
         // Rollback Site document if Project creation fails
         try {
@@ -2857,7 +2882,7 @@ class _SiteScreenState extends State<SiteScreen>
                       Expanded(
                         child: _buildTextField(
                           controller: _amountPaidController,
-                          label: 'Amount Received (₹)',
+                          label: 'Customer Received (₹)',
                           hintText: 'e.g. 500000',
                           primaryColor: primaryColor,
                           keyboardType: TextInputType.number,
@@ -2881,7 +2906,7 @@ class _SiteScreenState extends State<SiteScreen>
                       Expanded(
                         child: _buildTextField(
                           controller: _balanceAmountController,
-                          label: 'Balance Amount (₹)',
+                          label: 'Balance from Received (₹)',
                           hintText: '0.00',
                           primaryColor: primaryColor,
                           readOnly: true,
@@ -3742,7 +3767,7 @@ class _SiteScreenState extends State<SiteScreen>
                             Expanded(
                               child: _buildTextField(
                                 controller: _updateBalanceAmountController,
-                                label: 'Balance Amount (₹)',
+                                label: 'Balance from Received (₹)',
                                 hintText: '0.00',
                                 primaryColor: primaryColor,
                                 readOnly: true,
