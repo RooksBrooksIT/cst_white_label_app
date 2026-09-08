@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/firestore_error_handler.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/screens/manager/config_account_dashboard.dart';
-import 'package:demo_cst/screens/common/portal_loading_screen.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/firestore_error_handler.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/screens/manager/config_account_dashboard.dart';
+import 'package:ebricks/screens/common/portal_loading_screen.dart';
 
 class ConfigLoginPage extends StatefulWidget {
   const ConfigLoginPage({super.key});
@@ -131,8 +131,8 @@ class _ConfigLoginPageState extends State<ConfigLoginPage> {
       // Refresh FirestoreService cache
       await FirestoreService.initialize();
 
-      // Sync branding details
-      await AppTheme.syncWithFirestore(orgId);
+      // Sync branding details in background
+      AppTheme.syncWithFirestore(orgId).catchError((_) {});
 
       // 3. Authenticate within organization
       final configCollection = FirestoreService.configUsers;
@@ -160,12 +160,12 @@ class _ConfigLoginPageState extends State<ConfigLoginPage> {
           extraData: docData,
         );
 
-        // Save FCM token for push notifications
-        await NotificationService.saveToken(
+        // Save FCM token for push notifications in background
+        NotificationService.saveToken(
           userId: _usernameController.text.trim(),
           userType: 'manager',
           userName: _usernameController.text.trim(),
-        );
+        ).catchError((_) {});
 
         if (mounted) {
           Navigator.pushAndRemoveUntil(

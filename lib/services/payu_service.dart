@@ -499,6 +499,26 @@ class PayUService {
     return false;
   }
 
+  /// Asynchronously triggers subscription expiry scan on Firebase Cloud Function
+  static Future<Map<String, dynamic>?> triggerExpiryReminderScan() async {
+    try {
+      final String endpointUrl = '$cloudFunctionsBaseUrl/triggerSubscriptionExpiryCheck';
+      final response = await http.post(
+        Uri.parse(endpointUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'data': {}}),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['result'] as Map<String, dynamic>? ?? decoded as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('PayUService: Expiry reminder scan trigger exception: $e');
+    }
+    return null;
+  }
+
   /// Helper to generate unique transaction ID
   static String generateTxnId() {
     return 'PAYU_${DateTime.now().millisecondsSinceEpoch}';

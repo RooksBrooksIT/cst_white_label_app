@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:demo_cst/services/approval_workflow_service.dart';
+import 'package:ebricks/services/approval_workflow_service.dart';
 import 'package:intl/intl.dart';
 
 class ApprovalLifecycleStepper extends StatelessWidget {

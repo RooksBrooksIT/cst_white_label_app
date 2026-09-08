@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/dialog_utils.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/driver_vehicle_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/dialog_utils.dart';
+import 'package:ebricks/utils/responsive.dart';
 
 class VehicleDriverConfigPage extends StatefulWidget {
   const VehicleDriverConfigPage({super.key});
@@ -30,7 +31,13 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
   String _driverStatus = 'Active';
   String _currentDriverId = '';
   bool _isEditing = false;
+  bool _isSaving = false;
   String _searchQuery = '';
+
+  // Vehicle assignment fields
+  String? _selectedVehicleId;
+  String? _selectedVehicleModel;
+  String? _selectedVehiclePlate;
 
   late TabController _tabController;
 
@@ -53,66 +60,74 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
     super.dispose();
   }
 
-  Future<String> _getNextDriverId() async {
-    final snapshot = await FirestoreService.getCollection('drivers')
-        .orderBy('driverId', descending: true)
-        .limit(1)
-        .get();
-
-    if (snapshot.docs.isEmpty) return 'DV001';
-
-    final lastDriverId = snapshot.docs.first['driverId'] as String? ?? 'DV000';
-    final numberStr = lastDriverId.replaceAll(RegExp(r'[^0-9]'), '');
-    final number = int.tryParse(numberStr) ?? 0;
-    return 'DV${(number + 1).toString().padLeft(3, '0')}';
-  }
-
   Future<void> _saveDriver() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final driverId =
-        _isEditing ? _currentDriverId : await _getNextDriverId();
+    setState(() => _isSaving = true);
 
-    final data = {
-      'driverId': driverId,
-      'driverName': _driverNameController.text.trim(),
-      'driverPhone': _driverPhoneController.text.trim(),
-      'driverAddress': _driverAddressController.text.trim(),
-      'driverLicense': _driverLicenseController.text.trim(),
-      'experience': _experienceController.text.trim(),
-      'status': _driverStatus,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
+    try {
+      final driverId =
+          _isEditing ? _currentDriverId : await DriverVehicleService.getNextDriverId();
 
-    if (!_isEditing) {
-      data['createdAt'] = FieldValue.serverTimestamp();
-    }
-
-    await FirestoreService.getCollection('drivers').doc(driverId).set(data);
-
-    if (mounted) {
-      await DialogUtils.showSuccessDialog(
-        context,
-        message: 'Driver ${_isEditing ? 'updated' : 'saved'} successfully!',
+      await DriverVehicleService.saveDriverWithAssignment(
+        driverId: driverId,
+        driverName: _driverNameController.text.trim(),
+        driverPhone: _driverPhoneController.text.trim(),
+        driverAddress: _driverAddressController.text.trim(),
+        driverLicense: _driverLicenseController.text.trim(),
+        experience: _experienceController.text.trim(),
+        status: _driverStatus,
+        newVehicleId: _selectedVehicleId,
+        newVehicleModel: _selectedVehicleModel,
+        newVehiclePlate: _selectedVehiclePlate,
+        isEditing: _isEditing,
       );
-    }
 
-    if (!_isEditing) {
+      if (mounted) {
+        await DialogUtils.showSuccessDialog(
+          context,
+          message: 'Driver ${_isEditing ? 'updated' : 'saved'} successfully!',
+        );
+      }
+
       _resetForm();
       _tabController.animateTo(1);
+    } on VehicleAssignmentException catch (e) {
+      if (mounted) {
+        await DialogUtils.showWarningDialog(
+          context,
+          message: e.message,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        await DialogUtils.showWarningDialog(
+          context,
+          message: 'Error saving driver: ${e.toString()}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
   void _editDriver(DocumentSnapshot driver) {
+    final data = driver.data() as Map<String, dynamic>;
     setState(() {
       _isEditing = true;
-      _currentDriverId = driver['driverId'];
-      _driverNameController.text = driver['driverName'] ?? '';
-      _driverPhoneController.text = driver['driverPhone'] ?? '';
-      _driverAddressController.text = driver['driverAddress'] ?? '';
-      _driverLicenseController.text = driver['driverLicense'] ?? '';
-      _experienceController.text = driver['experience'] ?? '';
-      _driverStatus = driver['status'] ?? 'Active';
+      _currentDriverId = data['driverId'] ?? driver.id;
+      _driverNameController.text = data['driverName'] ?? '';
+      _driverPhoneController.text = data['driverPhone'] ?? '';
+      _driverAddressController.text = data['driverAddress'] ?? '';
+      _driverLicenseController.text = data['driverLicense'] ?? '';
+      _experienceController.text = data['experience'] ?? '';
+      _driverStatus = data['status'] ?? 'Active';
+      _selectedVehicleId = data['assignedVehicleId'] as String?;
+      _selectedVehicleModel = data['assignedVehicleModel'] as String?;
+      _selectedVehiclePlate = data['assignedVehiclePlate'] as String?;
     });
     _tabController.animateTo(0);
   }
@@ -128,16 +143,21 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
       _isEditing = false;
       _currentDriverId = '';
       _driverStatus = 'Active';
+      _selectedVehicleId = null;
+      _selectedVehicleModel = null;
+      _selectedVehiclePlate = null;
     });
   }
 
   Future<void> _deleteDriver(String driverId) async {
-    final result = await showDialog(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Driver', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to delete driver $driverId?'),
+        content: Text(
+          'Are you sure you want to delete driver $driverId?\nAny assigned vehicle will be released.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -153,12 +173,26 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
     );
 
     if (result == true) {
-      await FirestoreService.getCollection('drivers').doc(driverId).delete();
-      if (mounted) {
-        await DialogUtils.showSuccessDialog(
-          context,
-          message: 'Driver deleted successfully!',
-        );
+      setState(() => _isSaving = true);
+      try {
+        await DriverVehicleService.deleteDriver(driverId);
+        if (mounted) {
+          await DialogUtils.showSuccessDialog(
+            context,
+            message: 'Driver deleted and vehicle released successfully!',
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          await DialogUtils.showWarningDialog(
+            context,
+            message: 'Error deleting driver: $e',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isSaving = false);
+        }
       }
     }
   }
@@ -262,7 +296,7 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'NEW DRIVER',
+                      _isEditing ? 'EDIT DRIVER' : 'NEW DRIVER',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
@@ -294,13 +328,13 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                       color: _tabController.index == 1 ? Colors.white : const Color(0xFF64748B),
                     ),
                     const SizedBox(width: 6),
-                    Text(
+                    const Text(
                       'EXISTING DRIVERS',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.4,
-                        color: _tabController.index == 1 ? Colors.white : const Color(0xFF64748B),
+                        color: Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -457,6 +491,8 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                     ),
                   ),
                   const SizedBox(height: 12),
+                  _buildVehicleDropdown(primaryColor),
+                  const SizedBox(height: 12),
                   _buildCustomTextField(
                     label: 'Status *',
                     child: DropdownButtonFormField<String>(
@@ -473,9 +509,37 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                       items: ['Active', 'Inactive']
                           .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                           .toList(),
-                      onChanged: (val) => setState(() => _driverStatus = val!),
+                      onChanged: (val) {
+                        setState(() {
+                          _driverStatus = val!;
+                          if (_driverStatus == 'Inactive') {
+                            _selectedVehicleId = null;
+                            _selectedVehicleModel = null;
+                            _selectedVehiclePlate = null;
+                          }
+                        });
+                      },
                     ),
                   ),
+                  if (_driverStatus == 'Inactive') ...[
+                    const SizedBox(height: 6),
+                    const Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFDC2626)),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Inactive drivers cannot hold assigned vehicles. Any assigned vehicle is released automatically upon save.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -487,7 +551,7 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                     child: SizedBox(
                       height: 50,
                       child: OutlinedButton(
-                        onPressed: _resetForm,
+                        onPressed: _isSaving ? null : _resetForm,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF64748B),
                           side: const BorderSide(color: Color(0xFFCBD5E1)),
@@ -503,17 +567,26 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                   child: SizedBox(
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _saveDriver,
+                      onPressed: _isSaving ? null : _saveDriver,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 2,
                       ),
-                      child: Text(
-                        _isEditing ? 'UPDATE DRIVER' : 'SAVE DRIVER',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              _isEditing ? 'UPDATE DRIVER' : 'SAVE DRIVER',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                            ),
                     ),
                   ),
                 ),
@@ -521,6 +594,153 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleDropdown(Color primaryColor) {
+    return _buildCustomTextField(
+      label: 'Assigned Vehicle',
+      child: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: DriverVehicleService.streamAvailableVehicles(
+          currentDriverId: _isEditing ? _currentDriverId : null,
+        ),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    'Loading available vehicles...',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final availableVehicles = snapshot.data ?? [];
+
+          final bool hasMatch = _selectedVehicleId == null ||
+              availableVehicles.any((v) => v['id'] == _selectedVehicleId);
+
+          return DropdownButtonFormField<String?>(
+            key: ValueKey('vehicle_${_selectedVehicleId}_$_isEditing'),
+            isExpanded: true,
+            initialValue: hasMatch ? _selectedVehicleId : null,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            style: const TextStyle(
+              color: Color(0xFF0A183D),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              prefixIcon: Icon(Icons.directions_car_rounded, color: primaryColor, size: 20),
+              suffixIcon: _selectedVehicleId != null
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                      tooltip: 'Clear Vehicle Assignment',
+                      onPressed: () {
+                        setState(() {
+                          _selectedVehicleId = null;
+                          _selectedVehicleModel = null;
+                          _selectedVehiclePlate = null;
+                        });
+                      },
+                    )
+                  : null,
+            ),
+            hint: const Text(
+              'Select vehicle (Optional)',
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+            ),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text(
+                  'No Vehicle Assigned (Unassigned)',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+              ...availableVehicles.map((vehicle) {
+                final vId = vehicle['id'] as String;
+                final model = vehicle['modelName'] as String;
+                final plate = vehicle['numberPlate'] as String;
+                final isCurrent = vehicle['isCurrentDriverAssigned'] == true;
+
+                return DropdownMenuItem<String?>(
+                  value: vId,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$model ($plate)',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isCurrent ? primaryColor : const Color(0xFF0A183D),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? primaryColor.withValues(alpha: 0.12)
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isCurrent ? '$vId (Current)' : vId,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: isCurrent ? primaryColor : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+            onChanged: _driverStatus == 'Inactive'
+                ? null
+                : (val) {
+                    setState(() {
+                      _selectedVehicleId = val;
+                      if (val != null) {
+                        final chosen = availableVehicles.firstWhere(
+                          (v) => v['id'] == val,
+                          orElse: () => {'modelName': '', 'numberPlate': ''},
+                        );
+                        _selectedVehicleModel = chosen['modelName'] as String?;
+                        _selectedVehiclePlate = chosen['numberPlate'] as String?;
+                      } else {
+                        _selectedVehicleModel = null;
+                        _selectedVehiclePlate = null;
+                      }
+                    });
+                  },
+          );
+        },
       ),
     );
   }
@@ -567,7 +787,7 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
               onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
               style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
               decoration: InputDecoration(
-                hintText: 'Search driver by name, phone, or license...',
+                hintText: 'Search driver by name, phone, license, or vehicle...',
                 hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                 border: InputBorder.none,
                 prefixIcon: Icon(Icons.search_rounded, color: primaryColor, size: 20),
@@ -603,10 +823,17 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                 final phone = (data['driverPhone'] ?? '').toString().toLowerCase();
                 final license = (data['driverLicense'] ?? '').toString().toLowerCase();
                 final id = (data['driverId'] ?? d.id).toString().toLowerCase();
+                final vehicleModel = (data['assignedVehicleModel'] ?? '').toString().toLowerCase();
+                final vehiclePlate = (data['assignedVehiclePlate'] ?? '').toString().toLowerCase();
+                final vehicleId = (data['assignedVehicleId'] ?? '').toString().toLowerCase();
+
                 return name.contains(_searchQuery) ||
                     phone.contains(_searchQuery) ||
                     license.contains(_searchQuery) ||
-                    id.contains(_searchQuery);
+                    id.contains(_searchQuery) ||
+                    vehicleModel.contains(_searchQuery) ||
+                    vehiclePlate.contains(_searchQuery) ||
+                    vehicleId.contains(_searchQuery);
               }).toList();
 
               if (filtered.isEmpty) {
@@ -641,6 +868,10 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                   final data = driverDoc.data() as Map<String, dynamic>;
                   final isActive = (data['status'] ?? 'Active') == 'Active';
                   final driverId = data['driverId'] ?? driverDoc.id;
+                  final assignedVehicleId = data['assignedVehicleId'] as String?;
+                  final assignedVehicleModel = data['assignedVehicleModel'] as String?;
+                  final assignedVehiclePlate = data['assignedVehiclePlate'] as String?;
+                  final hasVehicle = assignedVehicleId != null && assignedVehicleId.isNotEmpty;
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -719,6 +950,93 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                                 _driverInfoRow(Icons.workspace_premium_rounded, '${data['experience'] ?? '0'} yrs experience'),
                                 if ((data['driverAddress'] ?? '').isNotEmpty)
                                   _driverInfoRow(Icons.location_on_rounded, data['driverAddress'] ?? ''),
+
+                                const SizedBox(height: 8),
+                                // Vehicle Assignment Display
+                                if (hasVehicle)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: primaryColor.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.directions_car_rounded, size: 16, color: primaryColor),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                (assignedVehicleModel?.isNotEmpty ?? false)
+                                                    ? assignedVehicleModel!
+                                                    : 'Vehicle Assigned',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 12.5,
+                                                  color: primaryColor,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (assignedVehiclePlate?.isNotEmpty ?? false)
+                                                Text(
+                                                  assignedVehiclePlate!,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 11,
+                                                    color: Color(0xFF475569),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Text(
+                                            assignedVehicleId,
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: primaryColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.no_crash_outlined, size: 13, color: Color(0xFF94A3B8)),
+                                        SizedBox(width: 5),
+                                        Text(
+                                          'No Vehicle Assigned',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -727,12 +1045,12 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.edit_rounded, size: 18, color: Color(0xFF2563EB)),
-                                onPressed: () => _editDriver(driverDoc),
+                                onPressed: _isSaving ? null : () => _editDriver(driverDoc),
                                 tooltip: 'Edit',
                               ),
                               IconButton(
                                 icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                                onPressed: () => _deleteDriver(driverId),
+                                onPressed: _isSaving ? null : () => _deleteDriver(driverId),
                                 tooltip: 'Delete',
                               ),
                             ],

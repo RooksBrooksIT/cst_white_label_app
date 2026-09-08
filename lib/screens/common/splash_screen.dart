@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/utils/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/location_service.dart';
-import 'package:demo_cst/utils/terms_helper.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/screens/common/portal_loading_screen.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/location_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/terms_helper.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/screens/common/portal_loading_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -104,9 +105,15 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _navigateToNext() async {
     if (!mounted) return;
 
-    // Request location permissions on startup
-    await LocationService.handleLocationPermission(context);
+    // 1. Request Notification permission on app open
+    await NotificationService.requestNotificationPermission();
 
+    // 2. Request Location permission on app open
+    if (mounted) {
+      await LocationService.handleLocationPermission(context);
+    }
+
+    if (!mounted) return;
     final auth = AuthService();
     if (auth.isLoggedIn) {
       Navigator.pushReplacement(
@@ -170,13 +177,13 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: Padding(
-                          padding: const EdgeInsets.all(16.0),
+                          padding: const EdgeInsets.all(20.0),
                           child: Image.asset(
                             'assets/images/logo_main.png',
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => Image.asset(
-                              'assets/images/splash_screen_logo.jpg',
-                              fit: BoxFit.cover,
+                              'assets/images/splash_screen_logo.png',
+                              fit: BoxFit.contain,
                             ),
                           ),
                         ),

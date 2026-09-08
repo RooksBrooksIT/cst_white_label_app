@@ -1,12 +1,12 @@
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+﻿import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/screens/organization/pricing_screen.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/auth_service.dart';
+import 'package:ebricks/screens/organization/pricing_screen.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/auth_service.dart';
 
 class BrandingScreen extends StatefulWidget {
   final String orgName;

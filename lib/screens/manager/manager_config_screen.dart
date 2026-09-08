@@ -1,11 +1,11 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/services/subscription_limit_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/services/subscription_limit_service.dart';
 
 class ManagerConfigScreen extends StatefulWidget {
   const ManagerConfigScreen({super.key});

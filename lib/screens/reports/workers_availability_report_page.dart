@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/screens/supervisor/worker_calendar_availability_page.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/supervisor/worker_calendar_availability_page.dart';
 
 class WorkersAvailabilityReportPage extends StatefulWidget {
   const WorkersAvailabilityReportPage({super.key});

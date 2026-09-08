@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/driver_vehicle_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
 
 class NumberPlateFormatter extends TextInputFormatter {
   @override
@@ -197,11 +198,11 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                 Navigator.of(context).pop();
                 setState(() => _isLoading = true);
                 try {
-                  await _vehiclesCollection.doc(vehicleId).delete();
+                  await DriverVehicleService.deleteVehicle(vehicleId);
                   if (mounted) {
                     messenger.showSnackBar(
                       const SnackBar(
-                        content: Text('Vehicle deleted successfully!'),
+                        content: Text('Vehicle deleted and assignments cleared successfully!'),
                         backgroundColor: Colors.redAccent,
                       ),
                     );
@@ -642,13 +643,53 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
                     ),
                   ],
                 ),
-                subtitle: Text(
-                  numberPlate,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF475569),
-                  ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      numberPlate,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (data['isAssigned'] == true &&
+                        (data['assignedDriverName'] as String?)?.isNotEmpty == true)
+                      Row(
+                        children: [
+                          const Icon(Icons.person_pin_circle_rounded, size: 14, color: Color(0xFF059669)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Assigned: ${data['assignedDriverName']} (${data['assignedDriverId'] ?? ''})',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF059669),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      const Row(
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded, size: 13, color: Color(0xFF64748B)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Available / Unassigned',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,

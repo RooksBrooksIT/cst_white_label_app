@@ -1,55 +1,56 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
 
-import 'package:demo_cst/screens/common/contact_support_screen.dart';
-import 'package:demo_cst/screens/manager/config_layout_and_drawing.dart';
-import 'package:demo_cst/screens/manager/config_material_information.dart';
-import 'package:demo_cst/screens/manager/config_materialavailability.dart';
-import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
-import 'package:demo_cst/screens/manager/contractor_page.dart';
-import 'package:demo_cst/screens/manager/contractor_report_page.dart';
-import 'package:demo_cst/screens/manager/labour_screen.dart';
-import 'package:demo_cst/screens/manager/manager_approvals_center_page.dart';
-import 'package:demo_cst/screens/manager/manager_expenses.dart';
-import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
-import 'package:demo_cst/screens/manager/manager_site_entry_page.dart';
-import 'package:demo_cst/screens/manager/manager_sites_list_page.dart';
-import 'package:demo_cst/screens/manager/material_screen.dart';
-import 'package:demo_cst/screens/manager/project_category_screen.dart';
-import 'package:demo_cst/screens/manager/project_configuration_screen.dart';
-import 'package:demo_cst/screens/manager/project_contract_screen.dart';
-import 'package:demo_cst/screens/manager/project_screen.dart';
-import 'package:demo_cst/screens/manager/project_setup_wizard.dart';
-import 'package:demo_cst/screens/manager/project_stage_config.dart';
-import 'package:demo_cst/screens/manager/project_status_screen.dart';
-import 'package:demo_cst/screens/manager/project_sub_category_screen.dart';
-import 'package:demo_cst/screens/manager/site_screen.dart';
-import 'package:demo_cst/screens/manager/site_supervisor_config.dart';
-import 'package:demo_cst/screens/manager/site_supervisor_map_screen.dart';
-import 'package:demo_cst/screens/manager/tools_master_page.dart';
-import 'package:demo_cst/screens/manager/vehicle_config_page.dart';
-import 'package:demo_cst/screens/manager/vehicle_details_page.dart';
-import 'package:demo_cst/screens/manager/vehicle_driver_config_page.dart';
-import 'package:demo_cst/screens/manager/vehicle_inventory_page.dart';
-import 'package:demo_cst/screens/manager/workers_config_page.dart';
-import 'package:demo_cst/screens/manager/workers_site_mapping_page.dart';
-import 'package:demo_cst/screens/organization/org_menu_screen.dart';
-import 'package:demo_cst/screens/manager/manager_notification_screen.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/screens/reports/material_report.dart';
-import 'package:demo_cst/screens/reports/tools_inventory_report.dart';
-import 'package:demo_cst/screens/reports/worker_summary_report_page.dart';
-import 'package:demo_cst/screens/reports/workers_availability_report_page.dart';
-import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
+import 'package:ebricks/screens/common/contact_support_screen.dart';
+import 'package:ebricks/screens/manager/config_layout_and_drawing.dart';
+import 'package:ebricks/screens/manager/config_material_information.dart';
+import 'package:ebricks/screens/manager/config_materialavailability.dart';
+import 'package:ebricks/screens/manager/contractor_entry_page.dart';
+import 'package:ebricks/screens/manager/contractor_page.dart';
+import 'package:ebricks/screens/manager/contractor_report_page.dart';
+import 'package:ebricks/screens/manager/labour_screen.dart';
+import 'package:ebricks/screens/manager/manager_approvals_center_page.dart';
+import 'package:ebricks/screens/manager/manager_expenses.dart';
+import 'package:ebricks/screens/manager/manager_material_approval_screen.dart';
+import 'package:ebricks/screens/manager/manager_petty_cash_page.dart';
+import 'package:ebricks/screens/manager/manager_site_entry_page.dart';
+import 'package:ebricks/screens/manager/manager_sites_list_page.dart';
+import 'package:ebricks/screens/manager/material_screen.dart';
+import 'package:ebricks/screens/manager/project_category_screen.dart';
+import 'package:ebricks/screens/manager/project_configuration_screen.dart';
+import 'package:ebricks/screens/manager/project_contract_screen.dart';
+import 'package:ebricks/screens/manager/project_screen.dart';
+import 'package:ebricks/screens/manager/project_setup_wizard.dart';
+import 'package:ebricks/screens/manager/project_stage_config.dart';
+import 'package:ebricks/screens/manager/project_status_screen.dart';
+import 'package:ebricks/screens/manager/project_sub_category_screen.dart';
+import 'package:ebricks/screens/manager/site_screen.dart';
+import 'package:ebricks/screens/manager/site_supervisor_config.dart';
+import 'package:ebricks/screens/manager/site_supervisor_map_screen.dart';
+import 'package:ebricks/screens/manager/tools_master_page.dart';
+import 'package:ebricks/screens/manager/vehicle_config_page.dart';
+import 'package:ebricks/screens/manager/vehicle_details_page.dart';
+import 'package:ebricks/screens/manager/vehicle_driver_config_page.dart';
+import 'package:ebricks/screens/manager/vehicle_inventory_page.dart';
+import 'package:ebricks/screens/manager/workers_config_page.dart';
+import 'package:ebricks/screens/manager/workers_site_mapping_page.dart';
+import 'package:ebricks/screens/organization/org_menu_screen.dart';
+import 'package:ebricks/screens/manager/manager_notification_screen.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/screens/reports/material_report.dart';
+import 'package:ebricks/screens/reports/tools_inventory_report.dart';
+import 'package:ebricks/screens/reports/worker_summary_report_page.dart';
+import 'package:ebricks/screens/reports/workers_availability_report_page.dart';
+import 'package:ebricks/screens/supervisor/tools_movement_page.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
@@ -158,6 +159,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFF2563EB),
         'Track manager expenditure logs',
         const Color(0xFF2563EB),
+      ),
+      DashboardItem(
+        'Petty Cash',
+        Icons.payments_rounded,
+        const Color(0xFF10B981),
+        'Allocations, supervisor balances & reviews',
+        const Color(0xFF10B981),
       ),
     ],
     "Materials & Tools Management": [
@@ -521,9 +529,17 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           primaryColor,
         );
 
-        return Theme(
-          data: AppTheme.getTheme(primaryColor),
-          child: Container(
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+            systemNavigationBarColor: Colors.transparent,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          ),
+          child: Theme(
+            data: AppTheme.getTheme(primaryColor),
+            child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -643,6 +659,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               ),
             ),
           ),
+        ),
         );
       },
     );
@@ -3292,6 +3309,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       'Tools Master': const ToolMasterPage(),
       'Tools Movement': ToolsMovementPage(),
       'Manager Expenses': const ManagerExpenses(hideAppBar: false),
+      'Petty Cash': const ManagerPettyCashPage(),
+      'Petty Cash Management': const ManagerPettyCashPage(),
       'Manager Daily Site Entry': ManagerSiteEntryPage(
         userName: _managerName,
         userDetails: AuthService().userData,

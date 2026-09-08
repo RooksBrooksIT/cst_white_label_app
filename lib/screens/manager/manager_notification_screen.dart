@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class ManagerNotificationScreen extends StatefulWidget {
   const ManagerNotificationScreen({super.key});
@@ -593,6 +593,39 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
                                   fontWeight: FontWeight.w600,
                                   color: primaryColor,
                                 ),
+                              ),
+                            ),
+                          if ((data['requiredAction']?.toString() ?? '').isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF7ED),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFFFFEDD5),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.pending_actions_rounded,
+                                    size: 11,
+                                    color: Color(0xFFEA580C),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    data['requiredAction'].toString(),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFC2410C),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                         ],

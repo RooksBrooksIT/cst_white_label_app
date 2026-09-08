@@ -1,25 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/common/notification_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_verification_page.dart';
-import 'package:demo_cst/screens/supervisor/material_request_form.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_material_view_request_screen.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_work_schedule_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_view_request_screen.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_worker_att_page.dart';
-import 'package:demo_cst/screens/supervisor/material_at_site_entry_page.dart';
-import 'package:demo_cst/screens/supervisor/tools_at_site_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_material_information.dart';
-import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_tools_view_request_screen.dart';
-import 'package:demo_cst/screens/common/construction_documents.dart';
-import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/common/notification_page.dart';
+import 'package:ebricks/screens/common/construction_documents.dart';
+import 'package:ebricks/screens/supervisor/site_entry_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_petty_cash_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_materials_tools_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_requests_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_workers_page.dart';
 
 class SupervisorDashboard extends StatefulWidget {
   final String supervisorId;
@@ -34,22 +27,6 @@ class SupervisorDashboard extends StatefulWidget {
 
   @override
   State<SupervisorDashboard> createState() => _SupervisorDashboardState();
-}
-
-class _CategoryData {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final List<SubMenuItem> items;
-
-  _CategoryData({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.items,
-  });
 }
 
 class _SupervisorDashboardState extends State<SupervisorDashboard> {
@@ -68,8 +45,8 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
             Icon(Icons.logout_rounded, color: Colors.redAccent, size: 24),
@@ -81,23 +58,31 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           ],
         ),
         content: const Text(
-          'Are you sure you want to end your active supervisor session and log out?',
-          style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
+          'Are you sure you want to log out?',
+          style: TextStyle(fontSize: 15, color: Color(0xFF475569)),
         ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
             child: const Text(
-              'CANCEL',
+              'Cancel',
               style: TextStyle(
-                color: Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
             ),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.of(dialogContext).pop();
               await AuthService().logout();
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
@@ -110,14 +95,15 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               elevation: 0,
             ),
             child: const Text(
-              'LOGOUT',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              'Yes, Log Out',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
             ),
           ),
         ],
@@ -133,8 +119,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     final crossAxisCount = availableWidth >= 900
         ? 4
         : (availableWidth >= 600 ? 3 : 2);
-    final childAspectRatio = availableWidth >= 600 ? 1.25 : 1.16;
-    final categories = _getCategories();
+    final childAspectRatio = availableWidth >= 600 ? 1.25 : 1.14;
 
     return PopScope(
       canPop: false,
@@ -167,6 +152,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           centerTitle: true,
           elevation: 0,
           backgroundColor: Colors.transparent,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+          ),
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -266,19 +256,48 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                     child: _buildSupervisorMetricsAndStatus(context, darkAccent),
                   ),
 
-                  // 3. Categorized Quick Action Modules Grid
-                  ..._buildGridSections(
-                    context,
-                    darkAccent,
-                    categories,
-                    crossAxisCount,
-                    childAspectRatio,
+                  // 3. Operations & Quick Actions Bento Grid (Organization Dashboard Style)
+                  SliverToBoxAdapter(
+                    child: _buildQuickActionsBentoSection(
+                      context,
+                      primaryColor,
+                      darkAccent,
+                      crossAxisCount,
+                      childAspectRatio,
+                    ),
                   ),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 60)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],
               ),
             ),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SiteEntryPage(
+                  userName: widget.supervisorName,
+                  userDetails: {
+                    'supervisorId': widget.supervisorId,
+                    ...AuthService().userData,
+                  },
+                ),
+              ),
+            );
+          },
+          backgroundColor: primaryColor,
+          elevation: 4,
+          highlightElevation: 8,
+          shape: const CircleBorder(),
+          tooltip: 'Daily Site Entry',
+          child: const Icon(
+            Icons.add_rounded,
+            color: Colors.white,
+            size: 28,
           ),
         ),
       ),
@@ -819,142 +838,205 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. CATEGORIZED QUICK ACTION MODULES GRID
+  // 3. OPERATIONS & QUICK ACTIONS BENTO GRID (Organization Dashboard Style)
   // ---------------------------------------------------------------------------
 
-  List<Widget> _buildGridSections(
+  Widget _buildQuickActionsBentoSection(
     BuildContext context,
+    Color primaryColor,
     Color darkAccent,
-    List<_CategoryData> categories,
     int crossAxisCount,
     double childAspectRatio,
   ) {
     final hPad = Responsive.horizontalPadding(context);
-    List<Widget> slivers = [];
 
-    for (var category in categories) {
-      if (category.items.isEmpty) continue;
-
-      // Section Header
-      slivers.add(
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 18, hPad, 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 18,
-                        decoration: BoxDecoration(
-                          color: category.color,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              category.title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0F172A),
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            Text(
-                              category.subtitle,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF64748B),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.8),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Primary Bar + "Quick Actions" + Shortcuts Pill
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        category.icon,
-                        size: 13,
-                        color: category.color,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${category.items.length} ${category.items.length == 1 ? 'Action' : 'Actions'}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: category.color,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Quick Actions',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
-              ],
-            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bolt_rounded, size: 13, color: primaryColor),
+                    const SizedBox(width: 3),
+                    Text(
+                      'Shortcuts',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
-      );
+          const SizedBox(height: 14),
 
-      // Grid Items for this section (matches Manager Console Action Card design language)
-      slivers.add(
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 10),
-          sliver: SliverGrid(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final item = category.items[index];
-              return _buildConstructionActionCard(
-                title: item.title,
-                subtitle: item.subtitle,
-                icon: item.icon,
-                accentColor: item.color,
-                onTap: item.onTap,
-              );
-            }, childCount: category.items.length),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 14,
-              childAspectRatio: childAspectRatio,
-            ),
+          // 2-Column Grid (Organization Dashboard Style)
+          GridView.count(
+            crossAxisCount: crossAxisCount,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: childAspectRatio,
+            children: [
+              // 1. Materials & Tools Hub
+              _buildConstructionActionCard(
+                title: 'Materials & Tools',
+                subtitle: 'Stock, tools, info & moves',
+                icon: Icons.warehouse_rounded,
+                accentColor: const Color(0xFF0D9488),
+                badgeLabel: '4 Modules',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SupervisorMaterialsToolsPage(
+                      supervisorId: widget.supervisorId,
+                      supervisorName: widget.supervisorName,
+                    ),
+                  ),
+                ),
+              ),
+
+              // 2. Requests Hub
+              _buildConstructionActionCard(
+                title: 'Requests',
+                subtitle: 'Materials, tools & schedules',
+                icon: Icons.fact_check_rounded,
+                accentColor: const Color(0xFF0284C7),
+                badgeLabel: '5 Modules',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SupervisorRequestsPage(
+                      supervisorId: widget.supervisorId,
+                      supervisorName: widget.supervisorName,
+                    ),
+                  ),
+                ),
+              ),
+
+              // 3. Workers Hub
+              _buildConstructionActionCard(
+                title: 'Workers',
+                subtitle: 'Attendance, presence & logs',
+                icon: Icons.people_rounded,
+                accentColor: const Color(0xFFF57C00),
+                badgeLabel: '3 Modules',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SupervisorWorkersPage(
+                      supervisorId: widget.supervisorId,
+                      supervisorName: widget.supervisorName,
+                    ),
+                  ),
+                ),
+              ),
+
+              // 4. Site Expenses
+              _buildConstructionActionCard(
+                title: 'Site Expenses',
+                subtitle: 'Daily bills & site entries',
+                icon: Icons.receipt_long_rounded,
+                accentColor: const Color(0xFFEF4444),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SiteEntryPage(
+                      userName: widget.supervisorName,
+                      userDetails: {
+                        'supervisorId': widget.supervisorId,
+                      },
+                    ),
+                  ),
+                ),
+              ),
+
+              // 5. Petty Cash
+              _buildConstructionActionCard(
+                title: 'Petty Cash',
+                subtitle: 'Balances, claims & receipts',
+                icon: Icons.account_balance_wallet_rounded,
+                accentColor: const Color(0xFF10B981),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SupervisorPettyCashPage(
+                      supervisorId: widget.supervisorId,
+                      supervisorName: widget.supervisorName,
+                    ),
+                  ),
+                ),
+              ),
+
+              // 6. Construction Drawings & Plans
+              _buildConstructionActionCard(
+                title: 'Drawings & Plans',
+                subtitle: 'Architectural blueprints',
+                icon: Icons.architecture_rounded,
+                accentColor: const Color(0xFF7C3AED),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ConstructionDocuments(),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-      );
-    }
-
-    return slivers;
+        ],
+      ),
+    );
   }
 
-  // Executive Construction Action Card (matches Manager Console design language)
+  // Executive Construction Action Card (matches Organization Dashboard style)
   Widget _buildConstructionActionCard({
     required String title,
     required String subtitle,
     required IconData icon,
     required Color accentColor,
     required VoidCallback onTap,
+    String? badgeLabel,
     bool isStatic = false,
   }) {
     return InkWell(
@@ -990,7 +1072,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Top Row: Soft Tinted Icon Badge + Top-Right Action Arrow Pill
+            // Top Row: Soft Tinted Icon Badge + Top-Right Action Arrow Pill or Count Badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1019,46 +1101,80 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                   ),
                 ),
 
-                // Top-Right Glass Outward Arrow Pill / Stay Tuned Pill
-                isStatic
+                // Top-Right Glass Outward Arrow Pill / Count Badge
+                badgeLabel != null
                     ? Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
-                          vertical: 3.5,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFFBEB),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFFEF3C7)),
-                        ),
-                        child: const Text(
-                          'Soon',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFFD97706),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
+                          color: accentColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: const Color(0xFFE2E8F0),
+                            color: accentColor.withValues(alpha: 0.22),
                             width: 1,
                           ),
                         ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.arrow_outward_rounded,
-                            size: 14,
-                            color: Color(0xFF94A3B8),
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              badgeLabel,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: accentColor,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 8.5,
+                              color: accentColor,
+                            ),
+                          ],
                         ),
-                      ),
+                      )
+                    : (isStatic
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFFEF3C7)),
+                            ),
+                            child: const Text(
+                              'Soon',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFD97706),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.arrow_outward_rounded,
+                                size: 14,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          )),
               ],
             ),
 
@@ -1075,7 +1191,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                     letterSpacing: -0.3,
                     height: 1.15,
                   ),
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
@@ -1097,212 +1213,5 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       ),
     );
   }
-
-  List<_CategoryData> _getCategories() {
-    return [
-      _CategoryData(
-        title: "Expenses & Finance",
-        subtitle: "Manage site expenses & verifications",
-        icon: Icons.account_balance_wallet_rounded,
-        color: primaryColor,
-        items: [
-          SubMenuItem(
-            title: 'Supervisor Expenses',
-            subtitle: 'Log and verify daily expenses',
-            icon: Icons.monetization_on_rounded,
-            color: primaryColor,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SupervisorVerificationPage(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      _CategoryData(
-        title: "Material Requests",
-        subtitle: "Request and track materials & supplies",
-        icon: Icons.inventory_2_rounded,
-        color: const Color(0xFF0284C7),
-        items: [
-          SubMenuItem(
-            title: 'Materials Request Form',
-            subtitle: 'Submit new material requests',
-            icon: Icons.add_shopping_cart_rounded,
-            color: const Color(0xFF0284C7),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MaterialRequestForm(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-          SubMenuItem(
-            title: 'Material Approvals',
-            subtitle: 'Check material request statuses',
-            icon: Icons.fact_check_rounded,
-            color: const Color(0xFF0EA5E9),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SupervisorMaterialViewRequestScreen(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      _CategoryData(
-        title: "Site Operations",
-        subtitle: "Schedules, approvals & labour attendance",
-        icon: Icons.engineering_rounded,
-        color: const Color(0xFF10B981),
-        items: [
-          SubMenuItem(
-            title: 'Work Schedule Request',
-            subtitle: 'Manage site work timelines',
-            icon: Icons.calendar_today_rounded,
-            color: const Color(0xFF10B981),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SupervisorWorkSchedulePage(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-          SubMenuItem(
-            title: 'Site Approvals',
-            subtitle: 'View pending operational approvals',
-            icon: Icons.check_circle_rounded,
-            color: const Color(0xFF059669),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ViewApprovalScreen(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-          SubMenuItem(
-            title: 'Workers Attendance',
-            subtitle: 'Track worker daily attendance',
-            icon: Icons.people_rounded,
-            color: const Color(0xFF34D399),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AttendanceManagementPage(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      _CategoryData(
-        title: "Inventory & Drawings",
-        subtitle: "Manage materials, tools & construction plans",
-        icon: Icons.construction_rounded,
-        color: const Color(0xFF8B5CF6),
-        items: [
-          SubMenuItem(
-            title: 'Materials at Site',
-            subtitle: 'Live stock & materials inventory',
-            icon: Icons.warehouse_rounded,
-            color: const Color(0xFF8B5CF6),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MaterialAtSiteEntryPage(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-          SubMenuItem(
-            title: 'Tools at Site',
-            subtitle: 'Live tool stock available at site',
-            icon: Icons.home_repair_service_rounded,
-            color: const Color(0xFF06B6D4),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ToolsAtSitePage(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-          SubMenuItem(
-            title: 'Tool Approvals',
-            subtitle: 'Check tool requests & arrival statuses',
-            icon: Icons.fact_check_rounded,
-            color: const Color(0xFF0D9488),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SupervisorToolsViewRequestScreen(
-                  supervisorId: widget.supervisorId,
-                  supervisorName: widget.supervisorName,
-                ),
-              ),
-            ),
-          ),
-          SubMenuItem(
-            title: 'Materials Info',
-            subtitle: 'Material specifications catalog',
-            icon: Icons.info_rounded,
-            color: const Color(0xFFA855F7),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SupervisorMaterialInfoScreen(),
-              ),
-            ),
-          ),
-          SubMenuItem(
-            title: 'Tools Movement',
-            subtitle: 'Move tools between sites & company',
-            icon: Icons.handyman_rounded,
-            color: const Color(0xFF7C3AED),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ToolsMovementPage(),
-              ),
-            ),
-          ),
-          SubMenuItem(
-            title: 'Construction Drawings',
-            subtitle: 'View architectural & layout plans',
-            icon: Icons.architecture_rounded,
-            color: const Color(0xFF6D28D9),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ConstructionDocuments(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ];
-  }
 }
+

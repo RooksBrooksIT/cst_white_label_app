@@ -21,6 +21,8 @@ class ExpenseService {
       final firestore = FirebaseFirestore.instance;
       final DocumentReference<Map<String, dynamic>>? projectRef =
           await _findExistingProjectDocBySiteId(siteId);
+      final DocumentReference<Map<String, dynamic>>? siteRef =
+          await _findExistingSiteDocBySiteId(siteId);
 
       await firestore.runTransaction((txn) async {
         // Document reference for total site expenses
@@ -31,6 +33,12 @@ class ExpenseService {
         DocumentSnapshot<Map<String, dynamic>>? projectSnap;
         if (projectRef != null) {
           projectSnap = await txn.get(projectRef);
+        }
+
+        // Read Site document snapshot (if exists)
+        DocumentSnapshot<Map<String, dynamic>>? siteSnap;
+        if (siteRef != null) {
+          siteSnap = await txn.get(siteRef);
         }
 
         // Upsert totals document with merged fields
@@ -55,18 +63,40 @@ class ExpenseService {
           double amountPaid = 0.0;
           if (data != null && data['amountPaid'] is num) {
             amountPaid = (data['amountPaid'] as num).toDouble();
+          } else if (data != null && data['paid'] is num) {
+            amountPaid = (data['paid'] as num).toDouble();
+          } else if (data != null && data['amountReceived'] is num) {
+            amountPaid = (data['amountReceived'] as num).toDouble();
           }
           final amountBalance = amountPaid - totalAllExpenses;
 
           txn.update(projectRef, {
-            'amountSpent': totalAllExpenses, // keep for backward compatibility
+            'amountSpent': totalAllExpenses,
+            'amountSpend': totalAllExpenses,
             'amountBalance': amountBalance,
             'updatedAt': FieldValue.serverTimestamp(),
           });
-        } else if (projectRef == null) {
-          print(
-            "⚠️ No existing project doc found in 'projects' with siteId=$siteId. Skipping amountSpent/amountSpend/amountBalance update to avoid creating a new doc.",
-          );
+        }
+
+        // Also update Site collection document if exists
+        if (siteRef != null && siteSnap != null && siteSnap.exists) {
+          final Map<String, dynamic>? sData = siteSnap.data();
+          double sAmountPaid = 0.0;
+          if (sData != null && sData['amountPaid'] is num) {
+            sAmountPaid = (sData['amountPaid'] as num).toDouble();
+          } else if (sData != null && sData['paid'] is num) {
+            sAmountPaid = (sData['paid'] as num).toDouble();
+          } else if (sData != null && sData['amountReceived'] is num) {
+            sAmountPaid = (sData['amountReceived'] as num).toDouble();
+          }
+          final sAmountBalance = sAmountPaid - totalAllExpenses;
+
+          txn.update(siteRef, {
+            'amountSpent': totalAllExpenses,
+            'amountSpend': totalAllExpenses,
+            'amountBalance': sAmountBalance,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
         }
       });
 
@@ -109,16 +139,57 @@ class ExpenseService {
   static Future<DocumentReference<Map<String, dynamic>>?>
       _findExistingProjectDocBySiteId(String siteId) async {
     try {
+      final docDirect = await FirestoreService.projects.doc(siteId).get();
+      if (docDirect.exists) {
+        return docDirect.reference;
+      }
       final query = await FirestoreService.projects
           .where('siteId', isEqualTo: siteId)
           .limit(1)
           .get();
-      if (query.docs.isEmpty) {
-        return null;
+      if (query.docs.isNotEmpty) {
+        return query.docs.first.reference;
       }
-      return query.docs.first.reference;
+      final querySite = await FirestoreService.projects
+          .where('site', isEqualTo: siteId)
+          .limit(1)
+          .get();
+      if (querySite.docs.isNotEmpty) {
+        return querySite.docs.first.reference;
+      }
+      return null;
     } catch (e) {
       print("❌ Error searching for project by siteId=$siteId: $e");
+      return null;
+    }
+  }
+
+  // Find the existing Site document reference by siteId
+  static Future<DocumentReference<Map<String, dynamic>>?>
+      _findExistingSiteDocBySiteId(String siteId) async {
+    try {
+      final siteDocDirect =
+          await FirestoreService.getCollection('Site').doc(siteId).get();
+      if (siteDocDirect.exists) {
+        return siteDocDirect.reference;
+      }
+      final query = await FirestoreService.getCollection('Site')
+          .where('siteId', isEqualTo: siteId)
+          .limit(1)
+          .get();
+      if (query.docs.isNotEmpty) {
+        return query.docs.first.reference;
+      }
+      final querySite = await FirestoreService.getCollection('Site')
+          .where('site', isEqualTo: siteId)
+          .limit(1)
+          .get();
+      if (querySite.docs.isNotEmpty) {
+        return querySite.docs.first.reference;
+      }
+      return null;
+    } catch (e) {
+      print("❌ Error searching for Site doc by siteId=$siteId: $e");
       return null;
     }
   }
@@ -204,17 +275,35 @@ class ExpenseService {
   static Future<double> _sumOrganizationExpenses(String siteId) async {
     double total = 0.0;
     try {
-      final snapshot = await FirestoreService.organizationExpenseSummary
-          // Document IDs assumed like: {siteId}_{something}
-          .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${siteId}_')
-          .where(FieldPath.documentId, isLessThan: '${siteId}_\uf8ff')
+      // 1. Direct entries in organizationEntries
+      final orgDirectSnap = await FirestoreService.organizationEntries
+          .where('siteId', isEqualTo: siteId)
           .get();
-
-      for (final doc in snapshot.docs) {
+      double directOrgTotal = 0.0;
+      for (final doc in orgDirectSnap.docs) {
         final data = doc.data();
-        final amount = data['orgExpenseTotalAmount'];
+        final amount = data['totalAmount'] ?? data['amount'];
         if (amount is num) {
-          total += amount.toDouble();
+          directOrgTotal += amount.toDouble();
+        }
+      }
+
+      if (directOrgTotal > 0) {
+        total += directOrgTotal;
+      } else {
+        // Fallback to organizationExpenseSummary
+        final snapshot = await FirestoreService.organizationExpenseSummary
+            // Document IDs assumed like: {siteId}_{something}
+            .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${siteId}_')
+            .where(FieldPath.documentId, isLessThan: '${siteId}_\uf8ff')
+            .get();
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final amount = data['orgExpenseTotalAmount'] ?? data['totalAmount'] ?? data['amount'];
+          if (amount is num) {
+            total += amount.toDouble();
+          }
         }
       }
 

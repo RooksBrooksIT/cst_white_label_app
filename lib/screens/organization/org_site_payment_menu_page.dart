@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/organization/org_site_payment_screen.dart';
-import 'package:demo_cst/screens/organization/org_site_supervisor_daily_week_report.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/organization/org_site_payment_screen.dart';
+import 'package:ebricks/screens/organization/org_site_supervisor_daily_week_report.dart';
 
 class OrgSitePaymentMenuPage extends StatelessWidget {
   const OrgSitePaymentMenuPage({super.key});

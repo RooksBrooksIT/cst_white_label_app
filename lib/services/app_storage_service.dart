@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
 
 /// Result object returned after a successful storage upload
 class StorageUploadResult {

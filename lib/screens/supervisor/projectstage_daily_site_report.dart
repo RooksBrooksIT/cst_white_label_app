@@ -8,7 +8,7 @@ import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
 import '/utils/project_stage_pdf_helper.dart';
-import 'package:demo_cst/screens/reports/pdf_preview_page.dart';
+import 'package:ebricks/screens/reports/pdf_preview_page.dart';
 
 class ProjectStageDailySiteExpensesReportPage extends StatefulWidget {
   final String supervisorId;

@@ -1,15 +1,15 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/expense_service.dart';
-import 'package:demo_cst/services/app_storage_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/app_storage_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
 
 class ManagerExpenses extends StatefulWidget {
   final bool hideAppBar;
@@ -1422,29 +1422,36 @@ class _ManagerExpensesState extends State<ManagerExpenses>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.analytics_rounded,
+                          color: Colors.white, size: 20),
                     ),
-                    child: const Icon(Icons.analytics_rounded,
-                        color: Colors.white, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Expense Audit & Activity Summary',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Expense Audit & Summary',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

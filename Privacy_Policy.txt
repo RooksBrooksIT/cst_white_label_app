@@ -1,0 +1,242 @@
+# eBrick Application - Privacy Policy
+
+**Effective Date:** September 7, 2026  
+**Last Updated:** September 7, 2026  
+**Applicable Application:** eBrick Construction Management Platform (Mobile & Web)  
+**Provider:** Rooks Technologies ("Company", "we", "our", or "us")  
+**Registered Address:** No. 17, Jawahar Street, Ramavarmapuram, Nagercoil – 629001, Tamil Nadu, India  
+**Contact / Grievance Email:** support@rookstechnologies.com  
+
+---
+
+## 1. INTRODUCTION & OVERVIEW
+
+eBrick ("Platform", "App", "eBrick Application") is an enterprise white-label construction management software solution developed and operated by Rooks Technologies. The platform is engineered to assist construction companies, builders, developers, contractors, and project organizations ("Organisation") in organizing, tracking, and managing construction workflows, site expenses, material inventory, workforce attendance, petty cash, architectural documentation, and project reporting.
+
+We respect your privacy and are committed to protecting personal data collected, stored, and processed through our mobile applications, web portals, APIs, and associated services.
+
+This Privacy Policy explains how personal data, site operations data, and technical telemetry are collected, processed, disclosed, retained, and protected in compliance with applicable data protection legislation, including:
+- The Information Technology Act, 2000 and the Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011 (India);
+- The Digital Personal Data Protection Act, 2023 (DPDPA - India);
+- Google Play Developer Policy and Apple App Store Review Guidelines regarding User Data, Device Permissions, and Account Deletion;
+- General Data Protection Regulation (GDPR) and other international standards where applicable.
+
+By accessing, registering with, or using the eBrick App, you acknowledge that you have read, understood, and agreed to the practices described in this Privacy Policy.
+
+---
+
+## 2. SCOPE & USER ROLES (DATA CONTROLLER VS. DATA PROCESSOR)
+
+### 2.1 Multi-Tenant White-Label Architecture
+eBrick is delivered as a white-label multi-tenant platform. In this structure:
+- **The Organisation (Customer Organization / Builder / Main Contractor)** is the **Data Fiduciary / Data Controller** with respect to the project data, site records, and user accounts it creates, authorizes, or assigns.
+- **Rooks Technologies (eBrick)** acts primarily as the **Data Processor** that hosts, maintains, secures, and provides the cloud software infrastructure.
+- Rooks Technologies acts as a **Data Controller** solely with regard to direct billing, subscription account registration of the primary Organisation representative, and direct customer support inquiries.
+
+### 2.2 User Personas Covered
+This policy applies to all individuals accessing the platform across all role levels:
+1. **Organisation Admins**: Primary account holders, company directors, and executive system administrators.
+2. **Project Managers & Engineers**: Users overseeing project phases, approving budget requests, assigning sites, and tracking schedules.
+3. **Site Supervisors**: Field personnel responsible for logging daily site entries, material receipts, workforce attendance, petty cash claims, and photographic progress.
+4. **Contractors & Subcontractors**: Specialized trade partners submitting bills, worker logs, and task completions.
+5. **Workers & Labourers**: Personnel whose names, trade categories, presence, and daily wage records are maintained by the Organisation/Supervisor.
+6. **Clients / Property Owners (Customers)**: End clients viewing project progress, site updates, and architectural drawings.
+
+---
+
+## 3. INFORMATION WE COLLECT
+
+We collect information necessary to deliver construction management operations, maintain authentication, verify site presence, and secure the platform.
+
+### 3.1 Information Provided Directly by the Organisation
+- **Company Profile**: Legal business name, company registration/GST number, registered office address, primary business phone, official email, and corporate logo/branding assets.
+- **Billing & Subscription Records**: Subscription plan selections, invoice details, transaction identifiers, and contact details of billing managers (note: sensitive credit/debit card numbers are handled directly by certified payment gateways and are never stored on eBrick servers).
+
+### 3.2 User Accounts & Profile Data (Created by Organisation or User)
+- Full name, mobile phone number, email address, password (stored in salted/hashed cryptographic formats).
+- Assigned system role (e.g., Supervisor, Manager, Organization Admin, Client).
+- Designated construction site(s) and project assignment mappings.
+- Identification details or emergency contact numbers (where configured by the Organisation).
+
+### 3.3 Construction Site Operations Data
+To fulfill the operational purpose of the application, users input and upload operational data:
+- **Daily Site Entries**: Daily logs of construction activities, work summaries, weather notes, and task progress.
+- **Material & Inventory Tracking**: Material receipts, consumption quantities, supplier bills, delivery notes, and tool movement logs.
+- **Petty Cash & Site Expenses**: Claims, advance receipts, vendor invoices, fuel, transportation, and food expenditure records.
+- **Workforce Attendance & Wage Tracking**: Worker counts, worker names, trade categories (masons, carpenters, helpers), daily attendance punch records, overtime logs, and payout calculations.
+- **Architectural Drawings & Documents**: Blueprints, CAD designs, site plans, structural documentation, PDFs, and inspection checklists.
+
+### 3.4 Media, Images & Device Files
+- **Progress Photographs**: Images captured on-site documenting structural progress, material quality, safety violations, or completed milestones.
+- **Bill & Receipt Scans**: Photos of cash vouchers, supplier bills, weighbridge slips, and challans uploaded for audit verification.
+
+### 3.5 Device Permissions & Hardware Data
+The eBrick mobile application requests specific device permissions to enable field features:
+
+| Permission | Technical Name | Purpose in eBrick | Optional / Required |
+|---|---|---|---|
+| **Location (Precise & Coarse)** | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | Verifies that supervisor/worker attendance check-ins and daily site entries occur at the designated geofenced construction site. Prevents fraudulent off-site entries. | Required for site check-in & geofenced entries |
+| **Camera** | `CAMERA` | Allows supervisors and managers to photograph daily site construction progress, material deliveries, damaged tools, and physical expense receipts directly within the app. | Required for live photo verification |
+| **Storage / Media / Photos** | `READ_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES` | Enables uploading existing blueprints, construction contracts, inspection PDFs, and receipt images from the device gallery or files. | Required for file attachments |
+| **Push Notifications** | `POST_NOTIFICATIONS` | Sends critical project alerts, task assignments, petty cash approval notifications, and material stock replenishment alerts. | Optional (user can toggle in device settings) |
+| **Internet & Network State** | `INTERNET`, `ACCESS_NETWORK_STATE` | Synchronizes offline site logs with cloud servers and detects active network connectivity. | Required for cloud synchronization |
+
+### 3.6 Automated Technical, Log & Telemetry Information
+- **Device Identifiers**: Hardware model, device brand, operating system and version, unique device tokens, screen resolution, and language settings.
+- **Network & Connectivity**: IP address, internet service provider, connection type (Wi-Fi, 4G, 5G), and signal state.
+- **App Telemetry & Crash Logs**: Crash traces, API latency logs, error stack traces, and interaction timestamps utilized to diagnose platform stability and prevent crashes.
+
+---
+
+## 4. PURPOSE & USE OF COLLECTED DATA
+
+eBrick processes data strictly for legitimate operational and business purposes:
+1. **Core Platform Delivery**: Authenticating user credentials, segregating tenant company data, and displaying role-specific dashboards.
+2. **Construction Operational Auditing**: Enabling real-time project oversight, tracking material consumption against phase estimates, and reconciling petty cash vouchers against physical bills.
+3. **Geographical Verification**: Verifying that field supervisors, contractors, and labour entries originate at authorized physical site coordinates.
+4. **Communication & Collaboration**: Relaying real-time push alerts, status changes on approval requests, and site notice broadcasts.
+5. **Audit Trails & Security**: Maintaining non-repudiable logs of financial transactions, daily site entries, and role modifications to deter fraudulent accounting or unauthorized modifications.
+6. **Platform Performance & Stability**: Analyzing crash reports, optimizing API responsiveness, and enhancing offline-first caching capabilities.
+7. **Legal & Compliance Obligations**: Adhering to statutory tax, accounting, dispute resolution, and contractual mandates.
+
+---
+
+## 5. LEGAL GROUNDS FOR DATA PROCESSING
+
+We process personal data on the following legal bases:
+- **Contractual Necessity**: To fulfill our platform service agreements entered into with the Organisation and provide users with requested application features.
+- **Consent**: Explicit consent granted when enabling device permissions (Location, Camera, Storage, Notifications) or when submitting voluntary information.
+- **Legitimate Business Interests**: Ensuring platform security, preventing accounting fraud, debugging software crashes, and optimizing field workflows.
+- **Legal Compliance**: Complying with applicable statutory directives, tax reporting laws, court summons, or regulatory inquiries.
+
+---
+
+## 6. DATA SHARING, DISCLOSURE & THIRD PARTIES
+
+**We do NOT sell, rent, lease, or monetize your personal or project data to data brokers, advertisers, or third-party marketers under any circumstances.**
+
+We only disclose information under the following defined circumstances:
+
+### 6.1 Within the Organisation's Deployment
+Project records, attendance logs, site photos, and expense submissions logged by Supervisors or Managers are accessible to authorized Project Managers, Company Directors, and Accountants belonging to that specific Organisation.
+
+### 6.2 Trusted Infrastructure & Sub-Processors
+We utilize industry-leading, enterprise-grade cloud service providers who operate under strict non-disclosure, security, and data protection agreements:
+- **Cloud Hosting & Databases**: Google Cloud Platform / Google Firebase (Authentication, Cloud Firestore, Cloud Storage, Firebase Cloud Messaging).
+- **Payment Processing**: Certified PCI-DSS compliant payment gateways (for Organisation subscription transactions).
+- **Crash Diagnostics & Logging**: Firebase Crashlytics / Google Cloud Monitoring.
+
+### 6.3 Legal, Regulatory, and Law Enforcement Disclosures
+We may disclose information if required to do so by applicable law, court order, search warrant, government investigation, or in good faith to:
+- Comply with mandatory statutory processes;
+- Enforce our Master Service Agreement or Terms of Service;
+- Protect the safety, property, platform integrity, or legal rights of Rooks Technologies, its users, or the public.
+
+### 6.4 Corporate Restructuring
+In the event of a merger, acquisition, corporate reorganization, or sale of company assets, project and user data may be transferred to the acquiring entity subject to continuous adherence to this Privacy Policy.
+
+---
+
+## 7. DATA SECURITY MEASURES
+
+We implement comprehensive administrative, technical, and physical safeguards designed to protect personal and construction records against unauthorized access, loss, alteration, or disclosure:
+- **Encryption in Transit**: All communications between the mobile application, web portals, and backend servers are secured using Transport Layer Security (TLS 1.2 / TLS 1.3) and HTTPS.
+- **Encryption at Rest**: Databases, cloud file storage, and server backups are encrypted using standard AES-256 bit encryption.
+- **Authentication & Authorization**: Role-Based Access Control (RBAC) ensures strict compartmentalization between roles and prevents cross-tenant access between different organizations.
+- **Password Protection**: Passwords are cryptographically salted and hashed; plaintext passwords are never accessible to platform operators.
+- **Access Logging & Audits**: Privileged infrastructure access is restricted to authorized engineering personnel through Multi-Factor Authentication (MFA) and audit-logged jump boxes.
+
+*Note: While we adhere to rigorous commercial security standards, no electronic storage system or wireless internet transmission is 100% infallible. Users are responsible for safeguarding their login credentials and mobile devices.*
+
+---
+
+## 8. DATA RETENTION & STORAGE DURATION
+
+- **Active Accounts**: We retain personal and operational site data for the duration of the Organisation's active subscription contract to maintain historical project records, warranty documentation, and audit histories.
+- **Terminated / Inactive Accounts**: Upon expiration or cancellation of an Organisation's subscription, data is retained for an archival period (typically 90 days) to allow account reactivation or data export, following which it is queued for secure deletion or permanent anonymization, unless legal, tax, or regulatory standards dictate longer preservation.
+- **Device Logs & Telemetry**: Technical diagnostic logs are automatically purged on a rolling 30 to 90-day cycle.
+
+---
+
+## 9. USER RIGHTS, DATA ACCESS & ACCOUNT / DATA DELETION
+
+In compliance with Google Play Store policies, Apple App Store guidelines, and data protection laws (including DPDPA / GDPR):
+
+### 9.1 Your Rights
+Users have the right to:
+1. **Access**: Request confirmation of whether their personal data is processed and obtain a copy.
+2. **Correction / Rectification**: Request updates or corrections to incomplete or inaccurate personal records.
+3. **Withdraw Consent**: Revoke location, camera, or notification permissions at any time via device OS settings.
+4. **Data Deletion / Erasure**: Request complete deletion of their user profile and associated personal data.
+
+### 9.2 Account and Data Deletion Process
+- **Individual App Users (Supervisors, Managers, Contractors, Clients)**: As your account is provisioned by your employer or contracting Organisation, you may request account deactivation directly through your Organisation Administrator, or submit a deletion request to **support@rookstechnologies.com**.
+- **Organisation Administrators**: The primary Organisation account owner may request complete organization decommissioning and irreversible deletion of all project databases, user profiles, and storage buckets by emailing **support@rookstechnologies.com** from the registered primary admin email address.
+- **Processing Timeline**: Legitimate account deletion requests are verified and processed within **30 business days**, following which associated personal identifiers are permanently scrubbed from our production servers, except where retention is mandatory under statutory taxation or legal dispute statutes.
+
+---
+
+## 10. SUBSCRIPTION, BILLING & REFUND POLICY
+
+### 10.1 Subscription Plans
+eBrick features are provided through tier-based subscription packages (monthly, annual, or custom enterprise agreements) contracted between Rooks Technologies and the Organisation.
+
+### 10.2 Payment Terms
+Charges, renewal terms, and user seat limits are specified during onboarding or within the applicable written quotation/agreement. Payments must be processed through designated corporate banking channels or approved payment gateways.
+
+### 10.3 Cancellation & Refunds
+- **General Policy**: Subscription fees are billed in advance and are non-refundable once the billing period has commenced and software access is activated.
+- **Refund Exceptions**: Refund requests will only be evaluated under the following specific conditions:
+  1. Duplicate or accidental billing transactions caused by gateway errors;
+  2. Unresolved platform outages attributable solely to eBrick exceeding five (5) consecutive business days;
+  3. Written cancellation requested prior to tenant provisioning and workspace deployment.
+- **Refund Submission**: To request a billing review, contact **support@rookstechnologies.com** with company details, invoice numbers, and payment receipts. Approved refunds are credited back to the original source method within 7–14 business working days.
+
+---
+
+## 11. CHILDREN'S PRIVACY
+
+eBrick is an enterprise B2B construction management tool intended strictly for working professionals and authorized business personnel aged 18 and above. We do not knowingly solicit, collect, or process information from minors or individuals under 18 years of age. If we become aware that personal data of a minor has been collected inadvertently, we take prompt measures to delete such data from our systems.
+
+---
+
+## 12. WHITE-LABEL PLATFORM DISCLAIMER
+
+eBrick provides software technology under white-label arrangements. Each subscribing Organisation operates its branded deployment autonomously and determines what operational records, employee credentials, and contractor information are stored within its environment.
+
+The subscribing Organisation is solely responsible for:
+- Maintaining lawful basis and obtaining appropriate worker and contractor consents before entering their details into the system;
+- Complying with applicable employment, labour, and safety regulatory codes;
+- Managing role access and revoking credentials for departed personnel immediately.
+
+---
+
+## 13. CHANGES TO THIS PRIVACY POLICY
+
+We may periodically revise this Privacy Policy to reflect platform enhancements, new feature releases, legal requirements, or updated regulatory frameworks. 
+
+When material changes occur:
+- We will update the **Effective Date** and **Last Updated** date at the top of this document;
+- We will provide notice via an in-app banner, splash screen announcement, or direct email notification to registered Organisation Administrators;
+- Continued use of the eBrick application following notice of amendments constitutes acceptance of the revised terms.
+
+---
+
+## 14. GRIEVANCE OFFICER & CONTACT DETAILS
+
+If you have any questions, concerns, complaints, data subject requests, or wish to report a security vulnerability regarding this Privacy Policy, please contact our designated Grievance & Privacy Office:
+
+**Grievance Officer:** Privacy & Compliance Desk  
+**Company:** Rooks Technologies  
+**Physical Address:**  
+No. 17, Jawahar Street, Ramavarmapuram,  
+Nagercoil – 629001, Tamil Nadu, India.  
+
+**Official Support Email:** [support@rookstechnologies.com](mailto:support@rookstechnologies.com)  
+**Website:** [https://rookstechnologies.com](https://rookstechnologies.com)  
+
+---
+
+## 15. CONSENT & ACKNOWLEDGMENT
+
+By downloading, installing, registering for, or using the eBrick Application, you certify that you have read and understood this Privacy Policy and explicitly consent to the collection, processing, transfer, and storage of your information in accordance with the terms set forth herein.

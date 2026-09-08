@@ -16,43 +16,62 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+val storeFilePath = keystoreProperties.getProperty("storeFile")
+val resolvedStoreFile = storeFilePath?.let { path ->
+    val inAppDir = project.file(path)
+    if (inAppDir.exists()) inAppDir else rootProject.file(path)
+}
+
+val isKeystoreValid = keystorePropertiesFile.exists() &&
+    resolvedStoreFile != null &&
+    resolvedStoreFile.exists() &&
+    !keystoreProperties.getProperty("keyAlias").isNullOrBlank() &&
+    !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
+    !keystoreProperties.getProperty("storePassword").contains("<")
+
 android {
-    namespace = "com.rooksandbrooks.cstwhitelabel"
+    namespace = "com.rooks.ebricks"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.rooksandbrooks.cstwhitelabel"
+        applicationId = "com.rooks.ebricks"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 1
-        versionName = "1.0.1"
+        versionCode = 2
+        versionName = "1.0.0"
     }
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties.getProperty("keyAlias")
-            keyPassword = keystoreProperties.getProperty("keyPassword")
-            storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
-            storePassword = keystoreProperties.getProperty("storePassword")
+            if (isKeystoreValid) {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = resolvedStoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (isKeystoreValid) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

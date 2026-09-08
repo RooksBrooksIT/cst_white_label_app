@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/reports/financial_status_report.dart';
-import 'package:demo_cst/screens/reports/project_indicator.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:ebricks/screens/reports/financial_status_report.dart';
+import 'package:ebricks/screens/reports/project_indicator.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class ProjectFinancialStatusReportPage extends StatefulWidget {
   const ProjectFinancialStatusReportPage({super.key});

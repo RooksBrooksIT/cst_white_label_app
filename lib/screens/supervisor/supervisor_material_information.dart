@@ -330,29 +330,97 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     return 0;
   }
 
-  // Load material data using unified MaterialInventoryService
-  Future<void> _loadMaterialData() async {
+  List<Map<String, dynamic>>? _cachedMasterMaterials;
+
+  /// Fetches dropdown options strictly from the 'materials' collection (same requirement as Materials Request Form)
+  /// Strictly extracts and uses the 'materialName' field, ignoring Material Categories and matCategory
+  Future<List<Map<String, dynamic>>> _fetchMasterMaterials({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedMasterMaterials != null && _cachedMasterMaterials!.isNotEmpty) {
+      return _cachedMasterMaterials!;
+    }
+
+    final Set<String> nameSet = {};
+    final List<Map<String, dynamic>> allMatDocs = [];
+
+    void processDocs(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+      for (final doc in docs) {
+        final data = doc.data();
+        // Strictly fetch from the 'materialName' field
+        final dynamic rawName = data['materialName'] ?? data['materialname'];
+        final String name = (rawName ?? '').toString().trim();
+
+        // Do NOT use or display values from Material Categories or fallback to matCategory
+        if (name.isNotEmpty && !nameSet.contains(name.toLowerCase())) {
+          nameSet.add(name.toLowerCase());
+          allMatDocs.add({
+            'docId': doc.id,
+            'materialName': name,
+            'materialId': data['materialId'] ?? doc.id,
+            'unit': (data['materialUnit'] ??
+                    data['unit'] ??
+                    data['matUnit'] ??
+                    '')
+                .toString()
+                .trim(),
+            'unitPrice': data['materialPrice'] ?? data['unitPrice'] ?? '',
+          });
+        }
+      }
+    }
+
+    // 1. Fetch strictly from 'materials' collection
     try {
+      final matSnap = await FirestoreService.getCollection('materials').get();
+      processDocs(matSnap.docs);
+    } catch (e) {
+      debugPrint('Error fetching from materials: $e');
+    }
+
+    // 2. Secondary check for case sensitivity: 'Materials' collection
+    if (allMatDocs.isEmpty) {
+      try {
+        final matCapitalSnap =
+            await FirestoreService.getCollection('Materials').get();
+        processDocs(matCapitalSnap.docs);
+      } catch (e) {
+        debugPrint('Error fetching from Materials: $e');
+      }
+    }
+
+    _cachedMasterMaterials = allMatDocs;
+    return allMatDocs;
+  }
+
+  // Load material data using materials collection as source of truth for items
+  Future<void> _loadMaterialData({bool forceRefresh = false}) async {
+    try {
+      final masterMaterials = await _fetchMasterMaterials(forceRefresh: forceRefresh);
       final items = await MaterialInventoryService.fetchAllMaterialsInventory();
-      final Map<String, Map<String, dynamic>> mapByDocOrName = {};
+      final Map<String, MaterialInventoryItem> invMap = {};
       for (final item in items) {
-        final key = item.materialName.trim();
-        if (key.isEmpty) continue;
-        if (!mapByDocOrName.containsKey(key)) {
-          mapByDocOrName[key] = {
-            'materialId': item.docId,
-            'materialName': key,
-            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
-            'unit': item.unit,
-            'count': item.companyAvailableCount,
-          };
+        final k = item.materialName.trim().toLowerCase();
+        if (k.isNotEmpty && !invMap.containsKey(k)) {
+          invMap[k] = item;
         }
       }
 
-      final list = mapByDocOrName.values.toList();
+      final List<Map<String, dynamic>> list = [];
+      for (final master in masterMaterials) {
+        final matName = master['materialName'] as String;
+        final inv = invMap[matName.toLowerCase()];
+        final count = inv?.companyAvailableCount ?? 0;
+        list.add({
+          'materialId': master['materialId'],
+          'materialName': matName,
+          'displayName': matName, // Display only the actual materialName
+          'unit': master['unit'],
+          'count': count,
+        });
+      }
+
       list.sort(
-        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-              (b['displayName'] as String).toLowerCase(),
+        (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
+              (b['materialName'] as String).toLowerCase(),
             ),
       );
 
@@ -382,7 +450,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
   }
 
-  // Load material data for a specific site from unified MaterialInventoryService
+  // Load material data for a specific site, strictly bound to materials collection definitions
   Future<void> _loadSiteMaterialData(String? siteId) async {
     if (siteId == null || siteId.isEmpty) {
       if (mounted) {
@@ -395,39 +463,51 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
 
     try {
+      final masterMaterials = await _fetchMasterMaterials();
       final items = await MaterialInventoryService.fetchAllMaterialsInventory();
-      final Map<String, Map<String, dynamic>> mapByDocOrName = {};
+      final Map<String, MaterialInventoryItem> invMap = {};
       for (final item in items) {
-        final key = item.materialName.trim();
-        if (key.isEmpty) continue;
-        final cleanLow = siteId.trim().toLowerCase();
-        final siteEntry = item.siteInventories.firstWhere(
-          (s) {
-            final sIdLow = s.siteId.trim().toLowerCase();
-            final sNameLow = s.siteName.trim().toLowerCase();
-            return sIdLow == cleanLow ||
-                (sNameLow.isNotEmpty && sNameLow == cleanLow) ||
-                (cleanLow.contains('_') && sIdLow.isNotEmpty && (cleanLow.startsWith('$sIdLow' '_') || cleanLow.endsWith('_$sIdLow'))) ||
-                (cleanLow.contains('_') && sNameLow.isNotEmpty && (cleanLow.startsWith('$sNameLow' '_') || cleanLow.endsWith('_$sNameLow'))) ||
-                (sIdLow.contains('_') && cleanLow.isNotEmpty && (sIdLow.startsWith('$cleanLow' '_') || sIdLow.endsWith('_$cleanLow')));
-          },
-          orElse: () => SiteInventoryEntry(siteId: siteId, availableCount: 0),
-        );
-        if (!mapByDocOrName.containsKey(key)) {
-          mapByDocOrName[key] = {
-            'materialId': item.docId,
-            'materialName': key,
-            'displayName': item.displayName.isNotEmpty ? item.displayName : key,
-            'unit': item.unit,
-            'count': siteEntry.availableCount,
-          };
+        final k = item.materialName.trim().toLowerCase();
+        if (k.isNotEmpty && !invMap.containsKey(k)) {
+          invMap[k] = item;
         }
       }
 
-      final list = mapByDocOrName.values.toList();
+      final cleanLow = siteId.trim().toLowerCase();
+      final List<Map<String, dynamic>> list = [];
+
+      for (final master in masterMaterials) {
+        final matName = master['materialName'] as String;
+        final inv = invMap[matName.toLowerCase()];
+        int count = 0;
+        if (inv != null) {
+          final siteEntry = inv.siteInventories.firstWhere(
+            (s) {
+              final sIdLow = s.siteId.trim().toLowerCase();
+              final sNameLow = s.siteName.trim().toLowerCase();
+              return sIdLow == cleanLow ||
+                  (sNameLow.isNotEmpty && sNameLow == cleanLow) ||
+                  (cleanLow.contains('_') && sIdLow.isNotEmpty && (cleanLow.startsWith('$sIdLow' '_') || cleanLow.endsWith('_$sIdLow'))) ||
+                  (cleanLow.contains('_') && sNameLow.isNotEmpty && (cleanLow.startsWith('$sNameLow' '_') || cleanLow.endsWith('_$sNameLow'))) ||
+                  (sIdLow.contains('_') && cleanLow.isNotEmpty && (sIdLow.startsWith('$cleanLow' '_') || sIdLow.endsWith('_$cleanLow')));
+            },
+            orElse: () => SiteInventoryEntry(siteId: siteId, availableCount: 0),
+          );
+          count = siteEntry.availableCount;
+        }
+
+        list.add({
+          'materialId': master['materialId'],
+          'materialName': matName,
+          'displayName': matName, // Display only the actual materialName
+          'unit': master['unit'],
+          'count': count,
+        });
+      }
+
       list.sort(
-        (a, b) => (a['displayName'] as String).toLowerCase().compareTo(
-              (b['displayName'] as String).toLowerCase(),
+        (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
+              (b['materialName'] as String).toLowerCase(),
             ),
       );
 
@@ -474,8 +554,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     final match = list.firstWhere(
       (m) =>
           (m['materialName'] ?? '').toString().trim().toLowerCase() ==
-              trimmed.toLowerCase() ||
-          (m['displayName'] ?? '').toString().trim().toLowerCase() ==
               trimmed.toLowerCase(),
       orElse: () => <String, dynamic>{'count': 0},
     );
@@ -564,7 +642,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     );
 
     final displayName =
-        (selectedMaterial['displayName'] ?? _selectedMaterialName!).toString();
+        (selectedMaterial['materialName'] ?? _selectedMaterialName!).toString();
 
     final alreadyAddedCount = materialsToTransfer
         .where(
@@ -2368,8 +2446,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     final hasMatch = _selectedMaterialName != null &&
         effectiveList.any((m) =>
             (m['materialName'] ?? '').toString().trim().toLowerCase() ==
-                _selectedMaterialName!.trim().toLowerCase() ||
-            (m['displayName'] ?? '').toString().trim().toLowerCase() ==
                 _selectedMaterialName!.trim().toLowerCase());
     final currentValue = hasMatch ? _selectedMaterialName : null;
 
@@ -2409,7 +2485,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           ),
           items: effectiveList.map((material) {
             final materialName = (material['materialName'] ?? '').toString();
-            final displayName = (material['displayName'] ?? materialName).toString();
             final count =
                 _parseCount(material['count'] ?? material['availableCount']);
 
@@ -2420,7 +2495,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      displayName.isNotEmpty ? displayName : materialName,
+                      materialName,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 13.5,

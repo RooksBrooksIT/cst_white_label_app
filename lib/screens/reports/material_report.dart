@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:demo_cst/services/material_inventory_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/screens/manager/material_inventory_details.dart';
+import 'package:ebricks/services/material_inventory_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/manager/material_inventory_details.dart';
 
 enum DataState { loading, loaded, error }
 
@@ -97,7 +97,7 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
 
       final list = items.map((item) {
         return MaterialInventorySummary(
-          materialName: item.displayName.isNotEmpty ? item.displayName : item.materialName,
+          materialName: item.materialName,
           category: item.category,
           subCategory: item.subCategory,
           unit: item.unit,

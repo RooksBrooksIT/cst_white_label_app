@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/screens/organization/pricing_screen.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/screens/organization/pricing_screen.dart';
 
 /// Centralized data model defining exact subscription limits for each plan.
 class SubscriptionPlanLimits {

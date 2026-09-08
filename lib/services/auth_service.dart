@@ -120,11 +120,13 @@ class AuthService {
     // we also set the specific keys they expect.
     await _syncLegacyKeys(role, sanitizedData);
 
-    // Automatically refresh branding if orgId is available
+    // Automatically refresh branding asynchronously in background without blocking login navigation
     final orgId = sanitizedData['dynamicPath'] ?? sanitizedData['orgId'];
     if (orgId != null && orgId.toString().isNotEmpty) {
       FirestoreService.setOrgPath(orgId.toString());
-      await refreshBranding(orgId.toString());
+      refreshBranding(orgId.toString()).catchError((e) {
+        debugPrint('AuthService: Background branding refresh note: $e');
+      });
     }
   }
 

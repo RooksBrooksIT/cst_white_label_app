@@ -1,11 +1,11 @@
-import 'package:demo_cst/screens/reports/project_stage_insights_dashboard.dart';
+﻿import 'package:ebricks/screens/reports/project_stage_insights_dashboard.dart';
 import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/manager/contractor_report_page.dart';
-import 'package:demo_cst/screens/organization/organization_insights_screen.dart';
-import 'package:demo_cst/screens/reports/project_financial_status_report_page.dart';
-import 'package:demo_cst/screens/reports/site_status_report.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/bottom_nav.dart';
+import 'package:ebricks/screens/manager/contractor_report_page.dart';
+import 'package:ebricks/screens/organization/organization_insights_screen.dart';
+import 'package:ebricks/screens/reports/project_financial_status_report_page.dart';
+import 'package:ebricks/screens/reports/site_status_report.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/widgets/bottom_nav.dart';
 
 class InsightsDashboard extends StatelessWidget {
   const InsightsDashboard({super.key});

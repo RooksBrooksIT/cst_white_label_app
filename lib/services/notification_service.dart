@@ -8,6 +8,10 @@ import '../screens/manager/manager_material_approval_screen.dart';
 import '../screens/manager/manager_tools_approval_screen.dart';
 import '../screens/manager/manager_site_payment_approval_page.dart';
 import '../screens/manager/manager_approval_screen.dart';
+import 'auth_service.dart';
+import '../screens/supervisor/supervisor_petty_cash_page.dart';
+import '../screens/manager/manager_petty_cash_page.dart';
+import '../screens/organization/org_petty_cash_page.dart';
 
 /// Handles background FCM messages when the app is terminated/background.
 @pragma('vm:entry-point')
@@ -18,18 +22,33 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class NotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
+  /// Explicitly requests notification permission from the operating system.
+  /// Uses Permission.notification for Android 13+ (POST_NOTIFICATIONS) runtime dialog
+  /// and FirebaseMessaging for iOS/Android FCM notification settings.
+  static Future<bool> requestNotificationPermission() async {
+    try {
+      // Request notification permission via FirebaseMessaging
+      // This handles Android 13+ POST_NOTIFICATIONS and iOS prompts.
+      final settings = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+      debugPrint('NotificationService: FCM permission status: ${settings.authorizationStatus}');
+
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (e) {
+      debugPrint('NotificationService: Error requesting notification permission: $e');
+      return false;
+    }
+  }
+
   /// Initialize FCM: request permissions, set background handler, listen foreground.
   static Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
     // Register background handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-    // Request permissions (iOS + Android 13+)
-    await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
 
     // Set foreground presentation options
     await _messaging.setForegroundNotificationPresentationOptions(
@@ -165,6 +184,30 @@ class NotificationService {
         context,
         MaterialPageRoute(builder: (_) => const ManagerApprovalScreen()),
       );
+    } else if (type.contains('petty_cash') || type.contains('petty')) {
+      final role = AuthService().userRole;
+      final ud = AuthService().userData;
+      if (role == UserRole.supervisor) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SupervisorPettyCashPage(
+              supervisorId: (ud['supervisorId'] ?? '').toString(),
+              supervisorName: (ud['supervisorName'] ?? 'Supervisor').toString(),
+            ),
+          ),
+        );
+      } else if (role == UserRole.organization) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const OrgPettyCashPage()),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ManagerPettyCashPage()),
+        );
+      }
     }
   }
 
@@ -222,16 +265,16 @@ class NotificationService {
   // ---------------------------------------------------------------------------
 
   /// Persists a notification record to the `notifications` Firestore collection.
-  /// This automatically triggers the Firebase Cloud Function to deliver real-time push notifications.
   static Future<void> _writeRecord({
     required String title,
     required String body,
-    required String targetRole, // 'manager', 'organisation', 'supervisor'
+    required String targetRole, // 'manager', 'organisation', 'supervisor', 'manager_and_organisation'
+    List<String>? targetRoles,
     String? forSupervisorName,
     String? forSupervisorId,
     String? forManagerName,
     String? forOrgId,
-    String? requestType, // 'material', 'tools', 'payment', 'workforce', 'site_assignment'
+    String? requestType, // 'material', 'tools', 'payment', 'workforce', 'site_assignment', 'petty_cash', 'site_management'
     String? requestId,
     String? docId,
     String? siteId,
@@ -240,6 +283,7 @@ class NotificationService {
     String? senderRole,
     String? senderName,
     String? remarks,
+    String? requiredAction,
     Map<String, dynamic>? extraData,
   }) async {
     try {
@@ -249,6 +293,7 @@ class NotificationService {
         'title': title,
         'body': body,
         'targetRole': targetRole,
+        'targetRoles': targetRoles ?? (targetRole == 'manager_and_organisation' ? ['manager', 'organisation'] : [targetRole]),
         'forSupervisorName': forSupervisorName,
         'forSupervisorId': forSupervisorId,
         'forManagerName': forManagerName,
@@ -263,6 +308,7 @@ class NotificationService {
         'senderRole': senderRole ?? '',
         'senderName': senderName ?? '',
         'remarks': remarks ?? '',
+        'requiredAction': requiredAction ?? '',
         'isRead': false,
         'createdAt': FieldValue.serverTimestamp(),
         'data': {
@@ -273,18 +319,18 @@ class NotificationService {
           'siteId': siteId ?? '',
           'siteName': siteName ?? siteId ?? '',
           'status': status ?? '',
+          'requiredAction': requiredAction ?? '',
           'title': title,
           'body': body,
           if (extraData != null) ...extraData,
         },
       };
 
-      // 1. Write to global notifications collection (triggers Cloud Function onNotificationCreated)
-      await FirebaseFirestore.instance.collection('notifications').add(payload);
-
-      // 2. Also write to organization-scoped notifications collection
+      // Write to organization-scoped notifications collection
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
         await FirestoreService.getCollection('notifications').add(payload);
+      } else {
+        await FirebaseFirestore.instance.collection('notifications').add(payload);
       }
     } catch (e) {
       debugPrint('NotificationService: Failed to write record: $e');
@@ -292,10 +338,83 @@ class NotificationService {
   }
 
   // ---------------------------------------------------------------------------
-  // SEND HELPERS FOR 5-STAGE WORKFLOW
+  // SEND HELPERS FOR ROLE-BASED NOTIFICATIONS
   // ---------------------------------------------------------------------------
 
-  /// 1. Notifies Manager(s) when a Supervisor submits a request or when Org authorizes a requisition.
+  /// 1. Dual-Target: Notifies BOTH Manager and Organization simultaneously.
+  /// Used when a Supervisor submits a request, requires approval, or confirms physical arrival.
+  static Future<void> notifyManagerAndOrganisation({
+    required String title,
+    required String body,
+    required String requestType,
+    required String requestId,
+    String? docId,
+    String? siteId,
+    String? siteName,
+    String? status,
+    String? senderRole,
+    String? senderName,
+    String? remarks,
+    String? requiredAction,
+    String? forSupervisorName,
+    String? forSupervisorId,
+    String? forManagerName,
+    String? forManagerId,
+    Map<String, dynamic>? extraData,
+  }) async {
+    final orgId = FirestoreService.currentOrgId;
+
+    // 1. Save single unified record with dual target roles (prevents duplicates)
+    await _writeRecord(
+      title: title,
+      body: body,
+      targetRole: 'manager_and_organisation',
+      targetRoles: ['manager', 'organisation'],
+      forOrgId: orgId,
+      forSupervisorName: forSupervisorName,
+      forSupervisorId: forSupervisorId,
+      forManagerName: forManagerName,
+      requestType: requestType,
+      requestId: requestId,
+      docId: docId ?? requestId,
+      siteId: siteId,
+      siteName: siteName,
+      status: status,
+      senderRole: senderRole ?? 'Supervisor',
+      senderName: senderName ?? 'Supervisor',
+      remarks: remarks,
+      requiredAction: requiredAction ?? 'Action Required: Review & Approve',
+      extraData: extraData,
+    );
+
+    // 2. Send FCM push to BOTH manager and organization tokens
+    try {
+      final snap = await FirestoreService.getCollection('fcmTokens')
+          .where('userType', whereIn: ['manager', 'organisation', 'config'])
+          .where('orgId', isEqualTo: orgId)
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final token = data['token']?.toString();
+        final uName = data['userName']?.toString();
+        if (token != null && token.isNotEmpty && uName != senderName) {
+          await _sendFcmPush(token: token, title: title, body: body, data: {
+            'requestType': requestType,
+            'requestId': requestId,
+            'docId': docId ?? requestId,
+            'siteId': siteId ?? '',
+            'status': status ?? '',
+            'requiredAction': requiredAction ?? '',
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('NotificationService: Error sending dual-target FCM: $e');
+    }
+  }
+
+  /// 2. Notifies Manager(s) only.
+  /// Used when Organization creates an action, authorizations, or directives for Manager.
   static Future<void> notifyManager({
     required String title,
     required String body,
@@ -308,15 +427,20 @@ class NotificationService {
     String? senderRole,
     String? senderName,
     String? remarks,
+    String? requiredAction,
+    String? forManagerName,
+    String? forManagerId,
     Map<String, dynamic>? extraData,
   }) async {
     final orgId = FirestoreService.currentOrgId;
 
-    // 1. Write in-app notification record for Manager
+    // 1. Write in-app notification record for Manager only
     await _writeRecord(
       title: title,
       body: body,
       targetRole: 'manager',
+      targetRoles: ['manager'],
+      forManagerName: forManagerName,
       forOrgId: orgId,
       requestType: requestType,
       requestId: requestId,
@@ -324,27 +448,37 @@ class NotificationService {
       siteId: siteId,
       siteName: siteName,
       status: status,
-      senderRole: senderRole ?? 'Supervisor',
-      senderName: senderName ?? 'Supervisor',
+      senderRole: senderRole ?? 'Organization',
+      senderName: senderName ?? 'Organization HQ',
       remarks: remarks,
+      requiredAction: requiredAction,
       extraData: extraData,
     );
 
-    // 2. Send FCM push to manager tokens
+    // 2. Send FCM push strictly to Manager tokens (NOT organization)
     try {
       final snap = await FirestoreService.getCollection('fcmTokens')
-          .where('userType', whereIn: ['manager', 'organisation', 'config'])
+          .where('userType', isEqualTo: 'manager')
           .where('orgId', isEqualTo: orgId)
           .get();
       for (final doc in snap.docs) {
-        final token = doc.data()['token']?.toString();
-        if (token != null && token.isNotEmpty) {
+        final data = doc.data();
+        final token = data['token']?.toString();
+        final uName = data['userName']?.toString() ?? '';
+        final uId = data['userId']?.toString() ?? '';
+
+        if (forManagerName != null && forManagerName.isNotEmpty) {
+          if (uName != forManagerName && uId != forManagerName) continue;
+        }
+
+        if (token != null && token.isNotEmpty && uName != senderName) {
           await _sendFcmPush(token: token, title: title, body: body, data: {
             'requestType': requestType,
             'requestId': requestId,
             'docId': docId ?? requestId,
             'siteId': siteId ?? '',
             'status': status ?? '',
+            'requiredAction': requiredAction ?? '',
           });
         }
       }
@@ -353,7 +487,8 @@ class NotificationService {
     }
   }
 
-  /// 2. Notifies Organization Admins when a Manager forwards a request for final authorization.
+  /// 3. Notifies Organization Admins only.
+  /// Used when Manager creates a site, forwards a request to HQ, or records manager expenses.
   static Future<void> notifyOrganisation({
     required String title,
     required String body,
@@ -366,15 +501,18 @@ class NotificationService {
     String? senderRole,
     String? senderName,
     String? remarks,
+    String? requiredAction,
     Map<String, dynamic>? data,
+    Map<String, dynamic>? extraData,
   }) async {
     final orgId = FirestoreService.currentOrgId;
 
-    // 1. Write in-app record for Organization
+    // 1. Write in-app record strictly for Organization
     await _writeRecord(
       title: title,
       body: body,
       targetRole: 'organisation',
+      targetRoles: ['organisation'],
       forOrgId: orgId,
       requestType: requestType,
       requestId: requestId,
@@ -385,24 +523,28 @@ class NotificationService {
       senderRole: senderRole ?? 'Manager',
       senderName: senderName ?? 'Manager',
       remarks: remarks,
-      extraData: data,
+      requiredAction: requiredAction,
+      extraData: extraData ?? data,
     );
 
-    // 2. Send FCM push to all org tokens
+    // 2. Send FCM push strictly to Organization / HQ tokens (NOT managers)
     try {
       final snap = await FirestoreService.getCollection('fcmTokens')
           .where('userType', whereIn: ['organisation', 'config'])
           .where('orgId', isEqualTo: orgId)
           .get();
       for (final doc in snap.docs) {
-        final token = doc.data()['token']?.toString();
-        if (token != null && token.isNotEmpty) {
+        final tokenData = doc.data();
+        final token = tokenData['token']?.toString();
+        final uName = tokenData['userName']?.toString();
+        if (token != null && token.isNotEmpty && uName != senderName) {
           await _sendFcmPush(token: token, title: title, body: body, data: {
             'requestType': requestType ?? '',
             'requestId': requestId ?? '',
             'docId': docId ?? requestId ?? '',
             'siteId': siteId ?? '',
             'status': status ?? '',
+            'requiredAction': requiredAction ?? '',
           });
         }
       }
@@ -426,7 +568,9 @@ class NotificationService {
     String? senderRole,
     String? senderName,
     String? remarks,
+    String? requiredAction,
     Map<String, dynamic>? data,
+    Map<String, dynamic>? extraData,
   }) async {
     final orgId = FirestoreService.currentOrgId;
 
@@ -446,10 +590,12 @@ class NotificationService {
       senderRole: senderRole ?? 'Manager',
       senderName: senderName ?? 'Manager',
       remarks: remarks,
+      requiredAction: requiredAction,
       extraData: {
         'supervisorId': supervisorId ?? '',
         'supervisorName': supervisorName,
         if (data != null) ...data,
+        if (extraData != null) ...extraData,
       },
     );
 
@@ -659,7 +805,7 @@ class NotificationService {
     );
   }
 
-  /// 8. Notifies Managers and Supervisors when a Master Configuration (Materials, Vehicles, Contractors) is updated.
+  /// 8. Notifies Managers and Organization when a Master Configuration is updated.
   static Future<void> notifyMasterConfigUpdated({
     required String configType, // 'Materials', 'Vehicles', 'Contractors', 'Units'
     required String itemTitle,
@@ -672,25 +818,13 @@ class NotificationService {
     await _writeRecord(
       title: title,
       body: body,
-      targetRole: 'manager',
+      targetRole: 'manager_and_organisation',
+      targetRoles: ['manager', 'organisation'],
       requestType: 'master_config',
       senderRole: senderRole ?? 'Manager',
       senderName: senderName ?? 'Manager',
       remarks: '$configType updated',
-      extraData: {
-        'configType': configType,
-        'itemTitle': itemTitle,
-      },
-    );
-
-    await _writeRecord(
-      title: title,
-      body: body,
-      targetRole: 'organisation',
-      requestType: 'master_config',
-      senderRole: senderRole ?? 'Manager',
-      senderName: senderName ?? 'Manager',
-      remarks: '$configType updated',
+      requiredAction: 'Catalog updated',
       extraData: {
         'configType': configType,
         'itemTitle': itemTitle,
@@ -779,6 +913,10 @@ class NotificationService {
   // ---------------------------------------------------------------------------
 
   /// Live stream of notifications for a specific user role.
+  /// Strictly filters so:
+  /// - Manager only receives Manager and dual-target Supervisor submissions.
+  /// - Organization only receives Organization and dual-target Supervisor submissions.
+  /// - Supervisor only receives notifications specifically addressed to them.
   static Stream<QuerySnapshot<Map<String, dynamic>>> streamForRole({
     required String role, // 'manager', 'organisation', 'supervisor'
     String? supervisorName,
@@ -793,12 +931,15 @@ class NotificationService {
       query = FirebaseFirestore.instance.collection('notifications');
     }
 
-    if (role == 'supervisor' && supervisorName != null && supervisorName.isNotEmpty) {
-      query = query.where('forSupervisorName', isEqualTo: supervisorName);
+    if (role == 'supervisor') {
+      query = query.where('targetRole', isEqualTo: 'supervisor');
+      if (supervisorName != null && supervisorName.isNotEmpty) {
+        query = query.where('forSupervisorName', isEqualTo: supervisorName);
+      }
     } else if (role == 'manager') {
-      query = query.where('targetRole', whereIn: ['manager', 'organisation', 'all']);
+      query = query.where('targetRole', whereIn: ['manager', 'manager_and_organisation']);
     } else if (role == 'organisation') {
-      query = query.where('targetRole', whereIn: ['organisation', 'all']);
+      query = query.where('targetRole', whereIn: ['organisation', 'manager_and_organisation']);
     }
 
     return query.orderBy('createdAt', descending: true).limit(50).snapshots();
@@ -822,12 +963,15 @@ class NotificationService {
           .where('isRead', isEqualTo: false);
     }
 
-    if (role == 'supervisor' && supervisorName != null && supervisorName.isNotEmpty) {
-      query = query.where('forSupervisorName', isEqualTo: supervisorName);
+    if (role == 'supervisor') {
+      query = query.where('targetRole', isEqualTo: 'supervisor');
+      if (supervisorName != null && supervisorName.isNotEmpty) {
+        query = query.where('forSupervisorName', isEqualTo: supervisorName);
+      }
     } else if (role == 'manager') {
-      query = query.where('targetRole', whereIn: ['manager', 'organisation', 'all']);
+      query = query.where('targetRole', whereIn: ['manager', 'manager_and_organisation']);
     } else if (role == 'organisation') {
-      query = query.where('targetRole', whereIn: ['organisation', 'all']);
+      query = query.where('targetRole', whereIn: ['organisation', 'manager_and_organisation']);
     }
 
     return query.snapshots().map((snap) => snap.docs.length);
@@ -857,17 +1001,19 @@ class NotificationService {
   static Future<void> markAsRead(String docId) async {
     try {
       final orgId = FirestoreService.currentOrgId;
-      await FirebaseFirestore.instance
-          .collection('notifications')
-          .doc(docId)
-          .update({'isRead': true})
-          .catchError((_) {});
-
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
-        await FirestoreService.getCollection('notifications')
-            .doc(docId)
-            .update({'isRead': true})
-            .catchError((_) {});
+        final orgDocRef = FirestoreService.getCollection('notifications').doc(docId);
+        final orgDoc = await orgDocRef.get();
+        if (orgDoc.exists) {
+          await orgDocRef.update({'isRead': true});
+          return;
+        }
+      }
+
+      final rootDocRef = FirebaseFirestore.instance.collection('notifications').doc(docId);
+      final rootDoc = await rootDocRef.get();
+      if (rootDoc.exists) {
+        await rootDocRef.update({'isRead': true});
       }
     } catch (e) {
       debugPrint('NotificationService: markAsRead failed: $e');
@@ -887,12 +1033,15 @@ class NotificationService {
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
         var orgQuery = FirestoreService.getCollection('notifications')
             .where('isRead', isEqualTo: false);
-        if (role == 'supervisor' && supervisorName != null && supervisorName.isNotEmpty) {
-          orgQuery = orgQuery.where('forSupervisorName', isEqualTo: supervisorName);
+        if (role == 'supervisor') {
+          orgQuery = orgQuery.where('targetRole', isEqualTo: 'supervisor');
+          if (supervisorName != null && supervisorName.isNotEmpty) {
+            orgQuery = orgQuery.where('forSupervisorName', isEqualTo: supervisorName);
+          }
         } else if (role == 'manager') {
-          orgQuery = orgQuery.where('targetRole', whereIn: ['manager', 'organisation', 'all']);
+          orgQuery = orgQuery.where('targetRole', whereIn: ['manager', 'manager_and_organisation']);
         } else if (role == 'organisation') {
-          orgQuery = orgQuery.where('targetRole', whereIn: ['organisation', 'all']);
+          orgQuery = orgQuery.where('targetRole', whereIn: ['organisation', 'manager_and_organisation']);
         }
         final snap = await orgQuery.get();
         final batch = FirebaseFirestore.instance.batch();
@@ -907,12 +1056,15 @@ class NotificationService {
           .collection('notifications')
           .where('orgId', isEqualTo: orgId)
           .where('isRead', isEqualTo: false);
-      if (role == 'supervisor' && supervisorName != null && supervisorName.isNotEmpty) {
-        globalQuery = globalQuery.where('forSupervisorName', isEqualTo: supervisorName);
+      if (role == 'supervisor') {
+        globalQuery = globalQuery.where('targetRole', isEqualTo: 'supervisor');
+        if (supervisorName != null && supervisorName.isNotEmpty) {
+          globalQuery = globalQuery.where('forSupervisorName', isEqualTo: supervisorName);
+        }
       } else if (role == 'manager') {
-        globalQuery = globalQuery.where('targetRole', whereIn: ['manager', 'organisation', 'all']);
+        globalQuery = globalQuery.where('targetRole', whereIn: ['manager', 'manager_and_organisation']);
       } else if (role == 'organisation') {
-        globalQuery = globalQuery.where('targetRole', whereIn: ['organisation', 'all']);
+        globalQuery = globalQuery.where('targetRole', whereIn: ['organisation', 'manager_and_organisation']);
       }
 
       final snap = await globalQuery.get();

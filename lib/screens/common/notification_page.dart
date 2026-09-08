@@ -1,5 +1,5 @@
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -181,6 +181,40 @@ class _NotificationPageState extends State<NotificationPage>
                         Text(body,
                             style: TextStyle(
                                 color: Colors.grey.shade600, fontSize: 13)),
+                        if ((data['siteId']?.toString() ?? '').isNotEmpty ||
+                            (data['requiredAction']?.toString() ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if ((data['siteId']?.toString() ?? '').isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Site: ${data['siteId']}',
+                                    style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              if ((data['requiredAction']?.toString() ?? '').isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    data['requiredAction'].toString(),
+                                    style: TextStyle(fontSize: 10, color: Colors.amber.shade900, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
                         if (dateStr.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(dateStr,
