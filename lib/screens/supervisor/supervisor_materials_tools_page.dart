@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/supervisor/material_at_site_entry_page.dart';
-import 'package:demo_cst/screens/supervisor/tools_at_site_page.dart';
-import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_material_information.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/supervisor/material_at_site_entry_page.dart';
+import 'package:ebricks/screens/supervisor/tools_at_site_page.dart';
+import 'package:ebricks/screens/supervisor/tools_movement_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_material_information.dart';
 
 class SupervisorMaterialsToolsPage extends StatelessWidget {
   final String supervisorId;

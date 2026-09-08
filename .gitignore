@@ -50,3 +50,8 @@ app.*.map.json
 **/.env
 **/.env.*
 !**/.env.example
+
+# Signing credentials
+*.jks
+*.keystore
+**/key.properties

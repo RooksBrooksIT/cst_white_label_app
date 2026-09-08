@@ -4,11 +4,12 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/organization/org_site_payment_menu_page.dart';
-import 'package:demo_cst/screens/organization/organization_expenses.dart';
+import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/organization/org_site_payment_menu_page.dart';
+import 'package:ebricks/screens/organization/organization_expenses.dart';
 
 class SiteFinancialDetailsPage extends StatefulWidget {
   final String siteId;
@@ -34,10 +35,11 @@ class SiteFinancialDetailsPage extends StatefulWidget {
 class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  Map<String, dynamic>? _projectData;
-  Map<String, dynamic>? _siteTotalsData;
   bool _isLoading = true;
   String? _errorMessage;
+
+  Map<String, dynamic>? _projectData;
+  Map<String, dynamic>? _siteTotalsData;
 
   @override
   void initState() {
@@ -61,47 +63,93 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     try {
       // 1. Fetch from 'projects' collection
       final projectsCol = FirestoreService.getCollection('projects');
-      QuerySnapshot<Map<String, dynamic>> projQuery = await projectsCol
-          .where('siteId', isEqualTo: widget.siteId)
-          .limit(1)
-          .get();
-
-      if (projQuery.docs.isEmpty) {
-        projQuery = await projectsCol
-            .where('site', isEqualTo: widget.siteId)
-            .limit(1)
-            .get();
-      }
-      if (projQuery.docs.isEmpty) {
-        projQuery = await projectsCol
-            .where('siteName', isEqualTo: widget.siteName)
-            .limit(1)
-            .get();
-      }
-
-      if (projQuery.docs.isNotEmpty) {
-        _projectData = projQuery.docs.first.data();
-      } else if (widget.initialData != null) {
-        _projectData = widget.initialData;
+      final directDoc = await projectsCol.doc(widget.siteId).get();
+      if (directDoc.exists && directDoc.data() != null) {
+        _projectData = directDoc.data();
       } else {
-        // Fallback to Site collection
+        QuerySnapshot<Map<String, dynamic>> projQuery = await projectsCol
+            .where('siteId', isEqualTo: widget.siteId)
+            .limit(1)
+            .get();
+
+        if (projQuery.docs.isEmpty) {
+          projQuery = await projectsCol
+              .where('site', isEqualTo: widget.siteId)
+              .limit(1)
+              .get();
+        }
+        if (projQuery.docs.isEmpty && widget.siteName.isNotEmpty) {
+          projQuery = await projectsCol
+              .where('siteName', isEqualTo: widget.siteName)
+              .limit(1)
+              .get();
+        }
+
+        if (projQuery.docs.isNotEmpty) {
+          _projectData = projQuery.docs.first.data();
+        } else if (widget.initialData != null) {
+          _projectData = widget.initialData;
+        } else {
+          // Fallback to Site collection
+          final siteDoc = await FirestoreService.getCollection('Site')
+              .doc(widget.siteId)
+              .get();
+          if (siteDoc.exists && siteDoc.data() != null) {
+            _projectData = siteDoc.data();
+          }
+        }
+      }
+
+      // Also overlay Site collection doc if exists to ensure all fields are captured
+      try {
         final siteDoc = await FirestoreService.getCollection('Site')
             .doc(widget.siteId)
             .get();
         if (siteDoc.exists && siteDoc.data() != null) {
-          _projectData = siteDoc.data();
+          final sData = siteDoc.data()!;
+          _projectData ??= {};
+          sData.forEach((k, v) {
+            if (v != null && (_projectData![k] == null || _projectData![k] == 0)) {
+              _projectData![k] = v;
+            }
+          });
         }
-      }
+      } catch (_) {}
 
       // 2. Fetch from 'totalSiteExpensesPerDay' for category breakdowns
       try {
         final totalsDoc = await FirestoreService.getCollection(
           'totalSiteExpensesPerDay',
         ).doc(widget.siteId).get();
-        if (totalsDoc.exists) {
+        if (totalsDoc.exists && totalsDoc.data() != null) {
           _siteTotalsData = totalsDoc.data();
+        } else {
+          final queryTotals = await FirestoreService.getCollection('totalSiteExpensesPerDay')
+              .where('siteId', isEqualTo: widget.siteId)
+              .limit(1)
+              .get();
+          if (queryTotals.docs.isNotEmpty) {
+            _siteTotalsData = queryTotals.docs.first.data();
+          }
         }
       } catch (_) {}
+
+      // Background fresh sync if totals data is empty
+      if (_siteTotalsData == null || _siteTotalsData!.isEmpty) {
+        ExpenseService.recalcTotalsAndSyncProject(widget.siteId).then((_) async {
+          if (!mounted) return;
+          try {
+            final refreshedDoc = await FirestoreService.getCollection(
+              'totalSiteExpensesPerDay',
+            ).doc(widget.siteId).get();
+            if (refreshedDoc.exists && refreshedDoc.data() != null) {
+              setState(() {
+                _siteTotalsData = refreshedDoc.data();
+              });
+            }
+          } catch (_) {}
+        });
+      }
 
       setState(() {
         _isLoading = false;
@@ -112,6 +160,26 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
         _isLoading = false;
       });
     }
+  }
+
+  double _computeTotalSpent(Map<String, dynamic> data) {
+    final rawSpent = _parseNum(
+      data['amountSpent'] ?? data['amountSpend'] ?? data['spent'] ?? data['totalAllExpenses'],
+    );
+    final totals = _siteTotalsData ?? {};
+    final totalFromTotals = _parseNum(totals['totalAllExpenses']);
+    final sumCategoryTotals = _parseNum(totals['totalSiteExpense']) +
+        _parseNum(totals['totalMgrExpense']) +
+        _parseNum(totals['totalOrgExpense']) +
+        _parseNum(totals['totalContractorExpense']) +
+        _parseNum(totals['totalIncentiveExpenses']);
+
+    if (totalFromTotals > 0) {
+      return totalFromTotals;
+    } else if (sumCategoryTotals > 0) {
+      return sumCategoryTotals;
+    }
+    return rawSpent;
   }
 
   String _formatCurrency(num value) {
@@ -186,9 +254,9 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     final data = _projectData ?? {};
 
     final budget = _parseNum(data['projectBudget'] ?? data['budget']);
-    final received = _parseNum(data['amountPaid'] ?? data['paid']);
-    final spent = _parseNum(data['amountSpent'] ?? data['spent']);
-    final balance = _parseNum(data['amountBalance'] ?? data['balance']);
+    final received = _parseNum(data['amountPaid'] ?? data['paid'] ?? data['amountReceived']);
+    final spent = _computeTotalSpent(data);
+    final balance = (budget - received);
     final usagePercent = budget > 0 ? ((spent / budget) * 100).clamp(0, 100).toStringAsFixed(1) : '0';
 
     final font = await PdfGoogleFonts.interRegular();
@@ -533,9 +601,9 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     final hPad = Responsive.horizontalPadding(context);
 
     final budget = _parseNum(data['projectBudget'] ?? data['budget']);
-    final received = _parseNum(data['amountPaid'] ?? data['paid']);
-    final spent = _parseNum(data['amountSpent'] ?? data['spent']);
-    final balance = _parseNum(data['amountBalance'] ?? data['balance']);
+    final received = _parseNum(data['amountPaid'] ?? data['paid'] ?? data['amountReceived']);
+    final spent = _computeTotalSpent(data);
+    final balance = (budget - received);
     final status = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
     final statusColor = _getStatusColor(status);
     final category = (data['projectCategory'] ?? 'House').toString();
@@ -1455,6 +1523,23 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     );
   }
 
+  DateTime _parseDateTimeVal(dynamic dateVal) {
+    if (dateVal == null) return DateTime.fromMillisecondsSinceEpoch(0);
+    if (dateVal is Timestamp) return dateVal.toDate();
+    if (dateVal is DateTime) return dateVal;
+    if (dateVal is String) {
+      final parsed = DateTime.tryParse(dateVal);
+      if (parsed != null) return parsed;
+      try {
+        return DateFormat('dd/MM/yyyy').parseLoose(dateVal);
+      } catch (_) {}
+      try {
+        return DateFormat('yyyy-MM-dd').parseLoose(dateVal);
+      } catch (_) {}
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
   // -------------------- TAB 3: ITEMIZED EXPENSES --------------------
   Widget _buildExpensesTab(Color primaryColor) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -1463,197 +1548,264 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
           .snapshots(),
       builder: (context, supEntriesSnap) {
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirestoreService.getCollection('organisationExpenses')
+          stream: FirestoreService.organizationEntries
               .where('siteId', isEqualTo: widget.siteId)
               .snapshots(),
           builder: (context, orgExpSnap) {
-            final List<Map<String, dynamic>> allExpenses = [];
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirestoreService.managerEntries
+                  .where('siteId', isEqualTo: widget.siteId)
+                  .snapshots(),
+              builder: (context, mgrExpSnap) {
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirestoreService.contractorEntries
+                      .where('siteId', isEqualTo: widget.siteId)
+                      .snapshots(),
+                  builder: (context, conExpSnap) {
+                    final List<Map<String, dynamic>> allExpenses = [];
 
-            if (supEntriesSnap.hasData) {
-              for (var doc in supEntriesSnap.data!.docs) {
-                final d = doc.data();
-                allExpenses.add({
-                  'title': d['expenseType'] ?? d['category'] ?? d['materialName'] ?? 'Site Entry',
-                  'amount': _parseNum(d['totalAmount'] ?? d['amount']),
-                  'date': d['date'] ?? d['createdAt'],
-                  'category': d['category'] ?? 'Supervisor',
-                  'vendor': d['vendorName'] ?? d['supplier'] ?? '',
-                });
-              }
-            }
+                    if (supEntriesSnap.hasData) {
+                      for (var doc in supEntriesSnap.data!.docs) {
+                        final d = doc.data();
+                        final isMgr = d['isManagerEntry'] == true || d['createdBy'] == 'manager';
+                        final isOrg = d['isOrgEntry'] == true || d['createdBy'] == 'manager_org';
+                        final category = isOrg ? 'Organization' : (isMgr ? 'Manager' : 'Supervisor');
+                        allExpenses.add({
+                          'title': d['expenseType'] ?? d['category'] ?? d['materialName'] ?? 'Site Entry',
+                          'amount': _parseNum(d['totalAmount'] ?? d['amount']),
+                          'date': d['date'] ?? d['createdAt'] ?? d['timestamp'],
+                          'category': category,
+                          'vendor': (d['vendorName'] ?? d['supplier'] ?? '').toString(),
+                        });
+                      }
+                    }
 
-            if (orgExpSnap.hasData) {
-              for (var doc in orgExpSnap.data!.docs) {
-                final d = doc.data();
-                allExpenses.add({
-                  'title': d['expenseName'] ?? d['description'] ?? 'Org Expense',
-                  'amount': _parseNum(d['amount']),
-                  'date': d['date'] ?? d['createdAt'],
-                  'category': d['category'] ?? 'Organization',
-                  'vendor': d['vendorName'] ?? '',
-                });
-              }
-            }
+                    if (orgExpSnap.hasData) {
+                      for (var doc in orgExpSnap.data!.docs) {
+                        final d = doc.data();
+                        final bills = d['bills'] as List<dynamic>? ?? [];
+                        if (bills.isNotEmpty) {
+                          for (var b in bills) {
+                            if (b is Map) {
+                              allExpenses.add({
+                                'title': (b['billNo'] != null && b['billNo'].toString().isNotEmpty)
+                                    ? 'Bill #${b['billNo']}'
+                                    : (d['projectStage'] ?? 'Org Expense'),
+                                'amount': _parseNum(b['billAmount'] ?? b['amount']),
+                                'date': b['billDate'] ?? d['entryDate'] ?? d['date'] ?? d['createdAt'],
+                                'category': 'Organization',
+                                'vendor': (b['billVendor'] ?? '').toString(),
+                              });
+                            }
+                          }
+                        } else {
+                          allExpenses.add({
+                            'title': d['projectStage'] ?? d['expenseName'] ?? d['description'] ?? 'Org Expense',
+                            'amount': _parseNum(d['totalAmount'] ?? d['amount']),
+                            'date': d['entryDate'] ?? d['date'] ?? d['createdAt'],
+                            'category': 'Organization',
+                            'vendor': (d['vendorName'] ?? '').toString(),
+                          });
+                        }
+                      }
+                    }
 
-            if (allExpenses.isEmpty) {
-              return Center(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.receipt_outlined,
-                        size: 44,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'No detailed expenses recorded yet',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF475569),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Site expense entries will automatically appear here.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF94A3B8),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
+                    if (mgrExpSnap.hasData) {
+                      for (var doc in mgrExpSnap.data!.docs) {
+                        final d = doc.data();
+                        allExpenses.add({
+                          'title': d['expenseType'] ?? d['category'] ?? d['materialName'] ?? 'Manager Entry',
+                          'amount': _parseNum(d['totalAmount'] ?? d['amount']),
+                          'date': d['date'] ?? d['createdAt'] ?? d['timestamp'],
+                          'category': 'Manager',
+                          'vendor': (d['vendorName'] ?? d['supplier'] ?? '').toString(),
+                        });
+                      }
+                    }
 
-            return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-              itemCount: allExpenses.length,
-              itemBuilder: (context, index) {
-                final exp = allExpenses[index];
-                final amt = exp['amount'] as double;
-                final dateStr = _formatDate(exp['date']);
-                final title = exp['title'].toString();
-                final cat = exp['category'].toString();
-                final vendor = exp['vendor'].toString();
+                    if (conExpSnap.hasData) {
+                      for (var doc in conExpSnap.data!.docs) {
+                        final d = doc.data();
+                        allExpenses.add({
+                          'title': d['contractorName'] ?? d['category'] ?? 'Contractor Payment',
+                          'amount': _parseNum(d['totalAmount'] ?? d['amount']),
+                          'date': d['date'] ?? d['createdAt'],
+                          'category': 'Contractor',
+                          'vendor': (d['contractorName'] ?? '').toString(),
+                        });
+                      }
+                    }
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEF2F2),
-                                borderRadius: BorderRadius.circular(10),
+                    // Sort newest to oldest
+                    allExpenses.sort((a, b) {
+                      final da = _parseDateTimeVal(a['date']);
+                      final db = _parseDateTimeVal(b['date']);
+                      return db.compareTo(da);
+                    });
+
+                    if (allExpenses.isEmpty) {
+                      return Center(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.receipt_outlined,
+                                size: 44,
+                                color: Colors.grey.shade400,
                               ),
-                              child: const Icon(
-                                Icons.arrow_upward_rounded,
-                                color: Color(0xFFEF4444),
-                                size: 18,
+                              const SizedBox(height: 10),
+                              const Text(
+                                'No detailed expenses recorded yet',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    title,
-                                    style: const TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF0F172A),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        dateStr,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF64748B),
-                                        ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Site expense entries will automatically appear here.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                      itemCount: allExpenses.length,
+                      itemBuilder: (context, index) {
+                        final exp = allExpenses[index];
+                        final amt = exp['amount'] as double;
+                        final dateStr = _formatDate(exp['date']);
+                        final title = exp['title'].toString();
+                        final cat = exp['category'].toString();
+                        final vendor = exp['vendor'].toString();
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF2F2),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                      if (vendor.isNotEmpty) ...[
-                                        const Text(' • ', style: TextStyle(color: Color(0xFFCBD5E1))),
-                                        Flexible(
-                                          child: Text(
-                                            vendor,
+                                      child: const Icon(
+                                        Icons.arrow_upward_rounded,
+                                        color: Color(0xFFEF4444),
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            title,
                                             style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF475569),
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF0F172A),
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                        ),
-                                      ],
-                                      const Text(' • ', style: TextStyle(color: Color(0xFFCBD5E1))),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          cat,
-                                          style: const TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFF475569),
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                dateStr,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Color(0xFF64748B),
+                                                ),
+                                              ),
+                                              if (vendor.isNotEmpty) ...[
+                                                const Text(' • ', style: TextStyle(color: Color(0xFFCBD5E1))),
+                                                Flexible(
+                                                  child: Text(
+                                                    vendor,
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Color(0xFF475569),
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                              const Text(' • ', style: TextStyle(color: Color(0xFFCBD5E1))),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  cat,
+                                                  style: const TextStyle(
+                                                    fontSize: 9.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF475569),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '- ₹ ${_formatCurrency(amt)}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFFEF4444),
-                        ),
-                      ),
-                    ],
-                  ),
+                              const SizedBox(width: 10),
+                              Text(
+                                '- ₹ ${_formatCurrency(amt)}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFEF4444),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 );
               },
             );

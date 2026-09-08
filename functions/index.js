@@ -280,7 +280,33 @@ exports.verifySubscription = functions.region("us-central1").https.onCall(async 
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
+    if (isSubscriptionActive) {
+      // Reset reminder flag for new/renewed subscription period so new reminder is scheduled cleanly
+      subscriptionUpdate.lastExpiryReminderSentForEndDate = null;
+    }
+
+    if (planDetails) {
+      if (planDetails.planType) subscriptionUpdate.subscriptionType = planDetails.planType;
+      if (planDetails.maxProjects !== undefined) subscriptionUpdate.maxProjects = planDetails.maxProjects;
+      if (planDetails.maxUsers !== undefined) subscriptionUpdate.maxUsers = planDetails.maxUsers;
+      if (planDetails.maxManagers !== undefined) subscriptionUpdate.maxManagers = planDetails.maxManagers;
+      if (planDetails.maxSupervisors !== undefined) subscriptionUpdate.maxSupervisors = planDetails.maxSupervisors;
+    }
+
     await subRef.set(subscriptionUpdate, { merge: true });
+
+    // Synchronize root organisation document in real-time
+    await orgRef.set({
+      isSubscriptionActive,
+      subscriptionPlan: subscriptionUpdate.subscriptionPlan,
+      subscriptionType: planType,
+      subscriptionStartDate: subscriptionUpdate.subscriptionStartDate,
+      subscriptionEndDate: subscriptionUpdate.subscriptionEndDate,
+      paymentStatus: finalStatus,
+      paymentTxnId: txnid,
+      payuMoneyId: subscriptionUpdate.payuMoneyId,
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true }).catch(() => {});
 
     // Ensure we have the user's registered email - check Firestore admin & root org doc if missing from request
     let effectiveEmail = (subscriptionUpdate.payerEmail || "").trim();
@@ -482,6 +508,7 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
             isSubscriptionActive: isSuccess,
             paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
             payuMoneyId: mihpayid,
+            ...(isSuccess ? { lastExpiryReminderSentForEndDate: null } : {}),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           }, { merge: true }).catch(() => {});
         }
@@ -510,6 +537,7 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
               isSubscriptionActive: isSuccess,
               paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
               payuMoneyId: mihpayid,
+              ...(isSuccess ? { lastExpiryReminderSentForEndDate: null } : {}),
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             }, { merge: true }).catch(() => {});
           }
@@ -1228,6 +1256,170 @@ exports.triggerScheduledNotifications = functions.region("us-central1").https.on
   } catch (err) {
     logger.error("triggerScheduledNotifications callable error:", err);
     throw new HttpsError("internal", err.message || "Failed to run scheduled notifications scan");
+  }
+});
+
+// =============================================================================
+// SUBSCRIPTION EXPIRY REMINDER ENGINE (2 DAYS PRIOR TO EXPIRY)
+// =============================================================================
+
+/**
+ * Scans all active subscriptions across organizations and dispatches
+ * expiry reminder emails for subscriptions that are 2 days away from expiry.
+ * 
+ * Rules:
+ * - Checks active subscriptions only (isSubscriptionActive === true)
+ * - Fires when 2 days away from expiry (0 < diffDays <= 2.05)
+ * - Sent only once for each subscription expiry period (checks lastExpiryReminderSentForEndDate)
+ * - Does not send duplicate emails
+ * - If subscription renewed or extended, old reminder is not sent
+ * - Expired subscriptions (diffDays <= 0) do not receive reminders
+ */
+async function executeSubscriptionExpiryScan(db) {
+  const now = new Date();
+  logger.info(`Starting subscription expiry reminder scan at: ${now.toISOString()}`);
+
+  let scannedCount = 0;
+  let remindersSent = 0;
+  let skippedCount = 0;
+
+  try {
+    const orgsSnap = await db.collection("organisation").get();
+    scannedCount = orgsSnap.docs.length;
+
+    for (const orgDoc of orgsSnap.docs) {
+      const orgId = orgDoc.id;
+      if (!orgId || orgId === "uninitialized") continue;
+
+      try {
+        const subRef = orgDoc.ref.collection("data").doc("subscription");
+        const subSnap = await subRef.get();
+        if (!subSnap.exists) continue;
+
+        const subData = subSnap.data() || {};
+        const isSubscriptionActive = subData.isSubscriptionActive === true;
+        if (!isSubscriptionActive) continue;
+
+        const endDateTimestamp = subData.subscriptionEndDate;
+        if (!endDateTimestamp || typeof endDateTimestamp.toDate !== "function") continue;
+
+        const endDate = endDateTimestamp.toDate();
+        const diffMs = endDate.getTime() - now.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+        // 1. Expired subscriptions must NOT receive reminders
+        if (diffMs <= 0 || diffDays <= 0) {
+          skippedCount++;
+          continue;
+        }
+
+        // 2. Only target subscriptions that are 2 days away (e.g. <= 2.05 days and > 0 days)
+        if (diffDays > 2.05) {
+          // Expiry is more than 2 days away
+          continue;
+        }
+
+        // 3. Prevent duplicate reminders for the same expiry period
+        const endDateIso = endDate.toISOString();
+        if (subData.lastExpiryReminderSentForEndDate === endDateIso) {
+          logger.info(`Org ${orgId} has already received 2-day reminder for period ending ${endDateIso}. Skipping duplicate.`);
+          skippedCount++;
+          continue;
+        }
+
+        // 4. Resolve registered user email
+        let payerEmail = (subData.payerEmail || "").trim();
+        let payerName = subData.payerName || "Customer";
+        let orgName = "Organization Workspace";
+
+        const orgData = orgDoc.data() || {};
+        orgName = orgData.org_name || orgData.name || orgName;
+        if (!payerEmail && orgData.email) {
+          payerEmail = orgData.email.trim();
+        }
+
+        if (!payerEmail || payerName === "Customer") {
+          const adminDoc = await orgDoc.ref.collection("data").doc("admin").get().catch(() => null);
+          if (adminDoc && adminDoc.exists) {
+            const adminData = adminDoc.data() || {};
+            if (!payerEmail && adminData.email) {
+              payerEmail = adminData.email.trim();
+            }
+            if (adminData.username && payerName === "Customer") {
+              payerName = adminData.username;
+            }
+          }
+        }
+
+        if (!payerEmail || !emailService.isValidEmail(payerEmail)) {
+          logger.warn(`No valid email found to send expiry reminder for org ${orgId}`);
+          skippedCount++;
+          continue;
+        }
+
+        const daysRemaining = Math.max(1, Math.ceil(diffDays));
+        const planName = subData.subscriptionPlan || "Subscription";
+
+        logger.info(`Sending 2-day expiry reminder to ${emailService.maskEmail(payerEmail)} for org ${orgId} (Expires in ${daysRemaining} days on ${endDateIso})`);
+
+        const emailResult = await emailService.sendSubscriptionExpiryReminder({
+          orgId,
+          payerEmail,
+          payerName,
+          orgName,
+          planName: planName.toUpperCase(),
+          expiryDate: endDate,
+          daysRemaining,
+        }, db);
+
+        if (emailResult && emailResult.success) {
+          remindersSent++;
+        }
+      } catch (orgErr) {
+        logger.warn(`Error checking expiry for org ${orgDoc.id}:`, orgErr.message || orgErr);
+      }
+    }
+
+    logger.info(`Subscription expiry scan completed. Scanned: ${scannedCount}, Reminders Sent: ${remindersSent}, Skipped: ${skippedCount}`);
+    return {
+      scanned: scannedCount,
+      remindersSent,
+      skipped: skippedCount,
+      timestamp: now.toISOString(),
+    };
+  } catch (err) {
+    logger.error("executeSubscriptionExpiryScan fatal error:", err);
+    throw err;
+  }
+}
+
+/**
+ * 9. Scheduled Cron Trigger: checkSubscriptionExpiryReminders
+ * Runs daily at 9:00 AM (Asia/Kolkata) to check active subscriptions
+ * and send 2-day expiry reminders automatically.
+ */
+exports.checkSubscriptionExpiryReminders = functions.region("us-central1")
+  .pubsub.schedule("0 9 * * *")
+  .timeZone("Asia/Kolkata")
+  .onRun(async (context) => {
+    logger.info("Executing scheduled cron job: checkSubscriptionExpiryReminders");
+    const result = await executeSubscriptionExpiryScan(admin.firestore());
+    logger.info("checkSubscriptionExpiryReminders completed:", result);
+    return null;
+  });
+
+/**
+ * 10. Callable Cloud Function: triggerSubscriptionExpiryCheck
+ * Allows manual or test triggering of the subscription expiry reminder worker on-demand
+ */
+exports.triggerSubscriptionExpiryCheck = functions.region("us-central1").https.onCall(async (data, context) => {
+  try {
+    logger.info("Manual trigger requested for triggerSubscriptionExpiryCheck");
+    const result = await executeSubscriptionExpiryScan(admin.firestore());
+    return { success: true, ...result };
+  } catch (err) {
+    logger.error("triggerSubscriptionExpiryCheck callable error:", err);
+    throw new HttpsError("internal", err.message || "Failed to execute subscription expiry scan");
   }
 });
 

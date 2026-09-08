@@ -1,14 +1,14 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:demo_cst/services/expense_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/pdf_templates.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/pdf_templates.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
 
 class LabourData {
   String labourType;

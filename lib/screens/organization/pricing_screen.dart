@@ -1,18 +1,18 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/utils/terms_helper.dart';
-import 'package:demo_cst/services/payu_service.dart';
-import 'package:demo_cst/screens/organization/payu_checkout_screen.dart';
-import 'package:demo_cst/screens/organization/organization_dashboard.dart';
-import 'package:demo_cst/screens/organization/transaction_completed_screen.dart';
-import 'package:demo_cst/screens/organization/org_subscription_page.dart';
-import 'package:demo_cst/screens/common/contact_support_screen.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/utils/terms_helper.dart';
+import 'package:ebricks/services/payu_service.dart';
+import 'package:ebricks/screens/organization/payu_checkout_screen.dart';
+import 'package:ebricks/screens/organization/organization_dashboard.dart';
+import 'package:ebricks/screens/organization/transaction_completed_screen.dart';
+import 'package:ebricks/screens/organization/org_subscription_page.dart';
+import 'package:ebricks/screens/common/contact_support_screen.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
 
 class PricingScreen extends StatefulWidget {
   final String orgName;

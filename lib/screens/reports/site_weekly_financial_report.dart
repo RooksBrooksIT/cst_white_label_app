@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 import 'dart:async';
-import 'package:demo_cst/screens/reports/site_weekly_financial_report2.dart';
+import 'package:ebricks/screens/reports/site_weekly_financial_report2.dart';
 
 class SiteWeeklyFinancialReports extends StatefulWidget {
   const SiteWeeklyFinancialReports({super.key});

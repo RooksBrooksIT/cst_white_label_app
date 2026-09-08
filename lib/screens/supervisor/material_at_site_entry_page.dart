@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/material_inventory_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/material_inventory_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class MaterialAtSiteEntryPage extends StatefulWidget {
   final String supervisorId;

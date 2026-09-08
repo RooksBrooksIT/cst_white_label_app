@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/approval_workflow_service.dart';
-import 'package:demo_cst/widgets/approval_lifecycle_stepper.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/approval_workflow_service.dart';
+import 'package:ebricks/widgets/approval_lifecycle_stepper.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class ManagerSitePaymentApprovalPage extends StatefulWidget {
   const ManagerSitePaymentApprovalPage({super.key});

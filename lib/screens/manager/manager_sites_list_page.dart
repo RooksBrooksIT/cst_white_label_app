@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/screens/manager/project_setup_wizard.dart';
-import 'package:demo_cst/screens/organization/site_financial_details_page.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/screens/manager/project_setup_wizard.dart';
+import 'package:ebricks/screens/organization/site_financial_details_page.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
 
 class ManagerSitesListPage extends StatefulWidget {
   final String initialFilter;

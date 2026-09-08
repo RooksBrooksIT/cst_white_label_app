@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/screens/organization/organisation_login_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_login_page.dart';
-import 'package:demo_cst/screens/common/config_login.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/screens/organization/organisation_login_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_login_page.dart';
+import 'package:ebricks/screens/common/config_login.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});

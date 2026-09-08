@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/screens/common/portal_loading_screen.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/screens/common/portal_loading_screen.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -24,6 +24,7 @@ class _LandingPageState extends State<LandingPage> {
 
   bool _isPasswordObscured = true;
   bool _isLoading = false;
+  bool _loginResolved = false;
 
   @override
   void dispose() {
@@ -47,6 +48,8 @@ class _LandingPageState extends State<LandingPage> {
     final password = _passwordController.text.trim();
 
     try {
+      _loginResolved = false;
+
       // Fetch all organisation documents (single roundtrip, no composite index needed)
       List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs = [];
       try {
@@ -57,25 +60,19 @@ class _LandingPageState extends State<LandingPage> {
         debugPrint('LandingPage: Root organisation fetch note: $e');
       }
 
-      // 1. Check if user is an Organization Admin
+      // 1. Check if user is an Organization Admin (in-memory scan is instant < 1ms)
       final bool isOrg =
           await _tryOrganizationLogin(username, password, orgDocs);
-      if (isOrg) return;
+      if (isOrg || _loginResolved) return;
 
-      // 2. Check if user is a Manager
-      final bool isManager =
-          await _tryManagerLogin(username, password, orgDocs);
-      if (isManager) return;
+      // 2. Concurrently check Manager, Supervisor, and Customer roles with fast targeted queries
+      final results = await Future.wait([
+        _tryManagerLogin(username, password, orgDocs),
+        _trySupervisorLogin(username, password, orgDocs),
+        _tryCustomerLogin(username, password, orgDocs),
+      ]);
 
-      // 3. Check if user is a Supervisor / Contractor
-      final bool isSupervisor =
-          await _trySupervisorLogin(username, password, orgDocs);
-      if (isSupervisor) return;
-
-      // 4. Check if user is a Customer / Client
-      final bool isCustomer =
-          await _tryCustomerLogin(username, password, orgDocs);
-      if (isCustomer) return;
+      if (results.any((r) => r == true) || _loginResolved) return;
 
       // If no matching account found across any role:
       if (mounted) {
@@ -99,6 +96,7 @@ class _LandingPageState extends State<LandingPage> {
     String password,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs,
   ) async {
+    if (_loginResolved) return true;
     final cleanInput = username.trim();
     final cleanLower = cleanInput.toLowerCase();
     final cleanPass = password.trim();
@@ -161,57 +159,87 @@ class _LandingPageState extends State<LandingPage> {
           }
         } catch (_) {}
       } else {
-        // Deep search inside each organisation subcollection
-        for (var doc in orgDocs) {
-          try {
-            final adminDoc =
-                await doc.reference.collection('data').doc('admin').get();
-            if (adminDoc.exists && adminDoc.data() != null) {
-              final aData = adminDoc.data()!;
-              final aEmail = (aData['email'] ?? '').toString().trim().toLowerCase();
-              final aUser = (aData['username'] ?? '').toString().trim().toLowerCase();
-              final aPhone =
-                  (aData['phone'] ?? aData['MobileNumber'] ?? '').toString().trim();
-              if (aEmail == cleanLower || aUser == cleanLower || aPhone == cleanInput) {
-                userData = aData;
-                dynamicPath = doc.id;
-                fullConfigPath = adminDoc.reference.path;
-                break;
+        // Fast targeted collectionGroup queries first
+        try {
+          final userQueries = await Future.wait([
+            FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: cleanLower).limit(1).get(),
+            FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: cleanInput).limit(1).get(),
+            FirebaseFirestore.instance.collectionGroup('organizationUser').where('UserName', isEqualTo: cleanInput).limit(1).get(),
+          ]);
+          for (final snap in userQueries) {
+            if (snap.docs.isNotEmpty) {
+              final doc = snap.docs.first;
+              final segments = doc.reference.path.split('/');
+              final orgIndex = segments.indexOf('organisation');
+              if (orgIndex != -1 && orgIndex + 1 < segments.length) {
+                dynamicPath = segments[orgIndex + 1];
               }
-            }
-
-            final userDoc =
-                await doc.reference.collection('organizationUser').doc(cleanLower).get();
-            if (userDoc.exists && userDoc.data() != null) {
-              userData = userDoc.data();
-              dynamicPath = doc.id;
-              fullConfigPath = userDoc.reference.path;
+              userData = doc.data();
+              fullConfigPath = doc.reference.path;
               break;
             }
-          } catch (_) {}
+          }
+        } catch (_) {}
+
+        // Fallback: Parallel search inside organisation subcollections if needed
+        if (userData == null && orgDocs.isNotEmpty) {
+          final searchFutures = orgDocs.map((doc) async {
+            try {
+              final adminDoc =
+                  await doc.reference.collection('data').doc('admin').get();
+              if (adminDoc.exists && adminDoc.data() != null) {
+                final aData = adminDoc.data()!;
+                final aEmail = (aData['email'] ?? '').toString().trim().toLowerCase();
+                final aUser = (aData['username'] ?? '').toString().trim().toLowerCase();
+                final aPhone =
+                    (aData['phone'] ?? aData['MobileNumber'] ?? '').toString().trim();
+                if (aEmail == cleanLower || aUser == cleanLower || aPhone == cleanInput) {
+                  return {
+                    'data': aData,
+                    'dynamicPath': doc.id,
+                    'path': adminDoc.reference.path,
+                  };
+                }
+              }
+
+              final userDoc =
+                  await doc.reference.collection('organizationUser').doc(cleanLower).get();
+              if (userDoc.exists && userDoc.data() != null) {
+                return {
+                  'data': userDoc.data()!,
+                  'dynamicPath': doc.id,
+                  'path': userDoc.reference.path,
+                };
+              }
+            } catch (_) {}
+            return null;
+          });
+
+          final results = await Future.wait(searchFutures);
+          for (final match in results) {
+            if (match != null) {
+              userData = match['data'] as Map<String, dynamic>?;
+              dynamicPath = match['dynamicPath'] as String?;
+              fullConfigPath = match['path'] as String?;
+              break;
+            }
+          }
         }
       }
 
       // Strategy C: Direct doc ID fallback
       if (userData == null) {
         try {
-          final directDoc = await FirebaseFirestore.instance
-              .collection('organisation')
-              .doc(cleanInput)
-              .get();
-          if (directDoc.exists && directDoc.data() != null) {
-            userData = directDoc.data();
-            dynamicPath = directDoc.id;
-            fullConfigPath = directDoc.reference.path;
-          } else {
-            final cstDoc = await FirebaseFirestore.instance
-                .collection('organisation')
-                .doc('cst_$cleanInput')
-                .get();
-            if (cstDoc.exists && cstDoc.data() != null) {
-              userData = cstDoc.data();
-              dynamicPath = cstDoc.id;
-              fullConfigPath = cstDoc.reference.path;
+          final directDocs = await Future.wait([
+            FirebaseFirestore.instance.collection('organisation').doc(cleanInput).get(),
+            FirebaseFirestore.instance.collection('organisation').doc('cst_$cleanInput').get(),
+          ]);
+          for (final directDoc in directDocs) {
+            if (directDoc.exists && directDoc.data() != null) {
+              userData = directDoc.data();
+              dynamicPath = directDoc.id;
+              fullConfigPath = directDoc.reference.path;
+              break;
             }
           }
         } catch (_) {}
@@ -236,12 +264,12 @@ class _LandingPageState extends State<LandingPage> {
       }
 
       // 2. Firebase Auth login attempt
-      if (email.isNotEmpty) {
+      if (email.isNotEmpty && !isPasswordValid) {
         try {
           await AuthService().loginWithEmail(email, cleanPass);
           isPasswordValid = true;
 
-          // Sync password if updated
+          // Sync password if updated in background
           if (storedPassword != cleanPass && fullConfigPath != null) {
             final WriteBatch batch = FirebaseFirestore.instance.batch();
             batch.update(FirebaseFirestore.instance.doc(fullConfigPath), {
@@ -263,7 +291,7 @@ class _LandingPageState extends State<LandingPage> {
                 {'password': cleanPass},
               );
             }
-            await batch.commit().catchError((_) {});
+            batch.commit().catchError((_) {});
           }
         } catch (authErr) {
           debugPrint('LandingPage: Firebase Auth note: $authErr');
@@ -271,16 +299,16 @@ class _LandingPageState extends State<LandingPage> {
       }
 
       if (!isPasswordValid) return false;
+      if (_loginResolved) return true;
+      _loginResolved = true;
 
       final String? referralCode = userData['referralCode']?.toString() ??
           userData['orgReferralCode']?.toString();
 
-      // Set org path and sync branding
+      // Set org path and sync branding in background
       FirestoreService.setOrgPath(dynamicPath ?? '');
       if (dynamicPath != null && dynamicPath != 'uninitialized') {
-        try {
-          await AppTheme.syncWithFirestore(dynamicPath);
-        } catch (_) {}
+        AppTheme.syncWithFirestore(dynamicPath).catchError((_) {});
       }
 
       await AuthService().login(UserRole.organization, {
@@ -291,11 +319,11 @@ class _LandingPageState extends State<LandingPage> {
         if (referralCode != null && referralCode.isNotEmpty) 'referral_code': referralCode,
       });
 
-      await NotificationService.saveToken(
+      NotificationService.saveToken(
         userId: actualUsername,
         userType: 'organisation',
         userName: actualUsername,
-      );
+      ).catchError((_) {});
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -304,7 +332,7 @@ class _LandingPageState extends State<LandingPage> {
             pageBuilder: (context, animation, secondaryAnimation) =>
                 const PortalLoadingScreen(
               expectedRole: UserRole.organization,
-              initialStatusMessage: 'Loading your dashboard…',
+              initialStatusMessage: 'Loading organization portal…',
             ),
             transitionDuration: const Duration(milliseconds: 300),
             transitionsBuilder: (context, animation, secondaryAnimation, child) =>
@@ -326,100 +354,102 @@ class _LandingPageState extends State<LandingPage> {
     String password,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs,
   ) async {
+    if (_loginResolved) return true;
     final cleanInput = username.trim();
     final cleanLower = cleanInput.toLowerCase();
     final cleanPass = password.trim();
 
     try {
-      // 1. Direct subcollection check under each org (zero index dependency)
-      for (var orgDoc in orgDocs) {
-        final orgId = orgDoc.id;
-        try {
-          final managerSnap = await orgDoc.reference.collection('manager').get();
-          for (var doc in managerSnap.docs) {
-            final docData = doc.data();
-            final docUser = (docData['UserName'] ?? docData['username'] ?? '')
-                .toString()
-                .trim()
-                .toLowerCase();
-            final docEmail =
-                (docData['email'] ?? '').toString().trim().toLowerCase();
-            final docPhone =
-                (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
-            final storedPass =
-                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
-
-            if ((docUser == cleanLower ||
-                    docUser == cleanInput ||
-                    docEmail == cleanLower ||
-                    docPhone == cleanInput ||
-                    doc.id.toLowerCase() == cleanLower) &&
-                storedPass == cleanPass) {
-              return await _completeManagerLogin(
-                  doc.id, orgId, docData, cleanInput, cleanPass);
-            }
-          }
-
-          final configUsersSnap =
-              await orgDoc.reference.collection('configUsers').get();
-          for (var doc in configUsersSnap.docs) {
-            final docData = doc.data();
-            final docUser = (docData['UserName'] ?? docData['username'] ?? '')
-                .toString()
-                .trim()
-                .toLowerCase();
-            final docEmail =
-                (docData['email'] ?? '').toString().trim().toLowerCase();
-            final docPhone =
-                (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
-            final storedPass =
-                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
-
-            if ((docUser == cleanLower ||
-                    docUser == cleanInput ||
-                    docEmail == cleanLower ||
-                    docPhone == cleanInput) &&
-                storedPass == cleanPass) {
-              return await _completeManagerLogin(
-                  doc.id, orgId, docData, cleanInput, cleanPass);
-            }
-          }
-        } catch (_) {}
-      }
-
-      // 2. Safe collectionGroup fallback with isolated error handling
+      // 1. Fast targeted collectionGroup queries (indexed, ~100-200ms)
       try {
-        final cgSnap =
-            await FirebaseFirestore.instance.collectionGroup('manager').get();
-        for (var doc in cgSnap.docs) {
-          final docData = doc.data();
-          final docUser = (docData['UserName'] ?? docData['username'] ?? '')
-              .toString()
-              .trim()
-              .toLowerCase();
-          final docEmail =
-              (docData['email'] ?? '').toString().trim().toLowerCase();
-          final docPhone =
-              (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
-          final storedPass =
-              (docData['Password'] ?? docData['password'] ?? '').toString().trim();
-
-          if ((docUser == cleanLower ||
-                  docUser == cleanInput ||
-                  docEmail == cleanLower ||
-                  docPhone == cleanInput) &&
-              storedPass == cleanPass) {
-            String orgId = '';
-            final segments = doc.reference.path.split('/');
-            final orgIndex = segments.indexOf('organisation');
-            if (orgIndex != -1 && orgIndex + 1 < segments.length) {
-              orgId = segments[orgIndex + 1];
+        final results = await Future.wait([
+          FirebaseFirestore.instance.collectionGroup('manager').where('UserName', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('manager').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('manager').where('UserName', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('manager').where('username', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('manager').where('MobileNumber', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('manager').where('email', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('configUsers').where('UserName', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('configUsers').where('UserName', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('configUsers').where('MobileNumber', isEqualTo: cleanInput).limit(1).get(),
+        ]);
+        for (final snap in results) {
+          for (final doc in snap.docs) {
+            final docData = doc.data();
+            final storedPass =
+                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
+            if (storedPass == cleanPass) {
+              String orgId = '';
+              final segments = doc.reference.path.split('/');
+              final orgIndex = segments.indexOf('organisation');
+              if (orgIndex != -1 && orgIndex + 1 < segments.length) {
+                orgId = segments[orgIndex + 1];
+              }
+              return await _completeManagerLogin(
+                  doc.id, orgId, docData, cleanInput, cleanPass);
             }
-            return await _completeManagerLogin(
-                doc.id, orgId, docData, cleanInput, cleanPass);
           }
         }
       } catch (_) {}
+
+      if (_loginResolved) return true;
+
+      // 2. Parallel subcollection search under orgDocs as fallback
+      if (orgDocs.isNotEmpty) {
+        final searchFutures = orgDocs.map((orgDoc) async {
+          final orgId = orgDoc.id;
+          try {
+            final snaps = await Future.wait([
+              orgDoc.reference.collection('manager').get(),
+              orgDoc.reference.collection('configUsers').get(),
+            ]);
+
+            for (final snap in snaps) {
+              for (final doc in snap.docs) {
+                final docData = doc.data();
+                final docUser = (docData['UserName'] ?? docData['username'] ?? '')
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+                final docEmail =
+                    (docData['email'] ?? '').toString().trim().toLowerCase();
+                final docPhone =
+                    (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
+                final storedPass =
+                    (docData['Password'] ?? docData['password'] ?? '').toString().trim();
+
+                if ((docUser == cleanLower ||
+                        docUser == cleanInput ||
+                        docEmail == cleanLower ||
+                        docPhone == cleanInput ||
+                        doc.id.toLowerCase() == cleanLower) &&
+                    storedPass == cleanPass) {
+                  return {
+                    'docId': doc.id,
+                    'orgId': orgId,
+                    'docData': docData,
+                  };
+                }
+              }
+            }
+          } catch (_) {}
+          return null;
+        });
+
+        final results = await Future.wait(searchFutures);
+        for (final match in results) {
+          if (match != null) {
+            return await _completeManagerLogin(
+              match['docId'] as String,
+              match['orgId'] as String,
+              match['docData'] as Map<String, dynamic>,
+              cleanInput,
+              cleanPass,
+            );
+          }
+        }
+      }
 
       return false;
     } catch (e) {
@@ -435,14 +465,17 @@ class _LandingPageState extends State<LandingPage> {
     String cleanInput,
     String cleanPass,
   ) async {
+    if (_loginResolved) return true;
+    _loginResolved = true;
+
     final prefs = await SharedPreferences.getInstance();
     if (orgId.isNotEmpty) {
       await prefs.setString('config_org_path', orgId);
       final String resolvedPath = 'organisation/$orgId/data/admin';
       await prefs.setString('config_org_doc_path', resolvedPath);
       FirestoreService.setOrgPath(orgId);
-      await FirestoreService.initialize();
-      await AppTheme.syncWithFirestore(orgId);
+      FirestoreService.initialize().catchError((_) {});
+      AppTheme.syncWithFirestore(orgId).catchError((_) {});
     }
 
     final Map<String, dynamic> data = {
@@ -454,11 +487,11 @@ class _LandingPageState extends State<LandingPage> {
     };
     await AuthService().login(UserRole.manager, data);
 
-    await NotificationService.saveToken(
+    NotificationService.saveToken(
       userId: docId,
       userType: 'manager',
       userName: data['username'] ?? cleanInput,
-    );
+    ).catchError((_) {});
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(
@@ -485,109 +518,106 @@ class _LandingPageState extends State<LandingPage> {
     String password,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs,
   ) async {
+    if (_loginResolved) return true;
     final cleanInput = username.trim();
     final cleanLower = cleanInput.toLowerCase();
     final cleanPass = password.trim();
 
     try {
-      // 1. Direct subcollection search under each org (zero index dependency)
-      for (var orgDoc in orgDocs) {
-        final orgId = orgDoc.id;
-        try {
-          final supSnap = await orgDoc.reference.collection('supervisor').get();
-          for (var doc in supSnap.docs) {
-            final docData = doc.data();
-            final docUser = (docData['UserName'] ??
-                    docData['username'] ??
-                    docData['Name'] ??
-                    '')
-                .toString()
-                .trim()
-                .toLowerCase();
-            final docEmail =
-                (docData['email'] ?? '').toString().trim().toLowerCase();
-            final docPhone =
-                (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
-            final storedPass =
-                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
-
-            if ((docUser == cleanLower ||
-                    docUser == cleanInput ||
-                    docEmail == cleanLower ||
-                    docPhone == cleanInput ||
-                    doc.id.toLowerCase() == cleanLower) &&
-                storedPass == cleanPass) {
-              return await _completeSupervisorLogin(
-                  doc.id, orgId, docData, cleanInput);
-            }
-          }
-
-          final supsSnap =
-              await orgDoc.reference.collection('supervisors').get();
-          for (var doc in supsSnap.docs) {
-            final docData = doc.data();
-            final docUser = (docData['UserName'] ??
-                    docData['username'] ??
-                    docData['Name'] ??
-                    '')
-                .toString()
-                .trim()
-                .toLowerCase();
-            final docEmail =
-                (docData['email'] ?? '').toString().trim().toLowerCase();
-            final docPhone =
-                (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
-            final storedPass =
-                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
-
-            if ((docUser == cleanLower ||
-                    docUser == cleanInput ||
-                    docEmail == cleanLower ||
-                    docPhone == cleanInput) &&
-                storedPass == cleanPass) {
-              return await _completeSupervisorLogin(
-                  doc.id, orgId, docData, cleanInput);
-            }
-          }
-        } catch (_) {}
-      }
-
-      // 2. Safe collectionGroup fallback
+      // 1. Fast targeted collectionGroup queries (indexed, ~100-200ms)
       try {
-        final cgSnap =
-            await FirebaseFirestore.instance.collectionGroup('supervisor').get();
-        for (var doc in cgSnap.docs) {
-          final docData = doc.data();
-          final docUser = (docData['UserName'] ??
-                  docData['username'] ??
-                  docData['Name'] ??
-                  '')
-              .toString()
-              .trim()
-              .toLowerCase();
-          final docEmail =
-              (docData['email'] ?? '').toString().trim().toLowerCase();
-          final docPhone =
-              (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
-          final storedPass =
-              (docData['Password'] ?? docData['password'] ?? '').toString().trim();
-
-          if ((docUser == cleanLower ||
-                  docUser == cleanInput ||
-                  docEmail == cleanLower ||
-                  docPhone == cleanInput) &&
-              storedPass == cleanPass) {
-            String orgId = '';
-            final segments = doc.reference.path.split('/');
-            final orgIndex = segments.indexOf('organisation');
-            if (orgIndex != -1 && orgIndex + 1 < segments.length) {
-              orgId = segments[orgIndex + 1];
+        final results = await Future.wait([
+          FirebaseFirestore.instance.collectionGroup('supervisors').where('UserName', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisors').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisors').where('UserName', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisors').where('username', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisors').where('MobileNumber', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisors').where('email', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisor').where('UserName', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisor').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisor').where('UserName', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisor').where('username', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisor').where('MobileNumber', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('supervisor').where('email', isEqualTo: cleanLower).limit(1).get(),
+        ]);
+        for (final snap in results) {
+          for (final doc in snap.docs) {
+            final docData = doc.data();
+            final storedPass =
+                (docData['Password'] ?? docData['password'] ?? '').toString().trim();
+            if (storedPass == cleanPass) {
+              String orgId = '';
+              final segments = doc.reference.path.split('/');
+              final orgIndex = segments.indexOf('organisation');
+              if (orgIndex != -1 && orgIndex + 1 < segments.length) {
+                orgId = segments[orgIndex + 1];
+              }
+              return await _completeSupervisorLogin(
+                  doc.id, orgId, docData, cleanInput);
             }
-            return await _completeSupervisorLogin(
-                doc.id, orgId, docData, cleanInput);
           }
         }
       } catch (_) {}
+
+      if (_loginResolved) return true;
+
+      // 2. Parallel subcollection search under orgDocs as fallback
+      if (orgDocs.isNotEmpty) {
+        final searchFutures = orgDocs.map((orgDoc) async {
+          final orgId = orgDoc.id;
+          try {
+            final snaps = await Future.wait([
+              orgDoc.reference.collection('supervisor').get(),
+              orgDoc.reference.collection('supervisors').get(),
+            ]);
+
+            for (final snap in snaps) {
+              for (final doc in snap.docs) {
+                final docData = doc.data();
+                final docUser = (docData['UserName'] ??
+                        docData['username'] ??
+                        docData['Name'] ??
+                        '')
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+                final docEmail =
+                    (docData['email'] ?? '').toString().trim().toLowerCase();
+                final docPhone =
+                    (docData['MobileNumber'] ?? docData['phone'] ?? '').toString().trim();
+                final storedPass =
+                    (docData['Password'] ?? docData['password'] ?? '').toString().trim();
+
+                if ((docUser == cleanLower ||
+                        docUser == cleanInput ||
+                        docEmail == cleanLower ||
+                        docPhone == cleanInput ||
+                        doc.id.toLowerCase() == cleanLower) &&
+                    storedPass == cleanPass) {
+                  return {
+                    'docId': doc.id,
+                    'orgId': orgId,
+                    'docData': docData,
+                  };
+                }
+              }
+            }
+          } catch (_) {}
+          return null;
+        });
+
+        final results = await Future.wait(searchFutures);
+        for (final match in results) {
+          if (match != null) {
+            return await _completeSupervisorLogin(
+              match['docId'] as String,
+              match['orgId'] as String,
+              match['docData'] as Map<String, dynamic>,
+              cleanInput,
+            );
+          }
+        }
+      }
 
       return false;
     } catch (e) {
@@ -602,6 +632,9 @@ class _LandingPageState extends State<LandingPage> {
     Map<String, dynamic> docData,
     String cleanInput,
   ) async {
+    if (_loginResolved) return true;
+    _loginResolved = true;
+
     final supervisorName = (docData['Name'] ??
             docData['supervisorName'] ??
             docData['UserName'] ??
@@ -614,8 +647,8 @@ class _LandingPageState extends State<LandingPage> {
       final String resolvedPath = 'organisation/$orgId/data/admin';
       await prefs.setString('sup_org_doc_path', resolvedPath);
       FirestoreService.setOrgPath(orgId);
-      await FirestoreService.initialize();
-      await AppTheme.syncWithFirestore(orgId);
+      FirestoreService.initialize().catchError((_) {});
+      AppTheme.syncWithFirestore(orgId).catchError((_) {});
     }
 
     await AuthService().login(UserRole.supervisor, {
@@ -629,11 +662,11 @@ class _LandingPageState extends State<LandingPage> {
       'sup_org_doc_path': 'organisation/$orgId/data/admin',
     });
 
-    await NotificationService.saveToken(
+    NotificationService.saveToken(
       userId: supervisorId,
       userType: 'supervisor',
       userName: supervisorName,
-    );
+    ).catchError((_) {});
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(
@@ -660,57 +693,68 @@ class _LandingPageState extends State<LandingPage> {
     String password,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> orgDocs,
   ) async {
+    if (_loginResolved) return true;
     final cleanInput = username.trim();
     final cleanLower = cleanInput.toLowerCase();
     final cleanPass = password.trim();
 
     try {
-      // 1. Direct subcollection search under each org (zero index dependency)
-      for (var orgDoc in orgDocs) {
-        try {
-          final custSnap =
-              await orgDoc.reference.collection('customers').get();
-          for (var doc in custSnap.docs) {
+      // 1. Fast targeted collectionGroup query
+      try {
+        final results = await Future.wait([
+          FirebaseFirestore.instance.collectionGroup('customers').where('ownerPhoneNumber', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('customers').where('phone', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('customers').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('customers').where('username', isEqualTo: cleanLower).limit(1).get(),
+        ]);
+        for (final snap in results) {
+          for (final doc in snap.docs) {
             final data = doc.data();
-            final phone =
-                (data['ownerPhoneNumber'] ?? data['phone'] ?? '').toString().trim();
-            final user =
-                (data['username'] ?? data['ownerName'] ?? '').toString().trim().toLowerCase();
             final storedPass =
                 (data['password'] ?? data['pin'] ?? '').toString().trim();
-
-            if ((phone == cleanInput ||
-                    user == cleanLower ||
-                    user == cleanInput ||
-                    doc.id.toLowerCase() == cleanLower) &&
-                (storedPass.isEmpty || storedPass == cleanPass)) {
+            if (storedPass.isEmpty || storedPass == cleanPass) {
               return await _completeCustomerLogin(data, cleanInput);
             }
           }
-        } catch (_) {}
-      }
-
-      // 2. Safe collectionGroup fallback
-      try {
-        final cgSnap =
-            await FirebaseFirestore.instance.collectionGroup('customers').get();
-        for (var doc in cgSnap.docs) {
-          final data = doc.data();
-          final phone =
-              (data['ownerPhoneNumber'] ?? data['phone'] ?? '').toString().trim();
-          final user =
-              (data['username'] ?? data['ownerName'] ?? '').toString().trim().toLowerCase();
-          final storedPass =
-              (data['password'] ?? data['pin'] ?? '').toString().trim();
-
-          if ((phone == cleanInput ||
-                  user == cleanLower ||
-                  user == cleanInput) &&
-              (storedPass.isEmpty || storedPass == cleanPass)) {
-            return await _completeCustomerLogin(data, cleanInput);
-          }
         }
       } catch (_) {}
+
+      if (_loginResolved) return true;
+
+      // 2. Parallel subcollection search under orgDocs as fallback
+      if (orgDocs.isNotEmpty) {
+        final searchFutures = orgDocs.map((orgDoc) async {
+          try {
+            final custSnap =
+                await orgDoc.reference.collection('customers').get();
+            for (var doc in custSnap.docs) {
+              final data = doc.data();
+              final phone =
+                  (data['ownerPhoneNumber'] ?? data['phone'] ?? '').toString().trim();
+              final user =
+                  (data['username'] ?? data['ownerName'] ?? '').toString().trim().toLowerCase();
+              final storedPass =
+                  (data['password'] ?? data['pin'] ?? '').toString().trim();
+
+              if ((phone == cleanInput ||
+                      user == cleanLower ||
+                      user == cleanInput ||
+                      doc.id.toLowerCase() == cleanLower) &&
+                  (storedPass.isEmpty || storedPass == cleanPass)) {
+                return data;
+              }
+            }
+          } catch (_) {}
+          return null;
+        });
+
+        final results = await Future.wait(searchFutures);
+        for (final match in results) {
+          if (match != null) {
+            return await _completeCustomerLogin(match, cleanInput);
+          }
+        }
+      }
 
       return false;
     } catch (e) {
@@ -721,6 +765,9 @@ class _LandingPageState extends State<LandingPage> {
 
   Future<bool> _completeCustomerLogin(
       Map<String, dynamic> data, String cleanInput) async {
+    if (_loginResolved) return true;
+    _loginResolved = true;
+
     await AuthService().login(UserRole.customer, {
       'ownerName': data['ownerName'] ?? cleanInput,
       'ownerPhoneNumber': data['ownerPhoneNumber'] ?? cleanInput,
@@ -772,6 +819,7 @@ class _LandingPageState extends State<LandingPage> {
                       Container(
                         width: 88,
                         height: 88,
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(22),

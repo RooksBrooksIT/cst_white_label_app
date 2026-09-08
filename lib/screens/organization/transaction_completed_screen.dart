@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/screens/organization/organization_dashboard.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/screens/organization/organization_dashboard.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class TransactionCompletedScreen extends StatelessWidget {
   final String txnid;

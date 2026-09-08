@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/screens/common/portal_loading_screen.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/screens/common/portal_loading_screen.dart';
 
 class OrganisationLandingPage extends StatefulWidget {
   const OrganisationLandingPage({super.key});

@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/screens/organization/organization_dashboard.dart';
-import 'package:demo_cst/screens/manager/config_account_dashboard.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
-import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
-import 'package:demo_cst/screens/customer/customer_dashboard.dart';
-import 'package:demo_cst/screens/organization/organisation_landing_page.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/screens/organization/organization_dashboard.dart';
+import 'package:ebricks/screens/manager/config_account_dashboard.dart';
+import 'package:ebricks/screens/supervisor/supervisor_dashboard.dart';
+import 'package:ebricks/screens/manager/contractor_entry_page.dart';
+import 'package:ebricks/screens/customer/customer_dashboard.dart';
+import 'package:ebricks/screens/organization/organisation_landing_page.dart';
 
 enum PortalErrorType {
   none,
@@ -127,46 +127,29 @@ class _PortalLoadingScreenState extends State<PortalLoadingScreen>
       }
 
       // Step 2: Role-based data loading & cache sync
-      if (mounted) {
-        setState(() => _statusMessage = 'Syncing workspace data…');
-      }
-
       final data = auth.userData;
       final orgId = (data['dynamicPath'] ?? data['orgId'])?.toString();
 
-      if (orgId != null && orgId.isNotEmpty && orgId != 'uninitialized') {
-        try {
-          await AppTheme.syncWithFirestore(orgId);
-        } catch (_) {}
-      }
-
+      // Ensure FirestoreService is initialized
       try {
         await FirestoreService.initialize();
       } catch (_) {}
 
-      // Save notification token
+      // Fire background tasks (Branding sync, FCM token saving, subscription check) asynchronously
+      if (orgId != null && orgId.isNotEmpty && orgId != 'uninitialized') {
+        AppTheme.syncWithFirestore(orgId).catchError((_) {});
+      }
+
       final username = data['username']?.toString() ?? 'unknown';
-      try {
-        await NotificationService.saveToken(
-          userId: username,
-          userType: actualRole.toString().split('.').last,
-          userName: username,
-        );
-      } catch (_) {}
+      NotificationService.saveToken(
+        userId: username,
+        userType: actualRole.toString().split('.').last,
+        userName: username,
+      ).catchError((_) {});
 
-      // Step 3: Check subscription & branding sync in background if organization
       if (actualRole == UserRole.organization) {
-        try {
-          await auth.checkSubscriptionStatus();
-        } catch (_) {}
+        auth.checkSubscriptionStatus().catchError((_) => true);
       }
-
-      if (mounted) {
-        setState(() => _statusMessage = 'Opening dashboard…');
-      }
-
-      // Smooth brief delay for fluid transition
-      await Future.delayed(const Duration(milliseconds: 300));
 
       if (!mounted) return;
 

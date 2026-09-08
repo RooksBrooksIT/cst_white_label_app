@@ -563,14 +563,247 @@ async function sendSubscriptionInvoice(params, db) {
   return result;
 }
 
+/**
+ * HTML Template: Subscription Expiry Reminder
+ */
+function renderExpiryReminderHtml(data) {
+  const {
+    customerName = "Valued Customer",
+    orgName = "Organization Workspace",
+    planName = "Subscription Plan",
+    expiryDate = "In 2 Days",
+    daysRemaining = 2,
+    supportEmail = "support@rookstechnologies.com",
+  } = data;
+
+  const daysText = daysRemaining === 1 ? "1 day" : `${daysRemaining} days`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Action Required: eBricks Subscription Expiring Soon</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0d1b2a; margin: 0; padding: 24px; color: #f8fafc; }
+    .container { max-width: 580px; margin: 0 auto; background: #1b2a47; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.45); }
+    .header { background: linear-gradient(135deg, #1e293b, #b45309); padding: 32px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .brand-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .brand-title { font-size: 20px; font-weight: 900; color: #ffffff; letter-spacing: -0.5px; }
+    .badge { background: rgba(245,158,11,0.2); border: 1px solid #f59e0b; color: #fbbf24; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 12px; letter-spacing: 0.5px; }
+    .hero-title { font-size: 24px; font-weight: 900; color: #ffffff; margin: 0 0 6px; }
+    .hero-subtitle { font-size: 14px; color: #fde68a; margin: 0; }
+    .content { padding: 28px; }
+    .greeting { font-size: 15px; color: #e2e8f0; margin: 0 0 20px; line-height: 1.6; }
+    .alert-box { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: 14px; padding: 20px; margin-bottom: 24px; }
+    .alert-title { font-size: 13px; font-weight: 800; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+    .details-table { width: 100%; border-collapse: collapse; }
+    .details-table td { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13px; }
+    .details-table tr:last-child td { border-bottom: none; }
+    .details-label { color: #94a3b8; width: 45%; }
+    .details-val { color: #f8fafc; font-weight: 700; text-align: right; }
+    .countdown-pill { background: #ef4444; color: #ffffff; padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 800; }
+    .action-card { background: rgba(37,99,235,0.1); border: 1px solid rgba(37,99,235,0.3); border-radius: 14px; padding: 20px; margin-bottom: 24px; }
+    .action-title { font-size: 14px; font-weight: 800; color: #93c5fd; margin: 0 0 10px; }
+    .action-step { font-size: 13px; color: #cbd5e1; margin: 6px 0; line-height: 1.5; }
+    .action-step strong { color: #ffffff; }
+    .footer { padding: 24px 28px; text-align: center; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: #64748b; line-height: 1.6; }
+    .footer a { color: #60a5fa; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand-row">
+        <div class="brand-title">eBricks Workspace</div>
+        <span class="badge">⚠️ EXPIRING SOON</span>
+      </div>
+      <div class="hero-title">${daysText.toUpperCase()} REMAINING</div>
+      <p class="hero-subtitle">Your subscription for <strong>${orgName}</strong> is approaching its expiry date.</p>
+    </div>
+
+    <div class="content">
+      <p class="greeting">
+        Dear <strong>${customerName}</strong>,<br>
+        This is an automatic notification to let you know that your <strong>${planName}</strong> subscription for <strong>${orgName}</strong> will expire in <strong>${daysText}</strong>.
+      </p>
+
+      <div class="alert-box">
+        <div class="alert-title">Subscription Status Overview</div>
+        <table class="details-table">
+          <tr>
+            <td class="details-label">Workspace / Organization</td>
+            <td class="details-val">${orgName}</td>
+          </tr>
+          <tr>
+            <td class="details-label">Current Plan</td>
+            <td class="details-val"><span style="color: #60a5fa;">${planName}</span></td>
+          </tr>
+          <tr>
+            <td class="details-label">Expiry Date</td>
+            <td class="details-val" style="color: #fbbf24;">${expiryDate}</td>
+          </tr>
+          <tr>
+            <td class="details-label">Time Remaining</td>
+            <td class="details-val"><span class="countdown-pill">${daysText} Left</span></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="action-card">
+        <div class="action-title">How to Renew or Upgrade Without Interruption</div>
+        <div class="action-step">1. Open the <strong>eBricks App</strong> on your device.</div>
+        <div class="action-step">2. Navigate to <strong>Organization Menu &gt; Subscription</strong>.</div>
+        <div class="action-step">3. Select your desired plan (Monthly, 6 Months, or Yearly) and complete payment via <strong>PayU</strong>.</div>
+        <div class="action-step">4. Your renewal will be verified instantly, generating a new invoice and extending your project &amp; supervisor access seamlessly.</div>
+      </div>
+
+      <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin: 0;">
+        If you have already initiated a renewal or queued an upgrade, you can safely disregard this notice. Once renewed, your workspace continues uninterrupted.
+      </p>
+    </div>
+
+    <div class="footer">
+      Questions about your renewal or need billing support?<br>
+      Contact us at <a href="mailto:${supportEmail}">${supportEmail}</a><br><br>
+      &copy; ${new Date().getFullYear()} Rooks &amp; Brooks Technologies. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * High-level helper: Send Subscription Expiry Reminder with Idempotency per Expiry Period
+ *
+ * @param {Object} params
+ * @param {string} params.orgId - Organisation Document ID
+ * @param {string} params.payerEmail - Registered user / organisation email
+ * @param {string} [params.payerName] - Customer name
+ * @param {string} [params.orgName] - Organisation name
+ * @param {string} [params.planName] - Plan name
+ * @param {Date} params.expiryDate - Subscription end date
+ * @param {number} params.daysRemaining - Number of days remaining
+ * @param {FirebaseFirestore.Firestore} db - Firestore admin instance
+ */
+async function sendSubscriptionExpiryReminder(params, db) {
+  const {
+    orgId,
+    payerEmail,
+    payerName = "Customer",
+    orgName = "Organization Workspace",
+    planName = "Subscription Plan",
+    expiryDate,
+    daysRemaining = 2,
+  } = params;
+
+  if (!payerEmail || !isValidEmail(payerEmail)) {
+    logger.warn(`Cannot send expiry reminder for org ${orgId}: invalid or missing email (${payerEmail})`);
+    return {
+      success: false,
+      skipped: true,
+      error: "Missing or invalid recipient email address",
+    };
+  }
+
+  const expiryDateObj = expiryDate instanceof Date ? expiryDate : new Date(expiryDate);
+  const expiryDateIso = expiryDateObj.toISOString();
+
+  // 1. Check Idempotency: Has a reminder already been dispatched for this exact expiry period?
+  if (db && orgId) {
+    try {
+      const subRef = db.collection("organisation").doc(orgId).collection("data").doc("subscription");
+      const subSnap = await subRef.get();
+      if (subSnap.exists) {
+        const subData = subSnap.data() || {};
+        if (subData.lastExpiryReminderSentForEndDate === expiryDateIso) {
+          logger.info(`Expiry reminder already sent for org ${orgId} period ending ${expiryDateIso}. Skipping duplicate.`);
+          return {
+            success: true,
+            alreadySent: true,
+            message: "Reminder already dispatched for this subscription period",
+          };
+        }
+      }
+    } catch (err) {
+      logger.warn(`Idempotency check warning for org ${orgId}:`, err.message || err);
+    }
+  }
+
+  const dateOptions = {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  };
+  const formattedExpiryDate = expiryDateObj.toLocaleDateString("en-IN", dateOptions);
+
+  const html = renderExpiryReminderHtml({
+    customerName: payerName,
+    orgName,
+    planName,
+    expiryDate: formattedExpiryDate,
+    daysRemaining,
+  });
+
+  const subject = `Action Required: Your eBricks Subscription for ${orgName} Expires in ${daysRemaining} Days`;
+
+  // 2. Dispatch Email
+  const result = await sendEmail({
+    to: payerEmail,
+    subject,
+    html,
+  });
+
+  // 3. Persist Reminder Record in Firestore
+  if (db && orgId) {
+    try {
+      const reminderDocId = `${orgId}_${expiryDateObj.getTime()}`;
+      const reminderRecord = {
+        orgId,
+        payerEmail,
+        payerName,
+        orgName,
+        planName,
+        expiryDate: expiryDateObj,
+        expiryDateIso,
+        daysRemaining,
+        emailStatus: result.success ? "SENT" : "FAILED",
+        emailMessageId: result.messageId || null,
+        emailError: result.error || null,
+        sentAt: new Date(),
+      };
+
+      // Write to audit collection
+      await db.collection("subscription_reminders").doc(reminderDocId).set(reminderRecord, { merge: true });
+
+      // Update subscription document to permanently record that this period received its reminder
+      if (result.success) {
+        await db.collection("organisation").doc(orgId).collection("data").doc("subscription").set({
+          lastExpiryReminderSentForEndDate: expiryDateIso,
+          lastExpiryReminderSentAt: new Date(),
+          lastExpiryReminderMessageId: result.messageId || null,
+        }, { merge: true });
+      }
+    } catch (dbErr) {
+      logger.warn(`Failed to persist expiry reminder record for ${orgId}:`, dbErr.message || dbErr);
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   getEmailConfig,
   getTransporter,
   verifyConnection,
   sendEmail,
   sendSubscriptionInvoice,
+  sendSubscriptionExpiryReminder,
   renderTestEmailHtml,
   renderInvoiceHtml,
+  renderExpiryReminderHtml,
   maskEmail,
   isValidEmail,
 };

@@ -1,15 +1,15 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:demo_cst/screens/customer/customer_insight_dashboard.dart';
-import 'package:demo_cst/screens/customer/customer_project_details.dart';
-import 'package:demo_cst/screens/customer/customer_worker_details.dart';
-import 'package:demo_cst/screens/customer/customer_workers_summary.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:ebricks/screens/customer/customer_insight_dashboard.dart';
+import 'package:ebricks/screens/customer/customer_project_details.dart';
+import 'package:ebricks/screens/customer/customer_worker_details.dart';
+import 'package:ebricks/screens/customer/customer_workers_summary.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
 
-import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
+import 'package:ebricks/screens/organization/org_sub_menu_screen.dart';
 
 class CustomerDashboardPage extends StatefulWidget {
   final String ownerName;

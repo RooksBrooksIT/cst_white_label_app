@@ -1,10 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/reports/vehicle_inventory_pdf.dart';
+import 'package:ebricks/screens/reports/vehicle_inventory_pdf.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
 
 enum ReportFilterMode { date, month, site }
 
@@ -174,7 +174,12 @@ class _VehicleInventoryReportPageState
           break;
       }
 
-      final items = snap.docs.map((d) => d.data()).toList();
+      final items = snap.docs.map((d) {
+        final data = Map<String, dynamic>.from(d.data());
+        data['docId'] ??= d.id;
+        data['id'] ??= d.id;
+        return data;
+      }).toList();
 
       if (_mode != ReportFilterMode.month) {
         items.sort((a, b) {
@@ -657,7 +662,16 @@ class _VehicleInventoryReportPageState
             final driver = row['driverName'] ?? 'Unknown Driver';
             final fromLoc = row['fromLocation'] ?? '';
             final toLoc = row['toLocation'] ?? '';
-            final material = row['materialType'] ?? '';
+            final isOther = row['isOtherMaterial'] == true ||
+                (row['otherShopName'] != null && row['otherShopName'].toString().trim().isNotEmpty) ||
+                (row['otherVendor'] != null && row['otherVendor'].toString().trim().isNotEmpty);
+            final material = isOther
+                ? (row['otherMaterialName']?.toString().isNotEmpty == true
+                    ? row['otherMaterialName']
+                    : (row['materialType'] ?? 'Other'))
+                : (row['materialType'] ?? '');
+            final otherShop = row['otherShopName']?.toString().trim() ?? '';
+            final otherVendor = row['otherVendor']?.toString().trim() ?? '';
             final qty = row['quantity'] ?? '0';
             final unit = row['materialUnit'] ?? '';
             final distance = row['distanceKm'] ?? '0';
@@ -736,12 +750,70 @@ class _VehicleInventoryReportPageState
                         ],
                       ),
                       if (material.toString().isNotEmpty)
-                        Text(
-                          '$material ($qty $unit)',
-                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isOther)
+                              Container(
+                                margin: const EdgeInsets.only(right: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                                ),
+                                child: const Text(
+                                  'Other',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8)),
+                                ),
+                              ),
+                            Text(
+                              '$material ($qty $unit)',
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+                            ),
+                          ],
                         ),
                     ],
                   ),
+                  if (isOther && (otherShop.isNotEmpty || otherVendor.isNotEmpty)) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          if (otherShop.isNotEmpty) ...[
+                            const Icon(Icons.storefront_rounded, size: 13, color: Color(0xFF64748B)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Shop: $otherShop',
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          if (otherShop.isNotEmpty && otherVendor.isNotEmpty)
+                            const SizedBox(width: 10),
+                          if (otherVendor.isNotEmpty) ...[
+                            const Icon(Icons.person_outline_rounded, size: 13, color: Color(0xFF64748B)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Vendor: $otherVendor',
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             );

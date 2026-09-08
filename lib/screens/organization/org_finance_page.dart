@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/widgets/bottom_nav.dart';
-import 'package:demo_cst/screens/organization/site_financial_details_page.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/widgets/bottom_nav.dart';
+import 'package:ebricks/screens/organization/site_financial_details_page.dart';
 
 class OrgFinancePage extends StatefulWidget {
   const OrgFinancePage({super.key});
@@ -91,6 +91,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> siteDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> projectDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> supervisorDocs,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> totalsDocs = const [],
   }) {
     final Map<String, Map<String, dynamic>> unified = {};
 
@@ -105,8 +106,8 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
         data['ownerName'] = data['ownerName'] ?? data['ownername'] ?? data['clientName'] ?? '';
         data['ownerPhoneNumber'] = data['ownerPhoneNumber'] ?? data['ownerPhone'] ?? data['phone'] ?? '';
         data['projectBudget'] = data['projectBudget'] ?? data['budget'] ?? 0;
-        data['amountPaid'] = data['amountPaid'] ?? data['paid'] ?? 0;
-        data['amountSpent'] = data['amountSpent'] ?? data['spent'] ?? 0;
+        data['amountPaid'] = data['amountPaid'] ?? data['paid'] ?? data['amountReceived'] ?? 0;
+        data['amountSpent'] = data['amountSpent'] ?? data['amountSpend'] ?? data['spent'] ?? data['totalAllExpenses'] ?? 0;
         data['amountBalance'] = data['amountBalance'] ?? data['balance'] ?? 0;
         data['currentStatus'] = data['currentStatus'] ?? data['status'] ?? 'OnProgress';
         unified[siteId] = data;
@@ -145,8 +146,8 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
         data['ownerName'] = data['ownerName'] ?? data['ownername'] ?? data['clientName'] ?? '';
         data['ownerPhoneNumber'] = data['ownerPhoneNumber'] ?? data['ownerPhone'] ?? data['phone'] ?? '';
         data['projectBudget'] = data['projectBudget'] ?? data['budget'] ?? 0;
-        data['amountPaid'] = data['amountPaid'] ?? data['paid'] ?? 0;
-        data['amountSpent'] = data['amountSpent'] ?? data['spent'] ?? 0;
+        data['amountPaid'] = data['amountPaid'] ?? data['paid'] ?? data['amountReceived'] ?? 0;
+        data['amountSpent'] = data['amountSpent'] ?? data['amountSpend'] ?? data['spent'] ?? data['totalAllExpenses'] ?? 0;
         data['amountBalance'] = data['amountBalance'] ?? data['balance'] ?? 0;
         data['currentStatus'] = data['currentStatus'] ?? data['status'] ?? 'OnProgress';
         unified[siteId] = data;
@@ -171,6 +172,49 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
             }
           }
         }
+      }
+    }
+
+    // 4. Ingest & overlay totalSiteExpensesPerDay aggregation docs
+    for (var doc in totalsDocs) {
+      final data = doc.data();
+      final siteId = (data['siteId'] ?? doc.id).toString().trim();
+      final siteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
+
+      String matchKey = siteId;
+      if (!unified.containsKey(matchKey) && siteName.isNotEmpty) {
+        for (var existingKey in unified.keys) {
+          final existingName = (unified[existingKey]?['siteName'] ?? '').toString().trim();
+          if (existingName.isNotEmpty && existingName.toLowerCase() == siteName.toLowerCase()) {
+            matchKey = existingKey;
+            break;
+          }
+        }
+      }
+
+      if (unified.containsKey(matchKey)) {
+        final existing = unified[matchKey]!;
+        double totalExp = 0.0;
+        if (data['totalAllExpenses'] is num) {
+          totalExp = (data['totalAllExpenses'] as num).toDouble();
+        } else {
+          final sExp = _parseNum(data['totalSiteExpense']);
+          final mExp = _parseNum(data['totalMgrExpense']);
+          final oExp = _parseNum(data['totalOrgExpense']);
+          final cExp = _parseNum(data['totalContractorExpense']);
+          final iExp = _parseNum(data['totalIncentiveExpenses']);
+          totalExp = sExp + mExp + oExp + cExp + iExp;
+        }
+
+        final currentSpent = _parseNum(existing['amountSpent'] ?? existing['spent']);
+        if (totalExp > 0 || currentSpent == 0) {
+          existing['amountSpent'] = totalExp > 0 ? totalExp : currentSpent;
+          final budget = _parseNum(existing['projectBudget'] ?? existing['budget']);
+          final income = _parseNum(existing['amountPaid'] ?? existing['paid'] ?? existing['amountReceived']);
+          final effectiveSpent = existing['amountSpent'] as double;
+          existing['amountBalance'] = budget > 0 ? (budget - effectiveSpent) : (income - effectiveSpent);
+        }
+        unified[matchKey] = existing;
       }
     }
 
@@ -218,27 +262,36 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                               stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
                               builder: (context, mapSnap) {
-                                final siteDocs = siteSnap.hasData
-                                    ? siteSnap.data!.docs
-                                    : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                                final projDocs = projSnap.hasData
-                                    ? projSnap.data!.docs
-                                    : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                                final supDocs = mapSnap.hasData
-                                    ? mapSnap.data!.docs
-                                    : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                  stream: FirestoreService.getCollection('totalSiteExpensesPerDay').snapshots(),
+                                  builder: (context, totalsSnap) {
+                                    final siteDocs = siteSnap.hasData
+                                        ? siteSnap.data!.docs
+                                        : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                                    final projDocs = projSnap.hasData
+                                        ? projSnap.data!.docs
+                                        : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                                    final supDocs = mapSnap.hasData
+                                        ? mapSnap.data!.docs
+                                        : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                                    final totalsDocs = totalsSnap.hasData
+                                        ? totalsSnap.data!.docs
+                                        : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-                                final allSitesMap = _buildUnifiedSiteDocs(
-                                  siteDocs: siteDocs,
-                                  projectDocs: projDocs,
-                                  supervisorDocs: supDocs,
-                                );
+                                    final allSitesMap = _buildUnifiedSiteDocs(
+                                      siteDocs: siteDocs,
+                                      projectDocs: projDocs,
+                                      supervisorDocs: supDocs,
+                                      totalsDocs: totalsDocs,
+                                    );
 
-                                return _buildFinanceBody(
-                                  context,
-                                  allSitesMap,
-                                  primaryColor,
-                                  darkAccent,
+                                    return _buildFinanceBody(
+                                      context,
+                                      allSitesMap,
+                                      primaryColor,
+                                      darkAccent,
+                                    );
+                                  },
                                 );
                               },
                             );
@@ -338,8 +391,8 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     int planningSitesCount = 0;
 
     for (var site in allSitesMap.values) {
-      final inc = _parseNum(site['amountPaid'] ?? site['paid']);
-      final exp = _parseNum(site['amountSpent'] ?? site['spent']);
+      final inc = _parseNum(site['amountPaid'] ?? site['paid'] ?? site['amountReceived']);
+      final exp = _parseNum(site['amountSpent'] ?? site['amountSpend'] ?? site['spent'] ?? site['totalAllExpenses']);
 
       totalIncome += inc;
       totalExpenses += exp;
@@ -392,9 +445,9 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
 
     // Sort Sites
     if (_sortBy == 'Income') {
-      filteredList.sort((a, b) => _parseNum(b['amountPaid'] ?? b['paid']).compareTo(_parseNum(a['amountPaid'] ?? a['paid'])));
+      filteredList.sort((a, b) => _parseNum(b['amountPaid'] ?? b['paid'] ?? b['amountReceived']).compareTo(_parseNum(a['amountPaid'] ?? a['paid'] ?? a['amountReceived'])));
     } else if (_sortBy == 'Expenses') {
-      filteredList.sort((a, b) => _parseNum(b['amountSpent'] ?? b['spent']).compareTo(_parseNum(a['amountSpent'] ?? a['spent'])));
+      filteredList.sort((a, b) => _parseNum(b['amountSpent'] ?? b['amountSpend'] ?? b['spent'] ?? b['totalAllExpenses']).compareTo(_parseNum(a['amountSpent'] ?? a['amountSpend'] ?? a['spent'] ?? a['totalAllExpenses'])));
     } else if (_sortBy == 'Budget') {
       filteredList.sort((a, b) => _parseNum(b['projectBudget'] ?? b['budget']).compareTo(_parseNum(a['projectBudget'] ?? a['budget'])));
     } else if (_sortBy == 'Name') {
@@ -936,9 +989,10 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     final statusColor = _getStatusColor(status);
 
     final budget = _parseNum(site['projectBudget'] ?? site['budget']);
-    final income = _parseNum(site['amountPaid'] ?? site['paid']);
-    final expenses = _parseNum(site['amountSpent'] ?? site['spent']);
-    final balance = _parseNum(site['amountBalance'] ?? site['balance']);
+    final income = _parseNum(site['amountPaid'] ?? site['paid'] ?? site['amountReceived']);
+    final expenses = _parseNum(site['amountSpent'] ?? site['amountSpend'] ?? site['spent'] ?? site['totalAllExpenses']);
+    final rawBalance = _parseNum(site['amountBalance'] ?? site['balance']);
+    final balance = rawBalance != 0 ? rawBalance : (budget > 0 ? (budget - expenses) : (income - expenses));
 
     final usageRatio = budget > 0 ? (expenses / budget).clamp(0.0, 1.0) : 0.0;
     final usagePercent = (usageRatio * 100).toStringAsFixed(0);

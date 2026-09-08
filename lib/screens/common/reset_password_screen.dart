@@ -1,8 +1,8 @@
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/widgets/glass_button.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_text_field.dart';
+﻿import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/widgets/glass_button.dart';
+import 'package:ebricks/widgets/glass_card.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/widgets/glass_text_field.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 

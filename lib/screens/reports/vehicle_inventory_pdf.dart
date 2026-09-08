@@ -30,7 +30,6 @@ class InventoryReportPdf {
     final doc = pw.Document();
 
     final dateFmt = DateFormat('yyyy-MM-dd HH:mm');
-    final genAt = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
 
     final headers = [
       'Date',
@@ -64,6 +63,22 @@ class InventoryReportPdf {
           created = ts.toString();
         }
       }
+      final isOther = r['isOtherMaterial'] == true ||
+          (r['otherShopName'] != null && r['otherShopName'].toString().trim().isNotEmpty) ||
+          (r['otherVendor'] != null && r['otherVendor'].toString().trim().isNotEmpty);
+      final matName = isOther
+          ? (r['otherMaterialName']?.toString().isNotEmpty == true
+              ? r['otherMaterialName']
+              : (r['materialType'] ?? 'Other'))
+          : (r['materialType'] ?? '');
+      final shop = r['otherShopName']?.toString().trim() ?? '';
+      final vendor = r['otherVendor']?.toString().trim() ?? '';
+      final StringBuffer matBuf = StringBuffer('$matName');
+      if (isOther) {
+        if (shop.isNotEmpty) matBuf.write('\nShop: $shop');
+        if (vendor.isNotEmpty) matBuf.write('\nVendor: $vendor');
+      }
+
       return [
         '${r['date'] ?? ''}',
         created,
@@ -77,7 +92,7 @@ class InventoryReportPdf {
         '${r['startTime'] ?? ''}',
         '${r['endTime'] ?? ''}',
         '${r['distanceKm'] ?? ''}',
-        '${r['materialType'] ?? ''}',
+        matBuf.toString(),
         '${r['materialUnit'] ?? ''}',
         '${r['quantity'] ?? ''}',
         '${r['remarks'] ?? ''}',

@@ -1,8 +1,8 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:demo_cst/services/payu_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:ebricks/services/payu_service.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PayUCheckoutScreen extends StatefulWidget {

@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/screens/manager/tools_inventory_details.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/manager/tools_inventory_details.dart';
+import 'package:ebricks/services/firestore_service.dart';
 
 class ToolsInventoryPage extends StatefulWidget {
   const ToolsInventoryPage({super.key});

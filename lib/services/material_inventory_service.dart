@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
 
 /// Represents site-specific inventory for a material
 class SiteInventoryEntry {

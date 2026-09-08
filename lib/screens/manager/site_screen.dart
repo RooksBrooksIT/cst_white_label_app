@@ -7,10 +7,10 @@ import 'package:lottie/lottie.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/services/subscription_limit_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/services/subscription_limit_service.dart';
 
 class SiteScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -119,23 +119,25 @@ class _SiteScreenState extends State<SiteScreen>
     _amountSpentController.text = '0.00';
     _balanceAmountController.text = '0.00';
     _projectBudgetController.addListener(_recalcNewSetupBalance);
+    _amountPaidController.addListener(_recalcNewSetupBalance);
     _amountSpentController.addListener(_recalcNewSetupBalance);
 
     _updateProjectBudgetController.addListener(_recalcUpdateBalance);
+    _updateAmountPaidController.addListener(_recalcUpdateBalance);
     _updateAmountSpentController.addListener(_recalcUpdateBalance);
   }
 
   void _recalcNewSetupBalance() {
-    final budget = double.tryParse(_projectBudgetController.text.trim()) ?? 0.0;
-    final spent = double.tryParse(_amountSpentController.text.trim()) ?? 0.0;
-    final balance = budget - spent;
+    final budget = double.tryParse(_projectBudgetController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final received = double.tryParse(_amountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final balance = budget - received;
     _balanceAmountController.text = balance.toStringAsFixed(2);
   }
 
   void _recalcUpdateBalance() {
-    final budget = double.tryParse(_updateProjectBudgetController.text.trim()) ?? 0.0;
-    final spent = double.tryParse(_updateAmountSpentController.text.trim()) ?? 0.0;
-    final balance = budget - spent;
+    final budget = double.tryParse(_updateProjectBudgetController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final received = double.tryParse(_updateAmountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final balance = budget - received;
     _updateBalanceAmountController.text = balance.toStringAsFixed(2);
   }
 
@@ -501,8 +503,7 @@ class _SiteScreenState extends State<SiteScreen>
     }
 
     _updateAmountSpentController.text = amountSpent.toStringAsFixed(2);
-    final balance = budget - amountSpent;
-    _updateBalanceAmountController.text = balance.toStringAsFixed(2);
+    _recalcUpdateBalance();
   }
 
   Future<void> _loadReceivedPaymentsForSite(
@@ -522,6 +523,7 @@ class _SiteScreenState extends State<SiteScreen>
         }
         _updateAmountPaidController.text = total.toStringAsFixed(2);
       }
+      _recalcUpdateBalance();
     } catch (e) {
       debugPrint('Error loading received payments: $e');
     }
@@ -1058,9 +1060,7 @@ class _SiteScreenState extends State<SiteScreen>
       // 3. Update project document & Site document
       final double budget =
           double.tryParse(_updateProjectBudgetController.text.replaceAll(',', '')) ?? 0.0;
-      final double spent =
-          double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
-      final double balance = budget - spent;
+      final double balance = budget - cumulativeAmountReceived;
 
       if (_selectedProjectId != null && _selectedProjectId!.isNotEmpty) {
         try {
@@ -1477,12 +1477,12 @@ class _SiteScreenState extends State<SiteScreen>
 
       // 2. Update linked project document
       final double budget =
-          double.tryParse(_updateProjectBudgetController.text) ?? 0.0;
+          double.tryParse(_updateProjectBudgetController.text.replaceAll(',', '')) ?? 0.0;
       final double amountPaid =
-          double.tryParse(_updateAmountPaidController.text) ?? 0.0;
+          double.tryParse(_updateAmountPaidController.text.replaceAll(',', '')) ?? 0.0;
       final double amountSpent =
-          double.tryParse(_updateAmountSpentController.text) ?? 0.0;
-      final double amountBalance = budget - amountSpent;
+          double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
+      final double amountBalance = budget - amountPaid;
 
       final projectUpdateData = {
         'projectName': projectName,
@@ -1911,29 +1911,33 @@ class _SiteScreenState extends State<SiteScreen>
         final nextPrDocId = 'PR${(maxPRNum + 1).toString().padLeft(3, '0')}';
 
         final double budget =
-            double.tryParse(_projectBudgetController.text) ?? 0.0;
+            double.tryParse(_projectBudgetController.text.replaceAll(',', '')) ?? 0.0;
         final double amountPaid =
-            double.tryParse(_amountPaidController.text) ?? 0.0;
-        final double balance = budget - 0.0;
+            double.tryParse(_amountPaidController.text.replaceAll(',', '')) ?? 0.0;
+        final double balance = budget - amountPaid;
 
         Map<String, dynamic>? initialPaymentEntry;
         if (amountPaid > 0) {
           final entryId = 'PAY_${DateTime.now().millisecondsSinceEpoch}';
+          final nowTimestamp = Timestamp.now();
           initialPaymentEntry = {
             'paymentId': entryId,
             'projectId': nextPrDocId,
             'siteId': createdSiteDocId,
             'siteName': siteName,
             'amount': amountPaid,
-            'date': Timestamp.now(),
+            'date': nowTimestamp,
             'paymentMode': 'Initial Payment',
             'referenceNo': 'SETUP',
             'remarks': 'Initial advance/payment received on site creation',
-            'createdAt': FieldValue.serverTimestamp(),
+            'createdAt': nowTimestamp,
           };
           await FirestoreService.getCollection('projectPayments')
               .doc(entryId)
-              .set(initialPaymentEntry);
+              .set({
+            ...initialPaymentEntry,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
         }
 
         final projectData = {

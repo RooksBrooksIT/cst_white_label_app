@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class AttendanceManagementPage extends StatefulWidget {
   final String supervisorId;
@@ -25,7 +25,6 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   String? _selectedSiteName;
   List<Map<String, dynamic>> _sites = [];
   List<Map<String, dynamic>> _workers = [];
-  final List<String> _assignedSiteNames = [];
 
   // Loading states
   bool _isLoadingSites = false;
@@ -52,123 +51,242 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
     try {
       if (!FirestoreService.isReady) {
-        debugPrint('FirestoreService is not ready.');
-        setState(() => _isLoadingSites = false);
-        return;
+        await FirestoreService.initialize();
       }
 
-      // 1. Get assigned site IDs from siteSupervisorMap
-      final mapCollection = FirestoreService.getCollection('siteSupervisorMap');
+      final cleanSupId = widget.supervisorId.trim().toLowerCase();
+      final cleanSupName = widget.supervisorName.trim().toLowerCase();
 
-      // Query by ID
-      final idSnapshot = await mapCollection
-          .where('Supervisor ID', isEqualTo: widget.supervisorId)
-          .get();
+      final Map<String, Map<String, dynamic>> consolidatedSites = {};
 
-      // Query by Name as fallback
-      final nameSnapshot = await mapCollection
-          .where('supervisor', isEqualTo: widget.supervisorName)
-          .get();
+      // -----------------------------------------------------------------------
+      // 1. Fetch from siteSupervisorMap
+      // -----------------------------------------------------------------------
+      try {
+        final mapSnap = await FirestoreService.siteSupervisorMap.get();
+        for (final doc in mapSnap.docs) {
+          final data = doc.data();
+          final sSupId = (data['Supervisor ID'] ??
+                  data['supervisorId'] ??
+                  data['SupervisorId'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final sSupName = (data['supervisor'] ??
+                  data['supervisorName'] ??
+                  data['FullName'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
 
-      final Set<String> assignedSiteIds = {};
-      for (var doc in idSnapshot.docs) {
-        final siteId = doc.data()['site']?.toString();
-        if (siteId != null && siteId.isNotEmpty) assignedSiteIds.add(siteId);
+          final isMatched = (cleanSupId.isNotEmpty && sSupId == cleanSupId) ||
+              (cleanSupName.isNotEmpty && sSupName == cleanSupName) ||
+              (cleanSupName.isNotEmpty && sSupName.contains(cleanSupName)) ||
+              (cleanSupName.isNotEmpty && cleanSupName.contains(sSupName) && sSupName.length > 2) ||
+              cleanSupId.isEmpty;
+
+          if (isMatched) {
+            final rawSiteId = (data['siteId'] ?? data['site'] ?? data['site_id'] ?? doc.id)
+                .toString()
+                .trim();
+            final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? rawSiteId)
+                .toString()
+                .trim();
+            final projName = (data['projectName'] ?? data['project'] ?? '').toString().trim();
+
+            if (rawSiteId.isNotEmpty || rawSiteName.isNotEmpty) {
+              final key = rawSiteId.isNotEmpty ? rawSiteId : rawSiteName;
+              consolidatedSites[key] = {
+                'id': key,
+                'siteId': rawSiteId.isNotEmpty ? rawSiteId : key,
+                'siteName': rawSiteName.isNotEmpty ? rawSiteName : key,
+                'site': rawSiteName.isNotEmpty ? rawSiteName : key,
+                'projectName': projName,
+                'supervisor': (data['supervisor'] ?? widget.supervisorName).toString(),
+              };
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading siteSupervisorMap: $e');
       }
-      for (var doc in nameSnapshot.docs) {
-        final siteId = doc.data()['site']?.toString();
-        if (siteId != null && siteId.isNotEmpty) assignedSiteIds.add(siteId);
+
+      // -----------------------------------------------------------------------
+      // 2. Fetch from Site collection
+      // -----------------------------------------------------------------------
+      try {
+        final siteSnap = await FirestoreService.getCollection('Site').get();
+        for (final doc in siteSnap.docs) {
+          final data = doc.data();
+          final docId = doc.id.trim();
+          final sId = (data['siteId'] ?? docId).toString().trim();
+          final sName = (data['siteName'] ?? data['name'] ?? docId).toString().trim();
+          final sSupName = (data['assignedSupervisor'] ??
+                  data['supervisor'] ??
+                  data['supervisorName'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final sSupId = (data['supervisorId'] ?? '').toString().trim().toLowerCase();
+
+          final bool isAssigned = (cleanSupId.isNotEmpty && sSupId == cleanSupId) ||
+              (cleanSupName.isNotEmpty && sSupName == cleanSupName) ||
+              (cleanSupName.isNotEmpty && sSupName.contains(cleanSupName)) ||
+              consolidatedSites.containsKey(docId) ||
+              consolidatedSites.containsKey(sId) ||
+              consolidatedSites.containsKey(sName);
+
+          if (isAssigned) {
+            final key = docId.isNotEmpty ? docId : (sId.isNotEmpty ? sId : sName);
+            final existing = consolidatedSites[key] ??
+                consolidatedSites[sId] ??
+                consolidatedSites[sName] ??
+                {};
+
+            consolidatedSites[key] = {
+              'id': key,
+              'siteId': sId.isNotEmpty ? sId : key,
+              'siteName': sName.isNotEmpty ? sName : (existing['siteName'] ?? key),
+              'site': sName.isNotEmpty ? sName : (existing['site'] ?? key),
+              'projectName': data['projectName'] ?? existing['projectName'] ?? '',
+              'supervisor': data['supervisor'] ?? existing['supervisor'] ?? widget.supervisorName,
+            };
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading Site collection: $e');
       }
 
-      debugPrint('Assigned Site IDs for supervisor: $assignedSiteIds');
+      // -----------------------------------------------------------------------
+      // 3. Fetch from workerSiteMapping & workerSiteMap
+      // -----------------------------------------------------------------------
+      try {
+        final mapSnap = await FirestoreService.getCollection('workerSiteMapping').get();
+        for (final doc in mapSnap.docs) {
+          final data = doc.data();
+          final sSupName = (data['supervisor'] ?? '').toString().trim().toLowerCase();
+          final isMatched = (cleanSupName.isNotEmpty && sSupName == cleanSupName) ||
+              (cleanSupName.isNotEmpty && sSupName.contains(cleanSupName));
 
-      // 2. Load worker sites
-      final workerSiteMapColl = FirestoreService.getCollection('workerSiteMap');
-      List<Map<String, dynamic>> finalSites = [];
+          if (isMatched) {
+            final rawSite = (data['site'] ?? doc.id).toString().trim();
+            final projName = (data['projectName'] ?? '').toString().trim();
+            if (rawSite.isNotEmpty && !consolidatedSites.containsKey(rawSite)) {
+              consolidatedSites[rawSite] = {
+                'id': rawSite,
+                'siteId': rawSite,
+                'siteName': rawSite,
+                'site': rawSite,
+                'projectName': projName,
+                'supervisor': data['supervisor'] ?? widget.supervisorName,
+              };
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading workerSiteMapping: $e');
+      }
 
-      if (assignedSiteIds.isNotEmpty) {
-        // Fetch only specific sites assigned to this supervisor
-        // Using chunks of 30 due to Firestore 'whereIn' limits
-        final idList = assignedSiteIds.toList();
-        for (var i = 0; i < idList.length; i += 30) {
-          final end = (i + 30 < idList.length) ? i + 30 : idList.length;
-          final chunk = idList.sublist(i, end);
-
-          final workerSnapshot = await workerSiteMapColl
-              .where(FieldPath.documentId, whereIn: chunk)
-              .get();
-
-          for (var doc in workerSnapshot.docs) {
+      // -----------------------------------------------------------------------
+      // 4. Broad Fallback: If no sites matched the supervisor, load all active sites
+      // -----------------------------------------------------------------------
+      if (consolidatedSites.isEmpty) {
+        try {
+          final siteSnap = await FirestoreService.getCollection('Site').get();
+          for (final doc in siteSnap.docs) {
             final data = doc.data();
-            finalSites.add({
-              'id': doc.id,
-              'site': data['site'] ?? doc.id,
-              'supervisor': data['supervisor'] ?? '',
+            final docId = doc.id.trim();
+            final sId = (data['siteId'] ?? docId).toString().trim();
+            final sName = (data['siteName'] ?? data['name'] ?? docId).toString().trim();
+            final key = docId.isNotEmpty ? docId : (sId.isNotEmpty ? sId : sName);
+            consolidatedSites[key] = {
+              'id': key,
+              'siteId': sId.isNotEmpty ? sId : key,
+              'siteName': sName.isNotEmpty ? sName : key,
+              'site': sName.isNotEmpty ? sName : key,
               'projectName': data['projectName'] ?? '',
-              'totalWorkers': data['totalWorkers'] ?? 0,
-            });
+              'supervisor': data['supervisor'] ?? widget.supervisorName,
+            };
+          }
+        } catch (e) {
+          debugPrint('Error in fallback site loading: $e');
+        }
+
+        // If Site collection was also empty, check all siteSupervisorMap docs
+        if (consolidatedSites.isEmpty) {
+          try {
+            final mapSnap = await FirestoreService.siteSupervisorMap.get();
+            for (final doc in mapSnap.docs) {
+              final data = doc.data();
+              final rawSiteId = (data['siteId'] ?? data['site'] ?? doc.id).toString().trim();
+              final rawSiteName = (data['siteName'] ?? data['site'] ?? rawSiteId).toString().trim();
+              final key = rawSiteId.isNotEmpty ? rawSiteId : rawSiteName;
+              if (key.isNotEmpty) {
+                consolidatedSites[key] = {
+                  'id': key,
+                  'siteId': rawSiteId.isNotEmpty ? rawSiteId : key,
+                  'siteName': rawSiteName.isNotEmpty ? rawSiteName : key,
+                  'site': rawSiteName.isNotEmpty ? rawSiteName : key,
+                  'projectName': data['projectName'] ?? '',
+                  'supervisor': data['supervisor'] ?? widget.supervisorName,
+                };
+              }
+            }
+          } catch (e) {
+            debugPrint('Error in fallback siteSupervisorMap loading: $e');
           }
         }
       }
 
-      // 3. Fallback: If no sites found by mapping, try a general query
-      // but only if finalSites is still empty (maybe mapping doc is missing but workerSiteMap has supervisor field)
-      if (finalSites.isEmpty) {
-        final searchName = widget.supervisorName.trim().toLowerCase();
-        final searchId = widget.supervisorId.trim().toLowerCase();
+      // Convert to clean list
+      final List<Map<String, dynamic>> finalSites = consolidatedSites.values.map((s) {
+        final sId = s['siteId']?.toString() ?? '';
+        final sName = s['siteName']?.toString() ?? '';
+        String displayLabel;
+        if (sId.isNotEmpty && sName.isNotEmpty && sId != sName) {
+          displayLabel = '$sName ($sId)';
+        } else {
+          displayLabel = sName.isNotEmpty ? sName : sId;
+        }
 
-        final allWorkerSites = await workerSiteMapColl.get();
-        finalSites = allWorkerSites.docs
-            .where((doc) {
-              final data = doc.data();
-              final docSupName =
-                  (data['supervisor'] ?? data['supervisorName'] ?? '')
-                      .toString()
-                      .toLowerCase();
-              final docSupId = (data['supervisorId'] ?? '')
-                  .toString()
-                  .toLowerCase();
+        return {
+          'id': s['id'],
+          'siteId': sId,
+          'siteName': sName.isNotEmpty ? sName : sId,
+          'site': sName.isNotEmpty ? sName : sId,
+          'displayName': displayLabel,
+          'projectName': s['projectName'] ?? '',
+          'supervisor': s['supervisor'] ?? '',
+        };
+      }).toList();
 
-              return (docSupId.isNotEmpty && docSupId == searchId) ||
-                  (docSupName.isNotEmpty &&
-                      (docSupName == searchName ||
-                          docSupName.contains(searchName)));
-            })
-            .map((doc) {
-              final data = doc.data();
-              return {
-                'id': doc.id,
-                'site': data['site'] ?? doc.id,
-                'supervisor': data['supervisor'] ?? '',
-                'projectName': data['projectName'] ?? '',
-                'totalWorkers': data['totalWorkers'] ?? 0,
-              };
-            })
-            .toList();
-      }
+      // Sort alphabetically by displayName
+      finalSites.sort((a, b) => (a['displayName'] as String).compareTo(b['displayName'] as String));
 
       if (mounted) {
         setState(() {
           _sites = finalSites;
           _isLoadingSites = false;
+          // If previous selection is no longer valid, reset
+          if (_selectedSiteId != null && !_sites.any((s) => s['id'] == _selectedSiteId)) {
+            _selectedSiteId = null;
+            _selectedSiteName = null;
+            _workers.clear();
+            _attendanceStatus.clear();
+          }
         });
       }
     } catch (e) {
       debugPrint('Error in _fetchAssignedSitesAndLoad: $e');
       if (mounted) {
         setState(() => _isLoadingSites = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading sites. Please check connection.'),
-          ),
-        );
       }
     }
   }
 
-  Future<void> _loadSites() async {
-    // This method is now handled by _fetchAssignedSitesAndLoad
-  }
 
   Future<void> _loadWorkersForSite(String siteId, String siteName) async {
     setState(() {
@@ -178,42 +296,116 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     });
 
     try {
-      final doc = await FirestoreService.getCollection(
-        'workerSiteMap',
-      ).doc(siteId).get();
+      List<dynamic> rawWorkers = [];
 
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        final workersList = List<Map<String, dynamic>>.from(
-          data['workers'] ?? [],
-        );
+      // 1. Try workerSiteMapping by siteId
+      var doc = await FirestoreService.getCollection('workerSiteMapping').doc(siteId).get();
+      if (doc.exists && doc.data() != null && doc.data()!['workers'] != null) {
+        rawWorkers = doc.data()!['workers'] as List<dynamic>;
+      }
 
-        // Load existing attendance for today if any
-        await _loadExistingAttendance(siteName);
+      // 2. Try workerSiteMapping by siteName
+      if (rawWorkers.isEmpty && siteName != siteId) {
+        doc = await FirestoreService.getCollection('workerSiteMapping').doc(siteName).get();
+        if (doc.exists && doc.data() != null && doc.data()!['workers'] != null) {
+          rawWorkers = doc.data()!['workers'] as List<dynamic>;
+        }
+      }
 
-        if (!mounted) return;
-        setState(() {
-          _workers = workersList;
-          _isLoadingWorkers = false;
-        });
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _isLoadingWorkers = false;
-        });
+      // 3. Query workerSiteMapping by 'site' field
+      if (rawWorkers.isEmpty) {
+        final querySnap = await FirestoreService.getCollection('workerSiteMapping')
+            .where('site', isEqualTo: siteName)
+            .get();
+        if (querySnap.docs.isNotEmpty) {
+          rawWorkers = querySnap.docs.first.data()['workers'] as List<dynamic>? ?? [];
+        }
+      }
+      if (rawWorkers.isEmpty) {
+        final querySnap = await FirestoreService.getCollection('workerSiteMapping')
+            .where('site', isEqualTo: siteId)
+            .get();
+        if (querySnap.docs.isNotEmpty) {
+          rawWorkers = querySnap.docs.first.data()['workers'] as List<dynamic>? ?? [];
+        }
+      }
+
+      // 4. Try legacy workerSiteMap collection
+      if (rawWorkers.isEmpty) {
+        doc = await FirestoreService.getCollection('workerSiteMap').doc(siteId).get();
+        if (doc.exists && doc.data() != null && doc.data()!['workers'] != null) {
+          rawWorkers = doc.data()!['workers'] as List<dynamic>;
+        }
+      }
+      if (rawWorkers.isEmpty && siteName != siteId) {
+        doc = await FirestoreService.getCollection('workerSiteMap').doc(siteName).get();
+        if (doc.exists && doc.data() != null && doc.data()!['workers'] != null) {
+          rawWorkers = doc.data()!['workers'] as List<dynamic>;
+        }
+      }
+
+      // 5. Fallback: if no mapping found, check workersConfig
+      if (rawWorkers.isEmpty) {
+        final configSnap = await FirestoreService.getCollection('workersConfig')
+            .where('site', isEqualTo: siteName)
+            .get();
+        if (configSnap.docs.isNotEmpty) {
+          rawWorkers = configSnap.docs.map((d) => d.data()).toList();
+        } else {
+          final configSnapId = await FirestoreService.getCollection('workersConfig')
+              .where('site', isEqualTo: siteId)
+              .get();
+          if (configSnapId.docs.isNotEmpty) {
+            rawWorkers = configSnapId.docs.map((d) => d.data()).toList();
+          }
+        }
+      }
+
+      // Format workers list cleanly
+      final List<Map<String, dynamic>> workersList = [];
+      for (final item in rawWorkers) {
+        if (item is Map) {
+          final w = Map<String, dynamic>.from(item);
+          final name = (w['workerName'] ?? w['name'] ?? '').toString().trim();
+          if (name.isNotEmpty) {
+            workersList.add({
+              'workerId': (w['workerId'] ?? w['id'] ?? '').toString(),
+              'workerName': name,
+              'workerDesignation': (w['workerDesignation'] ?? w['designation'] ?? '').toString(),
+              'workerSalary': (w['workerSalary'] ?? w['salary'] ?? '0').toString(),
+              'workerPhone': (w['workerPhone'] ?? w['phoneNumber'] ?? '').toString(),
+            });
+          }
+        }
+      }
+
+      // Load existing attendance for today
+      await _loadExistingAttendance(siteName);
+
+      if (!mounted) return;
+      setState(() {
+        _workers = workersList;
+        _isLoadingWorkers = false;
+      });
+
+      if (workersList.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No workers found for this site')),
+          SnackBar(
+            content: Text('No workers mapped to $siteName. Please assign workers under Worker Site Mapping.'),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } catch (e) {
-      print('Error loading workers: $e');
+      debugPrint('Error loading workers: $e');
       if (!mounted) return;
       setState(() {
         _isLoadingWorkers = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading workers: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading workers: $e')),
+      );
     }
   }
 
@@ -246,14 +438,12 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   }
 
   void _onSiteSelected(String? siteId) {
-    String? siteName;
-    if (siteId != null) {
-      final site = _sites.firstWhere(
-        (s) => s['id'] == siteId,
-        orElse: () => {},
-      );
-      siteName = site['site'];
-    }
+    if (siteId == null || siteId == '__loading__' || siteId == '__empty__') return;
+    final site = _sites.firstWhere(
+      (s) => s['id'] == siteId,
+      orElse: () => {},
+    );
+    final String siteName = (site['siteName'] ?? site['site'] ?? siteId).toString();
 
     setState(() {
       _selectedSiteId = siteId;
@@ -262,9 +452,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       _attendanceStatus.clear();
     });
 
-    if (siteId != null && siteName != null) {
-      _loadWorkersForSite(siteId, siteName);
-    }
+    _loadWorkersForSite(siteId, siteName);
   }
 
   void _setAttendance(String workerName, String status) {
@@ -523,6 +711,19 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: _isLoadingSites
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+            tooltip: 'Reload Sites',
+            onPressed: _isLoadingSites ? null : _fetchAssignedSitesAndLoad,
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -612,14 +813,24 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DropdownButtonFormField<String>(
+            key: ValueKey('site_dropdown_${_selectedSiteId}_${_sites.length}_$_isLoadingSites'),
             initialValue: _selectedSiteId,
             dropdownColor: Colors.white,
+            isExpanded: true,
             style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
             decoration: InputDecoration(
               labelText: 'Select Assigned Site *',
               labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade700),
               prefixIcon: Icon(Icons.construction_rounded,
                   color: primaryColor, size: 18),
+              suffixIcon: _isLoadingSites
+                  ? Container(
+                      padding: const EdgeInsets.all(12),
+                      width: 16,
+                      height: 16,
+                      child: const CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
               filled: true,
               fillColor: Colors.grey.shade50,
               isDense: true,
@@ -641,24 +852,37 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
             items: _isLoadingSites
                 ? [
                     const DropdownMenuItem(
-                      value: null,
+                      value: '__loading__',
+                      enabled: false,
                       child: Text(
-                        'Loading sites...',
+                        'Loading assigned sites...',
                         style: TextStyle(color: Color(0xFF64748B)),
                       ),
                     ),
                   ]
-                : _sites.map<DropdownMenuItem<String>>((site) {
-                    return DropdownMenuItem<String>(
-                      value: site['id'] as String?,
-                      child: Text(
-                        site['site'] ?? 'Unnamed Site',
-                        style: const TextStyle(
-                            fontSize: 13, color: Color(0xFF0F172A)),
-                      ),
-                    );
-                  }).toList(),
-            onChanged: _onSiteSelected,
+                : _sites.isEmpty
+                    ? [
+                        const DropdownMenuItem(
+                          value: '__empty__',
+                          enabled: false,
+                          child: Text(
+                            'No assigned sites found',
+                            style: TextStyle(color: Color(0xFF64748B)),
+                          ),
+                        ),
+                      ]
+                    : _sites.map<DropdownMenuItem<String>>((site) {
+                        return DropdownMenuItem<String>(
+                          value: site['id'] as String?,
+                          child: Text(
+                            site['displayName'] ?? site['site'] ?? 'Unnamed Site',
+                            style: const TextStyle(
+                                fontSize: 13, color: Color(0xFF0F172A)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+            onChanged: (_isLoadingSites || _sites.isEmpty) ? null : _onSiteSelected,
           ),
           if (_selectedSiteId != null) ...[
             const SizedBox(height: 12),

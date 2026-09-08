@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/common/notification_page.dart';
-import 'package:demo_cst/screens/common/construction_documents.dart';
-import 'package:demo_cst/screens/supervisor/site_entry_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_petty_cash_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_materials_tools_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_requests_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_workers_page.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/common/notification_page.dart';
+import 'package:ebricks/screens/common/construction_documents.dart';
+import 'package:ebricks/screens/supervisor/site_entry_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_petty_cash_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_materials_tools_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_requests_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_workers_page.dart';
 
 class SupervisorDashboard extends StatefulWidget {
   final String supervisorId;

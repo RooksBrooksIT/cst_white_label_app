@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/expense_service.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/material_inventory_service.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/glass_button.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/material_inventory_service.dart';
+import 'package:ebricks/widgets/glass_card.dart';
+import 'package:ebricks/widgets/glass_button.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class SiteEntryPage extends StatefulWidget {
   final String userName;

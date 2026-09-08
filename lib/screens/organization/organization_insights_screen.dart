@@ -1,14 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/screens/reports/daily_site_report.dart';
-import 'package:demo_cst/screens/reports/site_expenses_report_page.dart';
-import 'package:demo_cst/screens/reports/site_summary_page.dart';
+import 'package:ebricks/screens/reports/daily_site_report.dart';
+import 'package:ebricks/screens/reports/site_expenses_report_page.dart';
+import 'package:ebricks/screens/reports/site_summary_page.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/list_extensions.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/list_extensions.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
-import 'package:demo_cst/widgets/glass_card.dart';
+import 'package:ebricks/widgets/glass_card.dart';
 
 // --- SupervisorEntry Model ---
 class SupervisorEntry {

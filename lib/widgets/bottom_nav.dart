@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/screens/organization/org_sites_list_page.dart';
-import 'package:demo_cst/screens/organization/org_finance_page.dart';
-import 'package:demo_cst/screens/reports/insights_dashboard.dart';
-import 'package:demo_cst/screens/organization/org_menu_screen.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/organization/org_sites_list_page.dart';
+import 'package:ebricks/screens/organization/org_finance_page.dart';
+import 'package:ebricks/screens/reports/insights_dashboard.dart';
+import 'package:ebricks/screens/organization/org_menu_screen.dart';
 
 class BottomNav extends StatelessWidget {
   final int currentIndex;

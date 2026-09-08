@@ -271,7 +271,7 @@ class PettyCashService {
     final body =
         '$supervisorName requested $formattedAmt for petty cash. Reason: $reason';
 
-    await NotificationService.notifyManager(
+    await NotificationService.notifyManagerAndOrganisation(
       title: title,
       body: body,
       requestType: 'petty_cash',
@@ -281,6 +281,10 @@ class PettyCashService {
       senderRole: 'Supervisor',
       senderName: supervisorName,
       remarks: reason,
+      requiredAction: 'Action Required: Review & Verification',
+      forSupervisorName: supervisorName,
+      forSupervisorId: supervisorId,
+      forManagerName: resolvedManagerName.isNotEmpty ? resolvedManagerName : null,
       extraData: {
         'requestedAmount': requestedAmount,
         'requestType': requestType,
@@ -359,7 +363,8 @@ class PettyCashService {
       senderRole: 'Manager',
       senderName: managerName,
       remarks: remarks,
-      data: {
+      requiredAction: 'Action Required: HQ Authorization',
+      extraData: {
         'requestedAmount': req.requestedAmount,
         'supervisorName': req.supervisorName,
         'supervisorId': req.supervisorId,
@@ -429,6 +434,7 @@ class PettyCashService {
       senderRole: 'Manager',
       senderName: managerName,
       remarks: reason,
+      requiredAction: 'Action Required: Revise or Close Request',
     );
   }
 
@@ -496,6 +502,7 @@ class PettyCashService {
       title: '✅ Petty Cash Authorized by HQ',
       body:
           'HQ authorized ${formatCurrency(approvedAmount)} for ${req.supervisorName}. Manager clearance required to allocate funds.',
+      forManagerName: req.managerName,
       requestType: 'petty_cash',
       requestId: requestId,
       docId: requestId,
@@ -503,6 +510,7 @@ class PettyCashService {
       senderRole: 'Organization',
       senderName: orgUserName,
       remarks: remarks,
+      requiredAction: 'Action Required: Manager Cash Allocation',
       extraData: {
         'approvedAmount': approvedAmount,
         'supervisorName': req.supervisorName,
@@ -567,6 +575,7 @@ class PettyCashService {
       title: '❌ Petty Cash Rejected by HQ',
       body:
           'Petty cash request #$requestId for ${req.supervisorName} was rejected by HQ. Reason: $reason',
+      forManagerName: req.managerName,
       requestType: 'petty_cash',
       requestId: requestId,
       docId: requestId,
@@ -710,7 +719,8 @@ class PettyCashService {
       senderRole: 'Manager',
       senderName: managerName,
       remarks: remarks,
-      data: {
+      requiredAction: 'Action Required: Confirm Physical Cash Receipt',
+      extraData: {
         'allocatedAmount': allocationAmount,
         'status': ApprovalWorkflowService.statusAwaitingConfirmation,
       },
@@ -919,7 +929,7 @@ class PettyCashService {
     // 5. Notify Manager in real time that receipt has been confirmed
     final formattedAmt = formatCurrency(allocationAmount);
     final formattedBal = formatCurrency(newAvailableBalance);
-    await NotificationService.notifyManager(
+    await NotificationService.notifyManagerAndOrganisation(
       title: '🤝 Petty Cash Receipt Confirmed',
       body:
           'Supervisor $supervisorName confirmed receipt of $formattedAmt petty cash. Available balance: $formattedBal.',
@@ -930,6 +940,10 @@ class PettyCashService {
       senderRole: 'Supervisor',
       senderName: supervisorName,
       remarks: remarks,
+      requiredAction: 'Funds Active in Field',
+      forSupervisorName: supervisorName,
+      forSupervisorId: supervisorId,
+      forManagerName: managerName.isNotEmpty ? managerName : null,
       extraData: {
         'allocatedAmount': allocationAmount,
         'newBalance': newAvailableBalance,

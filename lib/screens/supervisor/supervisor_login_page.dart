@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/firestore_error_handler.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/screens/common/portal_loading_screen.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/screens/manager/contractor_entry_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_dashboard.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/utils/firestore_error_handler.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/common/portal_loading_screen.dart';
 
 class SupervisorLoginPage extends StatefulWidget {
   const SupervisorLoginPage({super.key});
@@ -198,8 +198,8 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
       // Refresh FirestoreService cache
       await FirestoreService.initialize();
 
-      // Sync branding details
-      await AppTheme.syncWithFirestore(orgId);
+      // Sync branding details in background
+      AppTheme.syncWithFirestore(orgId).catchError((_) {});
 
       // 3. Authenticate within organization
       final supervisorCollection = FirestoreService.supervisors;
@@ -266,12 +266,12 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
             resolvedPath: resolvedPath,
           );
 
-          // Save FCM token for push notifications
-          await NotificationService.saveToken(
+          // Save FCM token for push notifications in background
+          NotificationService.saveToken(
             userId: supervisorId,
             userType: 'supervisor',
             userName: supervisorName,
-          );
+          ).catchError((_) {});
 
           if (mounted) {
             Navigator.pushAndRemoveUntil(

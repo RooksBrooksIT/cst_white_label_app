@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/utils/app_theme.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/screens/organization/organisation_registration_page.dart';
-import 'package:demo_cst/screens/common/reset_password_screen.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/firestore_error_handler.dart';
-import 'package:demo_cst/screens/common/portal_loading_screen.dart';
+import 'package:ebricks/screens/organization/organisation_registration_page.dart';
+import 'package:ebricks/screens/common/reset_password_screen.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/utils/firestore_error_handler.dart';
+import 'package:ebricks/screens/common/portal_loading_screen.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
   const Organisation_LoginPage({super.key});
@@ -147,34 +147,84 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
           }
         } catch (_) {}
       } else {
-        // Deep search inside each organisation subcollection
-        for (var doc in orgDocs) {
-          try {
-            final adminDoc =
-                await doc.reference.collection('data').doc('admin').get();
-            if (adminDoc.exists && adminDoc.data() != null) {
-              final aData = adminDoc.data()!;
-              final aEmail = (aData['email'] ?? '').toString().trim().toLowerCase();
-              final aUser = (aData['username'] ?? '').toString().trim().toLowerCase();
-              final aPhone =
-                  (aData['phone'] ?? aData['MobileNumber'] ?? '').toString().trim();
-              if (aEmail == cleanLower || aUser == cleanLower || aPhone == cleanInput) {
-                userData = aData;
-                dynamicPath = doc.id;
-                fullConfigPath = adminDoc.reference.path;
-                break;
-              }
-            }
+        // Fast targeted lookup via collectionGroup (runs in parallel, 1 roundtrip)
+        try {
+          final targetedSnaps = await Future.wait([
+            FirebaseFirestore.instance
+                .collectionGroup('data')
+                .where('username', isEqualTo: cleanInput)
+                .limit(1)
+                .get(),
+            FirebaseFirestore.instance
+                .collectionGroup('data')
+                .where('email', isEqualTo: cleanLower)
+                .limit(1)
+                .get(),
+            FirebaseFirestore.instance
+                .collectionGroup('organizationUser')
+                .where('username', isEqualTo: cleanInput)
+                .limit(1)
+                .get(),
+            FirebaseFirestore.instance
+                .collectionGroup('organizationUser')
+                .where('email', isEqualTo: cleanLower)
+                .limit(1)
+                .get(),
+          ]);
 
-            final userDoc =
-                await doc.reference.collection('organizationUser').doc(cleanLower).get();
-            if (userDoc.exists && userDoc.data() != null) {
-              userData = userDoc.data();
-              dynamicPath = doc.id;
-              fullConfigPath = userDoc.reference.path;
+          for (final snap in targetedSnaps) {
+            if (snap.docs.isNotEmpty) {
+              final doc = snap.docs.first;
+              userData = doc.data();
+              dynamicPath = doc.reference.parent.parent?.id;
+              fullConfigPath = doc.reference.path;
               break;
             }
-          } catch (_) {}
+          }
+        } catch (_) {}
+
+        // Fast parallel search across orgDocs if not found via direct queries
+        if (userData == null && orgDocs.isNotEmpty) {
+          final results = await Future.wait(orgDocs.map((doc) async {
+            try {
+              final adminDoc =
+                  await doc.reference.collection('data').doc('admin').get();
+              if (adminDoc.exists && adminDoc.data() != null) {
+                final aData = adminDoc.data()!;
+                final aEmail = (aData['email'] ?? '').toString().trim().toLowerCase();
+                final aUser = (aData['username'] ?? '').toString().trim().toLowerCase();
+                final aPhone =
+                    (aData['phone'] ?? aData['MobileNumber'] ?? '').toString().trim();
+                if (aEmail == cleanLower || aUser == cleanLower || aPhone == cleanInput) {
+                  return {
+                    'data': aData,
+                    'dynamicPath': doc.id,
+                    'fullConfigPath': adminDoc.reference.path,
+                  };
+                }
+              }
+
+              final userDoc =
+                  await doc.reference.collection('organizationUser').doc(cleanLower).get();
+              if (userDoc.exists && userDoc.data() != null) {
+                return {
+                  'data': userDoc.data()!,
+                  'dynamicPath': doc.id,
+                  'fullConfigPath': userDoc.reference.path,
+                };
+              }
+            } catch (_) {}
+            return null;
+          }));
+
+          for (final res in results) {
+            if (res != null) {
+              userData = res['data'] as Map<String, dynamic>?;
+              dynamicPath = res['dynamicPath'] as String?;
+              fullConfigPath = res['fullConfigPath'] as String?;
+              break;
+            }
+          }
         }
       }
 
@@ -279,19 +329,17 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       // Refresh FirestoreService cache
       await FirestoreService.initialize();
 
-      // Synchronize branding details
+      // Synchronize branding details in background
       if (dynamicPath != null && dynamicPath != 'uninitialized') {
-        try {
-          await AppTheme.syncWithFirestore(dynamicPath);
-        } catch (_) {}
+        AppTheme.syncWithFirestore(dynamicPath).catchError((_) {});
       }
 
-      // Save FCM token for push notifications
-      await NotificationService.saveToken(
+      // Save FCM token for push notifications in background
+      NotificationService.saveToken(
         userId: actualUsername,
         userType: 'organisation',
         userName: actualUsername,
-      );
+      ).catchError((_) {});
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(

@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBw3RIOuuze6JJddwqbOWNueQ2-L1NEitc',
-    appId: '1:307172937314:android:c0b55c0c5a832235f3cb3b',
+    appId: '1:307172937314:android:03d9934313cb3fc6f3cb3b',
     messagingSenderId: '307172937314',
     projectId: 'cst-whitelabel-app',
     storageBucket: 'cst-whitelabel-app.firebasestorage.app',

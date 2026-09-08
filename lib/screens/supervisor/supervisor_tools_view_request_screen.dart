@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:demo_cst/services/app_storage_service.dart';
-import 'package:demo_cst/services/approval_workflow_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/widgets/approval_lifecycle_stepper.dart';
+import 'package:ebricks/services/app_storage_service.dart';
+import 'package:ebricks/services/approval_workflow_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/widgets/glass_card.dart';
+import 'package:ebricks/widgets/approval_lifecycle_stepper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
