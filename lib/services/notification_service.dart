@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'firestore_service.dart';
@@ -12,6 +13,9 @@ import 'auth_service.dart';
 import '../screens/supervisor/supervisor_petty_cash_page.dart';
 import '../screens/manager/manager_petty_cash_page.dart';
 import '../screens/organization/org_petty_cash_page.dart';
+import '../screens/organization/organization_expenses.dart';
+import '../screens/manager/manager_expenses.dart';
+import '../screens/supervisor/site_entry_page.dart';
 
 /// Handles background FCM messages when the app is terminated/background.
 @pragma('vm:entry-point')
@@ -21,6 +25,70 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class NotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  static const String _androidChannelId = 'cst_high_importance_channel';
+  static const String _androidChannelName = 'High Importance Notifications';
+  static const String _androidChannelDescription =
+      'Important notifications that require immediate attention';
+
+  /// Initializes flutter_local_notifications and creates the Android notification channel.
+  /// This is required to show heads-up notifications when the app is in the foreground,
+  /// and to ensure sound/vibration/icon work correctly on Android 8.0+.
+  static Future<void> _initializeLocalNotifications() async {
+    const AndroidInitializationSettings androidInit =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
+    );
+
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        if (response.payload != null) {
+          try {
+            final Map<String, dynamic> data = Map<String, dynamic>.from(
+              jsonDecode(response.payload!),
+            );
+            final ctx = NotificationService._lastContext;
+            if (ctx != null && ctx.mounted) {
+              navigateToTarget(ctx, data);
+            }
+          } catch (_) {}
+        }
+      },
+    );
+
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        _localNotifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        AndroidNotificationChannel(
+          _androidChannelId,
+          _androidChannelName,
+          description: _androidChannelDescription,
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          showBadge: true,
+          enableLights: true,
+        ),
+      );
+    }
+  }
+
+  static BuildContext? _lastContext;
+  static Map<String, dynamic>? _lastMessageData;
 
   /// Explicitly requests notification permission from the operating system.
   /// Uses Permission.notification for Android 13+ (POST_NOTIFICATIONS) runtime dialog
@@ -35,12 +103,16 @@ class NotificationService {
         sound: true,
         provisional: false,
       );
-      debugPrint('NotificationService: FCM permission status: ${settings.authorizationStatus}');
+      debugPrint(
+        'NotificationService: FCM permission status: ${settings.authorizationStatus}',
+      );
 
       return settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional;
     } catch (e) {
-      debugPrint('NotificationService: Error requesting notification permission: $e');
+      debugPrint(
+        'NotificationService: Error requesting notification permission: $e',
+      );
       return false;
     }
   }
@@ -49,6 +121,12 @@ class NotificationService {
   static Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
     // Register background handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+    // Initialize local notifications for foreground heads-up alerts
+    await _initializeLocalNotifications();
+
+    // Request permissions before setting presentation options
+    await requestNotificationPermission();
 
     // Set foreground presentation options
     await _messaging.setForegroundNotificationPresentationOptions(
@@ -70,10 +148,25 @@ class NotificationService {
 
     // Show banner when notification arrives while app is in foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final title =
+          message.notification?.title ??
+          message.data['title'] ??
+          'New Notification';
+      final body = message.notification?.body ?? message.data['body'] ?? '';
       final ctx = navigatorKey.currentContext;
+      _lastContext = ctx;
+      _lastMessageData = Map<String, dynamic>.from(message.data);
+
+      // 1. Show Android system tray / iOS heads-up notification via flutter_local_notifications
+      _showForegroundSystemNotification(
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        title: title,
+        body: body,
+        data: message.data,
+      );
+
+      // 2. Show in-app SnackBar banner (existing behaviour)
       if (ctx != null && ctx.mounted) {
-        final title = message.notification?.title ?? message.data['title'] ?? 'New Notification';
-        final body = message.notification?.body ?? message.data['body'] ?? '';
         _showInAppBanner(ctx, title, body, message.data);
       }
     });
@@ -90,6 +183,58 @@ class NotificationService {
     _messaging.onTokenRefresh.listen((newToken) {
       _refreshCurrentToken(newToken);
     });
+  }
+
+  /// Displays an actual Android system tray / iOS heads-up notification when the
+  /// app is in the foreground. Firebase Messaging does NOT automatically show a
+  /// system notification while the app is open — we must use flutter_local_notifications.
+  static Future<void> _showForegroundSystemNotification({
+    required int id,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      final AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+            _androidChannelId,
+            _androidChannelName,
+            channelDescription: _androidChannelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+            showWhen: true,
+            autoCancel: true,
+            enableVibration: true,
+            playSound: true,
+            visibility: NotificationVisibility.public,
+          );
+
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final NotificationDetails notifDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      final payload = data != null ? jsonEncode(data) : null;
+
+      await _localNotifications.show(
+        id,
+        title,
+        body,
+        notifDetails,
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint(
+        'NotificationService: Failed to show foreground local notification: $e',
+      );
+    }
   }
 
   /// Shows a rich foreground notification banner that can be tapped to navigate directly.
@@ -114,8 +259,11 @@ class NotificationService {
                   color: Colors.white.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.notifications_active_rounded,
-                    color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.notifications_active_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -134,7 +282,10 @@ class NotificationService {
                     const SizedBox(height: 2),
                     Text(
                       body,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -142,7 +293,11 @@ class NotificationService {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white70, size: 20),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white70,
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -161,13 +316,20 @@ class NotificationService {
   // ---------------------------------------------------------------------------
 
   /// Navigates directly to the relevant approval/request screen based on notification payload.
-  static void navigateToTarget(BuildContext context, Map<String, dynamic> data) {
-    final type = (data['requestType'] ?? data['type'] ?? '').toString().toLowerCase();
+  static void navigateToTarget(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) {
+    final type = (data['requestType'] ?? data['type'] ?? '')
+        .toString()
+        .toLowerCase();
 
     if (type.contains('material')) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const ManagerMaterialApprovalScreen()),
+        MaterialPageRoute(
+          builder: (_) => const ManagerMaterialApprovalScreen(),
+        ),
       );
     } else if (type.contains('tool')) {
       Navigator.push(
@@ -177,9 +339,13 @@ class NotificationService {
     } else if (type.contains('payment')) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const ManagerSitePaymentApprovalPage()),
+        MaterialPageRoute(
+          builder: (_) => const ManagerSitePaymentApprovalPage(),
+        ),
       );
-    } else if (type.contains('workforce') || type.contains('worker') || type.contains('schedule')) {
+    } else if (type.contains('workforce') ||
+        type.contains('worker') ||
+        type.contains('schedule')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const ManagerApprovalScreen()),
@@ -208,6 +374,34 @@ class NotificationService {
           MaterialPageRoute(builder: (_) => const ManagerPettyCashPage()),
         );
       }
+    } else if (type.contains('org_expense') ||
+        type.contains('organization_expense')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const OrganizationExpenses()),
+      );
+    } else if (type.contains('manager_expense')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ManagerExpenses()),
+      );
+    } else if (type.contains('site_assignment') ||
+        type.contains('supervisor_entry')) {
+      final ud = AuthService().userData;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SiteEntryPage(
+            userName:
+                (ud['FullName'] ??
+                        ud['fullName'] ??
+                        ud['username'] ??
+                        'Supervisor')
+                    .toString(),
+            userDetails: ud,
+          ),
+        ),
+      );
     }
   }
 
@@ -218,7 +412,8 @@ class NotificationService {
   /// Save this device's FCM token to Firestore under `fcmTokens/{userId}`.
   static Future<void> saveToken({
     required String userId,
-    required String userType, // 'supervisor', 'organisation', 'manager', 'config'
+    required String
+    userType, // 'supervisor', 'organisation', 'manager', 'config'
     required String userName,
   }) async {
     try {
@@ -236,10 +431,9 @@ class NotificationService {
       };
 
       // 1. Save in organization-scoped fcmTokens collection
-      await FirestoreService.getCollection('fcmTokens').doc(userId).set(
-            tokenData,
-            SetOptions(merge: true),
-          );
+      await FirestoreService.getCollection(
+        'fcmTokens',
+      ).doc(userId).set(tokenData, SetOptions(merge: true));
 
       // 2. Also save in root fcmTokens for instant global Cloud Function lookup
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
@@ -254,9 +448,18 @@ class NotificationService {
             .set(tokenData, SetOptions(merge: true));
       }
 
-      debugPrint('NotificationService: Token saved for $userName ($userType)');
+      // 3. Subscribe to org and role topics for broadcast push delivery
+      if (orgId.isNotEmpty && orgId != 'uninitialized') {
+        final cleanOrgId = orgId.replaceAll(RegExp(r'\W'), '_');
+        await _messaging.subscribeToTopic('org_$cleanOrgId');
+        await _messaging.subscribeToTopic('org_${cleanOrgId}_$userType');
+      }
+
+      debugPrint(
+        'NotificationService: Token & topic subscriptions saved for $userName ($userType)',
+      );
     } catch (e) {
-      debugPrint('NotificationService: Failed to save token: $e');
+      debugPrint('NotificationService: Failed to save token/topics: $e');
     }
   }
 
@@ -268,13 +471,15 @@ class NotificationService {
   static Future<void> _writeRecord({
     required String title,
     required String body,
-    required String targetRole, // 'manager', 'organisation', 'supervisor', 'manager_and_organisation'
+    required String
+    targetRole, // 'manager', 'organisation', 'supervisor', 'manager_and_organisation'
     List<String>? targetRoles,
     String? forSupervisorName,
     String? forSupervisorId,
     String? forManagerName,
     String? forOrgId,
-    String? requestType, // 'material', 'tools', 'payment', 'workforce', 'site_assignment', 'petty_cash', 'site_management'
+    String?
+    requestType, // 'material', 'tools', 'payment', 'workforce', 'site_assignment', 'petty_cash', 'site_management'
     String? requestId,
     String? docId,
     String? siteId,
@@ -293,7 +498,11 @@ class NotificationService {
         'title': title,
         'body': body,
         'targetRole': targetRole,
-        'targetRoles': targetRoles ?? (targetRole == 'manager_and_organisation' ? ['manager', 'organisation'] : [targetRole]),
+        'targetRoles':
+            targetRoles ??
+            (targetRole == 'manager_and_organisation'
+                ? ['manager', 'organisation']
+                : [targetRole]),
         'forSupervisorName': forSupervisorName,
         'forSupervisorId': forSupervisorId,
         'forManagerName': forManagerName,
@@ -330,7 +539,9 @@ class NotificationService {
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
         await FirestoreService.getCollection('notifications').add(payload);
       } else {
-        await FirebaseFirestore.instance.collection('notifications').add(payload);
+        await FirebaseFirestore.instance
+            .collection('notifications')
+            .add(payload);
       }
     } catch (e) {
       debugPrint('NotificationService: Failed to write record: $e');
@@ -398,14 +609,19 @@ class NotificationService {
         final token = data['token']?.toString();
         final uName = data['userName']?.toString();
         if (token != null && token.isNotEmpty && uName != senderName) {
-          await _sendFcmPush(token: token, title: title, body: body, data: {
-            'requestType': requestType,
-            'requestId': requestId,
-            'docId': docId ?? requestId,
-            'siteId': siteId ?? '',
-            'status': status ?? '',
-            'requiredAction': requiredAction ?? '',
-          });
+          await _sendFcmPush(
+            token: token,
+            title: title,
+            body: body,
+            data: {
+              'requestType': requestType,
+              'requestId': requestId,
+              'docId': docId ?? requestId,
+              'siteId': siteId ?? '',
+              'status': status ?? '',
+              'requiredAction': requiredAction ?? '',
+            },
+          );
         }
       }
     } catch (e) {
@@ -472,14 +688,19 @@ class NotificationService {
         }
 
         if (token != null && token.isNotEmpty && uName != senderName) {
-          await _sendFcmPush(token: token, title: title, body: body, data: {
-            'requestType': requestType,
-            'requestId': requestId,
-            'docId': docId ?? requestId,
-            'siteId': siteId ?? '',
-            'status': status ?? '',
-            'requiredAction': requiredAction ?? '',
-          });
+          await _sendFcmPush(
+            token: token,
+            title: title,
+            body: body,
+            data: {
+              'requestType': requestType,
+              'requestId': requestId,
+              'docId': docId ?? requestId,
+              'siteId': siteId ?? '',
+              'status': status ?? '',
+              'requiredAction': requiredAction ?? '',
+            },
+          );
         }
       }
     } catch (e) {
@@ -538,14 +759,19 @@ class NotificationService {
         final token = tokenData['token']?.toString();
         final uName = tokenData['userName']?.toString();
         if (token != null && token.isNotEmpty && uName != senderName) {
-          await _sendFcmPush(token: token, title: title, body: body, data: {
-            'requestType': requestType ?? '',
-            'requestId': requestId ?? '',
-            'docId': docId ?? requestId ?? '',
-            'siteId': siteId ?? '',
-            'status': status ?? '',
-            'requiredAction': requiredAction ?? '',
-          });
+          await _sendFcmPush(
+            token: token,
+            title: title,
+            body: body,
+            data: {
+              'requestType': requestType ?? '',
+              'requestId': requestId ?? '',
+              'docId': docId ?? requestId ?? '',
+              'siteId': siteId ?? '',
+              'status': status ?? '',
+              'requiredAction': requiredAction ?? '',
+            },
+          );
         }
       }
     } catch (e) {
@@ -601,9 +827,9 @@ class NotificationService {
 
     // 2. Look up supervisor's FCM token and push
     try {
-      final snap = await FirestoreService.getCollection('fcmTokens')
-          .where('userType', isEqualTo: 'supervisor')
-          .get();
+      final snap = await FirestoreService.getCollection(
+        'fcmTokens',
+      ).where('userType', isEqualTo: 'supervisor').get();
 
       for (final doc in snap.docs) {
         final tokenData = doc.data();
@@ -611,20 +837,29 @@ class NotificationService {
         final uName = (tokenData['userName'] ?? '').toString();
         final uId = (tokenData['userId'] ?? doc.id).toString();
 
-        final isMatch = (supervisorName.isNotEmpty && (uName == supervisorName || uId == supervisorName)) ||
-            (supervisorId != null && supervisorId.isNotEmpty && (uId == supervisorId || uName == supervisorId));
+        final isMatch =
+            (supervisorName.isNotEmpty &&
+                (uName == supervisorName || uId == supervisorName)) ||
+            (supervisorId != null &&
+                supervisorId.isNotEmpty &&
+                (uId == supervisorId || uName == supervisorId));
 
         if (token != null && token.isNotEmpty && isMatch) {
-          await _sendFcmPush(token: token, title: title, body: body, data: {
-            'requestType': requestType ?? '',
-            'requestId': requestId ?? '',
-            'docId': docId ?? requestId ?? '',
-            'siteId': siteId ?? '',
-            'siteName': siteName ?? '',
-            'status': status ?? '',
-            'title': title,
-            'body': body,
-          });
+          await _sendFcmPush(
+            token: token,
+            title: title,
+            body: body,
+            data: {
+              'requestType': requestType ?? '',
+              'requestId': requestId ?? '',
+              'docId': docId ?? requestId ?? '',
+              'siteId': siteId ?? '',
+              'siteName': siteName ?? '',
+              'status': status ?? '',
+              'title': title,
+              'body': body,
+            },
+          );
         }
       }
     } catch (e) {
@@ -642,14 +877,20 @@ class NotificationService {
     String? location,
     String? managerName,
   }) async {
-    final displaySite = (siteId.isNotEmpty && siteName.isNotEmpty && siteId != siteName)
+    final displaySite =
+        (siteId.isNotEmpty && siteName.isNotEmpty && siteId != siteName)
         ? '$siteId - $siteName'
         : (siteName.isNotEmpty ? siteName : siteId);
 
     final title = '📍 New Site Assignment';
-    final locationInfo = (location != null && location.isNotEmpty) ? ' located at $location' : '';
-    final projectInfo = (projectName != null && projectName.isNotEmpty) ? ' (Project: $projectName)' : '';
-    final body = 'You have been assigned to site "$displaySite"$locationInfo$projectInfo.';
+    final locationInfo = (location != null && location.isNotEmpty)
+        ? ' located at $location'
+        : '';
+    final projectInfo = (projectName != null && projectName.isNotEmpty)
+        ? ' (Project: $projectName)'
+        : '';
+    final body =
+        'You have been assigned to site "$displaySite"$locationInfo$projectInfo.';
 
     await notifySupervisor(
       supervisorName: supervisorName,
@@ -685,11 +926,14 @@ class NotificationService {
     String? orgId,
   }) async {
     final effectiveOrgId = orgId ?? FirestoreService.currentOrgId;
+    final title = '👤 Manager Account Registered';
+    final body =
+        'Manager $managerName ($designation, $department) has been registered under ID $managerId.';
 
     // 1. In-app record for Manager and Organization audit
     await _writeRecord(
-      title: '👤 Manager Account Registered',
-      body: 'Manager $managerName ($designation, $department) has been registered under ID $managerId.',
+      title: title,
+      body: body,
       targetRole: 'manager',
       forManagerName: managerName,
       forOrgId: effectiveOrgId,
@@ -711,7 +955,8 @@ class NotificationService {
     // 2. Also notify Organization audit trail
     await _writeRecord(
       title: '👤 New Manager Configured',
-      body: 'Manager profile $managerName ($managerId) configured in $department department.',
+      body:
+          'Manager profile $managerName ($managerId) configured in $department department.',
       targetRole: 'organisation',
       forOrgId: effectiveOrgId,
       requestType: 'manager_config',
@@ -721,6 +966,36 @@ class NotificationService {
       senderRole: 'Organization',
       senderName: 'HQ Administrator',
     );
+
+    // 3. Send FCM push to the specific Manager token
+    try {
+      final snap = await FirestoreService.getCollection('fcmTokens')
+          .where('userType', isEqualTo: 'manager')
+          .where('orgId', isEqualTo: effectiveOrgId)
+          .get();
+      for (final doc in snap.docs) {
+        final d = doc.data();
+        final token = d['token']?.toString();
+        final uName = (d['userName'] ?? '').toString();
+        final uId = (d['userId'] ?? doc.id).toString();
+        final isMatch =
+            uName == managerName || uId == managerId || uId == managerName;
+        if (token != null && token.isNotEmpty && isMatch) {
+          await _sendFcmPush(
+            token: token,
+            title: title,
+            body: body,
+            data: {
+              'requestType': 'manager_config',
+              'requestId': managerId,
+              'docId': managerId,
+            },
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('NotificationService: Error sending manager account FCM: $e');
+    }
   }
 
   /// 6. Notifies when a Manager creates or configures a Supervisor profile.
@@ -739,7 +1014,8 @@ class NotificationService {
       supervisorName: supervisorName,
       supervisorId: supervisorId,
       title: '👷 Welcome to eBricks',
-      body: 'Your Supervisor account ($supervisorId, $designation) has been registered by Manager ${managerName ?? "Admin"}.',
+      body:
+          'Your Supervisor account ($supervisorId, $designation) has been registered by Manager ${managerName ?? "Admin"}.',
       requestType: 'supervisor_config',
       requestId: supervisorId,
       docId: supervisorId,
@@ -757,7 +1033,8 @@ class NotificationService {
     // 2. In-app audit record for Organization
     await _writeRecord(
       title: '👷 New Supervisor Profile Created',
-      body: 'Supervisor $supervisorName ($supervisorId) was registered by Manager ${managerName ?? "Admin"}.',
+      body:
+          'Supervisor $supervisorName ($supervisorId) was registered by Manager ${managerName ?? "Admin"}.',
       targetRole: 'organisation',
       forOrgId: effectiveOrgId,
       requestType: 'supervisor_config',
@@ -778,10 +1055,15 @@ class NotificationService {
     String? managerName,
     bool isCreated = true,
   }) async {
-    final title = isCreated ? '🏗️ New Site Registered' : '🏗️ Site Details Updated';
+    final title = isCreated
+        ? '🏗️ New Site Registered'
+        : '🏗️ Site Details Updated';
     final actionWord = isCreated ? 'registered' : 'updated';
-    final projectInfo = (projectName != null && projectName.isNotEmpty) ? ' (Project: $projectName)' : '';
-    final body = 'Manager ${managerName ?? "Admin"} $actionWord Site "$siteId - $siteName" at $location$projectInfo.';
+    final projectInfo = (projectName != null && projectName.isNotEmpty)
+        ? ' (Project: $projectName)'
+        : '';
+    final body =
+        'Manager ${managerName ?? "Admin"} $actionWord Site "$siteId - $siteName" at $location$projectInfo.';
 
     // 1. Notify Organization
     await notifyOrganisation(
@@ -807,29 +1089,57 @@ class NotificationService {
 
   /// 8. Notifies Managers and Organization when a Master Configuration is updated.
   static Future<void> notifyMasterConfigUpdated({
-    required String configType, // 'Materials', 'Vehicles', 'Contractors', 'Units'
+    required String
+    configType, // 'Materials', 'Vehicles', 'Contractors', 'Units'
     required String itemTitle,
     String? senderName,
     String? senderRole,
   }) async {
     final title = '⚙️ $configType Catalogue Updated';
-    final body = '$itemTitle was added/modified in the $configType configuration by ${senderName ?? "Admin"}.';
+    final body =
+        '$itemTitle was added/modified in the $configType configuration by ${senderName ?? "Admin"}.';
+    final orgId = FirestoreService.currentOrgId;
 
     await _writeRecord(
       title: title,
       body: body,
       targetRole: 'manager_and_organisation',
       targetRoles: ['manager', 'organisation'],
+      forOrgId: orgId,
       requestType: 'master_config',
       senderRole: senderRole ?? 'Manager',
       senderName: senderName ?? 'Manager',
       remarks: '$configType updated',
       requiredAction: 'Catalog updated',
-      extraData: {
-        'configType': configType,
-        'itemTitle': itemTitle,
-      },
+      extraData: {'configType': configType, 'itemTitle': itemTitle},
     );
+
+    // Also send FCM push to BOTH managers and organization admins
+    try {
+      final snap = await FirestoreService.getCollection('fcmTokens')
+          .where('userType', whereIn: ['manager', 'organisation', 'config'])
+          .where('orgId', isEqualTo: orgId)
+          .get();
+      for (final doc in snap.docs) {
+        final d = doc.data();
+        final token = d['token']?.toString();
+        final uName = d['userName']?.toString();
+        if (token != null && token.isNotEmpty && uName != senderName) {
+          await _sendFcmPush(
+            token: token,
+            title: title,
+            body: body,
+            data: {
+              'requestType': 'master_config',
+              'configType': configType,
+              'itemTitle': itemTitle,
+            },
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('NotificationService: Error sending master_config FCM: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -849,8 +1159,9 @@ class NotificationService {
       final serverKey = configSnap.data()?['serverKey']?.toString();
       if (serverKey == null || serverKey.isEmpty) {
         debugPrint(
-            'NotificationService: FCM server key not set. '
-            'Add it to Firestore at organisation/$orgId/data/fcmConfig → serverKey');
+          'NotificationService: FCM server key not set. '
+          'Add it to Firestore at organisation/$orgId/data/fcmConfig → serverKey',
+        );
         return;
       }
 
@@ -900,9 +1211,31 @@ class NotificationService {
   /// Automatically update token in Firestore when refreshed.
   static Future<void> _refreshCurrentToken(String newToken) async {
     try {
-      final authData = FirestoreService.currentOrgId;
-      if (authData.isEmpty) return;
-      debugPrint('NotificationService: FCM token refreshed');
+      final userData = AuthService().userData;
+      final userId =
+          (userData['uid'] ??
+                  userData['username'] ??
+                  userData['UserName'] ??
+                  userData['Supervisor ID'] ??
+                  userData['supervisorId'] ??
+                  '')
+              .toString();
+      final userType = (userData['role'] ?? userData['userRole'] ?? '')
+          .toString();
+      final userName =
+          (userData['FullName'] ??
+                  userData['fullName'] ??
+                  userData['username'] ??
+                  userData['UserName'] ??
+                  'User')
+              .toString();
+
+      if (userId.isNotEmpty) {
+        await saveToken(userId: userId, userType: userType, userName: userName);
+      }
+      debugPrint(
+        'NotificationService: FCM token refreshed & saved successfully',
+      );
     } catch (e) {
       debugPrint('NotificationService: Error refreshing token: $e');
     }
@@ -937,9 +1270,15 @@ class NotificationService {
         query = query.where('forSupervisorName', isEqualTo: supervisorName);
       }
     } else if (role == 'manager') {
-      query = query.where('targetRole', whereIn: ['manager', 'manager_and_organisation']);
+      query = query.where(
+        'targetRole',
+        whereIn: ['manager', 'manager_and_organisation'],
+      );
     } else if (role == 'organisation') {
-      query = query.where('targetRole', whereIn: ['organisation', 'manager_and_organisation']);
+      query = query.where(
+        'targetRole',
+        whereIn: ['organisation', 'manager_and_organisation'],
+      );
     }
 
     return query.orderBy('createdAt', descending: true).limit(50).snapshots();
@@ -955,8 +1294,9 @@ class NotificationService {
     Query<Map<String, dynamic>> query;
 
     if (orgId.isNotEmpty && orgId != 'uninitialized') {
-      query = FirestoreService.getCollection('notifications')
-          .where('isRead', isEqualTo: false);
+      query = FirestoreService.getCollection(
+        'notifications',
+      ).where('isRead', isEqualTo: false);
     } else {
       query = FirebaseFirestore.instance
           .collection('notifications')
@@ -969,16 +1309,24 @@ class NotificationService {
         query = query.where('forSupervisorName', isEqualTo: supervisorName);
       }
     } else if (role == 'manager') {
-      query = query.where('targetRole', whereIn: ['manager', 'manager_and_organisation']);
+      query = query.where(
+        'targetRole',
+        whereIn: ['manager', 'manager_and_organisation'],
+      );
     } else if (role == 'organisation') {
-      query = query.where('targetRole', whereIn: ['organisation', 'manager_and_organisation']);
+      query = query.where(
+        'targetRole',
+        whereIn: ['organisation', 'manager_and_organisation'],
+      );
     }
 
     return query.snapshots().map((snap) => snap.docs.length);
   }
 
   /// Live stream of all notifications for a supervisor (backward compatibility).
-  static Stream<QuerySnapshot<Map<String, dynamic>>> streamForSupervisor(String supervisorName) {
+  static Stream<QuerySnapshot<Map<String, dynamic>>> streamForSupervisor(
+    String supervisorName,
+  ) {
     return streamForRole(role: 'supervisor', supervisorName: supervisorName);
   }
 
@@ -989,7 +1337,10 @@ class NotificationService {
 
   /// Live count of unread notifications for a supervisor.
   static Stream<int> unreadCountForSupervisor(String supervisorName) {
-    return unreadCountForRole(role: 'supervisor', supervisorName: supervisorName);
+    return unreadCountForRole(
+      role: 'supervisor',
+      supervisorName: supervisorName,
+    );
   }
 
   /// Live count of unread notifications for the organisation.
@@ -1002,7 +1353,9 @@ class NotificationService {
     try {
       final orgId = FirestoreService.currentOrgId;
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
-        final orgDocRef = FirestoreService.getCollection('notifications').doc(docId);
+        final orgDocRef = FirestoreService.getCollection(
+          'notifications',
+        ).doc(docId);
         final orgDoc = await orgDocRef.get();
         if (orgDoc.exists) {
           await orgDocRef.update({'isRead': true});
@@ -1010,7 +1363,9 @@ class NotificationService {
         }
       }
 
-      final rootDocRef = FirebaseFirestore.instance.collection('notifications').doc(docId);
+      final rootDocRef = FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(docId);
       final rootDoc = await rootDocRef.get();
       if (rootDoc.exists) {
         await rootDocRef.update({'isRead': true});
@@ -1031,17 +1386,27 @@ class NotificationService {
 
       // 1. Mark in org collection
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
-        var orgQuery = FirestoreService.getCollection('notifications')
-            .where('isRead', isEqualTo: false);
+        var orgQuery = FirestoreService.getCollection(
+          'notifications',
+        ).where('isRead', isEqualTo: false);
         if (role == 'supervisor') {
           orgQuery = orgQuery.where('targetRole', isEqualTo: 'supervisor');
           if (supervisorName != null && supervisorName.isNotEmpty) {
-            orgQuery = orgQuery.where('forSupervisorName', isEqualTo: supervisorName);
+            orgQuery = orgQuery.where(
+              'forSupervisorName',
+              isEqualTo: supervisorName,
+            );
           }
         } else if (role == 'manager') {
-          orgQuery = orgQuery.where('targetRole', whereIn: ['manager', 'manager_and_organisation']);
+          orgQuery = orgQuery.where(
+            'targetRole',
+            whereIn: ['manager', 'manager_and_organisation'],
+          );
         } else if (role == 'organisation') {
-          orgQuery = orgQuery.where('targetRole', whereIn: ['organisation', 'manager_and_organisation']);
+          orgQuery = orgQuery.where(
+            'targetRole',
+            whereIn: ['organisation', 'manager_and_organisation'],
+          );
         }
         final snap = await orgQuery.get();
         final batch = FirebaseFirestore.instance.batch();
@@ -1059,12 +1424,21 @@ class NotificationService {
       if (role == 'supervisor') {
         globalQuery = globalQuery.where('targetRole', isEqualTo: 'supervisor');
         if (supervisorName != null && supervisorName.isNotEmpty) {
-          globalQuery = globalQuery.where('forSupervisorName', isEqualTo: supervisorName);
+          globalQuery = globalQuery.where(
+            'forSupervisorName',
+            isEqualTo: supervisorName,
+          );
         }
       } else if (role == 'manager') {
-        globalQuery = globalQuery.where('targetRole', whereIn: ['manager', 'manager_and_organisation']);
+        globalQuery = globalQuery.where(
+          'targetRole',
+          whereIn: ['manager', 'manager_and_organisation'],
+        );
       } else if (role == 'organisation') {
-        globalQuery = globalQuery.where('targetRole', whereIn: ['organisation', 'manager_and_organisation']);
+        globalQuery = globalQuery.where(
+          'targetRole',
+          whereIn: ['organisation', 'manager_and_organisation'],
+        );
       }
 
       final snap = await globalQuery.get();
@@ -1080,7 +1454,10 @@ class NotificationService {
 
   /// Mark all supervisor notifications as read at once.
   static Future<void> markAllReadForSupervisor(String supervisorName) async {
-    return markAllReadForRole(role: 'supervisor', supervisorName: supervisorName);
+    return markAllReadForRole(
+      role: 'supervisor',
+      supervisorName: supervisorName,
+    );
   }
 
   /// Mark all organisation notifications as read at once.
@@ -1096,7 +1473,8 @@ class NotificationService {
   static Future<String?> scheduleNotification({
     required String title,
     required String body,
-    required String targetRole, // 'manager', 'organisation', 'supervisor', 'all'
+    required String
+    targetRole, // 'manager', 'organisation', 'supervisor', 'all'
     required DateTime scheduledTime,
     String? forSupervisorName,
     String? forSupervisorId,
@@ -1150,12 +1528,14 @@ class NotificationService {
 
       // 2. Org-scoped collection
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
-        await FirestoreService.getCollection('scheduled_notifications')
-            .doc(scheduleId)
-            .set(payload);
+        await FirestoreService.getCollection(
+          'scheduled_notifications',
+        ).doc(scheduleId).set(payload);
       }
 
-      debugPrint('NotificationService: Scheduled notification $scheduleId for $scheduledTime (repeat: $repeat)');
+      debugPrint(
+        'NotificationService: Scheduled notification $scheduleId for $scheduledTime (repeat: $repeat)',
+      );
       return scheduleId;
     } catch (e) {
       debugPrint('NotificationService: Failed to schedule notification: $e');
@@ -1172,7 +1552,8 @@ class NotificationService {
     int hour = 9, // 9:00 AM default
     int minute = 0,
     String title = '📋 Daily Site Log Reminder',
-    String body = 'Please submit today\'s site progress, workforce entries, and material consumption.',
+    String body =
+        'Please submit today\'s site progress, workforce entries, and material consumption.',
   }) async {
     final now = DateTime.now();
     var scheduled = DateTime(now.year, now.month, now.day, hour, minute);
@@ -1204,7 +1585,8 @@ class NotificationService {
 
     return scheduleNotification(
       title: '⏳ Pending Approval Requisitions',
-      body: 'You have requisitions awaiting verification for site ${siteId ?? "your projects"}. Please review.',
+      body:
+          'You have requisitions awaiting verification for site ${siteId ?? "your projects"}. Please review.',
       targetRole: 'manager',
       forManagerName: managerName,
       scheduledTime: scheduled,
@@ -1222,22 +1604,31 @@ class NotificationService {
       await FirebaseFirestore.instance
           .collection('scheduled_notifications')
           .doc(scheduleId)
-          .update({'status': 'cancelled', 'cancelledAt': FieldValue.serverTimestamp()});
+          .update({
+            'status': 'cancelled',
+            'cancelledAt': FieldValue.serverTimestamp(),
+          });
 
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
-        await FirestoreService.getCollection('scheduled_notifications')
-            .doc(scheduleId)
-            .update({'status': 'cancelled', 'cancelledAt': FieldValue.serverTimestamp()});
+        await FirestoreService.getCollection(
+          'scheduled_notifications',
+        ).doc(scheduleId).update({
+          'status': 'cancelled',
+          'cancelledAt': FieldValue.serverTimestamp(),
+        });
       }
 
-      debugPrint('NotificationService: Cancelled scheduled notification $scheduleId');
+      debugPrint(
+        'NotificationService: Cancelled scheduled notification $scheduleId',
+      );
     } catch (e) {
       debugPrint('NotificationService: Failed to cancel schedule: $e');
     }
   }
 
   /// Live stream of active scheduled notifications for the organization.
-  static Stream<QuerySnapshot<Map<String, dynamic>>> streamScheduledNotifications() {
+  static Stream<QuerySnapshot<Map<String, dynamic>>>
+  streamScheduledNotifications() {
     final orgId = FirestoreService.currentOrgId;
     return FirebaseFirestore.instance
         .collection('scheduled_notifications')

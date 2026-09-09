@@ -8,6 +8,7 @@ import 'package:ebricks/screens/common/splash_screen.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/screens/common/main_dashboard.dart';
 import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/offline_sync_service.dart';
 import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/screens/organization/organisation_login_page.dart';
 import 'package:ebricks/screens/common/config_login.dart';
@@ -46,6 +47,7 @@ void main() async {
   await FirestoreService.initialize();
   await AppTheme.initialize();
   await AuthService.initialize();
+  await OfflineSyncService.initialize();
 
   // Initialize FCM: request permissions, foreground listener
   await NotificationService.initialize(navigatorKey);

@@ -855,9 +855,15 @@ async function processNotificationAndSendPush(notificationData, docRef) {
         if (targetRole === "supervisor") {
           q = q.where("userType", "==", "supervisor");
         } else if (targetRole === "manager") {
-          q = q.where("userType", "in", ["manager", "organisation", "config"]);
+          q = q.where("userType", "==", "manager");
         } else if (targetRole === "organisation") {
           q = q.where("userType", "in", ["organisation", "config"]);
+        } else if (targetRole === "manager_and_organisation") {
+          q = q.where("userType", "in", ["manager", "organisation", "config"]);
+        } else if (targetRole === "all") {
+          // No userType filter — delivers to every active user in the org
+        } else {
+          q = q.where("userType", "in", ["manager", "organisation", "config", "supervisor"]);
         }
 
         const orgSnap = await q.get();
@@ -875,7 +881,7 @@ async function processNotificationAndSendPush(notificationData, docRef) {
               match = (reqSupName && (uName === reqSupName || uId === reqSupName)) ||
                       (reqSupId && (uId === reqSupId || uName === reqSupId));
             }
-          } else if (targetRole === "manager" && forManagerName) {
+          } else if ((targetRole === "manager" || targetRole === "manager_and_organisation") && forManagerName) {
             const reqMgrName = (forManagerName || "").trim();
             if (reqMgrName) {
               match = (uName === reqMgrName || uId === reqMgrName);
@@ -899,9 +905,15 @@ async function processNotificationAndSendPush(notificationData, docRef) {
         if (targetRole === "supervisor") {
           globalQuery = globalQuery.where("userType", "==", "supervisor");
         } else if (targetRole === "manager") {
-          globalQuery = globalQuery.where("userType", "in", ["manager", "organisation", "config"]);
+          globalQuery = globalQuery.where("userType", "==", "manager");
         } else if (targetRole === "organisation") {
           globalQuery = globalQuery.where("userType", "in", ["organisation", "config"]);
+        } else if (targetRole === "manager_and_organisation") {
+          globalQuery = globalQuery.where("userType", "in", ["manager", "organisation", "config"]);
+        } else if (targetRole === "all") {
+          // No userType filter — global broadcast to every user
+        } else {
+          globalQuery = globalQuery.where("userType", "in", ["manager", "organisation", "config", "supervisor"]);
         }
 
         const globalSnap = await globalQuery.get();
@@ -919,7 +931,7 @@ async function processNotificationAndSendPush(notificationData, docRef) {
               match = (reqSupName && (uName === reqSupName || uId === reqSupName)) ||
                       (reqSupId && (uId === reqSupId || uName === reqSupId));
             }
-          } else if (targetRole === "manager" && forManagerName) {
+          } else if ((targetRole === "manager" || targetRole === "manager_and_organisation") && forManagerName) {
             const reqMgrName = (forManagerName || "").trim();
             if (reqMgrName) {
               match = (uName === reqMgrName || uId === reqMgrName);
@@ -1423,7 +1435,151 @@ exports.triggerSubscriptionExpiryCheck = functions.region("us-central1").https.o
   }
 });
 
+/**
+ * 11. Firestore Document onCreate Trigger: sendFcmPushNotification
+ * Triggered automatically when a new notification document is created in:
+ * - root `/notifications/{docId}`
+ * - subcollection `/organisation/{orgId}/notifications/{docId}`
+ * 
+ * Flow: App action -> Backend Firestore -> Cloud Function -> FCM Admin SDK -> Recipient Device Notification Tray
+ */
+async function processFcmNotificationDoc(snapshot, context) {
+  try {
+    const data = snapshot.data();
+    if (!data) return null;
 
+    const title = data.title || "New Notification";
+    const body = data.body || "";
+    const orgId = data.orgId || data.forOrgId || "";
+    const targetRole = data.targetRole || "all";
+    const targetRoles = data.targetRoles || (targetRole === "manager_and_organisation" ? ["manager", "organisation"] : [targetRole]);
+    const forSupervisorName = data.forSupervisorName || "";
+    const forManagerName = data.forManagerName || "";
+    const senderName = data.senderName || "";
 
+    logger.info(`Processing FCM push notification trigger for doc ${snapshot.id}: "${title}" -> Target: ${targetRole} (Org: ${orgId})`);
 
+    const db = admin.firestore();
+    const tokens = new Set();
+
+    // 1. Query tokens from fcmTokens collection
+    let tokenQuery = db.collection("fcmTokens");
+    if (orgId && orgId !== "uninitialized") {
+      tokenQuery = tokenQuery.where("orgId", "==", orgId);
+    }
+
+    const tokenSnap = await tokenQuery.get();
+    tokenSnap.forEach((doc) => {
+      const tData = doc.data();
+      const token = tData.token;
+      const userType = (tData.userType || "").toLowerCase();
+      const uName = (tData.userName || "").toLowerCase();
+
+      if (!token) return;
+      if (senderName && uName === senderName.toLowerCase()) return; // Don't notify sender
+
+      // Role check
+      const isRoleMatch = targetRoles.includes("all") ||
+        targetRoles.includes("manager_and_organisation") ||
+        targetRoles.includes(userType) ||
+        (userType === "config" && targetRoles.includes("organisation"));
+
+      // User name check for supervisor/manager specific notifications
+      let isUserMatch = true;
+      if (userType === "supervisor" && forSupervisorName) {
+        isUserMatch = uName === forSupervisorName.toLowerCase();
+      } else if (userType === "manager" && forManagerName) {
+        isUserMatch = uName === forManagerName.toLowerCase();
+      }
+
+      if (isRoleMatch && isUserMatch) {
+        tokens.add(token);
+      }
+    });
+
+    if (tokens.size === 0) {
+      logger.info(`No matching FCM tokens found for target ${targetRole} in org ${orgId}. Sending via FCM topic broadcast...`);
+      // Topic fallback
+      if (orgId) {
+        const cleanOrgId = orgId.replace(/[^\w]/g, "_");
+        const topicName = targetRole === "manager_and_organisation"
+          ? `org_${cleanOrgId}`
+          : `org_${cleanOrgId}_${targetRole}`;
+
+        const topicMessage = {
+          topic: topicName,
+          notification: {
+            title: title,
+            body: body,
+          },
+          android: {
+            priority: "high",
+            notification: {
+              channelId: "cst_high_importance_channel",
+              sound: "default",
+              priority: "high",
+              visibility: "public",
+            },
+          },
+          data: {
+            click_action: "FLUTTER_NOTIFICATION_CLICK",
+            title: title,
+            body: body,
+            requestType: data.requestType || "general",
+            requestId: data.requestId || data.docId || "",
+            docId: data.docId || data.requestId || "",
+            siteId: data.siteId || "",
+            siteName: data.siteName || "",
+            status: data.status || "",
+          },
+        };
+
+        try {
+          const res = await admin.messaging().send(topicMessage);
+          logger.info(`FCM Topic push sent successfully to ${topicName}: ${res}`);
+        } catch (tErr) {
+          logger.error(`Failed sending FCM topic push to ${topicName}:`, tErr);
+        }
+      }
+      return null;
+    }
+
+    // Send payload to collected recipient device tokens
+    const message = {
+      notification: {
+        title: title,
+        body: body,
+      },
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "cst_high_importance_channel",
+          sound: "default",
+          priority: "high",
+          visibility: "public",
+        },
+      },
+      data: {
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+        title: title,
+        body: body,
+        requestType: data.requestType || "general",
+        requestId: data.requestId || data.docId || "",
+        docId: data.docId || data.requestId || "",
+        siteId: data.siteId || "",
+        siteName: data.siteName || "",
+        status: data.status || "",
+      },
+      tokens: Array.from(tokens),
+    };
+
+    const response = await admin.messaging().sendEachForMulticast(message);
+    logger.info(`FCM Multicast delivery result for doc ${snapshot.id}: Success ${response.successCount}, Failure ${response.failureCount}`);
+
+    return { successCount: response.successCount, failureCount: response.failureCount };
+  } catch (err) {
+    logger.error("Error processing FCM notification doc:", err);
+    return null;
+  }
+}
 

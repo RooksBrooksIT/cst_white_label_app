@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/app_theme.dart';
 import 'firestore_service.dart';
+import 'notification_service.dart';
 
 enum UserRole { organization, manager, supervisor, customer, none }
 
@@ -128,6 +129,30 @@ class AuthService {
         debugPrint('AuthService: Background branding refresh note: $e');
       });
     }
+
+    // Register FCM device token and subscribe to topics for push notifications
+    final userId = (sanitizedData['uid'] ??
+            sanitizedData['username'] ??
+            sanitizedData['UserName'] ??
+            sanitizedData['Supervisor ID'] ??
+            sanitizedData['supervisorId'] ??
+            'user')
+        .toString();
+    final userName = (sanitizedData['FullName'] ??
+            sanitizedData['fullName'] ??
+            sanitizedData['username'] ??
+            sanitizedData['UserName'] ??
+            'User')
+        .toString();
+    final roleStr = role.toString().split('.').last;
+
+    NotificationService.saveToken(
+      userId: userId,
+      userType: roleStr,
+      userName: userName,
+    ).catchError((e) {
+      debugPrint('AuthService: Notification token save error: $e');
+    });
   }
 
   /// Helper to convert non-JSON-encodable objects like Timestamp to standard strings

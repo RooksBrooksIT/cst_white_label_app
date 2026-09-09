@@ -191,7 +191,7 @@ class _ConstructionDocumentsState extends State<ConstructionDocuments> {
                               Text(
                                   'Project Name: ${selectedSiteData!['projectName'] ?? 'N/A'}'),
                               Text(
-                                  'Project Phase: ${selectedSiteData!['projectPhase'] ?? 'N/A'}'),
+                                  'Project Stage: ${selectedSiteData!['projectStage'] ?? selectedSiteData!['projectPhase'] ?? 'N/A'}'),
                               Text(
                                   'Supervisor: ${selectedSiteData!['supervisorName'] ?? 'N/A'}'),
                               const SizedBox(height: 24),

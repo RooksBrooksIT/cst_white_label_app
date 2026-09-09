@@ -5,6 +5,7 @@ import '../models/petty_cash_models.dart';
 import 'firestore_service.dart';
 import 'notification_service.dart';
 import 'approval_workflow_service.dart';
+import 'offline_sync_service.dart';
 
 class PettyCashService {
   static final PettyCashService _instance = PettyCashService._internal();
@@ -249,6 +250,18 @@ class PettyCashService {
     final requestMap = request.toMap();
     requestMap['createdAt'] = Timestamp.fromDate(now);
     requestMap['updatedAt'] = Timestamp.fromDate(now);
+
+    if (!OfflineSyncService().isOnline) {
+      final offlineMap = Map<String, dynamic>.from(requestMap);
+      offlineMap['createdAt'] = now.toIso8601String();
+      offlineMap['updatedAt'] = now.toIso8601String();
+      await OfflineSyncService().enqueueEntry(
+        type: 'petty_cash_request',
+        data: offlineMap,
+        idempotencyKey: reqDocId,
+      );
+      return reqDocId;
+    }
 
     await FirestoreService.pettyCashRequests.doc(reqDocId).set(requestMap);
 

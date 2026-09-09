@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -162,186 +162,275 @@ class SitePaymentScreenState extends State<SitePaymentScreen> {
     }
   }
 
+  Future<String?> _resolveSupervisorName(String? nameOrId) async {
+    if (nameOrId == null || nameOrId.trim().isEmpty) return null;
+    final clean = nameOrId.trim();
+
+    try {
+      final supDoc = await FirestoreService.supervisors.doc(clean).get();
+      if (supDoc.exists && supDoc.data() != null) {
+        final data = supDoc.data()!;
+        final fullName = (data['FullName'] ??
+                data['fullName'] ??
+                data['username'] ??
+                data['UserName'] ??
+                data['name'])
+            ?.toString()
+            .trim();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+
+      final queries = [
+        FirestoreService.supervisors.where('SupervisorId', isEqualTo: clean),
+        FirestoreService.supervisors.where('supervisorId', isEqualTo: clean),
+        FirestoreService.supervisors.where('Supervisor ID', isEqualTo: clean),
+        FirestoreService.supervisors.where('username', isEqualTo: clean),
+        FirestoreService.supervisors.where('UserName', isEqualTo: clean),
+      ];
+
+      for (var q in queries) {
+        final snap = await q.get();
+        if (snap.docs.isNotEmpty) {
+          final data = snap.docs.first.data();
+          final fullName = (data['FullName'] ??
+                  data['fullName'] ??
+                  data['username'] ??
+                  data['UserName'] ??
+                  data['name'])
+              ?.toString()
+              .trim();
+          if (fullName != null && fullName.isNotEmpty) {
+            return fullName;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error resolving supervisor name: $e');
+    }
+
+    return clean;
+  }
+
   Future<void> _fetchSupervisorForSite(String siteId) async {
     try {
-      // 1. Check Site collection doc
       String siteName = '';
+      String? foundSupervisorRaw;
+      String? foundSupervisorId;
+
+      // 1. Check Site collection doc
       final siteDoc = await FirestoreService.getCollection('Site')
           .doc(siteId)
           .get();
 
       if (siteDoc.exists && siteDoc.data() != null) {
         final siteData = siteDoc.data()!;
-        final supervisorValue = siteData['Supervisor'] ??
-            siteData['supervisor'] ??
-            siteData['supervisorName'] ??
-            siteData['supervisor_name'];
-
-        if (supervisorValue != null &&
-            supervisorValue.toString().trim().isNotEmpty) {
-          final foundName = supervisorValue.toString().trim();
-          if (mounted) {
-            setState(() {
-              supervisor = foundName;
-              supervisorController.text = foundName;
-            });
-          }
-          return;
-        }
-
-        siteName = (siteData['siteName'] ?? siteData['site'] ?? '')
+        siteName = (siteData['siteName'] ?? siteData['site'] ?? siteData['name'] ?? '')
             .toString()
             .trim();
+
+        final supVal = siteData['Supervisor'] ??
+            siteData['supervisor'] ??
+            siteData['supervisorName'] ??
+            siteData['supervisor_name'] ??
+            siteData['FullName'] ??
+            siteData['fullName'] ??
+            siteData['name'];
+
+        final supIdVal = siteData['Supervisor ID'] ??
+            siteData['supervisorId'] ??
+            siteData['SupervisorId'] ??
+            siteData['supervisor_id'] ??
+            siteData['assignedSupervisor'];
+
+        if (supVal != null && supVal.toString().trim().isNotEmpty) {
+          foundSupervisorRaw = supVal.toString().trim();
+        }
+        if (supIdVal != null && supIdVal.toString().trim().isNotEmpty) {
+          foundSupervisorId = supIdVal.toString().trim();
+        }
       }
 
       // 2. Check siteSupervisorMap by docId matching siteId
-      final mapDoc =
-          await FirestoreService.siteSupervisorMap.doc(siteId).get();
-      if (mapDoc.exists && mapDoc.data() != null) {
-        final mapData = mapDoc.data()!;
-        final sup = mapData['supervisor'] ??
-            mapData['supervisorName'] ??
-            mapData['Supervisor'] ??
-            mapData['supervisor_name'] ??
-            mapData['name'];
-        if (sup != null && sup.toString().trim().isNotEmpty) {
-          final foundName = sup.toString().trim();
-          if (mounted) {
-            setState(() {
-              supervisor = foundName;
-              supervisorController.text = foundName;
-            });
+      if (foundSupervisorRaw == null && foundSupervisorId == null) {
+        final mapDoc =
+            await FirestoreService.siteSupervisorMap.doc(siteId).get();
+        if (mapDoc.exists && mapDoc.data() != null) {
+          final mapData = mapDoc.data()!;
+          final sup = mapData['supervisor'] ??
+              mapData['supervisorName'] ??
+              mapData['Supervisor'] ??
+              mapData['supervisor_name'] ??
+              mapData['FullName'] ??
+              mapData['fullName'] ??
+              mapData['name'] ??
+              mapData['username'] ??
+              mapData['UserName'];
+          final supId = mapData['Supervisor ID'] ??
+              mapData['supervisorId'] ??
+              mapData['SupervisorId'] ??
+              mapData['supervisor_id'];
+
+          if (sup != null && sup.toString().trim().isNotEmpty) {
+            foundSupervisorRaw = sup.toString().trim();
           }
-          return;
+          if (supId != null && supId.toString().trim().isNotEmpty) {
+            foundSupervisorId = supId.toString().trim();
+          }
         }
       }
 
       // 3. Query siteSupervisorMap by site / siteId / siteName fields
-      final queriesToTry = [
-        FirestoreService.siteSupervisorMap.where('site', isEqualTo: siteId),
-        FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: siteId),
-        FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: siteId),
-      ];
+      if (foundSupervisorRaw == null && foundSupervisorId == null) {
+        final queriesToTry = [
+          FirestoreService.siteSupervisorMap.where('site', isEqualTo: siteId),
+          FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: siteId),
+          FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: siteId),
+        ];
 
-      if (siteName.isNotEmpty) {
-        queriesToTry.add(
-          FirestoreService.siteSupervisorMap.where('site', isEqualTo: siteName),
-        );
-        queriesToTry.add(
-          FirestoreService.siteSupervisorMap.where(
-            'siteName',
-            isEqualTo: siteName,
-          ),
-        );
-        queriesToTry.add(
-          FirestoreService.siteSupervisorMap.where(
-            'siteId',
-            isEqualTo: siteName,
-          ),
-        );
-      }
+        if (siteName.isNotEmpty) {
+          queriesToTry.add(
+            FirestoreService.siteSupervisorMap.where('site', isEqualTo: siteName),
+          );
+          queriesToTry.add(
+            FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: siteName),
+          );
+          queriesToTry.add(
+            FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: siteName),
+          );
+        }
 
-      for (var query in queriesToTry) {
-        final snapshot = await query.get();
-        if (snapshot.docs.isNotEmpty) {
-          for (var doc in snapshot.docs) {
-            final data = doc.data();
-            final sup = data['supervisor'] ??
-                data['supervisorName'] ??
-                data['Supervisor'] ??
-                data['supervisor_name'] ??
-                data['name'];
-            if (sup != null && sup.toString().trim().isNotEmpty) {
-              final foundName = sup.toString().trim();
-              if (mounted) {
-                setState(() {
-                  supervisor = foundName;
-                  supervisorController.text = foundName;
-                });
+        for (var query in queriesToTry) {
+          final snapshot = await query.get();
+          if (snapshot.docs.isNotEmpty) {
+            for (var doc in snapshot.docs) {
+              final data = doc.data();
+              final sup = data['supervisor'] ??
+                  data['supervisorName'] ??
+                  data['Supervisor'] ??
+                  data['supervisor_name'] ??
+                  data['FullName'] ??
+                  data['fullName'] ??
+                  data['name'] ??
+                  data['username'] ??
+                  data['UserName'];
+              final supId = data['Supervisor ID'] ??
+                  data['supervisorId'] ??
+                  data['SupervisorId'] ??
+                  data['supervisor_id'];
+
+              if (sup != null && sup.toString().trim().isNotEmpty) {
+                foundSupervisorRaw = sup.toString().trim();
               }
-              return;
+              if (supId != null && supId.toString().trim().isNotEmpty) {
+                foundSupervisorId = supId.toString().trim();
+              }
+              if (foundSupervisorRaw != null || foundSupervisorId != null) break;
             }
           }
+          if (foundSupervisorRaw != null || foundSupervisorId != null) break;
         }
       }
 
       // 4. Comprehensive Fallback: Fetch all siteSupervisorMap entries and match flexibly
-      final allMapDocs = await FirestoreService.siteSupervisorMap.get();
-      final targetSiteIdLower = siteId.toLowerCase().trim();
-      final targetSiteNameLower = siteName.toLowerCase().trim();
+      if (foundSupervisorRaw == null && foundSupervisorId == null) {
+        final allMapDocs = await FirestoreService.siteSupervisorMap.get();
+        final targetSiteIdLower = siteId.toLowerCase().trim();
+        final targetSiteNameLower = siteName.toLowerCase().trim();
 
-      for (var doc in allMapDocs.docs) {
-        final data = doc.data();
-        final docSite =
-            (data['site'] ?? '').toString().toLowerCase().trim();
-        final docSiteName =
-            (data['siteName'] ?? '').toString().toLowerCase().trim();
-        final docSiteId =
-            (data['siteId'] ?? '').toString().toLowerCase().trim();
-        final docId = doc.id.toLowerCase().trim();
+        for (var doc in allMapDocs.docs) {
+          final data = doc.data();
+          final docSite =
+              (data['site'] ?? '').toString().toLowerCase().trim();
+          final docSiteName =
+              (data['siteName'] ?? '').toString().toLowerCase().trim();
+          final docSiteId =
+              (data['siteId'] ?? '').toString().toLowerCase().trim();
+          final docId = doc.id.toLowerCase().trim();
 
-        final isMatch = (docSite.isNotEmpty &&
-                (docSite == targetSiteIdLower ||
-                    (targetSiteNameLower.isNotEmpty &&
-                        docSite == targetSiteNameLower))) ||
-            (docSiteName.isNotEmpty &&
-                (docSiteName == targetSiteIdLower ||
-                    (targetSiteNameLower.isNotEmpty &&
-                        docSiteName == targetSiteNameLower))) ||
-            (docSiteId.isNotEmpty &&
-                (docSiteId == targetSiteIdLower ||
-                    (targetSiteNameLower.isNotEmpty &&
-                        docSiteId == targetSiteNameLower))) ||
-            (docId == targetSiteIdLower ||
-                (targetSiteNameLower.isNotEmpty &&
-                    docId == targetSiteNameLower));
+          final isMatch = docId == targetSiteIdLower ||
+              docId.startsWith('${targetSiteIdLower}_') ||
+              docId.contains(targetSiteIdLower) ||
+              (targetSiteNameLower.isNotEmpty && docId.contains(targetSiteNameLower)) ||
+              (docSite.isNotEmpty && (docSite == targetSiteIdLower || docSite.contains(targetSiteIdLower) || (targetSiteNameLower.isNotEmpty && docSite.contains(targetSiteNameLower)))) ||
+              (docSiteName.isNotEmpty && (docSiteName == targetSiteIdLower || docSiteName.contains(targetSiteIdLower) || (targetSiteNameLower.isNotEmpty && docSiteName.contains(targetSiteNameLower)))) ||
+              (docSiteId.isNotEmpty && (docSiteId == targetSiteIdLower || docSiteId.contains(targetSiteIdLower) || (targetSiteNameLower.isNotEmpty && docSiteId.contains(targetSiteNameLower))));
 
-        if (isMatch) {
-          final sup = data['supervisor'] ??
-              data['supervisorName'] ??
-              data['Supervisor'] ??
-              data['supervisor_name'] ??
-              data['name'];
-          if (sup != null && sup.toString().trim().isNotEmpty) {
-            final foundName = sup.toString().trim();
-            if (mounted) {
-              setState(() {
-                supervisor = foundName;
-                supervisorController.text = foundName;
-              });
+          if (isMatch) {
+            final sup = data['supervisor'] ??
+                data['supervisorName'] ??
+                data['Supervisor'] ??
+                data['supervisor_name'] ??
+                data['FullName'] ??
+                data['fullName'] ??
+                data['name'] ??
+                data['username'] ??
+                data['UserName'];
+            final supId = data['Supervisor ID'] ??
+                data['supervisorId'] ??
+                data['SupervisorId'] ??
+                data['supervisor_id'];
+
+            if (sup != null && sup.toString().trim().isNotEmpty) {
+              foundSupervisorRaw = sup.toString().trim();
             }
-            return;
+            if (supId != null && supId.toString().trim().isNotEmpty) {
+              foundSupervisorId = supId.toString().trim();
+            }
+            if (foundSupervisorRaw != null || foundSupervisorId != null) break;
           }
         }
       }
 
       // 5. If still not found, check 'sites' collection
-      final sitesDoc = await FirestoreService.getCollection('sites')
-          .doc(siteId)
-          .get();
-      if (sitesDoc.exists && sitesDoc.data() != null) {
-        final data = sitesDoc.data()!;
-        final sup = data['Supervisor'] ??
-            data['supervisor'] ??
-            data['supervisorName'] ??
-            data['supervisor_name'];
-        if (sup != null && sup.toString().trim().isNotEmpty) {
-          final foundName = sup.toString().trim();
-          if (mounted) {
-            setState(() {
-              supervisor = foundName;
-              supervisorController.text = foundName;
-            });
+      if (foundSupervisorRaw == null && foundSupervisorId == null) {
+        final sitesDoc = await FirestoreService.getCollection('sites')
+            .doc(siteId)
+            .get();
+        if (sitesDoc.exists && sitesDoc.data() != null) {
+          final data = sitesDoc.data()!;
+          final sup = data['Supervisor'] ??
+              data['supervisor'] ??
+              data['supervisorName'] ??
+              data['supervisor_name'] ??
+              data['FullName'] ??
+              data['fullName'] ??
+              data['name'];
+          final supId = data['Supervisor ID'] ??
+              data['supervisorId'] ??
+              data['SupervisorId'] ??
+              data['supervisor_id'];
+
+          if (sup != null && sup.toString().trim().isNotEmpty) {
+            foundSupervisorRaw = sup.toString().trim();
           }
-          return;
+          if (supId != null && supId.toString().trim().isNotEmpty) {
+            foundSupervisorId = supId.toString().trim();
+          }
         }
       }
 
+      String? resolvedName;
+      if (foundSupervisorRaw != null && foundSupervisorRaw.isNotEmpty) {
+        resolvedName = await _resolveSupervisorName(foundSupervisorRaw);
+      }
+      if ((resolvedName == null || resolvedName.isEmpty) && foundSupervisorId != null && foundSupervisorId.isNotEmpty) {
+        resolvedName = await _resolveSupervisorName(foundSupervisorId);
+      }
+
       if (mounted) {
-        setState(() {
-          supervisor = 'No Supervisor Assigned';
-          supervisorController.text = 'No Supervisor Assigned';
-        });
+        if (resolvedName != null && resolvedName.isNotEmpty) {
+          setState(() {
+            supervisor = resolvedName!;
+            supervisorController.text = resolvedName;
+          });
+        } else {
+          setState(() {
+            supervisor = 'No Supervisor Assigned';
+            supervisorController.text = 'No Supervisor Assigned';
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error fetching supervisor for site: $e');

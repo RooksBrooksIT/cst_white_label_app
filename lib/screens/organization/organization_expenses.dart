@@ -1,8 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/offline_sync_service.dart';
+import 'package:ebricks/widgets/offline_sync_banner.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
 class OrganizationExpenses extends StatefulWidget {
@@ -15,10 +17,11 @@ class OrganizationExpenses extends StatefulWidget {
 class OrganizationExpensesState extends State<OrganizationExpenses> {
   String? selectedSiteId;
   String? selectedSupervisorId;
-  String? selectedProjectPhase;
+  String? selectedProjectStage;
   DateTime selectedDate = DateTime.now();
 
   List<String> siteIds = [];
+  Map<String, String> siteNameMap = {};
   bool isLoadingSites = true;
   bool isLoadingSiteDetails = false;
   bool isSubmitting = false;
@@ -27,7 +30,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
   final billVendorController = TextEditingController();
   final billAmountController = TextEditingController();
   final supervisorController = TextEditingController();
-  final projectPhaseController = TextEditingController();
+  final projectStageController = TextEditingController();
 
   List<Map<String, String>> bills = [];
 
@@ -45,7 +48,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
     billVendorController.dispose();
     billAmountController.dispose();
     supervisorController.dispose();
-    projectPhaseController.dispose();
+    projectStageController.dispose();
     super.dispose();
   }
 
@@ -54,25 +57,69 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
       isLoadingSites = true;
     });
     try {
-      final snapshot = await FirestoreService.getCollection('Site').get();
-      siteIds = snapshot.docs
-          .map((doc) => doc.id)
-          .where((id) => id.isNotEmpty)
-          .toList();
+      if (OfflineSyncService().isOnline) {
+        final Set<String> ids = {};
+        final Map<String, String> names = {};
+
+        final siteSnapshot = await FirestoreService.getCollection('Site').get();
+        for (var doc in siteSnapshot.docs) {
+          if (doc.id.isNotEmpty) {
+            ids.add(doc.id);
+            final data = doc.data();
+            final sName = (data['siteName'] ?? data['name'] ?? data['projectName'] ?? data['site'] ?? '').toString().trim();
+            if (sName.isNotEmpty && sName != doc.id) {
+              names[doc.id] = sName;
+            }
+          }
+        }
+
+        final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
+        for (var doc in mapSnapshot.docs) {
+          final data = doc.data();
+          final sId = (data['site'] ?? data['siteId'] ?? doc.id).toString().trim();
+          final sName = (data['siteName'] ?? data['projectName'] ?? data['site_name'] ?? data['location'] ?? '').toString().trim();
+          if (sId.isNotEmpty) {
+            ids.add(sId);
+            if (sName.isNotEmpty && sName != sId && (!names.containsKey(sId) || names[sId]!.isEmpty)) {
+              names[sId] = sName;
+            }
+          }
+        }
+
+        siteNameMap = names;
+        siteIds = ids.toList()..sort();
+
+        await OfflineSyncService.cacheMasterData('sites_list', siteIds);
+        await OfflineSyncService.cacheMasterData('sites_map', siteNameMap);
+      } else {
+        final cachedIds = await OfflineSyncService.getCachedMasterData('sites_list');
+        final cachedMap = await OfflineSyncService.getCachedMasterData('sites_map');
+
+        if (cachedIds is List) {
+          siteIds = cachedIds.map((e) => e.toString()).toList();
+        }
+        if (cachedMap is Map) {
+          siteNameMap = Map<String, String>.from(cachedMap.map((k, v) => MapEntry(k.toString(), v.toString())));
+        }
+      }
 
       setState(() {
         isLoadingSites = false;
       });
     } catch (e) {
-      siteIds = [];
+      final cachedIds = await OfflineSyncService.getCachedMasterData('sites_list');
+      final cachedMap = await OfflineSyncService.getCachedMasterData('sites_map');
+
+      if (cachedIds is List) {
+        siteIds = cachedIds.map((e) => e.toString()).toList();
+      }
+      if (cachedMap is Map) {
+        siteNameMap = Map<String, String>.from(cachedMap.map((k, v) => MapEntry(k.toString(), v.toString())));
+      }
+
       setState(() {
         isLoadingSites = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to load site IDs')),
-        );
-      }
     }
   }
 
@@ -333,10 +380,10 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
     setState(() {
       selectedSiteId = null;
       selectedSupervisorId = null;
-      selectedProjectPhase = null;
+      selectedProjectStage = null;
       selectedDate = DateTime.now();
       supervisorController.clear();
-      projectPhaseController.clear();
+      projectStageController.clear();
       billNoController.clear();
       billVendorController.clear();
       billAmountController.clear();
@@ -427,7 +474,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
 
     if (selectedSiteId == null ||
         selectedSupervisorId == null ||
-        selectedProjectPhase == null ||
+        selectedProjectStage == null ||
         bills.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -438,6 +485,116 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
       setState(() {
         isSubmitting = false;
       });
+      return;
+    }
+
+    if (!OfflineSyncService().isOnline) {
+      try {
+        final dateStr = DateFormat('ddMMyyyy').format(selectedDate);
+        final newDocId = '${selectedSiteId}_$dateStr';
+
+        double newTotal = 0;
+        final billsData = bills.map((bill) {
+          double amount = 0;
+          try {
+            amount = double.parse(
+              bill['billAmount']!.replaceAll(RegExp(r'[^0-9.]'), ''),
+            );
+          } catch (_) {}
+          newTotal += amount;
+          return {
+            'billNo': bill['billNo'],
+            'billVendor': bill['billVendor'],
+            'billAmount': amount,
+            'billDate': selectedDate.toIso8601String(),
+            'billCopy': 'billURL',
+          };
+        }).toList();
+
+        final collectionPath = FirestoreService.organizationEntries.path;
+
+        final payload = {
+          'siteId': selectedSiteId,
+          'supervisorName': selectedSupervisorId,
+          'projectStage': selectedProjectStage,
+          'projectName': siteNameMap[selectedSiteId] ?? '',
+          'entryDate': selectedDate.toIso8601String(),
+          'bills': billsData,
+          'totalAmount': newTotal,
+        };
+
+        await OfflineSyncService().enqueueOfflineEntry(
+          moduleName: 'Organization Expenses',
+          collectionPath: collectionPath,
+          documentId: newDocId,
+          payload: payload,
+        );
+
+        _resetForm();
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.0),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.cloud_off_rounded, color: Color(0xFFF59E0B), size: 60.0),
+                  SizedBox(height: 16.0),
+                  Text(
+                    'Saved Offline',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0A183D),
+                    ),
+                  ),
+                  SizedBox(height: 6.0),
+                  Text(
+                    'This entry will sync automatically when the network is available.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Error saving offline expense entry: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to save offline expense entry'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            isSubmitting = false;
+          });
+        }
+      }
       return;
     }
 
@@ -491,7 +648,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
       final entry = {
         'siteId': selectedSiteId,
         'supervisorName': selectedSupervisorId,
-        'projectStage': selectedProjectPhase,
+        'projectStage': selectedProjectStage,
         'projectName': projectName,
         'entryDate': Timestamp.now(),
         'bills': allBills,
@@ -515,7 +672,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
         'date': selectedDate.toIso8601String(),
         'orgExpenseTotalAmount': orgExpenseTotalAmount,
         'projectName': projectName,
-        'projectStage': selectedProjectPhase ?? '',
+        'projectStage': selectedProjectStage ?? '',
         'siteId': selectedSiteId ?? '',
       };
 
@@ -592,44 +749,155 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
     }
   }
 
+  String _getFormattedSiteDisplay(String siteId) {
+    if (siteId.isEmpty) return '';
+
+    if (siteId.contains('_')) {
+      final parts = siteId.split('_');
+      final code = parts[0];
+      final namePart = parts.sublist(1).join('_').trim();
+      if (namePart.isNotEmpty) {
+        final formattedName = namePart[0].toUpperCase() + namePart.substring(1);
+        return '${code}_$formattedName';
+      }
+      return siteId;
+    }
+
+    final sName = siteNameMap[siteId]?.trim();
+    if (sName != null && sName.isNotEmpty && sName.toLowerCase() != siteId.toLowerCase()) {
+      final formattedName = sName[0].toUpperCase() + sName.substring(1);
+      return '${siteId}_$formattedName';
+    }
+
+    return siteId;
+  }
+
+  Future<String?> _resolveSupervisorId(Map<String, dynamic> data) async {
+    final explicitId = data['Supervisor ID'] ??
+        data['supervisorId'] ??
+        data['SupervisorId'] ??
+        data['supervisor_id'] ??
+        data['assignedSupervisor'];
+
+    if (explicitId != null && explicitId.toString().trim().isNotEmpty) {
+      return explicitId.toString().trim();
+    }
+
+    final nameOrUser = data['Supervisor'] ??
+        data['supervisor'] ??
+        data['supervisorName'] ??
+        data['FullName'] ??
+        data['fullName'];
+
+    if (nameOrUser != null && nameOrUser.toString().trim().isNotEmpty) {
+      final clean = nameOrUser.toString().trim();
+      try {
+        final queries = [
+          FirestoreService.supervisors.where('supervisor', isEqualTo: clean),
+          FirestoreService.supervisors.where('supervisorName', isEqualTo: clean),
+          FirestoreService.supervisors.where('FullName', isEqualTo: clean),
+          FirestoreService.supervisors.where('fullName', isEqualTo: clean),
+          FirestoreService.supervisors.where('username', isEqualTo: clean),
+          FirestoreService.supervisors.where('UserName', isEqualTo: clean),
+        ];
+        for (var q in queries) {
+          final snap = await q.get();
+          if (snap.docs.isNotEmpty) {
+            final supData = snap.docs.first.data();
+            final id = supData['Supervisor ID'] ??
+                supData['supervisorId'] ??
+                supData['SupervisorId'] ??
+                supData['supervisor_id'] ??
+                snap.docs.first.id;
+            if (id.toString().trim().isNotEmpty) return id.toString().trim();
+          }
+        }
+      } catch (_) {}
+      return clean;
+    }
+
+    return null;
+  }
+
   Future<void> _loadSiteDetails(String siteId) async {
     if (!mounted) return;
     setState(() {
       isLoadingSiteDetails = true;
     });
+
+    String? foundSupervisorId;
+    String? foundProjectStage;
+
     try {
-      final snapshot = await FirestoreService.siteSupervisorMap
-          .where('site', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (!mounted) return;
-      if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data();
-        final supervisor = data['supervisor'] as String?;
-        final projectStage = data['projectStage'] as String?;
-        setState(() {
-          selectedSupervisorId = supervisor;
-          selectedProjectPhase = projectStage;
-          supervisorController.text = supervisor ?? '';
-          projectPhaseController.text = projectStage ?? '';
-          isLoadingSiteDetails = false;
-        });
-      } else {
-        setState(() {
-          selectedSupervisorId = 'Not Assigned';
-          selectedProjectPhase = 'Not Assigned';
-          supervisorController.text = 'Not Assigned';
-          projectPhaseController.text = 'Not Assigned';
-          isLoadingSiteDetails = false;
-        });
+      // 1. Check Site collection document
+      final siteDoc = await FirestoreService.getCollection('Site').doc(siteId).get();
+      if (siteDoc.exists && siteDoc.data() != null) {
+        final data = siteDoc.data()!;
+        foundProjectStage = (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+        foundSupervisorId = await _resolveSupervisorId(data);
+      }
+
+      // 2. Check siteSupervisorMap doc by doc ID == siteId
+      if (foundSupervisorId == null || foundProjectStage == null) {
+        final mapDoc = await FirestoreService.siteSupervisorMap.doc(siteId).get();
+        if (mapDoc.exists && mapDoc.data() != null) {
+          final data = mapDoc.data()!;
+          foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+          foundSupervisorId ??= await _resolveSupervisorId(data);
+        }
+      }
+
+      // 3. Query siteSupervisorMap by site / siteId fields
+      if (foundSupervisorId == null || foundProjectStage == null) {
+        final queriesToTry = [
+          FirestoreService.siteSupervisorMap.where('site', isEqualTo: siteId),
+          FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: siteId),
+          FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: siteId),
+        ];
+
+        for (var q in queriesToTry) {
+          final snap = await q.get();
+          if (snap.docs.isNotEmpty) {
+            final data = snap.docs.first.data();
+            foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+            foundSupervisorId ??= await _resolveSupervisorId(data);
+            if (foundSupervisorId != null && foundProjectStage != null) break;
+          }
+        }
+      }
+
+      // 4. Broad scan in siteSupervisorMap if still missing
+      if (foundSupervisorId == null || foundProjectStage == null) {
+        final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
+        final targetSiteLower = siteId.toLowerCase().trim();
+
+        for (var doc in mapSnapshot.docs) {
+          final data = doc.data();
+          final dSite = (data['site'] ?? data['siteId'] ?? data['siteName'] ?? doc.id).toString().toLowerCase().trim();
+          if (dSite == targetSiteLower || doc.id.toLowerCase().trim() == targetSiteLower) {
+            foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+            foundSupervisorId ??= await _resolveSupervisorId(data);
+            break;
+          }
+        }
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoadingSiteDetails = false;
-        });
-      }
+      debugPrint('Error loading site details in organization expenses: $e');
     }
+
+    if (!mounted) return;
+    setState(() {
+      selectedSupervisorId = (foundSupervisorId != null && foundSupervisorId.isNotEmpty)
+          ? foundSupervisorId
+          : 'Not Assigned';
+      selectedProjectStage = (foundProjectStage != null && foundProjectStage.isNotEmpty)
+          ? foundProjectStage
+          : 'Not Assigned';
+
+      supervisorController.text = selectedSupervisorId!;
+      projectStageController.text = selectedProjectStage!;
+      isLoadingSiteDetails = false;
+    });
   }
 
   @override
@@ -747,12 +1015,13 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SyncStatusCard(margin: EdgeInsets.only(top: 14)),
+                  const SizedBox(height: 14),
 
                   // SECTION 1: SITE & PROJECT INFO
                   _buildSectionHeader(
                     title: '1. Site & Project Details',
-                    subtitle: 'Choose site ID and verify supervisor/phase info',
+                    subtitle: 'Choose site ID and verify supervisor/stage info',
                     icon: Icons.location_on_rounded,
                     color: primaryColor,
                   ),
@@ -808,21 +1077,19 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
                                   borderSide: BorderSide(color: primaryColor, width: 1.8),
                                 ),
                               ),
-                              items: siteIds
-                                  .map(
-                                    (site) => DropdownMenuItem<String>(
-                                      value: site,
-                                      child: Text(
-                                        site,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Color(0xFF0A183D),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
+                              items: siteIds.map((site) {
+                                return DropdownMenuItem<String>(
+                                  value: site,
+                                  child: Text(
+                                    _getFormattedSiteDisplay(site),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF0A183D),
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                  )
-                                  .toList(),
+                                  ),
+                                );
+                              }).toList(),
                               onChanged: (value) {
                                 setState(() {
                                   selectedSiteId = value;
@@ -845,8 +1112,8 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
                     isMobile: isMobile,
                   ),
                   _buildLabeledTextField(
-                    'Project Phase',
-                    projectPhaseController,
+                    'Project Stage',
+                    projectStageController,
                     enabled: false,
                     prefixIcon: Icons.flag_rounded,
                     isDesktop: isDesktop,
@@ -1012,7 +1279,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
                                 : () {
                                     if (selectedSiteId == null ||
                                         selectedSupervisorId == null ||
-                                        selectedProjectPhase == null ||
+                                        selectedProjectStage == null ||
                                         bills.isEmpty) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(

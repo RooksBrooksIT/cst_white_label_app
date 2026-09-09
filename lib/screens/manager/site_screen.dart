@@ -75,7 +75,6 @@ class _SiteScreenState extends State<SiteScreen>
   String? _selectedProjectId;
   bool _isLoadingSiteData = false;
   bool _isUpdating = false;
-  bool _isGettingUpdateLocation = false;
 
   final TextEditingController _updateSiteNameController = TextEditingController();
   final TextEditingController _updateLocationController = TextEditingController();
@@ -301,30 +300,6 @@ class _SiteScreenState extends State<SiteScreen>
       return DateTime.tryParse(val.trim());
     }
     return null;
-  }
-
-  Future<void> _selectUpdateDate(BuildContext context, bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: isStartDate
-          ? (_updateStartDate ?? DateTime.now())
-          : (_updateEndDate ?? DateTime.now()),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-
-    if (picked != null) {
-      setState(() {
-        if (isStartDate) {
-          _updateStartDate = picked;
-          if (_updateEndDate != null && _updateEndDate!.isBefore(picked)) {
-            _updateEndDate = null;
-          }
-        } else {
-          _updateEndDate = picked;
-        }
-      });
-    }
   }
 
   Future<void> _loadSiteForUpdate(String docId) async {
@@ -1328,90 +1303,6 @@ class _SiteScreenState extends State<SiteScreen>
     );
   }
 
-  Future<void> _getCurrentUpdateLocation() async {
-    setState(() => _isGettingUpdateLocation = true);
-
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() => _isGettingUpdateLocation = false);
-        await _showEnableLocationDialog();
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw 'Location permissions are denied';
-        }
-      }
-      if (permission == LocationPermission.deniedForever) {
-        throw 'Location permissions are permanently denied';
-      }
-
-      Position? position;
-      try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 8),
-          ),
-        );
-      } catch (_) {
-        position = await Geolocator.getLastKnownPosition();
-      }
-
-      if (position == null) {
-        throw 'Failed to acquire location signal.';
-      }
-
-      String address = '';
-      if (kIsWeb) {
-        address = 'Web Location';
-      } else {
-        try {
-          List<Placemark> placemarks = await placemarkFromCoordinates(
-            position.latitude,
-            position.longitude,
-          );
-          if (placemarks.isNotEmpty) {
-            Placemark place = placemarks.first;
-            address = [
-              place.street,
-              place.locality,
-              place.administrativeArea,
-              place.country,
-            ].where((part) => part?.isNotEmpty ?? false).join(', ');
-          }
-        } catch (_) {
-          address =
-              'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
-        }
-      }
-
-      setState(() {
-        _updateLatitudeController.text = position!.latitude.toStringAsFixed(6);
-        _updateLongitudeController.text = position.longitude.toStringAsFixed(6);
-        if (_updateLocationController.text.isEmpty ||
-            _updateLocationController.text == 'Web Location') {
-          _updateLocationController.text = address;
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error getting location: $e'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isGettingUpdateLocation = false);
-    }
-  }
-
   Future<void> _updateSiteAndProject() async {
     if (_selectedSiteDocId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1438,43 +1329,18 @@ class _SiteScreenState extends State<SiteScreen>
     try {
       final siteName = _updateSiteNameController.text.trim();
       final location = _updateLocationController.text.trim();
-      final latitude = _updateLatitudeController.text.trim();
-      final longitude = _updateLongitudeController.text.trim();
       final projectName = _updateProjectNameController.text.trim().isEmpty
           ? siteName
           : _updateProjectNameController.text.trim();
 
-      // 1. Update Site document
+      // 1. Update Site document (Only editable fields allowed: Site Status, Actual Start/End Date)
       final siteUpdateData = {
-        'siteName': siteName,
-        'location': location,
-        'latitude': latitude.isNotEmpty ? double.tryParse(latitude) : null,
-        'longitude': longitude.isNotEmpty ? double.tryParse(longitude) : null,
-        'projectCategory': _updateProjectCategory ?? '',
-        'startDate': _updateStartDate != null
-            ? DateFormat('yyyy-MM-dd').format(_updateStartDate!)
-            : '',
-        'endDate': _updateEndDate != null
-            ? DateFormat('yyyy-MM-dd').format(_updateEndDate!)
-            : '',
         'status': _updateStatus,
         'actualStartDate': _updateActualStartDate != null
             ? Timestamp.fromDate(_updateActualStartDate!)
             : null,
         'actualEndDate': _updateActualEndDate != null
             ? Timestamp.fromDate(_updateActualEndDate!)
-            : null,
-        'isContractWork': _updateIsContractWork,
-        'contractorName':
-            _updateIsContractWork ? _updateContractorNameController.text.trim() : null,
-        'contractorBudget': _updateIsContractWork
-            ? (double.tryParse(_updateContractorBudgetController.text) ?? 0.0)
-            : null,
-        'contractStartDate': _updateContractStartDate != null
-            ? Timestamp.fromDate(_updateContractStartDate!)
-            : null,
-        'contractEndDate': _updateContractEndDate != null
-            ? Timestamp.fromDate(_updateContractEndDate!)
             : null,
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -1483,9 +1349,7 @@ class _SiteScreenState extends State<SiteScreen>
           .doc(_selectedSiteDocId)
           .update(siteUpdateData);
 
-      // 2. Update linked project document
-      final double budget =
-          double.tryParse(_updateProjectBudgetController.text.replaceAll(',', '')) ?? 0.0;
+      // 2. Update linked project document (Only editable fields allowed: Project Stage, Site Status, Amount Received, Actual Start/End Date)
       final double amountPaid =
           double.tryParse(_updateAmountPaidController.text.replaceAll(',', '')) ?? 0.0;
       final double amountSpent =
@@ -1493,45 +1357,17 @@ class _SiteScreenState extends State<SiteScreen>
       final double amountBalance = amountPaid - amountSpent;
 
       final projectUpdateData = {
-        'projectName': projectName,
-        'ownerName': _updateOwnerNameController.text.trim(),
-        'ownerPhoneNumber': _updateOwnerPhoneController.text.trim(),
-        'projectBudget': budget,
         'amountPaid': amountPaid,
         'amountReceived': amountPaid,
-        'amountSpent': amountSpent,
         'amountBalance': amountBalance,
-        'projectCategory': _updateProjectCategory ?? '',
-        'projectSubCategory': _updateProjectSubCategory ?? '',
-        'projectContract': _updateProjectContract ?? '',
         'projectStage': _updateProjectStage ?? '',
         'currentStatus': _updateProjectStatus ?? _updateStatus,
         'status': _updateProjectStatus ?? _updateStatus,
-        'siteName': siteName,
-        'siteLocation': location,
-        'plannedStartDate': _updateStartDate != null
-            ? Timestamp.fromDate(_updateStartDate!)
-            : null,
-        'plannedEndDate': _updateEndDate != null
-            ? Timestamp.fromDate(_updateEndDate!)
-            : null,
         'actualStateDate': _updateActualStartDate != null
             ? Timestamp.fromDate(_updateActualStartDate!)
             : null,
         'actualEndDate': _updateActualEndDate != null
             ? Timestamp.fromDate(_updateActualEndDate!)
-            : null,
-        'contractStartDate': _updateContractStartDate != null
-            ? Timestamp.fromDate(_updateContractStartDate!)
-            : null,
-        'contractEndDate': _updateContractEndDate != null
-            ? Timestamp.fromDate(_updateContractEndDate!)
-            : null,
-        'isContractWork': _updateIsContractWork,
-        'contractorName':
-            _updateIsContractWork ? _updateContractorNameController.text.trim() : null,
-        'contractorBudget': _updateIsContractWork
-            ? (double.tryParse(_updateContractorBudgetController.text) ?? 0.0)
             : null,
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -3359,70 +3195,18 @@ class _SiteScreenState extends State<SiteScreen>
                         const SizedBox(height: 18),
                         _buildTextField(
                           controller: _updateSiteNameController,
-                          label: 'Site Name *',
+                          label: 'Site Name',
                           hintText: 'e.g. Green Valley Site',
                           primaryColor: primaryColor,
-                          validator: (value) =>
-                              value?.trim().isEmpty ?? true ? 'Please enter site name' : null,
+                          readOnly: true,
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _updateLocationController,
-                                label: 'Location / Address *',
-                                hintText: 'Enter site address or fetch GPS',
-                                primaryColor: primaryColor,
-                                validator: (value) =>
-                                    value?.trim().isEmpty ?? true ? 'Please enter location' : null,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 1),
-                              child: InkWell(
-                                onTap: _isGettingUpdateLocation ? null : _getCurrentUpdateLocation,
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        primaryColor.withValues(alpha: 0.15),
-                                        primaryColor.withValues(alpha: 0.06),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: primaryColor.withValues(alpha: 0.25),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: _isGettingUpdateLocation
-                                        ? SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: primaryColor,
-                                            ),
-                                          )
-                                        : Icon(
-                                            Icons.gps_fixed_rounded,
-                                            color: primaryColor,
-                                            size: 22,
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        _buildTextField(
+                          controller: _updateLocationController,
+                          label: 'Location / Address',
+                          hintText: 'Enter site address',
+                          primaryColor: primaryColor,
+                          readOnly: true,
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -3461,7 +3245,7 @@ class _SiteScreenState extends State<SiteScreen>
                               label: 'Project Category',
                               hint: 'Select Category',
                               primaryColor: primaryColor,
-                              onChanged: (val) => setState(() => _updateProjectCategory = val),
+                              onChanged: null,
                             );
                           },
                         ),
@@ -3473,7 +3257,7 @@ class _SiteScreenState extends State<SiteScreen>
                                 label: 'Site Start Date',
                                 date: _updateStartDate,
                                 primaryColor: primaryColor,
-                                onTap: () => _selectUpdateDate(context, true),
+                                onTap: null,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -3482,7 +3266,7 @@ class _SiteScreenState extends State<SiteScreen>
                                 label: 'Site End Date',
                                 date: _updateEndDate,
                                 primaryColor: primaryColor,
-                                onTap: () => _selectUpdateDate(context, false),
+                                onTap: null,
                               ),
                             ),
                           ],
@@ -3595,7 +3379,7 @@ class _SiteScreenState extends State<SiteScreen>
                             Switch(
                               value: _updateIsContractWork,
                               activeThumbColor: primaryColor,
-                              onChanged: (val) => setState(() => _updateIsContractWork = val),
+                              onChanged: null,
                             ),
                           ],
                         ),
@@ -3606,6 +3390,7 @@ class _SiteScreenState extends State<SiteScreen>
                             label: 'Contractor Name',
                             hintText: 'e.g. Apex Builders Ltd',
                             primaryColor: primaryColor,
+                            readOnly: true,
                           ),
                           const SizedBox(height: 16),
                           _buildTextField(
@@ -3614,6 +3399,7 @@ class _SiteScreenState extends State<SiteScreen>
                             hintText: 'e.g. 500000',
                             primaryColor: primaryColor,
                             keyboardType: TextInputType.number,
+                            readOnly: true,
                           ),
                           const SizedBox(height: 16),
                           Row(
@@ -3623,10 +3409,7 @@ class _SiteScreenState extends State<SiteScreen>
                                   label: 'Contract Start',
                                   date: _updateContractStartDate,
                                   primaryColor: primaryColor,
-                                  onTap: () async {
-                                    final date = await _pickCustomDate(_updateContractStartDate);
-                                    if (date != null) setState(() => _updateContractStartDate = date);
-                                  },
+                                  onTap: null,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -3635,10 +3418,7 @@ class _SiteScreenState extends State<SiteScreen>
                                   label: 'Contract End',
                                   date: _updateContractEndDate,
                                   primaryColor: primaryColor,
-                                  onTap: () async {
-                                    final date = await _pickCustomDate(_updateContractEndDate);
-                                    if (date != null) setState(() => _updateContractEndDate = date);
-                                  },
+                                  onTap: null,
                                 ),
                               ),
                             ],
@@ -3677,11 +3457,10 @@ class _SiteScreenState extends State<SiteScreen>
                         const SizedBox(height: 18),
                         _buildTextField(
                           controller: _updateProjectNameController,
-                          label: 'Project Name *',
+                          label: 'Project Name',
                           hintText: 'e.g. Tower A Construction',
                           primaryColor: primaryColor,
-                          validator: (val) =>
-                              val?.trim().isEmpty ?? true ? 'Please enter project name' : null,
+                          readOnly: true,
                         ),
                         const SizedBox(height: 16),
                         FutureBuilder<List<String>>(
@@ -3694,7 +3473,7 @@ class _SiteScreenState extends State<SiteScreen>
                               label: 'Project Sub-Category',
                               hint: 'Select Sub-Category',
                               primaryColor: primaryColor,
-                              onChanged: (val) => setState(() => _updateProjectSubCategory = val),
+                              onChanged: null,
                             );
                           },
                         ),
@@ -3724,7 +3503,7 @@ class _SiteScreenState extends State<SiteScreen>
                               label: 'Project Contract Type',
                               hint: 'Select Contract Type',
                               primaryColor: primaryColor,
-                              onChanged: (val) => setState(() => _updateProjectContract = val),
+                              onChanged: null,
                             );
                           },
                         ),
@@ -3784,6 +3563,7 @@ class _SiteScreenState extends State<SiteScreen>
                                 label: 'Client / Owner Name',
                                 hintText: 'e.g. John Doe',
                                 primaryColor: primaryColor,
+                                readOnly: true,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -3794,6 +3574,7 @@ class _SiteScreenState extends State<SiteScreen>
                                 hintText: 'e.g. 9876543210',
                                 primaryColor: primaryColor,
                                 keyboardType: TextInputType.phone,
+                                readOnly: true,
                               ),
                             ),
                           ],
@@ -4090,7 +3871,7 @@ class _SiteScreenState extends State<SiteScreen>
     required String label,
     required String hint,
     Color? primaryColor,
-    required void Function(String?) onChanged,
+    void Function(String?)? onChanged,
   }) {
     final isValidValue = value != null && items.contains(value);
     final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
@@ -4127,6 +3908,10 @@ class _SiteScreenState extends State<SiteScreen>
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
@@ -4134,7 +3919,11 @@ class _SiteScreenState extends State<SiteScreen>
                 width: 1.8,
               ),
             ),
+            suffixIcon: onChanged == null
+                ? const Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF94A3B8))
+                : null,
           ),
+          icon: onChanged == null ? const SizedBox.shrink() : null,
           hint: Text(
             hint,
             style: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
@@ -4154,12 +3943,12 @@ class _SiteScreenState extends State<SiteScreen>
   Widget _buildDateField({
     required String label,
     required DateTime? date,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     Color? primaryColor,
   }) {
     final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
     final formattedDate =
-        date == null ? 'Select Date' : DateFormat('dd MMM yyyy').format(date);
+        date == null ? 'Not Set' : DateFormat('dd MMM yyyy').format(date);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4196,9 +3985,9 @@ class _SiteScreenState extends State<SiteScreen>
                   ),
                 ),
                 Icon(
-                  Icons.calendar_today_rounded,
-                  size: 18,
-                  color: effectivePrimary,
+                  onTap != null ? Icons.calendar_today_rounded : Icons.lock_outline_rounded,
+                  size: onTap != null ? 18 : 16,
+                  color: onTap != null ? effectivePrimary : const Color(0xFF94A3B8),
                 ),
               ],
             ),

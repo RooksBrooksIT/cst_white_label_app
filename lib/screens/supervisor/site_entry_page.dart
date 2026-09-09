@@ -5,6 +5,8 @@ import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/material_inventory_service.dart';
+import 'package:ebricks/services/offline_sync_service.dart';
+import 'package:ebricks/widgets/offline_sync_banner.dart';
 import 'package:ebricks/widgets/glass_card.dart';
 import 'package:ebricks/widgets/glass_button.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -171,7 +173,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       });
     } catch (e) {
       setState(() {
-        projectPhaseError = 'Failed to load project phases';
+        projectPhaseError = 'Failed to load project stages';
         isLoadingProjectPhases = false;
       });
     }
@@ -278,43 +280,69 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       materialError = null;
     });
     try {
-      final orgId = getOrgId();
-
-      // Fetch materials from organisation/{orgId}/materials
-      final snapshot = await FirebaseFirestore.instance
-          .collection('organisation')
-          .doc(orgId)
-          .collection('materials')
-          .get();
-      final options = <String>[];
-      final prices = <String, num>{};
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final name = (data['materialName'] ?? data['name'] ?? '').toString().trim();
-        if (name.isNotEmpty) {
-          options.add(name);
-          final priceRaw = data['materialPrice'];
-          num price = 0;
-          if (priceRaw is num) {
-            price = priceRaw;
-          } else if (priceRaw is String) {
-            price =
-                num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+      if (OfflineSyncService().isOnline) {
+        final orgId = getOrgId();
+        final snapshot = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(orgId)
+            .collection('materials')
+            .get();
+        final options = <String>[];
+        final prices = <String, num>{};
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          final name = (data['materialName'] ?? data['name'] ?? '').toString().trim();
+          if (name.isNotEmpty) {
+            options.add(name);
+            final priceRaw = data['materialPrice'];
+            num price = 0;
+            if (priceRaw is num) {
+              price = priceRaw;
+            } else if (priceRaw is String) {
+              price =
+                  num.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+            }
+            prices[name] = price;
           }
-          prices[name] = price;
         }
-      }
-      setState(() {
         materialOptions = options;
         materialPrices = prices;
+
+        await OfflineSyncService.cacheMasterData('materials_list', materialOptions);
+        await OfflineSyncService.cacheMasterData('materials_prices', materialPrices);
+      } else {
+        final cachedOptions = await OfflineSyncService.getCachedMasterData('materials_list');
+        final cachedPrices = await OfflineSyncService.getCachedMasterData('materials_prices');
+        if (cachedOptions is List) {
+          materialOptions = cachedOptions.map((e) => e.toString()).toList();
+        }
+        if (cachedPrices is Map) {
+          materialPrices = Map<String, num>.from(
+            cachedPrices.map((k, v) => MapEntry(k.toString(), (v as num))),
+          );
+        }
+      }
+
+      setState(() {
         selectedMaterial = materialOptions.isNotEmpty
             ? materialOptions.first
             : null;
         isLoadingMaterials = false;
       });
     } catch (e) {
+      final cachedOptions = await OfflineSyncService.getCachedMasterData('materials_list');
+      final cachedPrices = await OfflineSyncService.getCachedMasterData('materials_prices');
+      if (cachedOptions is List) {
+        materialOptions = cachedOptions.map((e) => e.toString()).toList();
+      }
+      if (cachedPrices is Map) {
+        materialPrices = Map<String, num>.from(
+          cachedPrices.map((k, v) => MapEntry(k.toString(), (v as num))),
+        );
+      }
+
       setState(() {
-        materialError = 'Failed to load materials';
+        selectedMaterial = materialOptions.isNotEmpty ? materialOptions.first : null;
         isLoadingMaterials = false;
       });
     }
@@ -326,43 +354,69 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       labourError = null;
     });
     try {
-      final orgId = getOrgId();
-      // Load labours from /organisation/{orgId}/labours
-      final snapshot = await FirebaseFirestore.instance
-          .collection('organisation')
-          .doc(orgId)
-          .collection('labours')
-          .get();
-      final options = <String>[];
-      final salaries = <String, num>{};
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        if (data.containsKey('designation')) {
-          final designation = data['designation']?.toString() ?? '';
-          if (designation.isNotEmpty) {
-            options.add(designation);
-            final salaryRaw = data['salary'];
-            num salary = 0;
-            if (salaryRaw is num) {
-              salary = salaryRaw;
-            } else if (salaryRaw is String) {
-              salary =
-                  num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ??
-                  0;
+      if (OfflineSyncService().isOnline) {
+        final orgId = getOrgId();
+        final snapshot = await FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(orgId)
+            .collection('labours')
+            .get();
+        final options = <String>[];
+        final salaries = <String, num>{};
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          if (data.containsKey('designation')) {
+            final designation = data['designation']?.toString() ?? '';
+            if (designation.isNotEmpty) {
+              options.add(designation);
+              final salaryRaw = data['salary'];
+              num salary = 0;
+              if (salaryRaw is num) {
+                salary = salaryRaw;
+              } else if (salaryRaw is String) {
+                salary =
+                    num.tryParse(salaryRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+              }
+              salaries[designation] = salary;
             }
-            salaries[designation] = salary;
           }
         }
-      }
-      setState(() {
         labourOptions = options;
         labourSalaries = salaries;
+
+        await OfflineSyncService.cacheMasterData('labours_list', labourOptions);
+        await OfflineSyncService.cacheMasterData('labours_salaries', labourSalaries);
+      } else {
+        final cachedOptions = await OfflineSyncService.getCachedMasterData('labours_list');
+        final cachedSalaries = await OfflineSyncService.getCachedMasterData('labours_salaries');
+        if (cachedOptions is List) {
+          labourOptions = cachedOptions.map((e) => e.toString()).toList();
+        }
+        if (cachedSalaries is Map) {
+          labourSalaries = Map<String, num>.from(
+            cachedSalaries.map((k, v) => MapEntry(k.toString(), (v as num))),
+          );
+        }
+      }
+
+      setState(() {
         selectedLabour = labourOptions.isNotEmpty ? labourOptions.first : null;
         isLoadingLabours = false;
       });
     } catch (e) {
+      final cachedOptions = await OfflineSyncService.getCachedMasterData('labours_list');
+      final cachedSalaries = await OfflineSyncService.getCachedMasterData('labours_salaries');
+      if (cachedOptions is List) {
+        labourOptions = cachedOptions.map((e) => e.toString()).toList();
+      }
+      if (cachedSalaries is Map) {
+        labourSalaries = Map<String, num>.from(
+          cachedSalaries.map((k, v) => MapEntry(k.toString(), (v as num))),
+        );
+      }
+
       setState(() {
-        labourError = 'Failed to load labours';
+        selectedLabour = labourOptions.isNotEmpty ? labourOptions.first : null;
         isLoadingLabours = false;
       });
     }
@@ -662,6 +716,70 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         .toList();
 
     try {
+      if (!OfflineSyncService().isOnline) {
+        final payload = {
+          'docId': docId,
+          'date': dateIso,
+          'food': int.tryParse(foodCost.text) ?? 0,
+          'fuel': int.tryParse(fuelCost.text) ?? 0,
+          'labours': newLabours,
+          'materials': newMaterials,
+          'supervisorId': supervisorId ?? '',
+          'supervisorName': widget.userName,
+          'projectStage': selectedProjectPhase ?? '',
+          'transport': int.tryParse(transportCost.text) ?? 0,
+          'totalAmount': _getTotalAmount(),
+          'siteLocation': siteLocation,
+          'siteId': siteCode,
+          'projectName': projectName ?? '',
+        };
+
+        await OfflineSyncService().enqueueEntry(
+          type: 'supervisor_entry',
+          data: payload,
+          idempotencyKey: '${docId}_${DateTime.now().millisecondsSinceEpoch}',
+        );
+
+        if (!mounted) return;
+
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.wifi_off_rounded, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Saved Offline'),
+              ],
+            ),
+            content: const Text(
+              'Site entry saved locally on your device because there is no internet connection.\n\nIt will automatically sync with the server database when connection is restored.',
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+
+        setState(() {
+          materials.clear();
+          labours.clear();
+          foodCost.text = '0';
+          transportCost.text = '0';
+          fuelCost.text = '0';
+          isSaving = false;
+        });
+        return;
+      }
       // Check for existing entry for this site and date
       final existing = await entriesColl.doc(docId).get();
       final bool isSameDate = existing.exists;
@@ -1351,6 +1469,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const SyncStatusCard(margin: EdgeInsets.only(bottom: 14)),
                     GlassCard(
                       color: cardBg,
                       padding: const EdgeInsets.all(16.0),
