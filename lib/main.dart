@@ -89,6 +89,7 @@ class MyApp extends StatelessWidget {
               routes: {
                 '/': (context) => const SplashScreen(),
                 '/landing': (context) => const LandingPage(),
+                '/login': (context) => const Organisation_LoginPage(),
                 '/authSelection': (context) =>
                     const MainDashboard(), // Role selection screen
                 '/orgLogin': (context) => const Organisation_LoginPage(),

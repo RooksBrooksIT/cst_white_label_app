@@ -432,6 +432,36 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
           ),
           const SizedBox(height: 12),
 
+          if (req.isSitePaymentLinked || (req.siteName != null && req.siteName!.isNotEmpty)) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.link_rounded, size: 14, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Linked Site Payment: ${req.linkedSitePaymentTitle ?? req.siteName ?? req.siteId}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1D4ED8),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Context Banner
           Container(
             padding: const EdgeInsets.all(10),
@@ -450,42 +480,54 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Total Alloc: ${PettyCashService.formatCurrency(req.totalAllocatedAtRequest)}',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                Expanded(
+                  child: Text(
+                    'Total Alloc: ${PettyCashService.formatCurrency(req.totalAllocatedAtRequest)}',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    textAlign: TextAlign.end,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           Text(
-            'Reason: ${req.reason}',
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+            'Justification: ${req.reason}',
+            style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155)),
           ),
-          const SizedBox(height: 14),
+          if (req.remarks.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Remarks: ${req.remarks}',
+              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+            ),
+          ],
+          const SizedBox(height: 16),
 
-          // Action Buttons: Review & Forward vs Reject
+          // Action Buttons: Approve & Forward vs Reject
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: OutlinedButton.icon(
                   onPressed: () => _showRejectDialog(req),
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  label: const Text('Reject'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFEF4444),
                     side: const BorderSide(color: Color(0xFFFCA5A5)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () => _showForwardDialog(req),
-                  icon: const Icon(Icons.send_rounded, size: 16),
-                  label: const Text('Forward to HQ', style: TextStyle(fontWeight: FontWeight.w800)),
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                  label: const Text('Verify & Forward'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
                     foregroundColor: Colors.white,
@@ -598,6 +640,36 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
             'Reason: ${req.reason}',
             style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
           ),
+          if (req.isSitePaymentLinked || (req.siteName != null && req.siteName!.isNotEmpty)) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.link_rounded, size: 13, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      'Linked Site Payment: ${req.linkedSitePaymentTitle ?? req.siteName ?? req.siteId}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1D4ED8),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (req.orgApprovalRemarks.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(

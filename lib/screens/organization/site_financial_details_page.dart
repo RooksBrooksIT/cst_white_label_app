@@ -1012,20 +1012,26 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.pie_chart_outline_rounded, size: 16, color: Color(0xFF64748B)),
-                    SizedBox(width: 6),
-                    Text(
-                      'Budget Remaining (Budget - Spent):',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF475569),
+                const Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.pie_chart_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Budget Remaining (Budget - Spent):',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF475569),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '₹ ${_formatCurrency(budgetRemaining)}',
                   style: const TextStyle(

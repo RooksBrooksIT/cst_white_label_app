@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
 class ProjectScreen extends StatefulWidget {
@@ -624,6 +625,18 @@ class _ProjectScreenState extends State<ProjectScreen>
         } else {
           await FirestoreService.getCollection('projects').add(projectData);
         }
+
+        try {
+          await NotificationService.notifyProjectCreatedOrUpdated(
+            projectId: _selectedSiteId ?? '',
+            projectName: _projectNameController.text.trim(),
+            siteId: _selectedSiteId ?? '',
+            siteName: _selectedSiteId ?? '',
+            isCreated: true,
+          );
+        } catch (notifErr) {
+          debugPrint('Error notifying project create: $notifErr');
+        }
       } else {
         if (selectedProjectId == null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -637,6 +650,18 @@ class _ProjectScreenState extends State<ProjectScreen>
         await FirestoreService.getCollection(
           'projects',
         ).doc(selectedProjectId).update(projectData);
+
+        try {
+          await NotificationService.notifyProjectCreatedOrUpdated(
+            projectId: selectedProjectId!,
+            projectName: _projectNameController.text.trim(),
+            siteId: _selectedSiteId ?? selectedProjectData?['siteId'] ?? '',
+            siteName: _selectedSiteId ?? selectedProjectData?['siteName'] ?? '',
+            isCreated: false,
+          );
+        } catch (notifErr) {
+          debugPrint('Error notifying project update: $notifErr');
+        }
       }
 
       final syncSiteId = _selectedSiteId ?? selectedProjectData?['siteId'] ?? selectedProjectId ?? '';

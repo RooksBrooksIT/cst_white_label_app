@@ -144,6 +144,104 @@ class PettyCashService {
     return assignedSites;
   }
 
+  /// Fetches active/unpaid site payment requisitions for a supervisor to link to petty cash.
+  Future<List<Map<String, dynamic>>> fetchPendingSitePaymentsForSupervisor({
+    required String supervisorId,
+    String? siteId,
+  }) async {
+    final List<Map<String, dynamic>> results = [];
+    try {
+      final cleanSupId = supervisorId.trim().toLowerCase();
+      final filterSiteId = (siteId ?? '').trim().toLowerCase();
+
+      // 1. Query siteSupervisorEntries collection
+      final entriesSnap =
+          await FirestoreService.getCollection('siteSupervisorEntries').get();
+      for (final doc in entriesSnap.docs) {
+        final data = doc.data();
+        final sSupId = (data['supervisorId'] ?? data['Supervisor ID'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final sSiteId = (data['siteId'] ?? data['site_id'] ?? data['siteCode'] ?? '')
+            .toString()
+            .trim();
+        final status = (data['status'] ?? 'pending_manager_review')
+            .toString()
+            .toLowerCase();
+
+        final isFunded = data['fundedViaPettyCash'] == true;
+        final isPending = !isFunded && status != 'rejected_by_manager' && status != 'rejected_by_org';
+        final matchSup = cleanSupId.isEmpty || sSupId == cleanSupId || sSupId.isEmpty;
+        final matchSite = filterSiteId.isEmpty || sSiteId.toLowerCase() == filterSiteId;
+
+        if (isPending && matchSup && matchSite) {
+          final amt = (data['amount'] is num)
+              ? (data['amount'] as num).toDouble()
+              : (data['totalAmount'] is num)
+                  ? (data['totalAmount'] as num).toDouble()
+                  : double.tryParse(data['amount']?.toString() ?? '') ?? 0.0;
+
+          final sName = (data['siteName'] ?? data['site'] ?? sSiteId).toString();
+          final stage = (data['projectStage'] ?? data['projectPhase'] ?? 'Site Requisition').toString();
+
+          results.add({
+            'id': doc.id,
+            'source': 'siteSupervisorEntries',
+            'siteId': sSiteId,
+            'siteName': sName,
+            'amount': amt,
+            'projectStage': stage,
+            'title': '$sName ($stage) - ${formatCurrency(amt)}',
+            'status': status,
+            'raw': data,
+          });
+        }
+      }
+
+      // 2. Query siteSupervisorPayments collection
+      final paymentsSnap =
+          await FirestoreService.getCollection('siteSupervisorPayments').get();
+      for (final doc in paymentsSnap.docs) {
+        final data = doc.data();
+        final sSiteId = (data['siteId'] ?? '').toString().trim();
+        final status = (data['status'] ?? 'pending_manager_review')
+            .toString()
+            .toLowerCase();
+
+        final isFunded = data['fundedViaPettyCash'] == true;
+        final isPending = !isFunded;
+        final matchSite = filterSiteId.isEmpty || sSiteId.toLowerCase() == filterSiteId;
+
+        if (isPending && matchSite) {
+          final amt = (data['amount'] is num)
+              ? (data['amount'] as num).toDouble()
+              : double.tryParse(data['amount']?.toString() ?? '') ?? 0.0;
+
+          final stage = (data['projectStage'] ?? 'Stage Payment').toString();
+
+          // Avoid duplicate if doc.id is already in results
+          if (!results.any((r) => r['id'] == doc.id)) {
+            results.add({
+              'id': doc.id,
+              'source': 'siteSupervisorPayments',
+              'siteId': sSiteId,
+              'siteName': sSiteId,
+              'amount': amt,
+              'projectStage': stage,
+              'title': 'Site Payment #$sSiteId ($stage) - ${formatCurrency(amt)}',
+              'status': status,
+              'raw': data,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('PettyCashService: Error fetching pending site payments: $e');
+    }
+    return results;
+  }
+
   // ---------------------------------------------------------------------------
   // 3. REQUEST LIFECYCLE: STAGE 1 (SUBMIT)
   // ---------------------------------------------------------------------------
@@ -158,6 +256,10 @@ class PettyCashService {
     String? managerId,
     String? managerName,
     bool isReplenishment = false,
+    String? siteId,
+    String? siteName,
+    String? linkedSitePaymentId,
+    String? linkedSitePaymentTitle,
   }) async {
     if (requestedAmount <= 0) {
       throw Exception('Requested amount must be greater than zero.');
@@ -242,6 +344,10 @@ class PettyCashService {
       currentBalanceAtRequest: account.availableBalance,
       totalAllocatedAtRequest: account.totalAllocated,
       totalUsedAtRequest: account.totalUsed,
+      siteId: siteId,
+      siteName: siteName,
+      linkedSitePaymentId: linkedSitePaymentId,
+      linkedSitePaymentTitle: linkedSitePaymentTitle,
       approvalHistory: [auditEntry],
       createdAt: now,
       updatedAt: now,
@@ -880,6 +986,10 @@ class PettyCashService {
       );
 
       // 3. Create Inflow Ledger Transaction
+      final linkedSitePaymentId = reqData['linkedSitePaymentId']?.toString();
+      final reqSiteId = reqData['siteId']?.toString();
+      final reqSiteName = reqData['siteName']?.toString();
+
       final txnRef = FirestoreService.pettyCashTransactions.doc(txnId);
       final transactionRecord = PettyCashTransaction(
         transactionId: txnId,
@@ -890,7 +1000,10 @@ class PettyCashService {
         supervisorName: supervisorName,
         managerId: managerId,
         managerName: managerName,
-        isSiteExpense: false,
+        siteId: reqSiteId,
+        siteName: reqSiteName,
+        linkedSitePaymentId: linkedSitePaymentId,
+        isSiteExpense: reqSiteId != null && reqSiteId.isNotEmpty,
         transactionType: isReplenishment ? 'REPLENISHMENT' : 'ALLOCATION',
         expenseCategory: isReplenishment ? 'Replenishment' : 'Initial Allocation',
         description: isReplenishment
@@ -907,6 +1020,33 @@ class PettyCashService {
       );
 
       txn.set(txnRef, transactionRecord.toMap());
+
+      // Update linked Site Payment status if present
+      if (linkedSitePaymentId != null && linkedSitePaymentId.isNotEmpty) {
+        final entryRef = FirestoreService.getCollection('siteSupervisorEntries').doc(linkedSitePaymentId);
+        final entrySnap = await txn.get(entryRef);
+        if (entrySnap.exists) {
+          txn.update(entryRef, {
+            'fundedViaPettyCash': true,
+            'pettyCashRequestId': requestId,
+            'pettyCashStatus': 'disbursed',
+            'pettyCashConfirmedAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          final paymentRef = FirestoreService.getCollection('siteSupervisorPayments').doc(linkedSitePaymentId);
+          final paymentSnap = await txn.get(paymentRef);
+          if (paymentSnap.exists) {
+            txn.update(paymentRef, {
+              'fundedViaPettyCash': true,
+              'pettyCashRequestId': requestId,
+              'pettyCashStatus': 'disbursed',
+              'pettyCashConfirmedAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
 
       // 4. Create Audit Log Entry
       final logRef = FirestoreService.pettyCashAuditLogs.doc();
@@ -930,7 +1070,11 @@ class PettyCashService {
           'status': 'received',
           'receivedAt': DateTime.now().toIso8601String(),
         },
-        metadata: {'requestId': requestId, 'txnId': txnId},
+        metadata: {
+          'requestId': requestId,
+          'txnId': txnId,
+          if (linkedSitePaymentId != null) 'linkedSitePaymentId': linkedSitePaymentId,
+        },
         timestamp: DateTime.now(),
       );
 

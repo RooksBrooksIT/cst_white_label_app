@@ -13,6 +13,8 @@ enum NotificationType {
   managerExpense,
   siteAssignment,
   siteCreated,
+  projectCreated,
+  projectUpdated,
   managerAccountCreated,
   supervisorAccountCreated,
   toolMovement,
@@ -116,6 +118,13 @@ class NotificationModel {
     } else if (typeStr.contains('site_created') ||
         typeStr.contains('site_management')) {
       parsedType = NotificationType.siteCreated;
+    } else if (typeStr.contains('project_created') ||
+        typeStr.contains('project_create')) {
+      parsedType = NotificationType.projectCreated;
+    } else if (typeStr.contains('project_updated') ||
+        typeStr.contains('project_update') ||
+        typeStr.contains('project')) {
+      parsedType = NotificationType.projectUpdated;
     } else if (typeStr.contains('manager_account') ||
         typeStr.contains('manager_config')) {
       parsedType = NotificationType.managerAccountCreated;

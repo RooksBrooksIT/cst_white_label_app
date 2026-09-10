@@ -7,6 +7,7 @@ import 'package:lottie/lottie.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
+import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/notification_service.dart';
@@ -118,11 +119,9 @@ class _SiteScreenState extends State<SiteScreen>
   void _setupFinancialCalculationListeners() {
     _amountSpentController.text = '0.00';
     _balanceAmountController.text = '0.00';
-    _projectBudgetController.addListener(_recalcNewSetupBalance);
     _amountPaidController.addListener(_recalcNewSetupBalance);
     _amountSpentController.addListener(_recalcNewSetupBalance);
 
-    _updateProjectBudgetController.addListener(_recalcUpdateBalance);
     _updateAmountPaidController.addListener(_recalcUpdateBalance);
     _updateAmountSpentController.addListener(_recalcUpdateBalance);
   }
@@ -131,14 +130,20 @@ class _SiteScreenState extends State<SiteScreen>
     final received = double.tryParse(_amountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
     final spent = double.tryParse(_amountSpentController.text.trim().replaceAll(',', '')) ?? 0.0;
     final balance = received - spent;
-    _balanceAmountController.text = balance.toStringAsFixed(2);
+    final formatted = balance.toStringAsFixed(2);
+    if (_balanceAmountController.text != formatted) {
+      _balanceAmountController.text = formatted;
+    }
   }
 
   void _recalcUpdateBalance() {
     final received = double.tryParse(_updateAmountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
     final spent = double.tryParse(_updateAmountSpentController.text.trim().replaceAll(',', '')) ?? 0.0;
     final balance = received - spent;
-    _updateBalanceAmountController.text = balance.toStringAsFixed(2);
+    final formatted = balance.toStringAsFixed(2);
+    if (_updateBalanceAmountController.text != formatted) {
+      _updateBalanceAmountController.text = formatted;
+    }
   }
 
   @override
@@ -1386,13 +1391,17 @@ class _SiteScreenState extends State<SiteScreen>
         }
       }
 
-      // Notification
+      // Real-time Notification to Organization
       try {
+        final ud = AuthService().userData;
+        final currentManager = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Manager').toString();
+
         await NotificationService.notifySiteCreatedOrUpdated(
           siteId: _selectedSiteId ?? _selectedSiteDocId!,
           siteName: siteName,
           location: location,
           projectName: projectName,
+          managerName: currentManager,
           isCreated: false,
         );
       } catch (notifErr) {
@@ -1631,6 +1640,17 @@ class _SiteScreenState extends State<SiteScreen>
       return;
     }
 
+    final ownerPhone = _ownerPhoneController.text.trim();
+    if (ownerPhone.isEmpty || ownerPhone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(ownerPhone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid 10-digit client phone number.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final siteName = _siteNameController.text.trim();
     final location = _locationController.text.trim();
     final latitude = _latitudeController.text.trim();
@@ -1727,11 +1747,15 @@ class _SiteScreenState extends State<SiteScreen>
 
       // Trigger real-time notification to Organization
       try {
+        final ud = AuthService().userData;
+        final currentManager = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Manager').toString();
+
         await NotificationService.notifySiteCreatedOrUpdated(
           siteId: nextSiteId,
           siteName: siteName,
           location: location,
           projectName: projectName,
+          managerName: currentManager,
           isCreated: true,
         );
       } catch (notifErr) {
@@ -1758,7 +1782,9 @@ class _SiteScreenState extends State<SiteScreen>
             double.tryParse(_projectBudgetController.text.replaceAll(',', '')) ?? 0.0;
         final double amountPaid =
             double.tryParse(_amountPaidController.text.replaceAll(',', '')) ?? 0.0;
-        final double balance = amountPaid;
+        final double amountSpent =
+            double.tryParse(_amountSpentController.text.replaceAll(',', '')) ?? 0.0;
+        final double balance = amountPaid - amountSpent;
 
         Map<String, dynamic>? initialPaymentEntry;
         if (amountPaid > 0) {
@@ -1791,7 +1817,7 @@ class _SiteScreenState extends State<SiteScreen>
           'ownerPhoneNumber': _ownerPhoneController.text.trim(),
           'amountPaid': amountPaid,
           'amountReceived': amountPaid,
-          'amountSpent': 0.0,
+          'amountSpent': amountSpent,
           'amountBalance': balance,
           'receivedPayments': initialPaymentEntry != null ? [initialPaymentEntry] : [],
           'projectBudget': budget,
@@ -2711,7 +2737,10 @@ class _SiteScreenState extends State<SiteScreen>
                           label: 'Estimated Budget (₹)',
                           hintText: 'e.g. 2500000',
                           primaryColor: primaryColor,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -2721,7 +2750,11 @@ class _SiteScreenState extends State<SiteScreen>
                           label: 'Customer Received (₹)',
                           hintText: 'e.g. 500000',
                           primaryColor: primaryColor,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                          ],
+                          onChanged: (_) => _recalcNewSetupBalance(),
                         ),
                       ),
                     ],
@@ -2742,7 +2775,7 @@ class _SiteScreenState extends State<SiteScreen>
                       Expanded(
                         child: _buildTextField(
                           controller: _balanceAmountController,
-                          label: 'Balance from Received (₹)',
+                          label: 'Balance (₹)',
                           hintText: '0.00',
                           primaryColor: primaryColor,
                           readOnly: true,
@@ -2769,6 +2802,20 @@ class _SiteScreenState extends State<SiteScreen>
                           hintText: 'e.g. 9876543210',
                           primaryColor: primaryColor,
                           keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                          validator: (val) {
+                            final phone = val?.trim() ?? '';
+                            if (phone.isEmpty) {
+                              return 'Please enter client phone number';
+                            }
+                            if (phone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(phone)) {
+                              return 'Client phone must be exactly 10 digits';
+                            }
+                            return null;
+                          },
                         ),
                       ),
                     ],
@@ -3546,7 +3593,7 @@ class _SiteScreenState extends State<SiteScreen>
                             Expanded(
                               child: _buildTextField(
                                 controller: _updateBalanceAmountController,
-                                label: 'Balance from Received (₹)',
+                                label: 'Balance (₹)',
                                 hintText: '0.00',
                                 primaryColor: primaryColor,
                                 readOnly: true,
@@ -3574,6 +3621,17 @@ class _SiteScreenState extends State<SiteScreen>
                                 hintText: 'e.g. 9876543210',
                                 primaryColor: primaryColor,
                                 keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(10),
+                                ],
+                                validator: (val) {
+                                  final phone = val?.trim() ?? '';
+                                  if (phone.isNotEmpty && (phone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(phone))) {
+                                    return 'Client phone must be exactly 10 digits';
+                                  }
+                                  return null;
+                                },
                                 readOnly: true,
                               ),
                             ),
@@ -3812,6 +3870,7 @@ class _SiteScreenState extends State<SiteScreen>
     TextInputType keyboardType = TextInputType.text,
     bool readOnly = false,
     void Function(String)? onChanged,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
 
@@ -3830,6 +3889,7 @@ class _SiteScreenState extends State<SiteScreen>
         TextFormField(
           controller: controller,
           validator: validator,
+          inputFormatters: inputFormatters,
           keyboardType: keyboardType,
           readOnly: readOnly,
           onChanged: onChanged,

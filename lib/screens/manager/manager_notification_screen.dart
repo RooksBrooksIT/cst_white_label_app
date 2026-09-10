@@ -563,12 +563,16 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
                                     color: Color(0xFF64748B),
                                   ),
                                   const SizedBox(width: 3),
-                                  Text(
-                                    siteId,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF475569),
+                                  Flexible(
+                                    child: Text(
+                                      siteId,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF475569),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
@@ -593,6 +597,8 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
                                   fontWeight: FontWeight.w600,
                                   color: primaryColor,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           if ((data['requiredAction']?.toString() ?? '').isNotEmpty)
@@ -617,12 +623,16 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
                                     color: Color(0xFFEA580C),
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    data['requiredAction'].toString(),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFFC2410C),
+                                  Flexible(
+                                    child: Text(
+                                      data['requiredAction'].toString(),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFC2410C),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],

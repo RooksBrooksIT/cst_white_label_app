@@ -26,12 +26,56 @@ class NotificationService {
       'Important notifications that require immediate attention';
 
   static StreamSubscription? _realtimeNotifSub;
-  static final DateTime _sessionStartTime = DateTime.now();
+  static final Set<String> _processedNotifIds = {};
+  static bool _isLocalNotificationsInitialized = false;
+  static GlobalKey<NavigatorState>? _navigatorKey;
+
+  /// Normalizes role string to canonical form ('organisation', 'manager', 'supervisor').
+  /// Handles American vs British spelling ('organization' -> 'organisation') and aliases.
+  static String normalizeRole(String? role) {
+    final r = (role ?? '').toLowerCase().trim();
+    if (r == 'organisation' || r == 'organization' || r == 'org') {
+      return 'organisation';
+    }
+    if (r == 'config' || r == 'admin') {
+      return 'organisation';
+    }
+    return r;
+  }
+
+  /// Safely converts Timestamps, DateTimes, and non-JSON-encodable values to ISO strings
+  /// to ensure jsonEncode never fails when preparing notification payloads.
+  static Map<String, dynamic> _sanitizeDataForPayload(Map<String, dynamic> raw) {
+    final clean = <String, dynamic>{};
+    raw.forEach((key, value) {
+      if (value is Timestamp) {
+        clean[key] = value.toDate().toIso8601String();
+      } else if (value is DateTime) {
+        clean[key] = value.toIso8601String();
+      } else if (value is Map) {
+        clean[key] = _sanitizeDataForPayload(Map<String, dynamic>.from(value));
+      } else if (value is List) {
+        clean[key] = value.map((item) {
+          if (item is Timestamp) return item.toDate().toIso8601String();
+          if (item is DateTime) return item.toIso8601String();
+          if (item is Map) {
+            return _sanitizeDataForPayload(Map<String, dynamic>.from(item));
+          }
+          return item?.toString();
+        }).toList();
+      } else {
+        clean[key] = value;
+      }
+    });
+    return clean;
+  }
 
   /// Initializes flutter_local_notifications and creates the Android notification channel.
   /// This is required to show heads-up notifications when the app is in the foreground,
   /// and to ensure sound/vibration/icon work correctly on Android 8.0+.
   static Future<void> _initializeLocalNotifications() async {
+    if (_isLocalNotificationsInitialized) return;
+
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
@@ -52,7 +96,7 @@ class NotificationService {
             final Map<String, dynamic> data = Map<String, dynamic>.from(
               jsonDecode(response.payload!),
             );
-            final ctx = NotificationService._lastContext;
+            final ctx = _navigatorKey?.currentContext ?? NotificationService._lastContext;
             if (ctx != null && ctx.mounted) {
               navigateToTarget(ctx, data);
             }
@@ -82,6 +126,7 @@ class NotificationService {
       // Explicitly request Android 13+ runtime POST_NOTIFICATIONS permission
       await androidPlugin.requestNotificationsPermission();
     }
+    _isLocalNotificationsInitialized = true;
   }
 
   static BuildContext? _lastContext;
@@ -122,6 +167,8 @@ class NotificationService {
 
   /// Initialize FCM: request permissions, set background handler, listen foreground.
   static Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
+    _navigatorKey = navigatorKey;
+
     // Register background handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -159,9 +206,25 @@ class NotificationService {
       final ctx = navigatorKey.currentContext;
       _lastContext = ctx;
 
+      final notifDocId = (message.data['idempotencyKey'] ??
+              message.data['notificationId'] ??
+              message.data['id'] ??
+              message.data['docId'] ??
+              message.data['requestId'] ??
+              '$title|$body')
+          .toString();
+
+      // Skip if this event was already delivered by the real-time bridge
+      if (_processedNotifIds.contains(notifDocId)) {
+        return;
+      }
+      _processedNotifIds.add(notifDocId);
+
+      final deterministicId = notifDocId.hashCode.abs().remainder(100000);
+
       // 1. Show Android system tray / iOS heads-up notification via flutter_local_notifications
       _showForegroundSystemNotification(
-        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        id: deterministicId,
         title: title,
         body: body,
         data: message.data,
@@ -186,6 +249,8 @@ class NotificationService {
       _refreshCurrentToken(newToken);
     });
   }
+
+  static final Map<String, int> _recentShownNotifs = {};
 
   /// Public interface to show a system notification in the mobile's notification tray.
   static Future<void> showSystemTrayNotification({
@@ -212,6 +277,34 @@ class NotificationService {
     Map<String, dynamic>? data,
   }) async {
     try {
+      await _initializeLocalNotifications();
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final notifDocId = (data?['idempotencyKey'] ??
+              data?['notificationId'] ??
+              data?['id'] ??
+              data?['docId'] ??
+              data?['requestId'] ??
+              '')
+          .toString();
+      final dedupKey = notifDocId.isNotEmpty ? notifDocId : '$title|$body';
+
+      // Prevent duplicate system tray alert if shown in the last 15 seconds
+      if (_recentShownNotifs.containsKey(dedupKey)) {
+        final lastTime = _recentShownNotifs[dedupKey]!;
+        if (now - lastTime < 15000) {
+          return;
+        }
+      }
+      _recentShownNotifs[dedupKey] = now;
+      if (notifDocId.isNotEmpty) {
+        _recentShownNotifs[notifDocId] = now;
+        _processedNotifIds.add(notifDocId);
+      }
+      if (_recentShownNotifs.length > 100) {
+        _recentShownNotifs.removeWhere((_, time) => now - time > 45000);
+      }
+
       final AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
             _androidChannelId,
@@ -220,6 +313,11 @@ class NotificationService {
             importance: Importance.max,
             priority: Priority.high,
             icon: '@mipmap/ic_launcher',
+            styleInformation: BigTextStyleInformation(
+              body,
+              contentTitle: title,
+              summaryText: 'eBricks',
+            ),
             showWhen: true,
             autoCancel: true,
             enableVibration: true,
@@ -238,7 +336,10 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      final payload = data != null ? jsonEncode(data) : null;
+      final cleanData = data != null
+          ? _sanitizeDataForPayload(Map<String, dynamic>.from(data))
+          : null;
+      final payload = cleanData != null ? jsonEncode(cleanData) : null;
 
       await _localNotifications.show(
         id,
@@ -254,6 +355,20 @@ class NotificationService {
     }
   }
 
+  /// Public method to ensure the realtime notification bridge is active
+  /// for the current role session (e.g. when OrganizationDashboard mounts).
+  static void ensureRealtimeBridgeActive({
+    required String role,
+    String? userName,
+    String? userId,
+  }) {
+    startRealtimeNotificationBridge(
+      role: role,
+      userName: userName,
+      userId: userId,
+    );
+  }
+
   /// Starts the real-time live notification bridge for the current user/role session.
   /// Guarantees that any new notification document created in Firestore triggers
   /// an immediate heads-up push in the device's system notification tray.
@@ -262,37 +377,74 @@ class NotificationService {
     String? userName,
     String? userId,
   }) {
+    final canonicalRole = normalizeRole(role);
     _realtimeNotifSub?.cancel();
     final orgId = FirestoreService.currentOrgId;
     if (orgId.isEmpty || orgId == 'uninitialized') return;
 
     try {
       final collection = FirestoreService.getCollection('notifications');
+      // Look back 2 minutes to eliminate any device-server clock skew differences,
+      // while relying on _processedNotifIds to prevent replay of past alerts.
+      final windowStart = DateTime.now().subtract(const Duration(minutes: 2));
+
       _realtimeNotifSub = collection
           .where('createdAt',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(_sessionStartTime))
+              isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart))
           .snapshots()
           .listen((snapshot) {
         for (final change in snapshot.docChanges) {
-          if (change.type == DocumentChangeType.added) {
+          if (change.type == DocumentChangeType.added ||
+              change.type == DocumentChangeType.modified) {
             final data = change.doc.data();
             if (data == null) continue;
 
-            final senderName =
-                (data['senderName'] ?? '').toString().toLowerCase().trim();
-            final currentUserName = (userName ?? '').toLowerCase().trim();
+            final docId = change.doc.id;
+            final notifDocId = (data['idempotencyKey'] ??
+                    data['notificationId'] ??
+                    data['id'] ??
+                    data['docId'] ??
+                    data['requestId'] ??
+                    docId)
+                .toString();
 
-            // Do not alert sender of their own actions
-            if (currentUserName.isNotEmpty && senderName == currentUserName) {
+            // Skip if this specific notification was already delivered locally in this session
+            if (_processedNotifIds.contains(notifDocId) ||
+                _processedNotifIds.contains(docId) ||
+                (data['idempotencyKey'] != null &&
+                    _processedNotifIds.contains(data['idempotencyKey'].toString()))) {
               continue;
             }
 
-            final targetRole =
+            final senderName =
+                (data['senderName'] ?? '').toString().toLowerCase().trim();
+            final senderRole =
+                (data['senderRole'] ?? '').toString().toLowerCase().trim();
+            final currentUserName = (userName ?? '').toLowerCase().trim();
+            final currentUserId = (userId ?? '').toLowerCase().trim();
+            final currentRole = canonicalRole;
+
+            // Only suppress self-actions if the sender is strictly the same user AND same role.
+            // Do NOT suppress if sender is Manager (e.g. 'admin') and recipient is Organization (also 'admin').
+            if (currentUserName.isNotEmpty && senderName == currentUserName) {
+              final normSenderRole = normalizeRole(senderRole);
+              if (normSenderRole.isNotEmpty && normSenderRole == currentRole) {
+                _processedNotifIds.add(notifDocId);
+                _processedNotifIds.add(docId);
+                continue;
+              }
+            }
+
+            final targetRole = normalizeRole((data['targetRole'] ?? '').toString());
+            final rawTargetRoleStr =
                 (data['targetRole'] ?? '').toString().toLowerCase().trim();
-            final targetRoles = (data['targetRoles'] as List?)
+            final rawTargetRoles = (data['targetRoles'] as List?)
                     ?.map((e) => e.toString().toLowerCase().trim())
                     .toList() ??
                 [];
+            final normalizedTargetRoles =
+                rawTargetRoles.map((e) => normalizeRole(e)).toList();
+
             final forSupervisorName = (data['forSupervisorName'] ?? '')
                 .toString()
                 .toLowerCase()
@@ -301,25 +453,34 @@ class NotificationService {
                 (data['forManagerName'] ?? '').toString().toLowerCase().trim();
             final recipientId =
                 (data['recipientId'] ?? '').toString().toLowerCase().trim();
-            final currentRole = role.toLowerCase().trim();
-            final currentUserId = (userId ?? '').toLowerCase().trim();
 
             bool isRecipient = false;
 
             if (recipientId == 'all' ||
-                (currentUserId.isNotEmpty && recipientId == currentUserId)) {
+                (currentUserId.isNotEmpty && recipientId == currentUserId) ||
+                (orgId.toLowerCase().trim() == recipientId)) {
               isRecipient = true;
-            } else if (targetRoles.contains('all') || targetRole == 'all') {
+            } else if (rawTargetRoles.contains('all') ||
+                targetRole == 'all' ||
+                normalizedTargetRoles.contains('all')) {
               isRecipient = true;
-            } else if (currentRole == 'organisation' ||
-                currentRole == 'config') {
+            } else if (currentRole == 'organisation') {
               isRecipient = targetRole == 'organisation' ||
-                  targetRole == 'manager_and_organisation' ||
-                  targetRoles.contains('organisation');
+                  rawTargetRoleStr == 'manager_and_organisation' ||
+                  rawTargetRoleStr == 'manager_and_organization' ||
+                  normalizedTargetRoles.contains('organisation') ||
+                  rawTargetRoles.contains('organisation') ||
+                  rawTargetRoles.contains('organization') ||
+                  rawTargetRoles.contains('manager_and_organisation') ||
+                  rawTargetRoles.contains('manager_and_organization');
             } else if (currentRole == 'manager') {
               isRecipient = targetRole == 'manager' ||
-                  targetRole == 'manager_and_organisation' ||
-                  targetRoles.contains('manager');
+                  rawTargetRoleStr == 'manager_and_organisation' ||
+                  rawTargetRoleStr == 'manager_and_organization' ||
+                  normalizedTargetRoles.contains('manager') ||
+                  rawTargetRoles.contains('manager') ||
+                  rawTargetRoles.contains('manager_and_organisation') ||
+                  rawTargetRoles.contains('manager_and_organization');
               if (forManagerName.isNotEmpty &&
                   currentUserName.isNotEmpty &&
                   forManagerName != currentUserName) {
@@ -327,7 +488,8 @@ class NotificationService {
               }
             } else if (currentRole == 'supervisor') {
               isRecipient = targetRole == 'supervisor' ||
-                  targetRoles.contains('supervisor');
+                  normalizedTargetRoles.contains('supervisor') ||
+                  rawTargetRoles.contains('supervisor');
               if (forSupervisorName.isNotEmpty &&
                   currentUserName.isNotEmpty &&
                   forSupervisorName != currentUserName) {
@@ -336,28 +498,37 @@ class NotificationService {
             }
 
             if (isRecipient) {
+              _processedNotifIds.add(notifDocId);
+              _processedNotifIds.add(docId);
+              if (data['idempotencyKey'] != null) {
+                _processedNotifIds.add(data['idempotencyKey'].toString());
+              }
+              if (_processedNotifIds.length > 300) {
+                _processedNotifIds.remove(_processedNotifIds.first);
+              }
+
               final title = data['title']?.toString() ?? 'New Notification';
               final body = data['body']?.toString() ??
                   data['message']?.toString() ??
                   '';
-              final docId = change.doc.id;
+              final deterministicId =
+                  notifDocId.hashCode.abs().remainder(100000);
+
+              final rawDataMap = data['data'] is Map ? data['data'] : data;
+              final cleanPayload = _sanitizeDataForPayload(
+                  Map<String, dynamic>.from(rawDataMap as Map));
 
               _showForegroundSystemNotification(
-                id: docId.hashCode.remainder(100000),
+                id: deterministicId,
                 title: title,
                 body: body,
-                data: Map<String, dynamic>.from(
-                    data['data'] is Map ? data['data'] : data),
+                data: cleanPayload,
               );
 
-              final ctx = _lastContext;
+              final ctx =
+                  _navigatorKey?.currentContext ?? NotificationService._lastContext;
               if (ctx != null && ctx.mounted) {
-                _showInAppBanner(
-                    ctx,
-                    title,
-                    body,
-                    Map<String, dynamic>.from(
-                        data['data'] is Map ? data['data'] : data));
+                _showInAppBanner(ctx, title, body, cleanPayload);
               }
             }
           }
@@ -367,7 +538,7 @@ class NotificationService {
       });
 
       debugPrint(
-          'NotificationService: Real-time notification tray bridge active for $role ($userName)');
+          'NotificationService: Real-time notification tray bridge active for $canonicalRole ($userName)');
     } catch (e) {
       debugPrint(
           'NotificationService: Failed to initialize realtime bridge: $e');
@@ -477,7 +648,7 @@ class NotificationService {
 
       final orgId = FirestoreService.currentOrgId;
       final cleanUserId = userId.trim();
-      final cleanUserType = userType.trim().toLowerCase();
+      final cleanUserType = normalizeRole(userType);
       final cleanUserName = userName.trim();
       final cleanOrgId = orgId.trim();
 
@@ -490,24 +661,29 @@ class NotificationService {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // 1. Save in organization-scoped fcmTokens collection
+      // 1. Save in organization-scoped fcmTokens collection under canonical key
       if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
-        await FirestoreService.getCollection(
-          'fcmTokens',
-        ).doc(cleanUserId).set(tokenData, SetOptions(merge: true));
+        final orgTokens = FirestoreService.getCollection('fcmTokens');
+        await orgTokens.doc('${cleanUserType}_$cleanUserId').set(tokenData, SetOptions(merge: true));
+        // Prune legacy duplicate doc to prevent multiple dispatches to the same token
+        await orgTokens.doc(cleanUserId).delete().catchError((_) {});
       }
 
       // 2. Also save in root fcmTokens for instant global Cloud Function lookup
       if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
-        await FirebaseFirestore.instance
-            .collection('fcmTokens')
-            .doc('${cleanOrgId}_$cleanUserId')
-            .set(tokenData, SetOptions(merge: true));
+        final rootTokens = FirebaseFirestore.instance.collection('fcmTokens');
+        await rootTokens.doc('${cleanOrgId}_${cleanUserType}_$cleanUserId').set(tokenData, SetOptions(merge: true));
+        await rootTokens.doc('${cleanOrgId}_$cleanUserId').delete().catchError((_) {});
       } else {
         await FirebaseFirestore.instance
             .collection('fcmTokens')
-            .doc(cleanUserId)
+            .doc('${cleanUserType}_$cleanUserId')
             .set(tokenData, SetOptions(merge: true));
+        await FirebaseFirestore.instance
+            .collection('fcmTokens')
+            .doc(cleanUserId)
+            .delete()
+            .catchError((_) {});
       }
 
       // 3. Subscribe to org and role topics for broadcast push delivery
@@ -515,8 +691,11 @@ class NotificationService {
         final sanitizedOrgId = cleanOrgId.replaceAll(RegExp(r'\W'), '_');
         await _messaging.subscribeToTopic('org_$sanitizedOrgId');
         await _messaging.subscribeToTopic('org_${sanitizedOrgId}_$cleanUserType');
-        if (cleanUserType == 'config') {
+        if (cleanUserType == 'organisation' || cleanUserType == 'organization' || cleanUserType == 'config') {
           await _messaging.subscribeToTopic('org_${sanitizedOrgId}_organisation');
+          await _messaging.subscribeToTopic('org_${sanitizedOrgId}_organization');
+        }
+        if (cleanUserType == 'config') {
           await _messaging.subscribeToTopic('org_${sanitizedOrgId}_manager');
         }
       }
@@ -556,28 +735,33 @@ class NotificationService {
         await _messaging
             .unsubscribeFromTopic('org_${sanitizedOrgId}_$cleanUserType')
             .catchError((_) {});
-        if (cleanUserType == 'config') {
+        if (cleanUserType == 'config' || cleanUserType == 'organisation' || cleanUserType == 'organization') {
           await _messaging
               .unsubscribeFromTopic('org_${sanitizedOrgId}_organisation')
+              .catchError((_) {});
+          await _messaging
+              .unsubscribeFromTopic('org_${sanitizedOrgId}_organization')
               .catchError((_) {});
           await _messaging
               .unsubscribeFromTopic('org_${sanitizedOrgId}_manager')
               .catchError((_) {});
         }
 
-        // Delete from org subcollection
-        await FirestoreService.getCollection('fcmTokens')
-            .doc(cleanUserId)
-            .delete()
-            .catchError((_) {});
+        // Delete from org subcollection (both role-isolated and generic key)
+        final orgTokens = FirestoreService.getCollection('fcmTokens');
+        await orgTokens.doc('${cleanUserType}_$cleanUserId').delete().catchError((_) {});
+        await orgTokens.doc(cleanUserId).delete().catchError((_) {});
 
         // Delete from global root collection
+        final rootTokens = FirebaseFirestore.instance.collection('fcmTokens');
+        await rootTokens.doc('${cleanOrgId}_${cleanUserType}_$cleanUserId').delete().catchError((_) {});
+        await rootTokens.doc('${cleanOrgId}_$cleanUserId').delete().catchError((_) {});
+      } else {
         await FirebaseFirestore.instance
             .collection('fcmTokens')
-            .doc('${cleanOrgId}_$cleanUserId')
+            .doc('${cleanUserType}_$cleanUserId')
             .delete()
             .catchError((_) {});
-      } else {
         await FirebaseFirestore.instance
             .collection('fcmTokens')
             .doc(cleanUserId)
@@ -586,7 +770,7 @@ class NotificationService {
       }
 
       debugPrint(
-        'NotificationService: Successfully pruned FCM token for user $cleanUserId',
+        'NotificationService: Successfully pruned FCM token for user $cleanUserId ($cleanUserType)',
       );
     } catch (e) {
       debugPrint('NotificationService: Error deleting token: $e');
@@ -625,11 +809,16 @@ class NotificationService {
   }) async {
     try {
       final orgId = forOrgId ?? FirestoreService.currentOrgId;
-      final notifId = docId ?? requestId ?? 'notif_${DateTime.now().millisecondsSinceEpoch}';
       final effectiveType = requestType ?? 'general';
+      final timeBucket = DateTime.now().millisecondsSinceEpoch ~/ 25000;
+      final targetEntity = siteId ?? requestId ?? docId ?? 'global';
+      final defaultIdempotencyKey = 'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
+      final idempotencyKey = (extraData?['idempotencyKey'] ?? defaultIdempotencyKey).toString();
+      final notifId = docId ?? requestId ?? idempotencyKey;
 
       final payload = {
         'app_id': FirestoreService.cstAppId,
+        'idempotencyKey': idempotencyKey,
         'notificationId': notifId,
         'id': notifId,
         'title': title,
@@ -667,6 +856,7 @@ class NotificationService {
         'readAt': null,
         'createdAt': FieldValue.serverTimestamp(),
         'actionData': {
+          'idempotencyKey': idempotencyKey,
           'notificationId': notifId,
           'requestType': effectiveType,
           'requestId': requestId ?? docId ?? notifId,
@@ -682,6 +872,7 @@ class NotificationService {
         },
         'data': {
           'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+          'idempotencyKey': idempotencyKey,
           'notificationId': notifId,
           'actionRoute': '/$effectiveType',
           'type': effectiveType,
@@ -769,25 +960,36 @@ class NotificationService {
           .where('userType', whereIn: ['manager', 'organisation', 'config'])
           .where('orgId', isEqualTo: orgId)
           .get();
+      final uniqueTokens = <String>{};
       for (final doc in snap.docs) {
         final data = doc.data();
         final token = data['token']?.toString();
         final uName = data['userName']?.toString();
         if (token != null && token.isNotEmpty && uName != senderName) {
-          await _sendFcmPush(
-            token: token,
-            title: title,
-            body: body,
-            data: {
-              'requestType': requestType,
-              'requestId': requestId,
-              'docId': docId ?? requestId,
-              'siteId': siteId ?? '',
-              'status': status ?? '',
-              'requiredAction': requiredAction ?? '',
-            },
-          );
+          uniqueTokens.add(token);
         }
+      }
+      final timeBucket = DateTime.now().millisecondsSinceEpoch ~/ 25000;
+      final targetEntity = siteId ?? requestId;
+      final effectiveType = requestType;
+      final idempotencyKey = extraData?['idempotencyKey'] ??
+          'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
+
+      for (final token in uniqueTokens) {
+        await _sendFcmPush(
+          token: token,
+          title: title,
+          body: body,
+          data: {
+            'idempotencyKey': idempotencyKey,
+            'requestType': requestType,
+            'requestId': requestId,
+            'docId': docId ?? requestId,
+            'siteId': siteId ?? '',
+            'status': status ?? '',
+            'requiredAction': requiredAction ?? '',
+          },
+        );
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending dual-target FCM: $e');
@@ -842,6 +1044,7 @@ class NotificationService {
           .where('userType', isEqualTo: 'manager')
           .where('orgId', isEqualTo: orgId)
           .get();
+      final uniqueTokens = <String>{};
       for (final doc in snap.docs) {
         final data = doc.data();
         final token = data['token']?.toString();
@@ -853,20 +1056,30 @@ class NotificationService {
         }
 
         if (token != null && token.isNotEmpty && uName != senderName) {
-          await _sendFcmPush(
-            token: token,
-            title: title,
-            body: body,
-            data: {
-              'requestType': requestType,
-              'requestId': requestId,
-              'docId': docId ?? requestId,
-              'siteId': siteId ?? '',
-              'status': status ?? '',
-              'requiredAction': requiredAction ?? '',
-            },
-          );
+          uniqueTokens.add(token);
         }
+      }
+      final timeBucket = DateTime.now().millisecondsSinceEpoch ~/ 25000;
+      final targetEntity = siteId ?? requestId;
+      final effectiveType = requestType;
+      final idempotencyKey = extraData?['idempotencyKey'] ??
+          'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
+
+      for (final token in uniqueTokens) {
+        await _sendFcmPush(
+          token: token,
+          title: title,
+          body: body,
+          data: {
+            'idempotencyKey': idempotencyKey,
+            'requestType': requestType,
+            'requestId': requestId,
+            'docId': docId ?? requestId,
+            'siteId': siteId ?? '',
+            'status': status ?? '',
+            'requiredAction': requiredAction ?? '',
+          },
+        );
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending manager FCM: $e');
@@ -916,28 +1129,42 @@ class NotificationService {
     // 2. Send FCM push strictly to Organization / HQ tokens (NOT managers)
     try {
       final snap = await FirestoreService.getCollection('fcmTokens')
-          .where('userType', whereIn: ['organisation', 'config'])
+          .where('userType', whereIn: ['organisation', 'organization', 'config', 'admin'])
           .where('orgId', isEqualTo: orgId)
           .get();
+      final uniqueTokens = <String>{};
       for (final doc in snap.docs) {
         final tokenData = doc.data();
         final token = tokenData['token']?.toString();
         final uName = tokenData['userName']?.toString();
         if (token != null && token.isNotEmpty && uName != senderName) {
-          await _sendFcmPush(
-            token: token,
-            title: title,
-            body: body,
-            data: {
-              'requestType': requestType ?? '',
-              'requestId': requestId ?? '',
-              'docId': docId ?? requestId ?? '',
-              'siteId': siteId ?? '',
-              'status': status ?? '',
-              'requiredAction': requiredAction ?? '',
-            },
-          );
+          uniqueTokens.add(token);
         }
+      }
+      final timeBucket = DateTime.now().millisecondsSinceEpoch ~/ 25000;
+      final targetEntity = siteId ?? requestId ?? docId ?? 'global';
+      final effectiveType = requestType ?? 'general';
+      final idempotencyKey = extraData?['idempotencyKey'] ??
+          data?['idempotencyKey'] ??
+          'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
+
+      for (final token in uniqueTokens) {
+        await _sendFcmPush(
+          token: token,
+          title: title,
+          body: body,
+          data: {
+            'idempotencyKey': idempotencyKey,
+            'requestType': requestType ?? '',
+            'requestId': requestId ?? '',
+            'docId': docId ?? requestId ?? '',
+            'siteId': siteId ?? '',
+            'status': status ?? '',
+            'requiredAction': requiredAction ?? '',
+            if (data != null) ...data,
+            if (extraData != null) ...extraData,
+          },
+        );
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending org FCM: $e');
@@ -996,6 +1223,7 @@ class NotificationService {
         'fcmTokens',
       ).where('userType', isEqualTo: 'supervisor').get();
 
+      final uniqueTokens = <String>{};
       for (final doc in snap.docs) {
         final tokenData = doc.data();
         final token = tokenData['token']?.toString();
@@ -1010,22 +1238,36 @@ class NotificationService {
                 (uId == supervisorId || uName == supervisorId));
 
         if (token != null && token.isNotEmpty && isMatch) {
-          await _sendFcmPush(
-            token: token,
-            title: title,
-            body: body,
-            data: {
-              'requestType': requestType ?? '',
-              'requestId': requestId ?? '',
-              'docId': docId ?? requestId ?? '',
-              'siteId': siteId ?? '',
-              'siteName': siteName ?? '',
-              'status': status ?? '',
-              'title': title,
-              'body': body,
-            },
-          );
+          uniqueTokens.add(token);
         }
+      }
+
+      final timeBucket = DateTime.now().millisecondsSinceEpoch ~/ 25000;
+      final targetEntity = supervisorId ?? supervisorName;
+      final effectiveType = requestType ?? 'supervisor_alert';
+      final idempotencyKey = extraData?['idempotencyKey'] ??
+          data?['idempotencyKey'] ??
+          'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
+
+      for (final token in uniqueTokens) {
+        await _sendFcmPush(
+          token: token,
+          title: title,
+          body: body,
+          data: {
+            'idempotencyKey': idempotencyKey,
+            'requestType': requestType ?? '',
+            'requestId': requestId ?? '',
+            'docId': docId ?? requestId ?? '',
+            'siteId': siteId ?? '',
+            'siteName': siteName ?? '',
+            'status': status ?? '',
+            'title': title,
+            'body': body,
+            if (data != null) ...data,
+            if (extraData != null) ...extraData,
+          },
+        );
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending supervisor FCM: $e');
@@ -1230,6 +1472,10 @@ class NotificationService {
     final body =
         'Manager ${managerName ?? "Admin"} $actionWord Site "$siteId - $siteName" at $location$projectInfo.';
 
+    final orgId = FirestoreService.currentOrgId;
+    final timeBucket = DateTime.now().millisecondsSinceEpoch ~/ 25000;
+    final idempotencyKey = 'site_mgmt_${orgId}_${siteId}_$timeBucket';
+
     // 1. Notify Organization
     await notifyOrganisation(
       title: title,
@@ -1243,11 +1489,58 @@ class NotificationService {
       senderRole: 'Manager',
       senderName: managerName ?? 'Manager',
       remarks: 'Site $actionWord in system',
-      data: {
+      extraData: {
+        'idempotencyKey': idempotencyKey,
         'siteId': siteId,
         'siteName': siteName,
         'location': location,
         'projectName': projectName ?? '',
+      },
+    );
+  }
+
+  /// 7a. Notifies Organization when a Manager creates or updates a Project.
+  static Future<void> notifyProjectCreatedOrUpdated({
+    required String projectId,
+    required String projectName,
+    required String siteId,
+    required String siteName,
+    String? location,
+    String? managerName,
+    bool isCreated = true,
+  }) async {
+    final title = isCreated ? 'New Project Created' : 'Project Updated';
+    final actionWord = isCreated ? 'created a new' : 'updated the';
+    final body =
+        'Manager ${managerName ?? "Admin"} has $actionWord project: $projectName';
+
+    final orgId = FirestoreService.currentOrgId;
+    final timeBucket = DateTime.now().millisecondsSinceEpoch ~/ 25000;
+    final reqType = isCreated ? 'project_created' : 'project_updated';
+    final idempotencyKey = '${reqType}_${orgId}_${projectId}_$timeBucket';
+
+    // 1. Notify Organization
+    await notifyOrganisation(
+      title: title,
+      body: body,
+      requestType: reqType,
+      requestId: projectId,
+      docId: projectId,
+      siteId: siteId,
+      siteName: siteName,
+      status: isCreated ? 'created' : 'updated',
+      senderRole: 'Manager',
+      senderName: managerName ?? 'Manager',
+      remarks: 'Project $actionWord in system',
+      extraData: {
+        'idempotencyKey': idempotencyKey,
+        'projectId': projectId,
+        'projectName': projectName,
+        'siteId': siteId,
+        'siteName': siteName,
+        'location': location ?? '',
+        'type': reqType,
+        'actionRoute': '/project_details',
       },
     );
   }
@@ -1264,6 +1557,8 @@ class NotificationService {
     final body =
         '$itemTitle was added/modified in the $configType configuration by ${senderName ?? "Admin"}.';
     final orgId = FirestoreService.currentOrgId;
+    final timeBucket = DateTime.now().millisecondsSinceEpoch ~/ 25000;
+    final idempotencyKey = 'master_cfg_${orgId}_${configType.toLowerCase()}_$timeBucket';
 
     await _writeRecord(
       title: title,
@@ -1276,7 +1571,11 @@ class NotificationService {
       senderName: senderName ?? 'Manager',
       remarks: '$configType updated',
       requiredAction: 'Catalog updated',
-      extraData: {'configType': configType, 'itemTitle': itemTitle},
+      extraData: {
+        'idempotencyKey': idempotencyKey,
+        'configType': configType,
+        'itemTitle': itemTitle,
+      },
     );
 
     // Also send FCM push to BOTH managers and organization admins
@@ -1285,22 +1584,27 @@ class NotificationService {
           .where('userType', whereIn: ['manager', 'organisation', 'config'])
           .where('orgId', isEqualTo: orgId)
           .get();
+      final uniqueTokens = <String>{};
       for (final doc in snap.docs) {
         final d = doc.data();
         final token = d['token']?.toString();
         final uName = d['userName']?.toString();
         if (token != null && token.isNotEmpty && uName != senderName) {
-          await _sendFcmPush(
-            token: token,
-            title: title,
-            body: body,
-            data: {
-              'requestType': 'master_config',
-              'configType': configType,
-              'itemTitle': itemTitle,
-            },
-          );
+          uniqueTokens.add(token);
         }
+      }
+      for (final token in uniqueTokens) {
+        await _sendFcmPush(
+          token: token,
+          title: title,
+          body: body,
+          data: {
+            'idempotencyKey': idempotencyKey,
+            'requestType': 'master_config',
+            'configType': configType,
+            'itemTitle': itemTitle,
+          },
+        );
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending master_config FCM: $e');
@@ -1323,6 +1627,7 @@ class NotificationService {
         'title': title,
         'body': body,
         'orgId': orgId,
+        'idempotencyKey': data?['idempotencyKey'],
         'data': data ?? {},
       };
 
@@ -1384,7 +1689,7 @@ class NotificationService {
   /// - Organization only receives Organization and dual-target Supervisor submissions.
   /// - Supervisor only receives notifications specifically addressed to them.
   static Stream<QuerySnapshot<Map<String, dynamic>>> streamForRole({
-    required String role, // 'manager', 'organisation', 'supervisor'
+    required String role, // 'manager', 'organisation', 'organization', 'supervisor'
     String? supervisorName,
     String? managerName,
   }) {
@@ -1397,20 +1702,30 @@ class NotificationService {
       query = FirebaseFirestore.instance.collection('notifications');
     }
 
-    if (role == 'supervisor') {
+    final canonicalRole = normalizeRole(role);
+    if (canonicalRole == 'supervisor') {
       query = query.where('targetRole', isEqualTo: 'supervisor');
       if (supervisorName != null && supervisorName.isNotEmpty) {
         query = query.where('forSupervisorName', isEqualTo: supervisorName);
       }
-    } else if (role == 'manager') {
+    } else if (canonicalRole == 'manager') {
       query = query.where(
         'targetRole',
-        whereIn: ['manager', 'manager_and_organisation'],
+        whereIn: [
+          'manager',
+          'manager_and_organisation',
+          'manager_and_organization',
+        ],
       );
-    } else if (role == 'organisation') {
+    } else if (canonicalRole == 'organisation') {
       query = query.where(
         'targetRole',
-        whereIn: ['organisation', 'manager_and_organisation'],
+        whereIn: [
+          'organisation',
+          'organization',
+          'manager_and_organisation',
+          'manager_and_organization',
+        ],
       );
     }
 
@@ -1419,7 +1734,7 @@ class NotificationService {
 
   /// Live stream count of unread notifications for a specific user role.
   static Stream<int> unreadCountForRole({
-    required String role, // 'manager', 'organisation', 'supervisor'
+    required String role, // 'manager', 'organisation', 'organization', 'supervisor'
     String? supervisorName,
     String? managerName,
   }) {
@@ -1436,20 +1751,30 @@ class NotificationService {
           .where('isRead', isEqualTo: false);
     }
 
-    if (role == 'supervisor') {
+    final canonicalRole = normalizeRole(role);
+    if (canonicalRole == 'supervisor') {
       query = query.where('targetRole', isEqualTo: 'supervisor');
       if (supervisorName != null && supervisorName.isNotEmpty) {
         query = query.where('forSupervisorName', isEqualTo: supervisorName);
       }
-    } else if (role == 'manager') {
+    } else if (canonicalRole == 'manager') {
       query = query.where(
         'targetRole',
-        whereIn: ['manager', 'manager_and_organisation'],
+        whereIn: [
+          'manager',
+          'manager_and_organisation',
+          'manager_and_organization',
+        ],
       );
-    } else if (role == 'organisation') {
+    } else if (canonicalRole == 'organisation') {
       query = query.where(
         'targetRole',
-        whereIn: ['organisation', 'manager_and_organisation'],
+        whereIn: [
+          'organisation',
+          'organization',
+          'manager_and_organisation',
+          'manager_and_organization',
+        ],
       );
     }
 
@@ -1516,13 +1841,14 @@ class NotificationService {
   }) async {
     try {
       final orgId = FirestoreService.currentOrgId;
+      final canonicalRole = normalizeRole(role);
 
       // 1. Mark in org collection
       if (orgId.isNotEmpty && orgId != 'uninitialized') {
         var orgQuery = FirestoreService.getCollection(
           'notifications',
         ).where('isRead', isEqualTo: false);
-        if (role == 'supervisor') {
+        if (canonicalRole == 'supervisor') {
           orgQuery = orgQuery.where('targetRole', isEqualTo: 'supervisor');
           if (supervisorName != null && supervisorName.isNotEmpty) {
             orgQuery = orgQuery.where(
@@ -1530,15 +1856,24 @@ class NotificationService {
               isEqualTo: supervisorName,
             );
           }
-        } else if (role == 'manager') {
+        } else if (canonicalRole == 'manager') {
           orgQuery = orgQuery.where(
             'targetRole',
-            whereIn: ['manager', 'manager_and_organisation'],
+            whereIn: [
+              'manager',
+              'manager_and_organisation',
+              'manager_and_organization',
+            ],
           );
-        } else if (role == 'organisation') {
+        } else if (canonicalRole == 'organisation') {
           orgQuery = orgQuery.where(
             'targetRole',
-            whereIn: ['organisation', 'manager_and_organisation'],
+            whereIn: [
+              'organisation',
+              'organization',
+              'manager_and_organisation',
+              'manager_and_organization',
+            ],
           );
         }
         final snap = await orgQuery.get();
@@ -1554,7 +1889,7 @@ class NotificationService {
           .collection('notifications')
           .where('orgId', isEqualTo: orgId)
           .where('isRead', isEqualTo: false);
-      if (role == 'supervisor') {
+      if (canonicalRole == 'supervisor') {
         globalQuery = globalQuery.where('targetRole', isEqualTo: 'supervisor');
         if (supervisorName != null && supervisorName.isNotEmpty) {
           globalQuery = globalQuery.where(
@@ -1562,15 +1897,24 @@ class NotificationService {
             isEqualTo: supervisorName,
           );
         }
-      } else if (role == 'manager') {
+      } else if (canonicalRole == 'manager') {
         globalQuery = globalQuery.where(
           'targetRole',
-          whereIn: ['manager', 'manager_and_organisation'],
+          whereIn: [
+            'manager',
+            'manager_and_organisation',
+            'manager_and_organization',
+          ],
         );
-      } else if (role == 'organisation') {
+      } else if (canonicalRole == 'organisation') {
         globalQuery = globalQuery.where(
           'targetRole',
-          whereIn: ['organisation', 'manager_and_organisation'],
+          whereIn: [
+            'organisation',
+            'organization',
+            'manager_and_organisation',
+            'manager_and_organization',
+          ],
         );
       }
 

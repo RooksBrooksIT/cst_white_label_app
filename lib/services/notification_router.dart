@@ -14,6 +14,9 @@ import '../screens/manager/manager_expenses.dart';
 import '../screens/supervisor/site_entry_page.dart';
 import '../screens/manager/manager_notification_screen.dart';
 import '../screens/organization/org_notification_page.dart';
+import '../screens/common/notification_page.dart';
+import '../screens/organization/org_sites_list_page.dart';
+import '../screens/manager/project_screen.dart';
 
 /// Centralized Decoupled Notification Router.
 /// Resolves incoming FCM push notification payloads and in-app notification records
@@ -40,46 +43,87 @@ class NotificationRouter {
     }
 
     try {
+      final role = AuthService().userRole;
+      final ud = AuthService().userData;
+
       switch (model.type) {
         case NotificationType.materialRequisition:
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ManagerMaterialApprovalScreen(),
-            ),
-          );
+          if (role == UserRole.supervisor) {
+            final supName = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Supervisor').toString();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NotificationPage(supervisorName: supName),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ManagerMaterialApprovalScreen(),
+              ),
+            );
+          }
           break;
         case NotificationType.toolsRequisition:
         case NotificationType.toolMovement:
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ManagerToolsApprovalScreen(),
-            ),
-          );
+          if (role == UserRole.supervisor) {
+            final supName = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Supervisor').toString();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NotificationPage(supervisorName: supName),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ManagerToolsApprovalScreen(),
+              ),
+            );
+          }
           break;
         case NotificationType.paymentRequisition:
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ManagerSitePaymentApprovalPage(),
-            ),
-          );
+          if (role == UserRole.supervisor) {
+            final supName = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Supervisor').toString();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NotificationPage(supervisorName: supName),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ManagerSitePaymentApprovalPage(),
+              ),
+            );
+          }
           break;
         case NotificationType.workforceSchedule:
         case NotificationType.dailyWorkSchedule:
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ManagerApprovalScreen(),
-            ),
-          );
+          if (role == UserRole.supervisor) {
+            final supName = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Supervisor').toString();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NotificationPage(supervisorName: supName),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ManagerApprovalScreen(),
+              ),
+            );
+          }
           break;
         case NotificationType.pettyCashRequest:
         case NotificationType.pettyCashTopup:
         case NotificationType.pettyCashDispatched:
-          final role = AuthService().userRole;
-          final ud = AuthService().userData;
           if (role == UserRole.supervisor) {
             Navigator.push(
               context,
@@ -117,7 +161,6 @@ class NotificationRouter {
           break;
         case NotificationType.siteAssignment:
         case NotificationType.siteCreated:
-          final ud = AuthService().userData;
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -131,6 +174,20 @@ class NotificationRouter {
               ),
             ),
           );
+          break;
+        case NotificationType.projectCreated:
+        case NotificationType.projectUpdated:
+          if (role == UserRole.organization) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const OrgSitesListPage()),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProjectScreen()),
+            );
+          }
           break;
         case NotificationType.managerAccountCreated:
         case NotificationType.supervisorAccountCreated:
@@ -154,6 +211,13 @@ class NotificationRouter {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const OrgNotificationPage()),
+      );
+    } else if (role == UserRole.supervisor) {
+      final ud = AuthService().userData;
+      final supName = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Supervisor').toString();
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => NotificationPage(supervisorName: supName)),
       );
     } else {
       Navigator.push(

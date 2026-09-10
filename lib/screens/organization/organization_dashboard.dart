@@ -61,6 +61,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     _initStreams();
     _loadUserData();
     _startAutoPlayCarousel();
+    NotificationService.ensureRealtimeBridgeActive(
+      role: 'organisation',
+      userName: _userName,
+    );
   }
 
   void _initStreams() {
@@ -144,6 +148,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         _userName = name.isNotEmpty ? name : 'User';
         _userRole = userData['role'] ?? 'Organization Head';
       });
+      NotificationService.ensureRealtimeBridgeActive(
+        role: 'organisation',
+        userName: _userName,
+      );
     }
   }
 

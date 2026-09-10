@@ -814,6 +814,50 @@ exports.sendNewSubscriptionInvoice = functions.region("us-central1").https.onCal
 // =============================================================================
 
 /**
+ * Atomic idempotency check to prevent duplicate push notifications for the same activity/event.
+ * Returns true if the event has already been processed or is currently in-flight.
+ */
+async function isEventAlreadyProcessed(idempotencyKey, eventDetails = {}) {
+  if (!idempotencyKey) return false;
+  const db = admin.firestore();
+  const ref = db.collection("processed_events").doc(idempotencyKey);
+
+  try {
+    // .create() fails atomically with gRPC code 6 (ALREADY_EXISTS) if doc exists
+    await ref.create({
+      idempotencyKey,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      ...eventDetails,
+    });
+    return false; // Successfully acquired lock, not duplicate
+  } catch (err) {
+    if (err.code === 6 || err.code === "already-exists" || (err.message && err.message.includes("ALREADY_EXISTS"))) {
+      logger.info(`[Idempotency] Duplicate event detected and dropped: ${idempotencyKey}`);
+      return true; // Already processed!
+    }
+    // Fallback check
+    try {
+      const doc = await ref.get();
+      if (doc.exists) {
+        logger.info(`[Idempotency] Duplicate event confirmed via get(): ${idempotencyKey}`);
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+}
+
+/**
+ * Helper to normalize user roles (handles British vs American spelling)
+ */
+const normalizeRole = (r) => {
+  const s = String(r || "").toLowerCase().trim();
+  if (s === "organisation" || s === "organization" || s === "org") return "organisation";
+  return s;
+};
+
+/**
  * Processes a newly created notification document and dispatches real-time push notifications
  * using Firebase Cloud Messaging (FCM) Admin SDK to all active recipient devices.
  */
@@ -857,10 +901,10 @@ async function processNotificationAndSendPush(notificationData, docRef) {
     // Parse target roles into normalized lowercase set
     let targetRoles = [];
     if (Array.isArray(rawTargetRoles) && rawTargetRoles.length > 0) {
-      targetRoles = rawTargetRoles.map((r) => String(r).toLowerCase().trim());
+      targetRoles = rawTargetRoles.map((r) => normalizeRole(r));
     } else if (targetRole) {
-      const tr = String(targetRole).toLowerCase().trim();
-      if (tr === "manager_and_organisation") {
+      const tr = normalizeRole(targetRole);
+      if (tr === "manager_and_organisation" || tr === "manager_and_organization") {
         targetRoles = ["manager", "organisation", "config"];
       } else {
         targetRoles = [tr];
@@ -869,82 +913,169 @@ async function processNotificationAndSendPush(notificationData, docRef) {
       targetRoles = ["all"];
     }
 
+    // Ensure organisation and organization synonyms both exist
+    if (targetRoles.includes("organisation") && !targetRoles.includes("organization")) {
+      targetRoles.push("organization");
+    }
+
+    const cleanSenderRole = normalizeRole(senderRole || "");
     const cleanSenderName = (senderName || "").trim().toLowerCase();
     const cleanSenderId = (senderId || "").trim().toLowerCase();
-    const targetUserIds = [directUserId, forUserId, forSupervisorId, forManagerId]
-      .filter(Boolean)
-      .map((s) => String(s).trim().toLowerCase());
 
-    const evaluateTokenDoc = (doc) => {
-      const d = doc.data() || {};
-      const t = (d.token || "").trim();
-      if (!t) return;
+    // 1. Idempotency Check & Atomic Lock
+    const explicitKey = notificationData.idempotencyKey ||
+      (customData && customData.idempotencyKey) ||
+      notificationData.eventId ||
+      (customData && customData.eventId);
 
-      const uType = (d.userType || "").toLowerCase().trim();
-      const uName = (d.userName || "").toLowerCase().trim();
-      const uId = (d.userId || doc.id || "").toLowerCase().trim();
+    const timeBucket = Math.floor(Date.now() / 25000);
+    const targetEntity = siteId || notificationData.projectId || docId || requestId || "global";
+    const effectiveReqType = requestType || notificationData.type || "general";
+    const targetRolesStr = targetRoles.join("_");
 
-      // Avoid self-notifications
-      if (cleanSenderName && uName === cleanSenderName) return;
-      if (cleanSenderId && (uId === cleanSenderId || doc.id.toLowerCase() === cleanSenderId)) return;
+    const idempotencyKey = explicitKey ?
+      String(explicitKey).trim() :
+      `evt_${orgId || "org"}_${effectiveReqType}_${targetEntity}_${targetRolesStr}_${cleanSenderName || "user"}_${timeBucket}`.replace(/[\/\s#]/g, "_");
 
-      // 1. Direct user ID match
-      if (targetUserIds.length > 0 && (targetUserIds.includes(uId) || targetUserIds.includes(doc.id.toLowerCase()))) {
-        tokens.add(t);
-        tokenDocRefs.push(doc.ref);
-        return;
+    const alreadyProcessed = await isEventAlreadyProcessed(idempotencyKey, {
+      title,
+      body,
+      orgId,
+      requestType: effectiveReqType,
+      targetEntity,
+    });
+
+    if (alreadyProcessed) {
+      logger.info(`[Idempotency] Suppressed duplicate push for event key "${idempotencyKey}".`);
+      if (docRef) {
+        await docRef.update({
+          pushDelivered: true,
+          duplicateSuppressed: true,
+          idempotencyKey,
+        }).catch(() => {});
       }
-
-      // 2. Role matching
-      const isRoleMatch = targetRoles.includes("all") ||
-        targetRoles.includes(uType) ||
-        (uType === "config" && (targetRoles.includes("organisation") || targetRoles.includes("manager"))) ||
-        (uType === "manager" && targetRoles.includes("config"));
-
-      // 3. Specific supervisor or manager name matching if specified
-      let isUserMatch = true;
-      if (forSupervisorName && (uType === "supervisor" || targetRoles.includes("supervisor"))) {
-        const targetSup = forSupervisorName.toLowerCase().trim();
-        isUserMatch = uName === targetSup || uName.includes(targetSup) || targetSup.includes(uName);
-      } else if (forManagerName && (uType === "manager" || targetRoles.includes("manager"))) {
-        const targetMgr = forManagerName.toLowerCase().trim();
-        isUserMatch = uName === targetMgr || uName.includes(targetMgr) || targetMgr.includes(uName);
-      }
-
-      if (isRoleMatch && isUserMatch) {
-        tokens.add(t);
-        tokenDocRefs.push(doc.ref);
-      }
-    };
-
-    // 1. Search in /organisation/{orgId}/fcmTokens
-    if (orgId && orgId !== "uninitialized") {
-      try {
-        const orgSnap = await db.collection("organisation").doc(orgId).collection("fcmTokens").get();
-        orgSnap.forEach(evaluateTokenDoc);
-      } catch (e) {
-        logger.warn(`Error querying org fcmTokens for ${orgId}:`, e.message);
-      }
+      return { successCount: 0, failureCount: 0, suppressed: true };
     }
 
-    // 2. Search in global /fcmTokens
-    try {
-      let globalQuery = db.collection("fcmTokens");
+    // 2. Direct Token check (if single token dispatch requested)
+    const directDeviceToken = (notificationData.token || (customData && customData.token) || "").trim();
+    if (directDeviceToken) {
+      tokens.add(directDeviceToken);
+    } else {
+      const targetUserIds = [directUserId, forUserId, forSupervisorId, forManagerId]
+        .filter(Boolean)
+        .map((s) => String(s).trim().toLowerCase());
+
+      const evaluateTokenDoc = (doc) => {
+        const d = doc.data() || {};
+        const t = (d.token || "").trim();
+        if (!t) return;
+
+        const rawUType = (d.userType || "").toLowerCase().trim();
+        const uType = normalizeRole(rawUType);
+        const uName = (d.userName || "").toLowerCase().trim();
+        const uId = (d.userId || doc.id || "").toLowerCase().trim();
+
+        // Avoid self-notifications ONLY if the token belongs to the same role and same user.
+        // (Do NOT suppress if sender is Manager and recipient is Organisation, even if both use username 'admin')
+        const isSameRole = cleanSenderRole && (
+          uType === cleanSenderRole ||
+          (cleanSenderRole === "manager" && uType === "config") ||
+          (cleanSenderRole === "organisation" && (uType === "config" || uType === "admin"))
+        );
+        if (isSameRole) {
+          if (cleanSenderName && uName === cleanSenderName) return;
+          if (cleanSenderId && (uId === cleanSenderId || doc.id.toLowerCase() === cleanSenderId || doc.id.toLowerCase().endsWith("_" + cleanSenderId))) return;
+        }
+
+        // 1. Direct user ID match
+        if (targetUserIds.length > 0 && (targetUserIds.includes(uId) || targetUserIds.some((tId) => doc.id.toLowerCase().includes(tId)))) {
+          tokens.add(t);
+          tokenDocRefs.push(doc.ref);
+          return;
+        }
+
+        // 2. Role matching (support organisation, organization, config, admin, manager, supervisor)
+        const isOrgTarget = targetRoles.includes("organisation") || targetRoles.includes("organization");
+        const isOrgUser = uType === "organisation" || rawUType === "organization" || uType === "config" || rawUType === "admin";
+        const isManagerTarget = targetRoles.includes("manager") || targetRoles.includes("config");
+        const isManagerUser = uType === "manager" || uType === "config";
+        const isSupervisorTarget = targetRoles.includes("supervisor");
+        const isSupervisorUser = uType === "supervisor";
+
+        const isRoleMatch = targetRoles.includes("all") ||
+          (isOrgTarget && isOrgUser) ||
+          (isManagerTarget && isManagerUser) ||
+          (isSupervisorTarget && isSupervisorUser) ||
+          targetRoles.includes(uType) ||
+          targetRoles.includes(rawUType);
+
+        // 3. User-specific filtering:
+        let isUserMatch = true;
+        if (isSupervisorUser) {
+          if (forSupervisorName || forSupervisorId) {
+            const targetSup = (forSupervisorName || "").toLowerCase().trim();
+            const targetSupId = (forSupervisorId || "").toLowerCase().trim();
+            isUserMatch = (targetSup && (uName === targetSup || uName.includes(targetSup) || targetSup.includes(uName))) ||
+                          (targetSupId && (uId === targetSupId || doc.id.toLowerCase().includes(targetSupId)));
+          }
+        } else if (isManagerUser) {
+          if (forManagerName || forManagerId) {
+            const targetMgr = (forManagerName || "").toLowerCase().trim();
+            const targetMgrId = (forManagerId || "").toLowerCase().trim();
+            isUserMatch = (targetMgr && (uName === targetMgr || uName.includes(targetMgr) || targetMgr.includes(uName))) ||
+                          (targetMgrId && (uId === targetMgrId || doc.id.toLowerCase().includes(targetMgrId)));
+          }
+        }
+
+        if (isRoleMatch && isUserMatch) {
+          tokens.add(t);
+          tokenDocRefs.push(doc.ref);
+        }
+      };
+
+      // 1. Search in /organisation/{orgId}/fcmTokens
       if (orgId && orgId !== "uninitialized") {
-        globalQuery = globalQuery.where("orgId", "==", orgId);
+        try {
+          const orgSnap = await db.collection("organisation").doc(orgId).collection("fcmTokens").get();
+          orgSnap.forEach(evaluateTokenDoc);
+        } catch (e) {
+          logger.warn(`Error querying org fcmTokens for ${orgId}:`, e.message);
+        }
       }
-      const globalSnap = await globalQuery.get();
-      globalSnap.forEach(evaluateTokenDoc);
-    } catch (e) {
-      logger.warn("Error querying global fcmTokens:", e.message);
-    }
 
-    // Fallback search in entire global collection if still 0 tokens and orgId was specified
-    if (tokens.size === 0 && orgId) {
+      // 2. Search in global /fcmTokens by orgId
       try {
-        const allSnap = await db.collection("fcmTokens").limit(100).get();
-        allSnap.forEach(evaluateTokenDoc);
-      } catch (_) {}
+        let globalQuery = db.collection("fcmTokens");
+        if (orgId && orgId !== "uninitialized") {
+          const globalSnap = await globalQuery.where("orgId", "==", orgId).get();
+          globalSnap.forEach(evaluateTokenDoc);
+        }
+      } catch (e) {
+        logger.warn("Error querying global fcmTokens:", e.message);
+      }
+
+      // 3. Search in global /fcmTokens for doc ids starting with orgId or matching
+      if (tokens.size === 0 && orgId && orgId !== "uninitialized") {
+        try {
+          const allSnap = await db.collection("fcmTokens").limit(200).get();
+          allSnap.forEach((doc) => {
+            const docId = doc.id;
+            const d = doc.data() || {};
+            if (docId.startsWith(orgId + "_") || (d.orgId && String(d.orgId).trim() === orgId)) {
+              evaluateTokenDoc(doc);
+            }
+          });
+        } catch (_) {}
+      }
+
+      // Fallback search in entire global collection if still 0 tokens
+      if (tokens.size === 0) {
+        try {
+          const allSnap = await db.collection("fcmTokens").limit(100).get();
+          allSnap.forEach(evaluateTokenDoc);
+        } catch (_) {}
+      }
     }
 
     const tokenList = Array.from(tokens);
@@ -969,6 +1100,8 @@ async function processNotificationAndSendPush(notificationData, docRef) {
       recipientId: String(notificationData.recipientId || directUserId || forSupervisorId || forManagerId || "all"),
       requestId: String(requestId || docId || effectiveDocId),
       docId: String(docId || requestId || effectiveDocId),
+      projectId: String(notificationData.projectId || siteId || ""),
+      projectName: String(notificationData.projectName || siteName || ""),
       siteId: String(siteId || ""),
       siteName: String(siteName || ""),
       status: String(status || ""),
@@ -1018,6 +1151,7 @@ async function processNotificationAndSendPush(notificationData, docRef) {
             priority: "high",
             visibility: "public",
             notificationCount: 1,
+            clickAction: "FLUTTER_NOTIFICATION_CLICK",
           },
         },
         apns: {
@@ -1070,8 +1204,10 @@ async function processNotificationAndSendPush(notificationData, docRef) {
       const cleanOrgId = orgId.replace(/[^\w]/g, "_");
       const topicTargets = new Set();
 
-      if (targetRoles.includes("all") || targetRoles.includes("manager_and_organisation")) {
+      if (targetRoles.includes("all") || targetRoles.includes("manager_and_organisation") || targetRoles.includes("organisation") || targetRoles.includes("organization")) {
         topicTargets.add(`org_${cleanOrgId}`);
+        topicTargets.add(`org_${cleanOrgId}_organisation`);
+        topicTargets.add(`org_${cleanOrgId}_organization`);
       }
       targetRoles.forEach((role) => {
         if (role !== "all") {
@@ -1100,6 +1236,7 @@ async function processNotificationAndSendPush(notificationData, docRef) {
               defaultVibrateTimings: true,
               priority: "high",
               visibility: "public",
+              clickAction: "FLUTTER_NOTIFICATION_CLICK",
             },
           },
           apns: {
@@ -1154,7 +1291,9 @@ exports.onNotificationCreated = functions.region("us-central1").firestore
   .document("notifications/{notificationId}")
   .onCreate(async (snap, context) => {
     logger.info(`Triggered onNotificationCreated for doc: ${context.params.notificationId}`);
-    return processNotificationAndSendPush(snap.data(), snap.ref);
+    const data = snap.data() || {};
+    const idempotencyKey = data.idempotencyKey || `notif_${context.params.notificationId}`;
+    return processNotificationAndSendPush({ ...data, idempotencyKey, notificationId: context.params.notificationId }, snap.ref);
   });
 
 /**
@@ -1165,11 +1304,375 @@ exports.onOrgNotificationCreated = functions.region("us-central1").firestore
   .document("organisation/{orgId}/notifications/{notificationId}")
   .onCreate(async (snap, context) => {
     logger.info(`Triggered onOrgNotificationCreated for org: ${context.params.orgId}, doc: ${context.params.notificationId}`);
-    return processNotificationAndSendPush({ ...snap.data(), orgId: context.params.orgId }, snap.ref);
+    const data = snap.data() || {};
+    const idempotencyKey = data.idempotencyKey || `notif_${context.params.orgId}_${context.params.notificationId}`;
+    return processNotificationAndSendPush({ ...data, orgId: context.params.orgId, idempotencyKey, notificationId: context.params.notificationId }, snap.ref);
   });
 
 /**
- * 6. Callable Cloud Function: sendPushNotification
+ * 6. Firestore Trigger: onProjectCreated
+ * Automatically fires in real-time when a project is created under /projects/{projectId}
+ */
+exports.onProjectCreated = functions.region("us-central1").firestore
+  .document("projects/{projectId}")
+  .onCreate(async (snap, context) => {
+    const data = snap.data() || {};
+    const projectId = context.params.projectId;
+    const projectName = data.projectName || data.name || projectId;
+    const siteId = data.siteId || "";
+    const siteName = data.siteName || "";
+    const orgId = data.orgId || data.forOrgId || "";
+    const managerName = data.managerName || data.ownerName || "Manager";
+
+    logger.info(`Triggered onProjectCreated for project: ${projectName} (${projectId})`);
+
+    const title = "New Project Created";
+    const body = `Manager has created a new project: ${projectName}`;
+    const timeBucket = Math.floor(Date.now() / 25000);
+    const idempotencyKey = `project_created_${orgId || "all"}_${projectId}_${timeBucket}`;
+
+    return processNotificationAndSendPush({
+      title,
+      body,
+      targetRole: "organisation",
+      targetRoles: ["organisation"],
+      requestType: "project_created",
+      type: "project_created",
+      projectId,
+      docId: projectId,
+      requestId: projectId,
+      siteId,
+      siteName,
+      orgId,
+      forOrgId: orgId,
+      senderRole: "Manager",
+      senderName: managerName,
+      actionRoute: "/project_details",
+      idempotencyKey,
+      data: {
+        projectId,
+        projectName,
+        siteId,
+        siteName,
+        type: "project_created",
+        actionRoute: "/project_details",
+        idempotencyKey,
+      },
+    }, null);
+  });
+
+/**
+ * 7. Firestore Trigger: onOrgProjectCreated
+ * Automatically fires in real-time when a project is created under /organisation/{orgId}/projects/{projectId}
+ */
+exports.onOrgProjectCreated = functions.region("us-central1").firestore
+  .document("organisation/{orgId}/projects/{projectId}")
+  .onCreate(async (snap, context) => {
+    const data = snap.data() || {};
+    const orgId = context.params.orgId;
+    const projectId = context.params.projectId;
+    const projectName = data.projectName || data.name || projectId;
+    const siteId = data.siteId || "";
+    const siteName = data.siteName || "";
+    const managerName = data.managerName || data.ownerName || "Manager";
+
+    logger.info(`Triggered onOrgProjectCreated for org: ${orgId}, project: ${projectName} (${projectId})`);
+
+    const title = "New Project Created";
+    const body = `Manager has created a new project: ${projectName}`;
+    const timeBucket = Math.floor(Date.now() / 25000);
+    const idempotencyKey = `project_created_${orgId}_${projectId}_${timeBucket}`;
+
+    return processNotificationAndSendPush({
+      title,
+      body,
+      targetRole: "organisation",
+      targetRoles: ["organisation"],
+      requestType: "project_created",
+      type: "project_created",
+      projectId,
+      docId: projectId,
+      requestId: projectId,
+      siteId,
+      siteName,
+      orgId,
+      forOrgId: orgId,
+      senderRole: "Manager",
+      senderName: managerName,
+      actionRoute: "/project_details",
+      idempotencyKey,
+      data: {
+        projectId,
+        projectName,
+        siteId,
+        siteName,
+        type: "project_created",
+        actionRoute: "/project_details",
+        idempotencyKey,
+      },
+    }, null);
+  });
+
+/**
+ * 8. Firestore Trigger: onProjectUpdated
+ * Automatically fires in real-time when a project is updated under /projects/{projectId}
+ */
+exports.onProjectUpdated = functions.region("us-central1").firestore
+  .document("projects/{projectId}")
+  .onUpdate(async (change, context) => {
+    const beforeData = change.before.data() || {};
+    const afterData = change.after.data() || {};
+    const projectId = context.params.projectId;
+    const projectName = afterData.projectName || afterData.name || projectId;
+    const siteId = afterData.siteId || "";
+    const siteName = afterData.siteName || "";
+    const orgId = afterData.orgId || afterData.forOrgId || "";
+    const managerName = afterData.managerName || afterData.ownerName || "Manager";
+
+    // Skip if only internal timestamp or notification flag changed
+    if (beforeData.pushDelivered !== afterData.pushDelivered) return null;
+
+    logger.info(`Triggered onProjectUpdated for project: ${projectName} (${projectId})`);
+
+    const title = "Project Updated";
+    const body = `Manager has updated the project: ${projectName}`;
+    const timeBucket = Math.floor(Date.now() / 25000);
+    const idempotencyKey = `project_updated_${orgId || "all"}_${projectId}_${timeBucket}`;
+
+    return processNotificationAndSendPush({
+      title,
+      body,
+      targetRole: "organisation",
+      targetRoles: ["organisation"],
+      requestType: "project_updated",
+      type: "project_updated",
+      projectId,
+      docId: projectId,
+      requestId: projectId,
+      siteId,
+      siteName,
+      orgId,
+      forOrgId: orgId,
+      senderRole: "Manager",
+      senderName: managerName,
+      actionRoute: "/project_details",
+      idempotencyKey,
+      data: {
+        projectId,
+        projectName,
+        siteId,
+        siteName,
+        type: "project_updated",
+        actionRoute: "/project_details",
+        idempotencyKey,
+      },
+    }, null);
+  });
+
+/**
+ * 9. Firestore Trigger: onOrgProjectUpdated
+ * Automatically fires in real-time when a project is updated under /organisation/{orgId}/projects/{projectId}
+ */
+exports.onOrgProjectUpdated = functions.region("us-central1").firestore
+  .document("organisation/{orgId}/projects/{projectId}")
+  .onUpdate(async (change, context) => {
+    const beforeData = change.before.data() || {};
+    const afterData = change.after.data() || {};
+    const orgId = context.params.orgId;
+    const projectId = context.params.projectId;
+    const projectName = afterData.projectName || afterData.name || projectId;
+    const siteId = afterData.siteId || "";
+    const siteName = afterData.siteName || "";
+    const managerName = afterData.managerName || afterData.ownerName || "Manager";
+
+    if (beforeData.pushDelivered !== afterData.pushDelivered) return null;
+
+    logger.info(`Triggered onOrgProjectUpdated for org: ${orgId}, project: ${projectName} (${projectId})`);
+
+    const title = "Project Updated";
+    const body = `Manager has updated the project: ${projectName}`;
+    const timeBucket = Math.floor(Date.now() / 25000);
+    const idempotencyKey = `project_updated_${orgId}_${projectId}_${timeBucket}`;
+
+    return processNotificationAndSendPush({
+      title,
+      body,
+      targetRole: "organisation",
+      targetRoles: ["organisation"],
+      requestType: "project_updated",
+      type: "project_updated",
+      projectId,
+      docId: projectId,
+      requestId: projectId,
+      siteId,
+      siteName,
+      orgId,
+      forOrgId: orgId,
+      senderRole: "Manager",
+      senderName: managerName,
+      actionRoute: "/project_details",
+      idempotencyKey,
+      data: {
+        projectId,
+        projectName,
+        siteId,
+        siteName,
+        type: "project_updated",
+        actionRoute: "/project_details",
+        idempotencyKey,
+      },
+    }, null);
+  });
+
+/**
+ * 10. Firestore Trigger: onOrgSiteCreated
+ * Automatically fires in real-time when a site is created under /organisation/{orgId}/Site/{siteId}
+ */
+exports.onOrgSiteCreated = functions.region("us-central1").firestore
+  .document("organisation/{orgId}/Site/{siteId}")
+  .onCreate(async (snap, context) => {
+    const data = snap.data() || {};
+    const orgId = context.params.orgId;
+    const siteId = context.params.siteId;
+    const siteName = data.siteName || data.name || data.SiteName || siteId;
+    const managerName = data.managerName || data.createdByName || data.updatedBy || "Manager";
+    const location = data.location || data.Location || data.siteLocation || "";
+
+    logger.info(`Triggered onOrgSiteCreated for org: ${orgId}, site: ${siteName} (${siteId})`);
+
+    const timeBucket = Math.floor(Date.now() / 25000);
+    const idempotencyKey = `site_mgmt_${orgId}_${siteId}_${timeBucket}`;
+
+    return processNotificationAndSendPush({
+      title: "🏗️ New Site Registered",
+      body: `Manager ${managerName} registered Site "${siteName}" at ${location || "Site Location"}.`,
+      targetRole: "organisation",
+      targetRoles: ["organisation"],
+      requestType: "site_management",
+      type: "site_created",
+      siteId,
+      siteName,
+      docId: siteId,
+      requestId: siteId,
+      orgId,
+      forOrgId: orgId,
+      senderRole: "Manager",
+      senderName: managerName,
+      actionRoute: "/site_details",
+      idempotencyKey,
+      data: {
+        siteId,
+        siteName,
+        location,
+        type: "site_created",
+        actionRoute: "/site_details",
+        idempotencyKey,
+      },
+    }, null);
+  });
+
+/**
+ * 11. Firestore Trigger: onOrgSiteUpdated
+ * Automatically fires in real-time when a manager updates any site values under /organisation/{orgId}/Site/{siteId}
+ */
+exports.onOrgSiteUpdated = functions.region("us-central1").firestore
+  .document("organisation/{orgId}/Site/{siteId}")
+  .onUpdate(async (change, context) => {
+    const beforeData = change.before.data() || {};
+    const afterData = change.after.data() || {};
+    const orgId = context.params.orgId;
+    const siteId = context.params.siteId;
+    const siteName = afterData.siteName || afterData.name || afterData.SiteName || siteId;
+    const managerName = afterData.managerName || afterData.updatedBy || afterData.modifiedBy || "Manager";
+    const status = afterData.currentStatus || afterData.status || "Updated";
+
+    if (beforeData.pushDelivered !== afterData.pushDelivered) return null;
+
+    logger.info(`Triggered onOrgSiteUpdated for org: ${orgId}, site: ${siteName} (${siteId})`);
+
+    const timeBucket = Math.floor(Date.now() / 25000);
+    const idempotencyKey = `site_mgmt_${orgId}_${siteId}_${timeBucket}`;
+
+    return processNotificationAndSendPush({
+      title: "🏗️ Site Values Updated",
+      body: `Manager ${managerName} updated values for Site "${siteName}" (Status: ${status}).`,
+      targetRole: "organisation",
+      targetRoles: ["organisation"],
+      requestType: "site_management",
+      type: "site_created",
+      siteId,
+      siteName,
+      docId: siteId,
+      requestId: siteId,
+      orgId,
+      forOrgId: orgId,
+      senderRole: "Manager",
+      senderName: managerName,
+      actionRoute: "/site_details",
+      idempotencyKey,
+      data: {
+        siteId,
+        siteName,
+        status,
+        type: "site_created",
+        actionRoute: "/site_details",
+        idempotencyKey,
+      },
+    }, null);
+  });
+
+/**
+ * 12. Firestore Trigger: onOrgLowerSiteUpdated
+ * Handles /organisation/{orgId}/sites/{siteId} lowercase collection path
+ */
+exports.onOrgLowerSiteUpdated = functions.region("us-central1").firestore
+  .document("organisation/{orgId}/sites/{siteId}")
+  .onUpdate(async (change, context) => {
+    const beforeData = change.before.data() || {};
+    const afterData = change.after.data() || {};
+    const orgId = context.params.orgId;
+    const siteId = context.params.siteId;
+    const siteName = afterData.siteName || afterData.name || afterData.SiteName || siteId;
+    const managerName = afterData.managerName || afterData.updatedBy || afterData.modifiedBy || "Manager";
+    const status = afterData.currentStatus || afterData.status || "Updated";
+
+    if (beforeData.pushDelivered !== afterData.pushDelivered) return null;
+
+    logger.info(`Triggered onOrgLowerSiteUpdated for org: ${orgId}, site: ${siteName} (${siteId})`);
+
+    const timeBucket = Math.floor(Date.now() / 25000);
+    const idempotencyKey = `site_mgmt_${orgId}_${siteId}_${timeBucket}`;
+
+    return processNotificationAndSendPush({
+      title: "🏗️ Site Values Updated",
+      body: `Manager ${managerName} updated values for Site "${siteName}" (Status: ${status}).`,
+      targetRole: "organisation",
+      targetRoles: ["organisation"],
+      requestType: "site_management",
+      type: "site_created",
+      siteId,
+      siteName,
+      docId: siteId,
+      requestId: siteId,
+      orgId,
+      forOrgId: orgId,
+      senderRole: "Manager",
+      senderName: managerName,
+      actionRoute: "/site_details",
+      idempotencyKey,
+      data: {
+        siteId,
+        siteName,
+        status,
+        type: "site_created",
+        actionRoute: "/site_details",
+        idempotencyKey,
+      },
+    }, null);
+  });
+
+/**
+ * 13. Callable Cloud Function: sendPushNotification
  * Allows authorized client calls to trigger direct push notifications
  */
 exports.sendPushNotification = functions.region("us-central1").https.onCall(async (data, context) => {

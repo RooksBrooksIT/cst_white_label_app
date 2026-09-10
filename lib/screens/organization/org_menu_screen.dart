@@ -1,7 +1,6 @@
-﻿import 'package:ebricks/screens/organization/org_reset_password_screen.dart';
+import 'package:ebricks/screens/organization/org_reset_password_screen.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -394,10 +393,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
                       ),
                     ),
                     child: const Text(
-                      'YES, LOGOUT',
+                      'YES',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -412,14 +411,10 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
     if (result == true) {
       await AuthService().logout();
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('org_isLoggedIn');
-      await prefs.remove('org_username');
-
       if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/landing',
+          '/orgLogin',
           (route) => false,
         );
       }

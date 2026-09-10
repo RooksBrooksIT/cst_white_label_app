@@ -2,22 +2,24 @@
   CST WHITE LABEL APPLICATION - COMPLETE NOTIFICATION FLOW ANALYSIS REPORT
 ================================================================================
 Project: CST White Label App (eBricks Construction ERP Platform)
-Generated On: September 05, 2026
+Generated On: September 10, 2026
 Scope: End-to-End Notification Architecture, Real-Time Push, Scheduled Cron,
-       5-Stage Approval Workflows, Token Lifecycle, Multi-Tenant Isolation & UI Routing
+       5-Stage Approval Workflows, Petty Cash & Expenses, Token Lifecycle,
+       Multi-Tenant Isolation, Cloud Functions Backend & UI Deep Routing
 File Name: NOTIFICATION_FLOW_ANALYSIS_REPORT.txt
-Status: Complete Comprehensive Analysis
+Status: Complete Comprehensive System Analysis
 
 ================================================================================
 TABLE OF CONTENTS
 ================================================================================
 1. EXECUTIVE ARCHITECTURAL SUMMARY
 2. DUAL-ENGINE ARCHITECTURE OVERVIEW (REAL-TIME VS. SCHEDULED)
-3. CLIENT-SIDE LIFECYCLE & FLUTTER INTEGRATION (notification_service.dart)
+3. CLIENT-SIDE LIFECYCLE & FLUTTER INTEGRATION
    3.1 Initialization, Background Handler & Cold-Start Recovery
-   3.2 Foreground In-App Banners & SnackBar Alerts
-   3.3 Device FCM Token Lifecycle & Dual-Write Storage
-   3.4 Direct Target Deep Routing Engine (navigateToTarget)
+   3.2 Local Notification Channel & Android 13+ Runtime Permissions
+   3.3 Foreground In-App Banners & SnackBar Alerts
+   3.4 Device FCM Token Lifecycle & Dual-Write Storage
+   3.5 Decoupled NotificationRouter & Role-Based Deep Linking Matrix
 4. THE 5-STAGE REQUISITION APPROVAL WORKFLOW NOTIFICATION MATRIX
    4.1 Stage 1: Requisition Submission (Supervisor -> Manager)
    4.2 Stage 2: Manager Verification & Forwarding (Manager -> Org HQ)
@@ -25,42 +27,52 @@ TABLE OF CONTENTS
    4.4 Stage 3: Organization HQ Authorization (Org HQ -> Manager)
    4.5 Stage 3 (Reject): Organization HQ Rejection (Org HQ -> Supervisor & Manager)
    4.6 Stage 4: Manager Release & Fund Dispatch (Manager -> Supervisor)
-   4.7 Stage 5: Site Completion / Material Receipt Audit
-5. ADMINISTRATIVE & OPERATIONAL REAL-TIME NOTIFICATION TRIGGERS
-   5.1 Supervisor Site Mapping & Assignment Alerts
-   5.2 Manager Profile Creation & Onboarding Audit
-   5.3 Supervisor Profile Creation & Welcome Alerts
-   5.4 Site Creation / Modification Alerts
-   5.5 Master Catalogue Updates (Materials, Vehicles, Contractors)
-   5.6 Daily Work Schedule & Supervisor Tool Movement Logs
-6. SCHEDULED & RECURRING CRON NOTIFICATION ENGINE
-   6.1 Client-Side Scheduling Interface & Helpers
-   6.2 Database Schema for Scheduled Tasks
-   6.3 Firebase Cloud Functions Pub/Sub Cron Worker (processScheduledNotifications)
-   6.4 Concurrency Control, Atomic Locks & Duplicate Prevention
-   6.5 Recurrence Rescheduling Algorithm (Daily / Weekly)
-   6.6 Manual / On-Demand Callable Trigger (triggerScheduledNotifications)
-7. MULTI-TENANT BACKEND & FIRESTORE DATABASE ARCHITECTURE
-   7.1 Global vs. Organization-Scoped Document Paths
-   7.2 Collection Schema: fcmTokens
-   7.3 Collection Schema: notifications
-   7.4 Collection Schema: scheduled_notifications
-8. FCM PUSH DELIVERY, DEVICE CHANNELS & PAYLOAD STRUCTURE
-   8.1 High-Priority Android Notification Channel (cst_high_importance_channel)
-   8.2 iOS APNs Background Wake-Up & Heads-Up Alerts
-   8.3 Cloud Function Recipient Resolution & Multicast Engine
-   8.4 Stale / Invalid FCM Token Pruning Mechanism
-9. USER INTERFACE & REAL-TIME STREAMING INTEGRATION
-   9.1 Role-Based Live Notification Streams & Reactive Unread Counters
-   9.2 Supervisor Notification Inbox (notification_page.dart)
-   9.3 Manager Notification Center (manager_notification_screen.dart)
-   9.4 Organization Notification Center (org_notification_page.dart)
-   9.5 Dashboard Notification Badges & Dynamic App Bar Counters
-10. END-TO-END NOTIFICATION SEQUENCE DIAGRAMS (ASCII)
-   10.1 Real-Time Requisition Approval Sequence
-   10.2 Daily Scheduled Reminder Cron Sequence
-   10.3 Site Assignment & Profile Onboarding Sequence
-11. VERIFICATION, EDGE CASES & PRODUCTION BEST PRACTICES
+   4.7 Stage 5: Site Completion & Material Receipt Audit
+5. FINANCIAL & OPERATIONAL DOMAIN NOTIFICATION FLOWS
+   5.1 Petty Cash Workflow & 10% Low-Balance Alert Engine
+   5.2 Expense Management Workflow (Org & Manager Expenses)
+   5.3 Material Inventory Low-Stock & Site Transfer Alerts
+   5.4 Tool Movement & Daily Work Schedule Logs
+6. ADMINISTRATIVE & CONFIGURATION REAL-TIME NOTIFICATION TRIGGERS
+   6.1 Supervisor Site Mapping & Assignment Alerts
+   6.2 Manager Profile Creation & Onboarding Audit
+   6.3 Supervisor Profile Creation & Welcome Alerts
+   6.4 Site Creation & Modification Alerts
+   6.5 Project Creation & Update Triggers
+   6.6 Master Catalogue Updates (Materials, Vehicles, Contractors)
+7. SCHEDULED & RECURRING CRON NOTIFICATION ENGINE
+   7.1 Client-Side Scheduling Interface & Helpers
+   7.2 Database Schema for Scheduled Tasks
+   7.3 Firebase Cloud Functions Pub/Sub Cron Worker (processScheduledNotifications)
+   7.4 Concurrency Control, Atomic Locks & Duplicate Prevention
+   7.5 Recurrence Rescheduling Algorithm (Daily / Weekly)
+   7.6 Manual / On-Demand Callable Trigger (triggerScheduledNotifications)
+8. MULTI-TENANT BACKEND & FIRESTORE DATABASE ARCHITECTURE
+   8.1 Global vs. Organization-Scoped Document Paths
+   8.2 Collection Schema: fcmTokens
+   8.3 Collection Schema: notifications
+   8.4 Collection Schema: scheduled_notifications
+9. FIREBASE CLOUD FUNCTIONS PUSH DELIVERY ENGINE (FCM ADMIN SDK)
+   9.1 High-Priority Android Notification Channel (cst_high_importance_channel)
+   9.2 iOS APNs Background Wake-Up & Heads-Up Alerts
+   9.3 Cloud Function Recipient Resolution & Multicast Engine
+   9.4 Stale / Invalid FCM Token Pruning Mechanism
+   9.5 Topic-Based Broadcast Fallback (org_{orgId}_{role})
+10. SUBSCRIPTION EXPIRY NOTIFICATION ENGINE
+   10.1 2-Day Prior Expiry Detection Algorithm
+   10.2 Automated SMTP Email Delivery
+11. USER INTERFACE & REAL-TIME STREAMING INTEGRATION
+   11.1 Role-Based Live Notification Streams & Reactive Unread Counters
+   11.2 Supervisor Notification Inbox (notification_page.dart)
+   11.3 Manager Notification Center (manager_notification_screen.dart)
+   11.4 Organization Notification Center (org_notification_page.dart)
+   11.5 Dynamic Dashboard Badges & AppBar StreamBuilders
+12. END-TO-END NOTIFICATION SEQUENCE DIAGRAMS (ASCII)
+   12.1 5-Stage Requisition Approval Sequence
+   12.2 Petty Cash Request & 10% Low-Balance Alert Sequence
+   12.3 Scheduled Cron Reminder Sequence
+   12.4 Cold-Start Push Notification Deep-Link Routing Flow
+13. VERIFICATION, RELIABILITY GUARANTEES & PRODUCTION BEST PRACTICES
 
 ================================================================================
 1. EXECUTIVE ARCHITECTURAL SUMMARY
@@ -70,22 +82,27 @@ ERP) is a robust, production-grade dual-engine framework designed to handle both
 instant real-time event alerts and recurring cron-based background deliveries.
 
 The system connects three principal stakeholder roles:
-1. Supervisor (Site execution, daily logs, materials/tools/payment requisitions)
-2. Manager (Project oversight, site configuration, stage-1 verification, final release)
-3. Organization Admin / HQ (Corporate financial control, budget authorization, compliance)
+1. Supervisor: Site execution, daily logs, material/tool/payment requisitions,
+   petty cash management.
+2. Manager: Project oversight, site configuration, stage-1 verification,
+   fund dispatch, clearance.
+3. Organization Admin / HQ: Corporate financial control, budget authorization,
+   subscription management, enterprise-wide compliance.
 
-Key Capabilities:
+Key Architectural Capabilities:
 - Full Multi-Tenant Isolation: Every token, notification, and schedule is partitioned
   by `orgId` and `app_id`.
-- Dual-Write Persistence: Written both globally and in `/organisation/{orgId}/` subcollections
-  to allow localized querying and high-throughput global Cloud Function triggers.
+- Dual-Write Persistence: Written both globally (`/notifications`, `/fcmTokens`)
+  and in organization-scoped subcollections (`/organisation/{orgId}/notifications`,
+  `/organisation/{orgId}/fcmTokens`) to allow localized querying and high-throughput
+  global Cloud Function triggers.
 - Multi-Level Push Delivery: Cloud Firestore `onCreate` triggers -> Firebase Admin SDK
   Multicast Push -> Device heads-up alerts with deep-navigation payloads.
 - Automated Scheduled Engine: Serverless Cron executing every 5 minutes with atomic
   transaction locking to guarantee zero duplicate pushes.
 - Automatic Stale Token Self-Healing: Instant pruning of unregistered or invalid FCM tokens.
 - Rich In-App UX: Custom floating SnackBars for foreground arrivals and click-to-action deep
-  linking directly into relevant approval screens.
+  linking directly into relevant approval screens via `NotificationRouter`.
 
 ================================================================================
 2. DUAL-ENGINE ARCHITECTURE OVERVIEW (REAL-TIME VS. SCHEDULED)
@@ -136,7 +153,7 @@ Key Capabilities:
                               +-------------------------------+
 
 ================================================================================
-3. CLIENT-SIDE LIFECYCLE & FLUTTER INTEGRATION (notification_service.dart)
+3. CLIENT-SIDE LIFECYCLE & FLUTTER INTEGRATION
 ================================================================================
 
 3.1 Initialization, Background Handler & Cold-Start Recovery
@@ -151,7 +168,20 @@ Key Capabilities:
   A post-frame callback `WidgetsBinding.instance.addPostFrameCallback` ensures the
   navigator context is mounted before calling `navigateToTarget(context, payload)`.
 
-3.2 Foreground In-App Banners & SnackBar Alerts
+3.2 Local Notification Channel & Android 13+ Runtime Permissions
+-----------------------------------------------------------------
+- Uses `flutter_local_notifications` plugin for Android 8.0+ Oreo and Android 13+ Tiramisu.
+- Android Notification Channel:
+  * Channel ID: `cst_high_importance_channel`
+  * Channel Name: `High Importance Notifications`
+  * Importance: `Importance.max`
+  * Priority: `Priority.high`
+  * Sound: `default`
+  * Vibration & Lights: Enabled
+- Explicitly requests `POST_NOTIFICATIONS` runtime permission on Android 13+ devices
+  via `AndroidFlutterLocalNotificationsPlugin.requestNotificationsPermission()`.
+
+3.3 Foreground In-App Banners & SnackBar Alerts
 ------------------------------------------------
 - When a push arrives while the user is actively using the app, `FirebaseMessaging.onMessage`
   intercepts the event.
@@ -159,7 +189,7 @@ Key Capabilities:
   vibrant notification icon, bold title, two-line body truncation, and a tap chevron.
 - Tapping the banner immediately dismisses the SnackBar and navigates to the target page.
 
-3.3 Device FCM Token Lifecycle & Dual-Write Storage
+3.4 Device FCM Token Lifecycle & Dual-Write Storage
 ----------------------------------------------------
 - Method: `NotificationService.saveToken({userId, userType, userName})`
 - Triggered upon login across all application screens:
@@ -174,18 +204,36 @@ Key Capabilities:
 - Token Refresh: `_messaging.onTokenRefresh.listen` handles automatic token updates
   whenever Google Play Services or APNs issues a new registration token.
 
-3.4 Direct Target Deep Routing Engine (navigateToTarget)
----------------------------------------------------------
-- Method: `NotificationService.navigateToTarget(BuildContext context, Map<String, dynamic> data)`
-- Evaluates `data['requestType']` or `data['type']`:
-  * `material`: Pushes `ManagerMaterialApprovalScreen`
-  * `tool` / `tools`: Pushes `ManagerToolsApprovalScreen`
-  * `payment`: Pushes `ManagerSitePaymentApprovalPage`
-  * `workforce` / `worker` / `schedule`: Pushes `ManagerApprovalScreen`
+3.5 Decoupled NotificationRouter & Role-Based Deep Linking Matrix
+------------------------------------------------------------------
+File: `lib/services/notification_router.dart`
+Method: `NotificationRouter.navigate(BuildContext context, dynamic payload)`
+Supported Types and Destinations:
 
-================================================================================
++----------------------------+-----------------------------------+-----------------------------------+
+| Notification Type / Key    | User Role                         | Target Destination Screen         |
++----------------------------+-----------------------------------+-----------------------------------+
+| materialRequisition        | Manager / Org                     | ManagerMaterialApprovalScreen     |
+| toolsRequisition           | Manager / Org                     | ManagerToolsApprovalScreen        |
+| paymentRequisition         | Manager / Org                     | ManagerSitePaymentApprovalPage    |
+| workforceSchedule          | Manager / Org                     | ManagerApprovalScreen             |
+| toolMovement               | Manager / Org                     | ManagerToolsApprovalScreen        |
+| dailyWorkSchedule          | Manager / Org                     | ManagerApprovalScreen             |
+| pettyCashRequest / Topup   | Supervisor                        | SupervisorPettyCashPage           |
+| pettyCashRequest / Topup   | Manager                           | ManagerPettyCashPage              |
+| pettyCashRequest / Topup   | Organisation                      | OrgPettyCashPage                  |
+| organizationExpense        | Organisation / Manager            | OrganizationExpenses              |
+| managerExpense             | Manager / Org                     | ManagerExpenses                   |
+| siteAssignment             | Supervisor                        | SiteEntryPage                     |
+| siteCreated                | Supervisor                        | SiteEntryPage                     |
+| projectCreated / Updated   | Organisation                      | OrgSitesListPage                  |
+| projectCreated / Updated   | Manager                           | ProjectScreen                     |
+| accountCreated / General   | Supervisor / Manager / Org        | Role-appropriate Notification Hub |
++----------------------------+-----------------------------------+-----------------------------------+
+
+===============================================================================
 4. THE 5-STAGE REQUISITION APPROVAL WORKFLOW NOTIFICATION MATRIX
-================================================================================
+===============================================================================
 Implemented in `lib/services/approval_workflow_service.dart`:
 
 4.1 Stage 1: Requisition Submission (Supervisor -> Manager)
@@ -253,23 +301,75 @@ Implemented in `lib/services/approval_workflow_service.dart`:
 - Target Supervisor: Specific requesting supervisor.
 - Status Update: `completed` / `released`.
 
-4.7 Stage 5: Site Completion / Material Receipt Audit
+4.7 Stage 5: Site Completion & Material Receipt Audit
 ------------------------------------------------------
 - Triggered by: Supervisor confirming physical receipt of materials or tools at site.
 - In-App audit entry updated for Manager and Organization audit screens.
 
 ================================================================================
-5. ADMINISTRATIVE & OPERATIONAL REAL-TIME NOTIFICATION TRIGGERS
+5. FINANCIAL & OPERATIONAL DOMAIN NOTIFICATION FLOWS
 ================================================================================
 
-5.1 Supervisor Site Mapping & Assignment Alerts
+5.1 Petty Cash Workflow & 10% Low-Balance Alert Engine
+-------------------------------------------------------
+File: `lib/services/petty_cash_service.dart`
+Petty cash operations trigger automated multi-tier notifications:
+1. Petty Cash Request Submission:
+   - Supervisor requests funds -> Notifies Manager & Org HQ (`NotificationService.notifyManagerAndOrganisation`).
+   - Title: "💰 New Petty Cash Request: ₹[Amount]"
+   - Body: "Supervisor [Name] submitted request [ReqId] for Site [SiteName]."
+2. Petty Cash Manager Verification:
+   - Manager forwards request -> Notifies Org HQ (`NotificationService.notifyOrganisation`).
+3. Organization Top-up Approval & Fund Dispatch:
+   - Org authorizes -> Notifies Supervisor & Manager (`NotificationService.notifySupervisor`).
+   - Title: "💵 Petty Cash Dispatched: ₹[Amount]"
+   - Body: "Top-up of ₹[Amount] credited to Site [SiteName] petty cash wallet."
+4. 10% Low-Balance Threshold Alert:
+   - When supervisor logs an expense and remaining wallet balance drops below 10% of total
+     allocated budget (`currentBalance <= 0.10 * totalBudget`):
+   - Automatically triggers high-priority alert to Supervisor and Manager.
+   - Title: "⚠️ Low Petty Cash Balance Alert"
+   - Body: "Site [SiteName] petty cash balance is ₹[Balance] (< 10% of allocated budget). Please initiate top-up."
+
+5.2 Expense Management Workflow (Org & Manager Expenses)
+---------------------------------------------------------
+File: `lib/services/expense_service.dart`
+- Organization Expense Recorded:
+  * Notifies Organization Executives with summary of expenditure, category, and vendor details.
+- Manager Expense Logging:
+  * Notifies Org HQ for audit trail and balance reconciliation.
+
+5.3 Material Inventory Low-Stock & Site Transfer Alerts
+--------------------------------------------------------
+Files: `lib/services/material_inventory_service.dart`, `material_transfer_service.dart`
+- Low-Stock Alert:
+  * Automatically checks current inventory against `minimumStockThreshold`.
+  * Triggers notification to Manager: "⚠️ Low Stock Warning: [MaterialName] at [SiteName] is below threshold ([Qty] remaining)."
+- Material Transfer Request:
+  * Supervisor/Manager requests inter-site transfer -> Notifies Source Site Manager & Destination Site Supervisor.
+- Material Transfer Acceptance:
+  * Notifies sender upon confirmation of receipt.
+
+5.4 Tool Movement & Daily Work Schedule Logs
+---------------------------------------------
+Files: `supervisor_work_schedule_page.dart`, `supervisor_tool_movement.dart`
+- Daily Work Schedule:
+  * Supervisor logs daily worker attendance and progress -> Notifies Manager & Org HQ.
+- Tool Movement:
+  * Tool check-in / check-out / transfer between sites triggers audit alert to Manager.
+
+================================================================================
+6. ADMINISTRATIVE & CONFIGURATION REAL-TIME NOTIFICATION TRIGGERS
+================================================================================
+
+6.1 Supervisor Site Mapping & Assignment Alerts
 ------------------------------------------------
 - File: `lib/screens/manager/site_supervisor_map_screen.dart`
 - Method: `NotificationService.notifySiteAssignment(...)`
 - Target: Mapped Supervisor.
 - Content: "📍 New Site Assignment: You have been assigned to site [SiteId] - [SiteName] located at [Location]."
 
-5.2 Manager Profile Creation & Onboarding Audit
+6.2 Manager Profile Creation & Onboarding Audit
 ------------------------------------------------
 - File: `lib/screens/manager/manager_config_screen.dart`
 - Method: `NotificationService.notifyManagerAccountCreated(...)`
@@ -277,7 +377,7 @@ Implemented in `lib/services/approval_workflow_service.dart`:
   * Target Manager: "👤 Manager Account Registered: ID [ManagerId] under [Department]."
   * Organization Audit: "👤 New Manager Configured: Profile [ManagerName] configured."
 
-5.3 Supervisor Profile Creation & Welcome Alerts
+6.3 Supervisor Profile Creation & Welcome Alerts
 -------------------------------------------------
 - File: `lib/screens/manager/site_supervisor_config.dart`
 - Method: `NotificationService.notifySupervisorAccountCreated(...)`
@@ -285,29 +385,30 @@ Implemented in `lib/services/approval_workflow_service.dart`:
   * Target Supervisor: "👷 Welcome to eBricks: Your Supervisor account ([Id]) has been registered."
   * Organization Audit: "👷 New Supervisor Profile Created: Supervisor [Name] registered."
 
-5.4 Site Creation / Modification Alerts
+6.4 Site Creation & Modification Alerts
 ----------------------------------------
 - File: `lib/screens/manager/site_screen.dart`
 - Method: `NotificationService.notifySiteCreatedOrUpdated(...)`
 - Target: Organization HQ.
 - Content: "🏗️ New Site Registered / Updated: Manager [Name] registered Site [SiteId] - [SiteName] at [Location]."
 
-5.5 Master Catalogue Updates (Materials, Vehicles, Contractors)
+6.5 Project Creation & Update Triggers
+---------------------------------------
+- Cloud Functions Triggers: `onProjectCreated`, `onOrgProjectCreated`, `onProjectUpdated`, `onOrgProjectUpdated`
+- Automatically detects new project records created under `/projects` or `/organisation/{orgId}/projects`
+- Fires real-time push to Organization HQ and Managers with deep links to `/project_details`.
+
+6.6 Master Catalogue Updates (Materials, Vehicles, Contractors)
 ----------------------------------------------------------------
 - Method: `NotificationService.notifyMasterConfigUpdated(...)`
 - Target: All Managers and Organization Admins.
 - Content: "⚙️ [Category] Catalogue Updated: [Item] was added/modified by [Admin]."
 
-5.6 Daily Work Schedule & Supervisor Tool Movement Logs
---------------------------------------------------------
-- Files: `supervisor_work_schedule_page.dart` & `supervisor_tool_movement.dart`
-- Method: Real-time notification to Manager and Organization upon site schedule submissions.
-
 ================================================================================
-6. SCHEDULED & RECURRING CRON NOTIFICATION ENGINE
+7. SCHEDULED & RECURRING CRON NOTIFICATION ENGINE
 ================================================================================
 
-6.1 Client-Side Scheduling Interface & Helpers
+7.1 Client-Side Scheduling Interface & Helpers
 -----------------------------------------------
 Located in `lib/services/notification_service.dart`:
 - `scheduleNotification(...)`: Core method to persist a schedule with `scheduledAt`,
@@ -319,7 +420,7 @@ Located in `lib/services/notification_service.dart`:
 - `cancelScheduledNotification(scheduleId)`: Marks status as 'cancelled'.
 - `streamScheduledNotifications()`: Real-time UI stream of active pending schedules.
 
-6.2 Database Schema for Scheduled Tasks
+7.2 Database Schema for Scheduled Tasks
 ----------------------------------------
 Collection: `/scheduled_notifications/{scheduleId}`
 Document Fields:
@@ -346,7 +447,7 @@ Document Fields:
   "data": { "click_action": "FLUTTER_NOTIFICATION_CLICK", "requestType": "daily_site_log" }
 }
 
-6.3 Firebase Cloud Functions Pub/Sub Cron Worker (processScheduledNotifications)
+7.3 Firebase Cloud Functions Pub/Sub Cron Worker (processScheduledNotifications)
 ---------------------------------------------------------------------------------
 - File: `functions/index.js`
 - Trigger: `functions.pubsub.schedule("every 5 minutes").timeZone("Asia/Kolkata")`
@@ -354,14 +455,14 @@ Document Fields:
   1. Scans `/scheduled_notifications` where `status == 'pending'` and `scheduledAt <= now`.
   2. Batch limit: 50 documents per run.
 
-6.4 Concurrency Control, Atomic Locks & Duplicate Prevention
+7.4 Concurrency Control, Atomic Locks & Duplicate Prevention
 -------------------------------------------------------------
 - Worker uses Firestore `db.runTransaction` to atomically transition `status: 'pending'`
   to `status: 'processing'`.
 - If two cron instances run concurrently, only one successfully claims the document.
 - Once processed, dispatches FCM Multicast Push and creates an in-app notification record.
 
-6.5 Recurrence Rescheduling Algorithm (Daily / Weekly)
+7.5 Recurrence Rescheduling Algorithm (Daily / Weekly)
 -------------------------------------------------------
 - If `repeat === 'daily'`:
   Adds 24 hours to `scheduledAt`. If next date is still in past, advances to tomorrow.
@@ -371,16 +472,16 @@ Document Fields:
 - If `repeat === 'none'`:
   Marks `status: 'delivered'` with `deliveredAt` timestamp.
 
-6.6 Manual / On-Demand Callable Trigger (triggerScheduledNotifications)
+7.6 Manual / On-Demand Callable Trigger (triggerScheduledNotifications)
 ------------------------------------------------------------------------
 - Callable HTTPS function `triggerScheduledNotifications` allows manual invocation
   from admin portals or integration tests to force an immediate scan without waiting 5 minutes.
 
 ================================================================================
-7. MULTI-TENANT BACKEND & FIRESTORE DATABASE ARCHITECTURE
+8. MULTI-TENANT BACKEND & FIRESTORE DATABASE ARCHITECTURE
 ================================================================================
 
-7.1 Global vs. Organization-Scoped Document Paths
+8.1 Global vs. Organization-Scoped Document Paths
 --------------------------------------------------
 To support multi-tenancy and white-label client isolation:
 - Organization-Scoped Collections:
@@ -392,7 +493,7 @@ To support multi-tenancy and white-label client isolation:
   * `/fcmTokens/{orgId}_{userId}`
   * `/scheduled_notifications/{scheduleId}`
 
-7.2 Collection Schema: fcmTokens
+8.2 Collection Schema: fcmTokens
 ---------------------------------
 {
   "token": "dK9s...xP1",
@@ -403,7 +504,7 @@ To support multi-tenancy and white-label client isolation:
   "updatedAt": Timestamp
 }
 
-7.3 Collection Schema: notifications
+8.3 Collection Schema: notifications
 -------------------------------------
 {
   "app_id": "cst-app",
@@ -430,19 +531,19 @@ To support multi-tenancy and white-label client isolation:
 }
 
 ================================================================================
-8. FCM PUSH DELIVERY, DEVICE CHANNELS & PAYLOAD STRUCTURE
+9. FIREBASE CLOUD FUNCTIONS PUSH DELIVERY ENGINE (FCM ADMIN SDK)
 ================================================================================
 
-8.1 High-Priority Android Notification Channel
+9.1 High-Priority Android Notification Channel
 ----------------------------------------------
 - Channel ID: `cst_high_importance_channel`
 - Sound: `default`
 - Priority: `high`
 - Visibility: `public`
-- Default vibrate timings enabled.
+- TTL: 86,400 seconds (24 hours)
 - Guarantees heads-up banner display and audio alert even when the device is locked.
 
-8.2 iOS APNs Background Wake-Up & Heads-Up Alerts
+9.2 iOS APNs Background Wake-Up & Heads-Up Alerts
 --------------------------------------------------
 - APNs Headers: `"apns-priority": "10"`
 - Payload APS:
@@ -451,15 +552,16 @@ To support multi-tenancy and white-label client isolation:
   * `badge`: 1
   * `contentAvailable`: true (wakes background app for background data sync)
 
-8.3 Cloud Function Recipient Resolution & Multicast Engine
+9.3 Cloud Function Recipient Resolution & Multicast Engine
 -----------------------------------------------------------
 - `processNotificationAndSendPush` resolves recipient tokens:
   1. Searches `/organisation/{orgId}/fcmTokens` filtered by `userType` and matching
-     `forSupervisorName`, `forSupervisorId`, or `forManagerName`.
+     `forSupervisorName`, `forSupervisorId`, `forManagerName`, or `directUserId`.
   2. Falls back to root `/fcmTokens` if no scoped tokens are found.
-  3. Uses `admin.messaging().sendEachForMulticast(message)` for batch delivery.
+  3. Suppresses self-notifications (matches `senderName` or `senderId`).
+  4. Uses `admin.messaging().sendEachForMulticast(message)` for batch delivery.
 
-8.4 Stale / Invalid FCM Token Pruning Mechanism
+9.4 Stale / Invalid FCM Token Pruning Mechanism
 ------------------------------------------------
 - When FCM returns failure responses:
   * `messaging/invalid-registration-token`
@@ -467,26 +569,52 @@ To support multi-tenancy and white-label client isolation:
 - The Cloud Function automatically deletes the expired token document from Firestore,
   preventing wasted quota and stale multicast attempts.
 
+9.5 Topic-Based Broadcast Fallback
+-----------------------------------
+- If direct device tokens are not registered or return zero targets:
+  * Cloud Function automatically broadcasts to tenant topics:
+    - `org_{orgId}`
+    - `org_{orgId}_manager`
+    - `org_{orgId}_supervisor`
+    - `org_{orgId}_organisation`
+
 ================================================================================
-9. USER INTERFACE & REAL-TIME STREAMING INTEGRATION
+10. SUBSCRIPTION EXPIRY NOTIFICATION ENGINE
 ================================================================================
 
-9.1 Role-Based Live Notification Streams & Reactive Unread Counters
+10.1 2-Day Prior Expiry Detection Algorithm
+--------------------------------------------
+- Cloud Function Cron: `checkSubscriptionExpiryReminders`
+- Trigger: Runs daily at 9:00 AM (Asia/Kolkata).
+- Rules:
+  1. Checks active subscriptions (`isSubscriptionActive === true`).
+  2. Calculates remaining time: `0 < diffDays <= 2.05`.
+  3. Duplicate suppression: Checks `lastExpiryReminderSentForEndDate` to prevent duplicate emails.
+  4. Skips already expired or cancelled subscriptions.
+
+10.2 Automated SMTP Email Delivery
+-----------------------------------
+- Dispatches branded HTML invoice and reminder template via Gmail SMTP (`emailService.js`).
+- Contains renewal deep link, organization ID, and days remaining.
+
+================================================================================
+11. USER INTERFACE & REAL-TIME STREAMING INTEGRATION
+================================================================================
+
+11.1 Role-Based Live Notification Streams & Reactive Unread Counters
 --------------------------------------------------------------------
 - Streams provided by `NotificationService`:
   * `streamForRole({role, supervisorName, managerName})`
   * `unreadCountForRole({role, supervisorName, managerName})`
-  * Backward compatibility helpers: `streamForSupervisor`, `unreadCountForSupervisor`,
-    `streamForOrganisation`, `unreadCountForOrganisation`.
-- All streams order by `createdAt DESC` with a default limit of 50 items.
+- Live badge counters update instantaneously across AppBars using `StreamBuilder<int>`.
 
-9.2 Supervisor Notification Inbox (notification_page.dart)
+11.2 Supervisor Notification Inbox (notification_page.dart)
 -----------------------------------------------------------
 - Displays notifications specific to the logged-in supervisor.
 - Auto-marks notifications as read on screen load or item swipe.
-- Tapping an item invokes `NotificationService.navigateToTarget`.
+- Tapping an item invokes `NotificationRouter.navigate`.
 
-9.3 Manager Notification Center (manager_notification_screen.dart)
+11.3 Manager Notification Center (manager_notification_screen.dart)
 -------------------------------------------------------------------
 - Features category tabs: "All", "Materials", "Tools", "Payments", "Workforce".
 - Live unread badge count in app bar.
@@ -494,24 +622,18 @@ To support multi-tenancy and white-label client isolation:
 - Dismissible list tiles allowing instant swipe-to-read.
 - Direct tap navigation to requisition approval pages.
 
-9.4 Organization Notification Center (org_notification_page.dart)
+11.4 Organization Notification Center (org_notification_page.dart)
 ------------------------------------------------------------------
 - Filter tabs tailored for HQ Admins.
 - Real-time Firestore stream filtered to `targetRole in ['organisation', 'all']`.
 - Actionable deep navigation to authorization screens.
 
-9.5 Dashboard Notification Badges & Dynamic App Bar Counters
--------------------------------------------------------------
-- Integrated in `supervisor_dashboard.dart`, `organization_dashboard.dart`, and
-  `config_account_dashboard.dart`.
-- `StreamBuilder<int>` dynamically updates badge count icon in the AppBar in real time.
-
 ================================================================================
-10. END-TO-END NOTIFICATION SEQUENCE DIAGRAMS (ASCII)
+12. END-TO-END NOTIFICATION SEQUENCE DIAGRAMS (ASCII)
 ================================================================================
 
-10.1 Real-Time Requisition Approval Sequence
----------------------------------------------
+12.1 5-Stage Requisition Approval Sequence
+-------------------------------------------
 Supervisor                  Firestore / Functions          Manager                  Org HQ
     |                                 |                       |                       |
     |-- 1. Submit Material Req ------>|                       |                       |
@@ -529,8 +651,22 @@ Supervisor                  Firestore / Functions          Manager              
     |<-- 10. FCM Push ----------------|                       |                       |
     |    (🚀 Approved & Dispatched)   |                       |                       |
 
-10.2 Daily Scheduled Reminder Cron Sequence
---------------------------------------------
+12.2 Petty Cash Request & 10% Low-Balance Alert Sequence
+---------------------------------------------------------
+Supervisor                  Firestore / Functions          Manager                  Org HQ
+    |                                 |                       |                       |
+    |-- 1. Request Petty Cash ------->|                       |                       |
+    |                                 |-- 2. FCM Push ------->|                       |
+    |                                 |-- 3. FCM Push ------------------------------->|
+    |                                 |                       |                       |-- 4. Approve & Top-up
+    |<-- 5. FCM Push (💵 Topup) ------|                       |                       |
+    |                                 |                       |                       |
+    |-- 6. Log Expense (Bal < 10%) -->|                       |                       |
+    |<-- 7. Alert (⚠️ Low Balance) ---|                       |                       |
+    |                                 |-- 8. Alert (⚠️ Low) ->|                       |
+
+12.3 Scheduled Cron Reminder Sequence
+--------------------------------------
 Client App                 Firestore (/scheduled_notif)     Cloud Functions Cron     Supervisor Device
     |                                   |                            |                      |
     |-- 1. scheduleDailyReminder ------>| (status: 'pending')        |                      |
@@ -544,27 +680,38 @@ Client App                 Firestore (/scheduled_notif)     Cloud Functions Cron
     |                                   |<-- 6. Reschedule (+24 hrs)-|                      |
     |                                   |   (status: 'pending')      |                      |
 
-10.3 Site Assignment & Profile Onboarding Sequence
----------------------------------------------------
-Manager                    Firestore / Functions          Supervisor
-    |                                 |                       |
-    |-- 1. Create Supervisor Profile >|                       |
-    |   (writes to /notifications)    |-- 2. FCM Push ------->|
-    |                                 |   (👷 Welcome)        |
-    |                                 |                       |
-    |-- 3. Assign to Site ST001 ----->|                       |
-    |   (notifySiteAssignment)        |-- 4. FCM Push ------->|
-    |                                 |   (📍 Site Assignment)|
-    |                                 |   (Deep Route to Site)|
+12.4 Cold-Start Push Notification Deep-Link Routing Flow
+---------------------------------------------------------
+[Device System Tray] 
+        | (User taps push banner while app is terminated)
+        v
+[Android / iOS OS Kernel Launches App Engine]
+        |
+        v
+[main.dart -> NotificationService.initialize()]
+        |
+        v
+[FirebaseMessaging.instance.getInitialMessage()]
+        |
+        v (Payload with requestType: 'material', 'payment', etc.)
+[WidgetsBinding.instance.addPostFrameCallback]
+        | (Ensures MaterialApp Navigator Context is Mounted)
+        v
+[NotificationRouter.navigate(context, payload)]
+        |
+        +---> Material Requisition -> ManagerMaterialApprovalScreen
+        +---> Payment Requisition  -> ManagerSitePaymentApprovalPage
+        +---> Tools Requisition    -> ManagerToolsApprovalScreen
+        +---> Petty Cash Topup     -> Supervisor/Manager/OrgPettyCashPage
+        +---> Site Assignment      -> SiteEntryPage
 
 ================================================================================
-11. VERIFICATION, EDGE CASES & PRODUCTION BEST PRACTICES
+13. VERIFICATION, RELIABILITY GUARANTEES & PRODUCTION BEST PRACTICES
 ================================================================================
 
 1. Missing FCM Server Key:
-   - If FCM Server Key is absent in Firestore at `organisation/{orgId}/data/fcmConfig`,
-     the system gracefully skips direct client HTTP push and relies on the serverless
-     Cloud Function `onNotificationCreated` backend trigger.
+   - If direct client HTTP push is unavailable, the system reliably falls back on the
+     backend Cloud Function `onNotificationCreated` Firestore trigger.
 
 2. App Running in Terminated / Killed State:
    - High-priority FCM payload with APNs `contentAvailable: true` and Android
@@ -583,6 +730,10 @@ Manager                    Firestore / Functions          Supervisor
 5. Zero Duplicate Execution on Cron:
    - Firestore transactions ensure idempotent execution of scheduled notifications across
      multiple Cloud Functions container instances.
+
+6. Self-Healing Token Lifecycle:
+   - Stale or uninstalled app tokens returning `messaging/registration-token-not-registered`
+     are immediately pruned from Firestore.
 
 ================================================================================
 END OF REPORT

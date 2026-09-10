@@ -388,12 +388,16 @@ class _OrgNotificationPageState extends State<OrgNotificationPage> {
                                     color: Color(0xFFEA580C),
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    requiredAction,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFFC2410C),
+                                  Flexible(
+                                    child: Text(
+                                      requiredAction,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFC2410C),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],

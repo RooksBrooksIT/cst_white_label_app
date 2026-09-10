@@ -441,7 +441,13 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
         double maxContentWidth = 480.0;
 
         return GlassScaffold(
-          onBack: () => Navigator.pop(context),
+          onBack: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/landing');
+            }
+          },
           body: Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),

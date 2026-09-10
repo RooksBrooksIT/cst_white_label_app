@@ -144,7 +144,7 @@ class AuthService {
             sanitizedData['UserName'] ??
             'User')
         .toString();
-    final roleStr = role.toString().split('.').last;
+    final roleStr = NotificationService.normalizeRole(role.toString().split('.').last);
 
     NotificationService.saveToken(
       userId: userId,
@@ -226,38 +226,23 @@ class AuthService {
     await _syncLegacyKeys(currentRole, currentData);
   }
 
-  /// Log out and clear all session data
+  /// Log out and clear all session data immediately
   Future<void> logout() async {
-    // Delete FCM token and unsubscribe from topics before clearing session
-    try {
-      final currentRole = userRole;
-      final uData = userData;
-      final userId = (uData['uid'] ??
-              uData['username'] ??
-              uData['UserName'] ??
-              uData['Supervisor ID'] ??
-              uData['supervisorId'] ??
-              '')
-          .toString();
-      final roleStr = currentRole.toString().split('.').last;
+    final currentRole = userRole;
+    final uData = userData;
+    final userId = (uData['uid'] ??
+            uData['username'] ??
+            uData['UserName'] ??
+            uData['Supervisor ID'] ??
+            uData['supervisorId'] ??
+            '')
+        .toString();
+    final roleStr = currentRole.toString().split('.').last;
 
-      if (userId.isNotEmpty) {
-        await NotificationService.deleteToken(
-          userId: userId,
-          userType: roleStr,
-        );
-      }
-    } catch (e) {
-      debugPrint('AuthService: Error pruning notification token on logout: $e');
-    }
-
-    // Clear our unified keys
+    // 1. Clear session and legacy keys IMMEDIATELY (instant < 2ms)
     await _prefs.remove(_isLoggedInKey);
     await _prefs.remove(_userRoleKey);
     await _prefs.remove(_userDataKey);
-
-    // Sign out from Firebase if needed
-    await _auth.signOut();
 
     // Clear all legacy keys to be safe
     final keys = _prefs.getKeys();
@@ -269,6 +254,20 @@ class AuthService {
         await _prefs.remove(key);
       }
     }
+
+    // 2. Perform network token pruning and Firebase sign-out in background without blocking UI
+    if (userId.isNotEmpty) {
+      NotificationService.deleteToken(
+        userId: userId,
+        userType: roleStr,
+      ).catchError((e) {
+        debugPrint('AuthService: Error pruning notification token on logout: $e');
+      });
+    }
+
+    _auth.signOut().catchError((e) {
+      debugPrint('AuthService: Firebase sign out note: $e');
+    });
   }
 
   /// Send a password reset email using Firebase Authentication

@@ -141,11 +141,19 @@ class _PortalLoadingScreenState extends State<PortalLoadingScreen>
       }
 
       final username = data['username']?.toString() ?? 'unknown';
+      final roleStr = NotificationService.normalizeRole(
+        actualRole.toString().split('.').last,
+      );
       NotificationService.saveToken(
         userId: username,
-        userType: actualRole.toString().split('.').last,
+        userType: roleStr,
         userName: username,
       ).catchError((_) {});
+      NotificationService.ensureRealtimeBridgeActive(
+        role: roleStr,
+        userName: username,
+        userId: username,
+      );
 
       if (actualRole == UserRole.organization) {
         auth.checkSubscriptionStatus().catchError((_) => true);
