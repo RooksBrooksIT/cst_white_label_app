@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -5,17 +6,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'firestore_service.dart';
-import '../screens/manager/manager_material_approval_screen.dart';
-import '../screens/manager/manager_tools_approval_screen.dart';
-import '../screens/manager/manager_site_payment_approval_page.dart';
-import '../screens/manager/manager_approval_screen.dart';
+import 'notification_router.dart';
 import 'auth_service.dart';
-import '../screens/supervisor/supervisor_petty_cash_page.dart';
-import '../screens/manager/manager_petty_cash_page.dart';
-import '../screens/organization/org_petty_cash_page.dart';
-import '../screens/organization/organization_expenses.dart';
-import '../screens/manager/manager_expenses.dart';
-import '../screens/supervisor/site_entry_page.dart';
 
 /// Handles background FCM messages when the app is terminated/background.
 @pragma('vm:entry-point')
@@ -33,6 +25,9 @@ class NotificationService {
   static const String _androidChannelDescription =
       'Important notifications that require immediate attention';
 
+  static StreamSubscription? _realtimeNotifSub;
+  static final DateTime _sessionStartTime = DateTime.now();
+
   /// Initializes flutter_local_notifications and creates the Android notification channel.
   /// This is required to show heads-up notifications when the app is in the foreground,
   /// and to ensure sound/vibration/icon work correctly on Android 8.0+.
@@ -40,9 +35,9 @@ class NotificationService {
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
     );
     const InitializationSettings initSettings = InitializationSettings(
       android: androidInit,
@@ -84,19 +79,27 @@ class NotificationService {
           enableLights: true,
         ),
       );
+      // Explicitly request Android 13+ runtime POST_NOTIFICATIONS permission
+      await androidPlugin.requestNotificationsPermission();
     }
   }
 
   static BuildContext? _lastContext;
-  static Map<String, dynamic>? _lastMessageData;
 
   /// Explicitly requests notification permission from the operating system.
   /// Uses Permission.notification for Android 13+ (POST_NOTIFICATIONS) runtime dialog
   /// and FirebaseMessaging for iOS/Android FCM notification settings.
   static Future<bool> requestNotificationPermission() async {
     try {
-      // Request notification permission via FirebaseMessaging
-      // This handles Android 13+ POST_NOTIFICATIONS and iOS prompts.
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+      if (androidPlugin != null) {
+        await androidPlugin.requestNotificationsPermission();
+      }
+
       final settings = await _messaging.requestPermission(
         alert: true,
         badge: true,
@@ -155,7 +158,6 @@ class NotificationService {
       final body = message.notification?.body ?? message.data['body'] ?? '';
       final ctx = navigatorKey.currentContext;
       _lastContext = ctx;
-      _lastMessageData = Map<String, dynamic>.from(message.data);
 
       // 1. Show Android system tray / iOS heads-up notification via flutter_local_notifications
       _showForegroundSystemNotification(
@@ -183,6 +185,21 @@ class NotificationService {
     _messaging.onTokenRefresh.listen((newToken) {
       _refreshCurrentToken(newToken);
     });
+  }
+
+  /// Public interface to show a system notification in the mobile's notification tray.
+  static Future<void> showSystemTrayNotification({
+    required String title,
+    required String body,
+    int? id,
+    Map<String, dynamic>? data,
+  }) async {
+    await _showForegroundSystemNotification(
+      id: id ?? DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title: title,
+      body: body,
+      data: data,
+    );
   }
 
   /// Displays an actual Android system tray / iOS heads-up notification when the
@@ -232,8 +249,128 @@ class NotificationService {
       );
     } catch (e) {
       debugPrint(
-        'NotificationService: Failed to show foreground local notification: $e',
+        'NotificationService: Failed to show system tray notification: $e',
       );
+    }
+  }
+
+  /// Starts the real-time live notification bridge for the current user/role session.
+  /// Guarantees that any new notification document created in Firestore triggers
+  /// an immediate heads-up push in the device's system notification tray.
+  static void startRealtimeNotificationBridge({
+    required String role,
+    String? userName,
+    String? userId,
+  }) {
+    _realtimeNotifSub?.cancel();
+    final orgId = FirestoreService.currentOrgId;
+    if (orgId.isEmpty || orgId == 'uninitialized') return;
+
+    try {
+      final collection = FirestoreService.getCollection('notifications');
+      _realtimeNotifSub = collection
+          .where('createdAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(_sessionStartTime))
+          .snapshots()
+          .listen((snapshot) {
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final data = change.doc.data();
+            if (data == null) continue;
+
+            final senderName =
+                (data['senderName'] ?? '').toString().toLowerCase().trim();
+            final currentUserName = (userName ?? '').toLowerCase().trim();
+
+            // Do not alert sender of their own actions
+            if (currentUserName.isNotEmpty && senderName == currentUserName) {
+              continue;
+            }
+
+            final targetRole =
+                (data['targetRole'] ?? '').toString().toLowerCase().trim();
+            final targetRoles = (data['targetRoles'] as List?)
+                    ?.map((e) => e.toString().toLowerCase().trim())
+                    .toList() ??
+                [];
+            final forSupervisorName = (data['forSupervisorName'] ?? '')
+                .toString()
+                .toLowerCase()
+                .trim();
+            final forManagerName =
+                (data['forManagerName'] ?? '').toString().toLowerCase().trim();
+            final recipientId =
+                (data['recipientId'] ?? '').toString().toLowerCase().trim();
+            final currentRole = role.toLowerCase().trim();
+            final currentUserId = (userId ?? '').toLowerCase().trim();
+
+            bool isRecipient = false;
+
+            if (recipientId == 'all' ||
+                (currentUserId.isNotEmpty && recipientId == currentUserId)) {
+              isRecipient = true;
+            } else if (targetRoles.contains('all') || targetRole == 'all') {
+              isRecipient = true;
+            } else if (currentRole == 'organisation' ||
+                currentRole == 'config') {
+              isRecipient = targetRole == 'organisation' ||
+                  targetRole == 'manager_and_organisation' ||
+                  targetRoles.contains('organisation');
+            } else if (currentRole == 'manager') {
+              isRecipient = targetRole == 'manager' ||
+                  targetRole == 'manager_and_organisation' ||
+                  targetRoles.contains('manager');
+              if (forManagerName.isNotEmpty &&
+                  currentUserName.isNotEmpty &&
+                  forManagerName != currentUserName) {
+                isRecipient = false;
+              }
+            } else if (currentRole == 'supervisor') {
+              isRecipient = targetRole == 'supervisor' ||
+                  targetRoles.contains('supervisor');
+              if (forSupervisorName.isNotEmpty &&
+                  currentUserName.isNotEmpty &&
+                  forSupervisorName != currentUserName) {
+                isRecipient = false;
+              }
+            }
+
+            if (isRecipient) {
+              final title = data['title']?.toString() ?? 'New Notification';
+              final body = data['body']?.toString() ??
+                  data['message']?.toString() ??
+                  '';
+              final docId = change.doc.id;
+
+              _showForegroundSystemNotification(
+                id: docId.hashCode.remainder(100000),
+                title: title,
+                body: body,
+                data: Map<String, dynamic>.from(
+                    data['data'] is Map ? data['data'] : data),
+              );
+
+              final ctx = _lastContext;
+              if (ctx != null && ctx.mounted) {
+                _showInAppBanner(
+                    ctx,
+                    title,
+                    body,
+                    Map<String, dynamic>.from(
+                        data['data'] is Map ? data['data'] : data));
+              }
+            }
+          }
+        }
+      }, onError: (e) {
+        debugPrint('NotificationService: Realtime bridge stream error: $e');
+      });
+
+      debugPrint(
+          'NotificationService: Real-time notification tray bridge active for $role ($userName)');
+    } catch (e) {
+      debugPrint(
+          'NotificationService: Failed to initialize realtime bridge: $e');
     }
   }
 
@@ -318,98 +455,16 @@ class NotificationService {
   /// Navigates directly to the relevant approval/request screen based on notification payload.
   static void navigateToTarget(
     BuildContext context,
-    Map<String, dynamic> data,
+    dynamic data,
   ) {
-    final type = (data['requestType'] ?? data['type'] ?? '')
-        .toString()
-        .toLowerCase();
-
-    if (type.contains('material')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const ManagerMaterialApprovalScreen(),
-        ),
-      );
-    } else if (type.contains('tool')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ManagerToolsApprovalScreen()),
-      );
-    } else if (type.contains('payment')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const ManagerSitePaymentApprovalPage(),
-        ),
-      );
-    } else if (type.contains('workforce') ||
-        type.contains('worker') ||
-        type.contains('schedule')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ManagerApprovalScreen()),
-      );
-    } else if (type.contains('petty_cash') || type.contains('petty')) {
-      final role = AuthService().userRole;
-      final ud = AuthService().userData;
-      if (role == UserRole.supervisor) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SupervisorPettyCashPage(
-              supervisorId: (ud['supervisorId'] ?? '').toString(),
-              supervisorName: (ud['supervisorName'] ?? 'Supervisor').toString(),
-            ),
-          ),
-        );
-      } else if (role == UserRole.organization) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const OrgPettyCashPage()),
-        );
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ManagerPettyCashPage()),
-        );
-      }
-    } else if (type.contains('org_expense') ||
-        type.contains('organization_expense')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const OrganizationExpenses()),
-      );
-    } else if (type.contains('manager_expense')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ManagerExpenses()),
-      );
-    } else if (type.contains('site_assignment') ||
-        type.contains('supervisor_entry')) {
-      final ud = AuthService().userData;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => SiteEntryPage(
-            userName:
-                (ud['FullName'] ??
-                        ud['fullName'] ??
-                        ud['username'] ??
-                        'Supervisor')
-                    .toString(),
-            userDetails: ud,
-          ),
-        ),
-      );
-    }
+    NotificationRouter.navigate(context, data);
   }
 
   // ---------------------------------------------------------------------------
   // TOKEN MANAGEMENT
   // ---------------------------------------------------------------------------
 
-  /// Save this device's FCM token to Firestore under `fcmTokens/{userId}`.
+  /// Save this device's FCM token to Firestore under `fcmTokens/{userId}` and root `fcmTokens`.
   static Future<void> saveToken({
     required String userId,
     required String
@@ -421,45 +476,120 @@ class NotificationService {
       if (token == null || token.isEmpty) return;
 
       final orgId = FirestoreService.currentOrgId;
+      final cleanUserId = userId.trim();
+      final cleanUserType = userType.trim().toLowerCase();
+      final cleanUserName = userName.trim();
+      final cleanOrgId = orgId.trim();
+
       final tokenData = {
         'token': token,
-        'userId': userId,
-        'userType': userType,
-        'userName': userName,
-        'orgId': orgId,
+        'userId': cleanUserId,
+        'userType': cleanUserType,
+        'userName': cleanUserName,
+        'orgId': cleanOrgId,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
       // 1. Save in organization-scoped fcmTokens collection
-      await FirestoreService.getCollection(
-        'fcmTokens',
-      ).doc(userId).set(tokenData, SetOptions(merge: true));
+      if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
+        await FirestoreService.getCollection(
+          'fcmTokens',
+        ).doc(cleanUserId).set(tokenData, SetOptions(merge: true));
+      }
 
       // 2. Also save in root fcmTokens for instant global Cloud Function lookup
-      if (orgId.isNotEmpty && orgId != 'uninitialized') {
+      if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
         await FirebaseFirestore.instance
             .collection('fcmTokens')
-            .doc('${orgId}_$userId')
+            .doc('${cleanOrgId}_$cleanUserId')
             .set(tokenData, SetOptions(merge: true));
       } else {
         await FirebaseFirestore.instance
             .collection('fcmTokens')
-            .doc(userId)
+            .doc(cleanUserId)
             .set(tokenData, SetOptions(merge: true));
       }
 
       // 3. Subscribe to org and role topics for broadcast push delivery
-      if (orgId.isNotEmpty && orgId != 'uninitialized') {
-        final cleanOrgId = orgId.replaceAll(RegExp(r'\W'), '_');
-        await _messaging.subscribeToTopic('org_$cleanOrgId');
-        await _messaging.subscribeToTopic('org_${cleanOrgId}_$userType');
+      if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
+        final sanitizedOrgId = cleanOrgId.replaceAll(RegExp(r'\W'), '_');
+        await _messaging.subscribeToTopic('org_$sanitizedOrgId');
+        await _messaging.subscribeToTopic('org_${sanitizedOrgId}_$cleanUserType');
+        if (cleanUserType == 'config') {
+          await _messaging.subscribeToTopic('org_${sanitizedOrgId}_organisation');
+          await _messaging.subscribeToTopic('org_${sanitizedOrgId}_manager');
+        }
       }
 
+      // 4. Activate the realtime notification tray bridge
+      startRealtimeNotificationBridge(
+        role: cleanUserType,
+        userName: cleanUserName,
+        userId: cleanUserId,
+      );
+
       debugPrint(
-        'NotificationService: Token & topic subscriptions saved for $userName ($userType)',
+        'NotificationService: Token, topics & notification tray bridge saved for $cleanUserName ($cleanUserType)',
       );
     } catch (e) {
       debugPrint('NotificationService: Failed to save token/topics: $e');
+    }
+  }
+
+  /// Removes this device's FCM token document and unsubscribes from topics on logout.
+  static Future<void> deleteToken({
+    required String userId,
+    required String userType,
+  }) async {
+    try {
+      _realtimeNotifSub?.cancel();
+      final orgId = FirestoreService.currentOrgId;
+      final cleanUserId = userId.trim();
+      final cleanUserType = userType.trim().toLowerCase();
+      final cleanOrgId = orgId.trim();
+
+      if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
+        final sanitizedOrgId = cleanOrgId.replaceAll(RegExp(r'\W'), '_');
+        await _messaging
+            .unsubscribeFromTopic('org_$sanitizedOrgId')
+            .catchError((_) {});
+        await _messaging
+            .unsubscribeFromTopic('org_${sanitizedOrgId}_$cleanUserType')
+            .catchError((_) {});
+        if (cleanUserType == 'config') {
+          await _messaging
+              .unsubscribeFromTopic('org_${sanitizedOrgId}_organisation')
+              .catchError((_) {});
+          await _messaging
+              .unsubscribeFromTopic('org_${sanitizedOrgId}_manager')
+              .catchError((_) {});
+        }
+
+        // Delete from org subcollection
+        await FirestoreService.getCollection('fcmTokens')
+            .doc(cleanUserId)
+            .delete()
+            .catchError((_) {});
+
+        // Delete from global root collection
+        await FirebaseFirestore.instance
+            .collection('fcmTokens')
+            .doc('${cleanOrgId}_$cleanUserId')
+            .delete()
+            .catchError((_) {});
+      } else {
+        await FirebaseFirestore.instance
+            .collection('fcmTokens')
+            .doc(cleanUserId)
+            .delete()
+            .catchError((_) {});
+      }
+
+      debugPrint(
+        'NotificationService: Successfully pruned FCM token for user $cleanUserId',
+      );
+    } catch (e) {
+      debugPrint('NotificationService: Error deleting token: $e');
     }
   }
 
@@ -474,9 +604,11 @@ class NotificationService {
     required String
     targetRole, // 'manager', 'organisation', 'supervisor', 'manager_and_organisation'
     List<String>? targetRoles,
+    String? recipientId,
     String? forSupervisorName,
     String? forSupervisorId,
     String? forManagerName,
+    String? forManagerId,
     String? forOrgId,
     String?
     requestType, // 'material', 'tools', 'payment', 'workforce', 'site_assignment', 'petty_cash', 'site_management'
@@ -493,44 +625,77 @@ class NotificationService {
   }) async {
     try {
       final orgId = forOrgId ?? FirestoreService.currentOrgId;
+      final notifId = docId ?? requestId ?? 'notif_${DateTime.now().millisecondsSinceEpoch}';
+      final effectiveType = requestType ?? 'general';
+
       final payload = {
         'app_id': FirestoreService.cstAppId,
+        'notificationId': notifId,
+        'id': notifId,
         'title': title,
         'body': body,
+        'message': body,
+        'type': effectiveType,
+        'requestType': effectiveType,
         'targetRole': targetRole,
+        'recipientRole': targetRole,
         'targetRoles':
             targetRoles ??
             (targetRole == 'manager_and_organisation'
                 ? ['manager', 'organisation']
                 : [targetRole]),
+        'recipientId': recipientId ?? forSupervisorId ?? forManagerId ?? 'all',
         'forSupervisorName': forSupervisorName,
         'forSupervisorId': forSupervisorId,
         'forManagerName': forManagerName,
         'forOrgId': orgId,
         'orgId': orgId,
-        'requestType': requestType ?? 'general',
-        'requestId': requestId ?? docId ?? '',
-        'docId': docId ?? requestId ?? '',
+        'tenantId': orgId,
+        'requestId': requestId ?? docId ?? notifId,
+        'docId': docId ?? requestId ?? notifId,
         'siteId': siteId ?? '',
         'siteName': siteName ?? siteId ?? '',
         'status': status ?? '',
         'senderRole': senderRole ?? '',
         'senderName': senderName ?? '',
+        'senderId': senderName ?? '',
         'remarks': remarks ?? '',
         'requiredAction': requiredAction ?? '',
+        'priority': 'high',
+        'actionRoute': '/$effectiveType',
         'isRead': false,
+        'readAt': null,
         'createdAt': FieldValue.serverTimestamp(),
-        'data': {
-          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-          'requestType': requestType ?? 'general',
-          'requestId': requestId ?? docId ?? '',
-          'docId': docId ?? requestId ?? '',
+        'actionData': {
+          'notificationId': notifId,
+          'requestType': effectiveType,
+          'requestId': requestId ?? docId ?? notifId,
+          'docId': docId ?? requestId ?? notifId,
           'siteId': siteId ?? '',
           'siteName': siteName ?? siteId ?? '',
           'status': status ?? '',
           'requiredAction': requiredAction ?? '',
           'title': title,
           'body': body,
+          'orgId': orgId,
+          if (extraData != null) ...extraData,
+        },
+        'data': {
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+          'notificationId': notifId,
+          'actionRoute': '/$effectiveType',
+          'type': effectiveType,
+          'requestType': effectiveType,
+          'requestId': requestId ?? docId ?? notifId,
+          'docId': docId ?? requestId ?? notifId,
+          'siteId': siteId ?? '',
+          'siteName': siteName ?? siteId ?? '',
+          'status': status ?? '',
+          'requiredAction': requiredAction ?? '',
+          'title': title,
+          'body': body,
+          'orgId': orgId,
+          'tenantId': orgId,
           if (extraData != null) ...extraData,
         },
       };
@@ -1153,58 +1318,26 @@ class NotificationService {
   }) async {
     try {
       final orgId = FirestoreService.currentOrgId;
-      final configSnap = await FirebaseFirestore.instance
-          .doc('organisation/$orgId/data/fcmConfig')
-          .get();
-      final serverKey = configSnap.data()?['serverKey']?.toString();
-      if (serverKey == null || serverKey.isEmpty) {
-        debugPrint(
-          'NotificationService: FCM server key not set. '
-          'Add it to Firestore at organisation/$orgId/data/fcmConfig → serverKey',
-        );
-        return;
-      }
-
       final payload = {
-        'to': token,
-        'priority': 'high',
-        'content_available': true,
-        'notification': {
-          'title': title,
-          'body': body,
-          'sound': 'default',
-          'android_channel_id': 'cst_high_importance_channel',
-          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-        },
-        'android': {
-          'priority': 'high',
-          'notification': {
-            'channel_id': 'cst_high_importance_channel',
-            'sound': 'default',
-            'default_sound': true,
-            'default_vibrate_timings': true,
-            'priority': 'high',
-            'visibility': 'public',
-          },
-        },
-        'data': {
-          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-          'title': title,
-          'body': body,
-          if (data != null) ...data,
-        },
+        'token': token,
+        'title': title,
+        'body': body,
+        'orgId': orgId,
+        'data': data ?? {},
       };
 
+      // Call Cloud Function to dispatch push via Firebase Admin SDK
       await http.post(
-        Uri.parse('https://fcm.googleapis.com/fcm/send'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'key=$serverKey',
-        },
-        body: jsonEncode(payload),
+        Uri.parse(
+          'https://us-central1-cst-whitelabel-app.cloudfunctions.net/sendPushNotification',
+        ),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'data': payload}),
       );
     } catch (e) {
-      debugPrint('NotificationService: FCM send failed: $e');
+      debugPrint(
+        'NotificationService: Cloud Function FCM bridge call error: $e',
+      );
     }
   }
 

@@ -228,6 +228,29 @@ class AuthService {
 
   /// Log out and clear all session data
   Future<void> logout() async {
+    // Delete FCM token and unsubscribe from topics before clearing session
+    try {
+      final currentRole = userRole;
+      final uData = userData;
+      final userId = (uData['uid'] ??
+              uData['username'] ??
+              uData['UserName'] ??
+              uData['Supervisor ID'] ??
+              uData['supervisorId'] ??
+              '')
+          .toString();
+      final roleStr = currentRole.toString().split('.').last;
+
+      if (userId.isNotEmpty) {
+        await NotificationService.deleteToken(
+          userId: userId,
+          userType: roleStr,
+        );
+      }
+    } catch (e) {
+      debugPrint('AuthService: Error pruning notification token on logout: $e');
+    }
+
     // Clear our unified keys
     await _prefs.remove(_isLoggedInKey);
     await _prefs.remove(_userRoleKey);

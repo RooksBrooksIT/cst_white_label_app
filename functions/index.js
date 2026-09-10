@@ -820,245 +820,329 @@ exports.sendNewSubscriptionInvoice = functions.region("us-central1").https.onCal
 async function processNotificationAndSendPush(notificationData, docRef) {
   try {
     const {
-      title,
-      body,
-      targetRole, // 'supervisor', 'manager', 'organisation', 'all'
-      forSupervisorName,
-      forSupervisorId,
-      forManagerName,
-      forOrgId,
-      orgId: directOrgId,
-      requestType,
-      requestId,
-      docId,
-      siteId,
-      siteName,
-      status,
+      title = "New Notification",
+      body = "",
+      targetRole = "all",
+      targetRoles: rawTargetRoles,
+      forSupervisorName = "",
+      forSupervisorId = "",
+      forManagerName = "",
+      forManagerId = "",
+      userId: directUserId = "",
+      forUserId = "",
+      forOrgId = "",
+      orgId: directOrgId = "",
+      requestType = "general",
+      requestId = "",
+      docId = "",
+      siteId = "",
+      siteName = "",
+      status = "",
+      senderName = "",
+      senderRole = "",
+      senderId = "",
       data: customData = {},
     } = notificationData || {};
 
-    if (!title || !body) {
-      logger.warn("Notification skipped: Missing title or body", notificationData);
+    if (!title && !body) {
+      logger.warn("Notification skipped: Missing title and body", notificationData);
       return;
     }
 
-    const orgId = forOrgId || directOrgId || "";
+    const orgId = (forOrgId || directOrgId || "").trim();
     const db = admin.firestore();
     const tokens = new Set();
     const tokenDocRefs = [];
 
-    // 1. Search in /organisation/{orgId}/fcmTokens if orgId is present
+    // Parse target roles into normalized lowercase set
+    let targetRoles = [];
+    if (Array.isArray(rawTargetRoles) && rawTargetRoles.length > 0) {
+      targetRoles = rawTargetRoles.map((r) => String(r).toLowerCase().trim());
+    } else if (targetRole) {
+      const tr = String(targetRole).toLowerCase().trim();
+      if (tr === "manager_and_organisation") {
+        targetRoles = ["manager", "organisation", "config"];
+      } else {
+        targetRoles = [tr];
+      }
+    } else {
+      targetRoles = ["all"];
+    }
+
+    const cleanSenderName = (senderName || "").trim().toLowerCase();
+    const cleanSenderId = (senderId || "").trim().toLowerCase();
+    const targetUserIds = [directUserId, forUserId, forSupervisorId, forManagerId]
+      .filter(Boolean)
+      .map((s) => String(s).trim().toLowerCase());
+
+    const evaluateTokenDoc = (doc) => {
+      const d = doc.data() || {};
+      const t = (d.token || "").trim();
+      if (!t) return;
+
+      const uType = (d.userType || "").toLowerCase().trim();
+      const uName = (d.userName || "").toLowerCase().trim();
+      const uId = (d.userId || doc.id || "").toLowerCase().trim();
+
+      // Avoid self-notifications
+      if (cleanSenderName && uName === cleanSenderName) return;
+      if (cleanSenderId && (uId === cleanSenderId || doc.id.toLowerCase() === cleanSenderId)) return;
+
+      // 1. Direct user ID match
+      if (targetUserIds.length > 0 && (targetUserIds.includes(uId) || targetUserIds.includes(doc.id.toLowerCase()))) {
+        tokens.add(t);
+        tokenDocRefs.push(doc.ref);
+        return;
+      }
+
+      // 2. Role matching
+      const isRoleMatch = targetRoles.includes("all") ||
+        targetRoles.includes(uType) ||
+        (uType === "config" && (targetRoles.includes("organisation") || targetRoles.includes("manager"))) ||
+        (uType === "manager" && targetRoles.includes("config"));
+
+      // 3. Specific supervisor or manager name matching if specified
+      let isUserMatch = true;
+      if (forSupervisorName && (uType === "supervisor" || targetRoles.includes("supervisor"))) {
+        const targetSup = forSupervisorName.toLowerCase().trim();
+        isUserMatch = uName === targetSup || uName.includes(targetSup) || targetSup.includes(uName);
+      } else if (forManagerName && (uType === "manager" || targetRoles.includes("manager"))) {
+        const targetMgr = forManagerName.toLowerCase().trim();
+        isUserMatch = uName === targetMgr || uName.includes(targetMgr) || targetMgr.includes(uName);
+      }
+
+      if (isRoleMatch && isUserMatch) {
+        tokens.add(t);
+        tokenDocRefs.push(doc.ref);
+      }
+    };
+
+    // 1. Search in /organisation/{orgId}/fcmTokens
     if (orgId && orgId !== "uninitialized") {
       try {
-        let q = db.collection("organisation").doc(orgId).collection("fcmTokens");
-
-        if (targetRole === "supervisor") {
-          q = q.where("userType", "==", "supervisor");
-        } else if (targetRole === "manager") {
-          q = q.where("userType", "==", "manager");
-        } else if (targetRole === "organisation") {
-          q = q.where("userType", "in", ["organisation", "config"]);
-        } else if (targetRole === "manager_and_organisation") {
-          q = q.where("userType", "in", ["manager", "organisation", "config"]);
-        } else if (targetRole === "all") {
-          // No userType filter — delivers to every active user in the org
-        } else {
-          q = q.where("userType", "in", ["manager", "organisation", "config", "supervisor"]);
-        }
-
-        const orgSnap = await q.get();
-        for (const doc of orgSnap.docs) {
-          const d = doc.data();
-          const t = d.token;
-          const uName = (d.userName || "").trim();
-          const uId = (d.userId || doc.id).trim();
-
-          let match = true;
-          if (targetRole === "supervisor") {
-            const reqSupName = (forSupervisorName || "").trim();
-            const reqSupId = (forSupervisorId || "").trim();
-            if (reqSupName || reqSupId) {
-              match = (reqSupName && (uName === reqSupName || uId === reqSupName)) ||
-                      (reqSupId && (uId === reqSupId || uName === reqSupId));
-            }
-          } else if ((targetRole === "manager" || targetRole === "manager_and_organisation") && forManagerName) {
-            const reqMgrName = (forManagerName || "").trim();
-            if (reqMgrName) {
-              match = (uName === reqMgrName || uId === reqMgrName);
-            }
-          }
-
-          if (t && match) {
-            tokens.add(t);
-            tokenDocRefs.push(doc.ref);
-          }
-        }
+        const orgSnap = await db.collection("organisation").doc(orgId).collection("fcmTokens").get();
+        orgSnap.forEach(evaluateTokenDoc);
       } catch (e) {
         logger.warn(`Error querying org fcmTokens for ${orgId}:`, e.message);
       }
     }
 
-    // 2. Search in global fcmTokens if no tokens found yet or for broad delivery
-    if (tokens.size === 0) {
-      try {
-        let globalQuery = db.collection("fcmTokens");
-        if (targetRole === "supervisor") {
-          globalQuery = globalQuery.where("userType", "==", "supervisor");
-        } else if (targetRole === "manager") {
-          globalQuery = globalQuery.where("userType", "==", "manager");
-        } else if (targetRole === "organisation") {
-          globalQuery = globalQuery.where("userType", "in", ["organisation", "config"]);
-        } else if (targetRole === "manager_and_organisation") {
-          globalQuery = globalQuery.where("userType", "in", ["manager", "organisation", "config"]);
-        } else if (targetRole === "all") {
-          // No userType filter — global broadcast to every user
-        } else {
-          globalQuery = globalQuery.where("userType", "in", ["manager", "organisation", "config", "supervisor"]);
-        }
-
-        const globalSnap = await globalQuery.get();
-        for (const doc of globalSnap.docs) {
-          const d = doc.data();
-          const t = d.token;
-          const uName = (d.userName || "").trim();
-          const uId = (d.userId || doc.id).trim();
-
-          let match = true;
-          if (targetRole === "supervisor") {
-            const reqSupName = (forSupervisorName || "").trim();
-            const reqSupId = (forSupervisorId || "").trim();
-            if (reqSupName || reqSupId) {
-              match = (reqSupName && (uName === reqSupName || uId === reqSupName)) ||
-                      (reqSupId && (uId === reqSupId || uName === reqSupId));
-            }
-          } else if ((targetRole === "manager" || targetRole === "manager_and_organisation") && forManagerName) {
-            const reqMgrName = (forManagerName || "").trim();
-            if (reqMgrName) {
-              match = (uName === reqMgrName || uId === reqMgrName);
-            }
-          }
-
-          if (t && match) {
-            tokens.add(t);
-            tokenDocRefs.push(doc.ref);
-          }
-        }
-      } catch (e) {
-        logger.warn("Error querying global fcmTokens:", e.message);
+    // 2. Search in global /fcmTokens
+    try {
+      let globalQuery = db.collection("fcmTokens");
+      if (orgId && orgId !== "uninitialized") {
+        globalQuery = globalQuery.where("orgId", "==", orgId);
       }
+      const globalSnap = await globalQuery.get();
+      globalSnap.forEach(evaluateTokenDoc);
+    } catch (e) {
+      logger.warn("Error querying global fcmTokens:", e.message);
+    }
+
+    // Fallback search in entire global collection if still 0 tokens and orgId was specified
+    if (tokens.size === 0 && orgId) {
+      try {
+        const allSnap = await db.collection("fcmTokens").limit(100).get();
+        allSnap.forEach(evaluateTokenDoc);
+      } catch (_) {}
     }
 
     const tokenList = Array.from(tokens);
-    logger.info(`Found ${tokenList.length} FCM token(s) for notification "${title}" (Role: ${targetRole})`);
+    logger.info(`Resolved ${tokenList.length} direct FCM token(s) for "${title}" -> Target: ${targetRoles.join(",")} (Org: ${orgId})`);
 
-    if (tokenList.length === 0) {
-      if (docRef) {
-        await docRef.update({
-          pushDelivered: false,
-          deliveryNote: "No active FCM tokens found for target recipient",
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }).catch(() => {});
-      }
-      return;
-    }
-
-    // Prepare sanitize data payload (all values must be strings for FCM data payload)
+    // Prepare string data payload (FCM requirement)
+    const effectiveDocId = String(notificationData.notificationId || requestId || docId || Date.now());
+    const effectiveType = String(requestType || notificationData.type || "general");
+    const effectiveRoute = String(notificationData.actionRoute || `/${effectiveType}`);
     const stringData = {
       click_action: "FLUTTER_NOTIFICATION_CLICK",
-      id: String(requestId || docId || Date.now()),
+      notificationId: effectiveDocId,
+      id: effectiveDocId,
       title: String(title),
       body: String(body),
-      targetRole: String(targetRole || ""),
-      requestType: String(requestType || ""),
-      requestId: String(requestId || ""),
-      docId: String(docId || ""),
+      message: String(body),
+      type: effectiveType,
+      requestType: effectiveType,
+      actionRoute: effectiveRoute,
+      targetRole: String(targetRoles[0] || targetRole || ""),
+      recipientRole: String(targetRoles[0] || targetRole || ""),
+      recipientId: String(notificationData.recipientId || directUserId || forSupervisorId || forManagerId || "all"),
+      requestId: String(requestId || docId || effectiveDocId),
+      docId: String(docId || requestId || effectiveDocId),
       siteId: String(siteId || ""),
       siteName: String(siteName || ""),
       status: String(status || ""),
+      priority: String(notificationData.priority || "high"),
       orgId: String(orgId || ""),
+      tenantId: String(orgId || ""),
+      senderName: String(senderName || ""),
+      senderRole: String(senderRole || ""),
     };
 
-    if (customData && typeof customData === "object") {
-      for (const [k, v] of Object.entries(customData)) {
+    if (notificationData.actionData && typeof notificationData.actionData === "object") {
+      for (const [k, v] of Object.entries(notificationData.actionData)) {
         if (v !== undefined && v !== null) {
           stringData[k] = typeof v === "string" ? v : JSON.stringify(v);
         }
       }
     }
 
-    // Build the high-priority Multicast message for instant background delivery
-    const message = {
-      tokens: tokenList,
-      notification: {
-        title: title,
-        body: body,
-      },
-      data: stringData,
-      android: {
-        priority: "high",
-        ttl: 86400 * 1000, // 24 hours
+    if (customData && typeof customData === "object") {
+      for (const [k, v] of Object.entries(customData)) {
+        if (v !== undefined && v !== null && stringData[k] === undefined) {
+          stringData[k] = typeof v === "string" ? v : JSON.stringify(v);
+        }
+      }
+    }
+
+    // 3. Dispatch to Direct Device Tokens if available
+    let successCount = 0;
+    let failureCount = 0;
+
+    if (tokenList.length > 0) {
+      const message = {
+        tokens: tokenList,
         notification: {
-          channelId: "cst_high_importance_channel",
-          sound: "default",
-          defaultSound: true,
-          defaultVibrateTimings: true,
+          title: title,
+          body: body,
+        },
+        data: stringData,
+        android: {
           priority: "high",
-          visibility: "public",
-          notificationCount: 1,
-        },
-      },
-      apns: {
-        headers: {
-          "apns-priority": "10",
-        },
-        payload: {
-          aps: {
-            alert: {
-              title: title,
-              body: body,
-            },
+          ttl: 86400 * 1000, // 24 hours
+          notification: {
+            channelId: "cst_high_importance_channel",
             sound: "default",
-            badge: 1,
-            contentAvailable: true,
+            defaultSound: true,
+            defaultVibrateTimings: true,
+            priority: "high",
+            visibility: "public",
+            notificationCount: 1,
           },
         },
-      },
-    };
+        apns: {
+          headers: {
+            "apns-priority": "10",
+          },
+          payload: {
+            aps: {
+              alert: {
+                title: title,
+                body: body,
+              },
+              sound: "default",
+              badge: 1,
+              contentAvailable: true,
+            },
+          },
+        },
+      };
 
-    const response = await admin.messaging().sendEachForMulticast(message);
-    logger.info(`FCM Multicast result: ${response.successCount} succeeded, ${response.failureCount} failed`);
+      const response = await admin.messaging().sendEachForMulticast(message);
+      successCount = response.successCount;
+      failureCount = response.failureCount;
+      logger.info(`FCM Multicast delivery result for "${title}": Success ${successCount}, Failure ${failureCount}`);
 
-    // Clean up stale / invalid registration tokens automatically
-    if (response.failureCount > 0) {
-      const tokensToDelete = [];
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success && resp.error) {
-          const code = resp.error.code;
-          if (
-            code === "messaging/invalid-registration-token" ||
-            code === "messaging/registration-token-not-registered"
-          ) {
-            tokensToDelete.push(tokenDocRefs[idx]);
+      // Auto-prune dead/invalid registration tokens
+      if (failureCount > 0) {
+        const tokensToDelete = [];
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success && resp.error) {
+            const code = resp.error.code;
+            if (
+              code === "messaging/invalid-registration-token" ||
+              code === "messaging/registration-token-not-registered"
+            ) {
+              tokensToDelete.push(tokenDocRefs[idx]);
+            }
           }
+        });
+
+        if (tokensToDelete.length > 0) {
+          logger.info(`Pruning ${tokensToDelete.length} stale/expired FCM token documents.`);
+          await Promise.all(tokensToDelete.map((ref) => (ref ? ref.delete().catch(() => {}) : Promise.resolve())));
+        }
+      }
+    }
+
+    // 4. Topic Broadcast Fallback (if direct tokens were 0 or failed)
+    if (successCount === 0 && orgId && orgId !== "uninitialized") {
+      const cleanOrgId = orgId.replace(/[^\w]/g, "_");
+      const topicTargets = new Set();
+
+      if (targetRoles.includes("all") || targetRoles.includes("manager_and_organisation")) {
+        topicTargets.add(`org_${cleanOrgId}`);
+      }
+      targetRoles.forEach((role) => {
+        if (role !== "all") {
+          topicTargets.add(`org_${cleanOrgId}_${role}`);
         }
       });
+      if (topicTargets.size === 0) {
+        topicTargets.add(`org_${cleanOrgId}`);
+      }
 
-      if (tokensToDelete.length > 0) {
-        logger.info(`Cleaning up ${tokensToDelete.length} invalid/expired FCM tokens.`);
-        await Promise.all(tokensToDelete.map((ref) => (ref ? ref.delete().catch(() => {}) : Promise.resolve())));
+      for (const topic of topicTargets) {
+        const topicMessage = {
+          topic,
+          notification: {
+            title: title,
+            body: body,
+          },
+          data: stringData,
+          android: {
+            priority: "high",
+            ttl: 86400 * 1000,
+            notification: {
+              channelId: "cst_high_importance_channel",
+              sound: "default",
+              defaultSound: true,
+              defaultVibrateTimings: true,
+              priority: "high",
+              visibility: "public",
+            },
+          },
+          apns: {
+            headers: {
+              "apns-priority": "10",
+            },
+            payload: {
+              aps: {
+                alert: {
+                  title: title,
+                  body: body,
+                },
+                sound: "default",
+                badge: 1,
+                contentAvailable: true,
+              },
+            },
+          },
+        };
+
+        try {
+          const res = await admin.messaging().send(topicMessage);
+          logger.info(`FCM Topic push broadcast delivered to topic "${topic}": ${res}`);
+          successCount++;
+        } catch (topicErr) {
+          logger.warn(`Failed sending FCM topic broadcast to "${topic}":`, topicErr.message || topicErr);
+        }
       }
     }
 
     if (docRef) {
       await docRef.update({
-        pushDelivered: response.successCount > 0,
-        successCount: response.successCount,
-        failureCount: response.failureCount,
+        pushDelivered: successCount > 0,
+        successCount: successCount,
+        failureCount: failureCount,
         deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
       }).catch(() => {});
     }
+
+    return { successCount, failureCount };
   } catch (err) {
     logger.error("processNotificationAndSendPush error:", err);
+    return null;
   }
 }
 
@@ -1091,8 +1175,8 @@ exports.onOrgNotificationCreated = functions.region("us-central1").firestore
 exports.sendPushNotification = functions.region("us-central1").https.onCall(async (data, context) => {
   try {
     const payload = data || {};
-    await processNotificationAndSendPush(payload, null);
-    return { success: true };
+    const result = await processNotificationAndSendPush(payload, null);
+    return { success: true, ...result };
   } catch (err) {
     logger.error("sendPushNotification error:", err);
     throw new HttpsError("internal", err.message || "Failed to dispatch push notification");
@@ -1435,151 +1519,5 @@ exports.triggerSubscriptionExpiryCheck = functions.region("us-central1").https.o
   }
 });
 
-/**
- * 11. Firestore Document onCreate Trigger: sendFcmPushNotification
- * Triggered automatically when a new notification document is created in:
- * - root `/notifications/{docId}`
- * - subcollection `/organisation/{orgId}/notifications/{docId}`
- * 
- * Flow: App action -> Backend Firestore -> Cloud Function -> FCM Admin SDK -> Recipient Device Notification Tray
- */
-async function processFcmNotificationDoc(snapshot, context) {
-  try {
-    const data = snapshot.data();
-    if (!data) return null;
 
-    const title = data.title || "New Notification";
-    const body = data.body || "";
-    const orgId = data.orgId || data.forOrgId || "";
-    const targetRole = data.targetRole || "all";
-    const targetRoles = data.targetRoles || (targetRole === "manager_and_organisation" ? ["manager", "organisation"] : [targetRole]);
-    const forSupervisorName = data.forSupervisorName || "";
-    const forManagerName = data.forManagerName || "";
-    const senderName = data.senderName || "";
-
-    logger.info(`Processing FCM push notification trigger for doc ${snapshot.id}: "${title}" -> Target: ${targetRole} (Org: ${orgId})`);
-
-    const db = admin.firestore();
-    const tokens = new Set();
-
-    // 1. Query tokens from fcmTokens collection
-    let tokenQuery = db.collection("fcmTokens");
-    if (orgId && orgId !== "uninitialized") {
-      tokenQuery = tokenQuery.where("orgId", "==", orgId);
-    }
-
-    const tokenSnap = await tokenQuery.get();
-    tokenSnap.forEach((doc) => {
-      const tData = doc.data();
-      const token = tData.token;
-      const userType = (tData.userType || "").toLowerCase();
-      const uName = (tData.userName || "").toLowerCase();
-
-      if (!token) return;
-      if (senderName && uName === senderName.toLowerCase()) return; // Don't notify sender
-
-      // Role check
-      const isRoleMatch = targetRoles.includes("all") ||
-        targetRoles.includes("manager_and_organisation") ||
-        targetRoles.includes(userType) ||
-        (userType === "config" && targetRoles.includes("organisation"));
-
-      // User name check for supervisor/manager specific notifications
-      let isUserMatch = true;
-      if (userType === "supervisor" && forSupervisorName) {
-        isUserMatch = uName === forSupervisorName.toLowerCase();
-      } else if (userType === "manager" && forManagerName) {
-        isUserMatch = uName === forManagerName.toLowerCase();
-      }
-
-      if (isRoleMatch && isUserMatch) {
-        tokens.add(token);
-      }
-    });
-
-    if (tokens.size === 0) {
-      logger.info(`No matching FCM tokens found for target ${targetRole} in org ${orgId}. Sending via FCM topic broadcast...`);
-      // Topic fallback
-      if (orgId) {
-        const cleanOrgId = orgId.replace(/[^\w]/g, "_");
-        const topicName = targetRole === "manager_and_organisation"
-          ? `org_${cleanOrgId}`
-          : `org_${cleanOrgId}_${targetRole}`;
-
-        const topicMessage = {
-          topic: topicName,
-          notification: {
-            title: title,
-            body: body,
-          },
-          android: {
-            priority: "high",
-            notification: {
-              channelId: "cst_high_importance_channel",
-              sound: "default",
-              priority: "high",
-              visibility: "public",
-            },
-          },
-          data: {
-            click_action: "FLUTTER_NOTIFICATION_CLICK",
-            title: title,
-            body: body,
-            requestType: data.requestType || "general",
-            requestId: data.requestId || data.docId || "",
-            docId: data.docId || data.requestId || "",
-            siteId: data.siteId || "",
-            siteName: data.siteName || "",
-            status: data.status || "",
-          },
-        };
-
-        try {
-          const res = await admin.messaging().send(topicMessage);
-          logger.info(`FCM Topic push sent successfully to ${topicName}: ${res}`);
-        } catch (tErr) {
-          logger.error(`Failed sending FCM topic push to ${topicName}:`, tErr);
-        }
-      }
-      return null;
-    }
-
-    // Send payload to collected recipient device tokens
-    const message = {
-      notification: {
-        title: title,
-        body: body,
-      },
-      android: {
-        priority: "high",
-        notification: {
-          channelId: "cst_high_importance_channel",
-          sound: "default",
-          priority: "high",
-          visibility: "public",
-        },
-      },
-      data: {
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-        title: title,
-        body: body,
-        requestType: data.requestType || "general",
-        requestId: data.requestId || data.docId || "",
-        docId: data.docId || data.requestId || "",
-        siteId: data.siteId || "",
-        siteName: data.siteName || "",
-        status: data.status || "",
-      },
-      tokens: Array.from(tokens),
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(message);
-    logger.info(`FCM Multicast delivery result for doc ${snapshot.id}: Success ${response.successCount}, Failure ${response.failureCount}`);
-
-    return { successCount: response.successCount, failureCount: response.failureCount };
-  } catch (err) {
-    logger.error("Error processing FCM notification doc:", err);
-    return null;
-  }
-}
 
