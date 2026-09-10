@@ -1,27 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/screens/organization/organisation_landing_page.dart';
+import 'package:ebricks/screens/organization/organisation_landing_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/screens/common/splash_screen.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/screens/common/main_dashboard.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/screens/organization/organisation_login_page.dart';
-import 'package:demo_cst/screens/common/config_login.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_login_page.dart';
-import 'package:demo_cst/screens/customer/customer_login_page.dart';
-import 'package:demo_cst/screens/common/reset_password_screen.dart';
-import 'package:demo_cst/screens/organization/organization_dashboard.dart';
-import 'package:demo_cst/screens/organization/organisation_registration_page.dart';
-import 'package:demo_cst/screens/common/landing_page.dart';
-import 'package:demo_cst/screens/common/join_by_referral_page.dart';
-import 'package:demo_cst/screens/organization/org_menu_screen.dart';
-import 'package:demo_cst/screens/branding/branding_edit_screen.dart';
-import 'package:demo_cst/screens/common/contact_support_screen.dart';
-import 'package:demo_cst/widgets/connectivity_wrapper.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/common/splash_screen.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/screens/common/main_dashboard.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/offline_sync_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/screens/organization/organisation_login_page.dart';
+import 'package:ebricks/screens/common/config_login.dart';
+import 'package:ebricks/screens/supervisor/supervisor_login_page.dart';
+import 'package:ebricks/screens/customer/customer_login_page.dart';
+import 'package:ebricks/screens/common/reset_password_screen.dart';
+import 'package:ebricks/screens/organization/organization_dashboard.dart';
+import 'package:ebricks/screens/organization/organisation_registration_page.dart';
+import 'package:ebricks/screens/common/landing_page.dart';
+import 'package:ebricks/screens/common/join_by_referral_page.dart';
+import 'package:ebricks/screens/organization/org_menu_screen.dart';
+import 'package:ebricks/screens/branding/branding_edit_screen.dart';
+import 'package:ebricks/screens/common/contact_support_screen.dart';
+import 'package:ebricks/widgets/connectivity_wrapper.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -46,6 +47,7 @@ void main() async {
   await FirestoreService.initialize();
   await AppTheme.initialize();
   await AuthService.initialize();
+  await OfflineSyncService.initialize();
 
   // Initialize FCM: request permissions, foreground listener
   await NotificationService.initialize(navigatorKey);
@@ -87,6 +89,7 @@ class MyApp extends StatelessWidget {
               routes: {
                 '/': (context) => const SplashScreen(),
                 '/landing': (context) => const LandingPage(),
+                '/login': (context) => const Organisation_LoginPage(),
                 '/authSelection': (context) =>
                     const MainDashboard(), // Role selection screen
                 '/orgLogin': (context) => const Organisation_LoginPage(),

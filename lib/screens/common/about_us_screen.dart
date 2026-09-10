@@ -1,5 +1,5 @@
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+﻿import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class AboutUsScreen extends StatelessWidget {

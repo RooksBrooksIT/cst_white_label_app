@@ -146,6 +146,10 @@ class PettyCashRequest {
   final DateTime? receivedAt;
   final String? receivedBySupervisorId;
   final String? receivedBySupervisorName;
+  final String? siteId;
+  final String? siteName;
+  final String? linkedSitePaymentId;
+  final String? linkedSitePaymentTitle;
   final List<Map<String, dynamic>> approvalHistory;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -182,6 +186,10 @@ class PettyCashRequest {
     this.receivedAt,
     this.receivedBySupervisorId,
     this.receivedBySupervisorName,
+    this.siteId,
+    this.siteName,
+    this.linkedSitePaymentId,
+    this.linkedSitePaymentTitle,
     this.approvalHistory = const [],
     this.createdAt,
     this.updatedAt,
@@ -192,6 +200,8 @@ class PettyCashRequest {
       status == 'awaiting_confirmation' || status == 'awaiting_receipt_confirmation';
   bool get isReceived =>
       status == 'received' || status == 'approved' || receivedAt != null;
+  bool get isSitePaymentLinked =>
+      linkedSitePaymentId != null && linkedSitePaymentId!.isNotEmpty;
 
   factory PettyCashRequest.fromMap(String id, Map<String, dynamic> data) {
     return PettyCashRequest(
@@ -240,6 +250,10 @@ class PettyCashRequest {
       receivedAt: _parseDateTime(data['receivedAt']),
       receivedBySupervisorId: data['receivedBySupervisorId']?.toString(),
       receivedBySupervisorName: data['receivedBySupervisorName']?.toString(),
+      siteId: data['siteId']?.toString(),
+      siteName: data['siteName']?.toString(),
+      linkedSitePaymentId: data['linkedSitePaymentId']?.toString(),
+      linkedSitePaymentTitle: data['linkedSitePaymentTitle']?.toString(),
       approvalHistory: (data['approvalHistory'] is List)
           ? List<Map<String, dynamic>>.from(
               (data['approvalHistory'] as List).whereType<Map<String, dynamic>>(),
@@ -289,6 +303,12 @@ class PettyCashRequest {
         'receivedBySupervisorId': receivedBySupervisorId,
       if (receivedBySupervisorName != null)
         'receivedBySupervisorName': receivedBySupervisorName,
+      if (siteId != null) 'siteId': siteId,
+      if (siteName != null) 'siteName': siteName,
+      if (linkedSitePaymentId != null)
+        'linkedSitePaymentId': linkedSitePaymentId,
+      if (linkedSitePaymentTitle != null)
+        'linkedSitePaymentTitle': linkedSitePaymentTitle,
       'approvalHistory': approvalHistory,
       'createdAt': createdAt != null
           ? Timestamp.fromDate(createdAt!)
@@ -310,6 +330,7 @@ class PettyCashTransaction {
   final String managerName;
   final String? siteId;
   final String? siteName;
+  final String? linkedSitePaymentId;
   final bool isSiteExpense;
   final String transactionType; // 'ALLOCATION', 'EXPENSE', 'REPLENISHMENT', 'ADJUSTMENT', 'REVERSAL'
   final String expenseCategory;
@@ -335,6 +356,7 @@ class PettyCashTransaction {
     this.managerName = '',
     this.siteId,
     this.siteName,
+    this.linkedSitePaymentId,
     this.isSiteExpense = false,
     required this.transactionType,
     this.expenseCategory = 'Other',
@@ -366,6 +388,7 @@ class PettyCashTransaction {
       managerName: (data['managerName'] ?? '').toString(),
       siteId: data['siteId']?.toString(),
       siteName: data['siteName']?.toString(),
+      linkedSitePaymentId: data['linkedSitePaymentId']?.toString(),
       isSiteExpense: data['isSiteExpense'] == true,
       transactionType: (data['transactionType'] ?? 'EXPENSE').toString(),
       expenseCategory: (data['expenseCategory'] ?? 'Other').toString(),
@@ -400,6 +423,8 @@ class PettyCashTransaction {
       'managerName': managerName,
       'siteId': siteId ?? '',
       'siteName': siteName ?? '',
+      if (linkedSitePaymentId != null)
+        'linkedSitePaymentId': linkedSitePaymentId,
       'isSiteExpense': isSiteExpense,
       'transactionType': transactionType,
       'expenseCategory': expenseCategory,

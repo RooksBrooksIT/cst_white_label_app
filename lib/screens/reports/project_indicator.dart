@@ -5,7 +5,7 @@ import '/services/firestore_service.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class ProjectIndicatorPage extends StatefulWidget {
   final String? siteId;
@@ -188,10 +188,17 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
   }
 
   Widget _buildFinancialHealthIndicator(ThemeData theme) {
-    final paid = _parseNum(projectData?['amountPaid']);
-    final spent = _parseNum(projectData?['amountSpent']);
-    final balance = _parseNum(projectData?['amountBalance']);
-    final progress = paid > 0 ? (spent / paid).clamp(0.0, 1.0) : 0.0;
+    final budget = _parseNum(projectData?['projectBudget']);
+    final paid = _parseNum(
+      projectData?['amountPaid'] ??
+          projectData?['amountReceived'] ??
+          projectData?['paid'],
+    );
+    final spent = _parseNum(
+      projectData?['amountSpent'] ?? projectData?['amountSpend'],
+    );
+    final customerCashBalance = paid - spent;
+    final progress = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : (paid > 0 ? (spent / paid).clamp(0.0, 1.0) : 0.0);
     
     Color healthColor = theme.primaryColor;
     String status = 'Stable';
@@ -220,14 +227,16 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('${(progress * 100).toStringAsFixed(1)}% Utilized', style: theme.textTheme.bodySmall),
-              Text('Remaining: ₹${balance.toStringAsFixed(2)}', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+              Text('Cash Balance: ₹${customerCashBalance.toStringAsFixed(2)}', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
             ],
           ),
           const Divider(height: 40),
           Row(
             children: [
-              _statItem('Budget', '₹$paid', theme.primaryColor),
+              _statItem('Budget', '₹$budget', theme.primaryColor),
+              _statItem('Received', '₹$paid', Colors.green),
               _statItem('Spent', '₹$spent', healthColor),
+              _statItem('Balance', '₹$customerCashBalance', customerCashBalance >= 0 ? Colors.blue : Colors.red),
             ],
           ),
         ],

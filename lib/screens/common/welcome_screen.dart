@@ -1,10 +1,10 @@
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/firestore_error_handler.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/widgets/glass_button.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_text_field.dart';
+﻿import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/firestore_error_handler.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/widgets/glass_button.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/widgets/glass_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

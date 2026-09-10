@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/approval_workflow_service.dart';
-import 'package:demo_cst/widgets/approval_lifecycle_stepper.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/approval_workflow_service.dart';
+import 'package:ebricks/widgets/approval_lifecycle_stepper.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class ManagerSitePaymentApprovalPage extends StatefulWidget {
   const ManagerSitePaymentApprovalPage({super.key});
@@ -419,6 +419,32 @@ class _ManagerSitePaymentApprovalPageState
                   color: Color(0xFF64748B),
                 ),
               ),
+              if (data['fundedViaPettyCash'] == true || data['pettyCashRequestId'] != null) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.account_balance_wallet_rounded, size: 13, color: Color(0xFF059669)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Funded via Petty Cash (${data['pettyCashRequestId'] ?? 'Disbursed'})',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF065F46),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
 
               // Visual Stepper

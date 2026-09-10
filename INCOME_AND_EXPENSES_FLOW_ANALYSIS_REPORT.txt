@@ -1,0 +1,750 @@
+================================================================================
+  CST WHITE LABEL APPLICATION - COMPLETE INCOME & EXPENSES FLOW ANALYSIS REPORT
+================================================================================
+Project: CST White Label App (eBricks Construction ERP Platform)
+Generated On: September 08, 2026
+Scope: Complete End-to-End Financial Architecture, Income & Inflow Modeling,
+       5-Category Expense Taxonomy, Supervisor Petty Cash Lifecycle, Requisition
+       Settlement Pipeline, Real-Time Atomic Sync Engine (ExpenseService),
+       Database Schema, PDF Generators & Financial Reporting Suite
+File Name: INCOME_AND_EXPENSES_FLOW_ANALYSIS_REPORT.txt
+Status: Complete Production Analysis & Code Blueprint
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. EXECUTIVE FINANCIAL ARCHITECTURAL SUMMARY
+2. COMPREHENSIVE CASH FLOW MODEL (INFLOW VS. OUTFLOW TAXONOMY)
+   2.1 Inflows (Revenue, Client Stage Billings, Budget Allocations, Subscriptions)
+   2.2 Outflows (The 5 Core Expense Categories + Petty Cash Disbursements)
+3. THE 5-CATEGORY EXPENSE ENGINE & CALCULATION LOGIC
+   3.1 Category 1: Supervisor Site Expenses (siteSupervisorEntries)
+   3.2 Category 2: Manager Site Expenses (managerEntries & managerExpenseSummary)
+   3.3 Category 3: Organization Direct Expenses (organizationEntries & orgExpenseSummary)
+   3.4 Category 4: Contractor Milestone Billing & Payouts (contractorEntries)
+   3.5 Category 5: Supervisor & Worker Productivity Incentives (siteSupervisorIncentives)
+4. ATOMIC RECONCILIATION & SYNC ENGINE (ExpenseService.dart)
+   4.1 Multi-Collection Aggregation Algorithm
+   4.2 Firestore Atomic Transaction Blueprint
+   4.3 Dynamic Balance Formula & Multi-Collection Cascade Updates
+   4.4 Automatic Background Trigger Hooks Across the Application
+5. SUPERVISOR PETTY CASH ACCOUNT & CYCLE LIFECYCLE (PettyCashService.dart)
+   5.1 Dual-Tier Model: Account Ledger vs. Transaction Journal
+   5.2 Cycle Allocation & Advance Top-Up Pipeline
+   5.3 Transaction Capture, Receipt Upload & Instant Balance Subtraction
+   5.4 Automated 10% Low-Balance Alert & High-Priority Push Notification
+   5.5 Cycle Closure, Settlement & PDF Cashbook Statement Generation
+6. 5-STAGE REQUISITION APPROVAL TO EXPENSE SETTLEMENT PIPELINE
+   6.1 Requisition Types: Materials, Tools, Site Payments, Petty Cash
+   6.2 Approval State Machine (Stages 1 to 5)
+   6.3 Financial Settlement & Ledger Write-Back
+7. COMPLETE FIRESTORE FINANCIAL DATA SCHEMAS
+   7.1 projects / Site Document Schema
+   7.2 totalSiteExpensesPerDay Document Schema
+   7.3 siteSupervisorEntries Document Schema
+   7.4 managerEntries & managerExpenseSummary Schema
+   7.5 organizationEntries & organizationExpenseSummary Schema
+   7.6 contractorEntries Document Schema
+   7.7 siteSupervisorIncentives Document Schema
+   7.8 petty_cash_accounts & petty_cash_transactions Schema
+8. FINANCIAL REPORTING & PDF GENERATION SUITE
+   8.1 Site Financial Details Dashboard (site_financial_details_page.dart)
+   8.2 Overall Project Financial Status Report (project_financial_status_report_page.dart)
+   8.3 Site Weekly Financial Reports (site_weekly_financial_report.dart)
+   8.4 Incentive Calculation & Bonus Matrix (incentive_calculation_sheet.dart)
+   8.5 Petty Cash PDF Exporter (petty_cash_report_pdf_helper.dart)
+   8.6 Customer Financial Transparency Portal (customer_project_financial_statusreport.dart)
+9. END-TO-END FINANCIAL SEQUENCE DIAGRAMS (ASCII)
+   9.1 Site Expense Logging & Atomic Recalculation Flow
+   9.2 Petty Cash Allocation, Spend & Low-Balance Alert Flow
+   9.3 Client Stage Payment & Project Balance Reconciliation Flow
+10. PRODUCTION BEST PRACTICES, AUDIT TRAILS & INTEGRITY SAFEGUARDS
+
+================================================================================
+1. EXECUTIVE FINANCIAL ARCHITECTURAL SUMMARY
+================================================================================
+The CST White Label Application (eBricks Construction ERP) implements an enterprise-
+grade, dual-entry synchronized financial system. Construction projects inherently
+involve distributed spending across dispersed physical sites with asynchronous
+approvals, fluctuating material costs, contractor milestone advances, and localized
+petty cash expenditures.
+
+Key Capabilities of the Financial Engine:
+- Multi-Tier Inflow / Outflow Separation: Clear segregation between Project Owner
+  Receipts, Org-Level Capital Outlays, Site-Level Manager Procurements, and Daily
+  Supervisor Field Expenses.
+- 5-Category Expense Taxonomy: Automated categorization into (1) Supervisor Field
+  Expenses, (2) Manager Expenses, (3) Organization Corporate Expenses, (4) Contractor
+  Contract Expenses, and (5) Worker/Supervisor Performance Incentives.
+- Real-Time Atomic Transaction Sync (ExpenseService): Zero race-condition summation
+  that recalculates all category totals and synchronously updates project balance
+  sheets across `projects`, `Site`, and `totalSiteExpensesPerDay` collections.
+- Isolated Petty Cash Micro-Accounting: Dedicated account ledgers with dynamic
+  balance tracking, automated 10% low-balance warning triggers, and cycle archiving.
+- Multi-Role Financial Access Control: Organization Admins maintain macro financial
+  visibility; Managers monitor site budgets; Supervisors record micro field expenses;
+  and Customers view certified stage completion statements without seeing internal
+  vendor cost margins.
+- Tamper-Evident Multi-Tenant Isolation: Financial documents are strictly sandboxed
+  under `/organisation/{orgId}/data/...` with Firestore security rules preventing
+  cross-tenant data leakage.
+
+================================================================================
+2. COMPREHENSIVE CASH FLOW MODEL (INFLOW VS. OUTFLOW TAXONOMY)
+================================================================================
+
++-----------------------------------------------------------------------------------+
+|                        PROJECT FINANCIAL ARCHITECTURE                             |
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|  [ INFLOWS / CAPITAL INTAKE ]                      [ OUTFLOWS / SITE EXPENSES ]   |
+|  1. Project Total Budget (Estimated Cost)          1. Supervisor Field Purchases  |
+|  2. Client Milestone Payments (amountPaid)         2. Manager Procurements        |
+|  3. Petty Cash Allocation Advances                 3. Org Direct Overhead/Bills   |
+|  4. SaaS Organization Subscriptions (PayU)         4. Contractor Contract Claims  |
+|                                                    5. Productivity Incentives     |
+|                                                                                   |
+|                               +------------------+                                |
+|                               |  ExpenseService  |                                |
+|                               |  Atomic Engine   |                                |
+|                               +--------+---------+                                |
+|                                        |                                          |
+|                                        v                                          |
+|                       +----------------------------------+                        |
+|                       |   amountSpent = Sum(Categories)  |                        |
+|                       |   amountBalance = Paid - Spent   |                        |
+|                       +----------------------------------+                        |
++-----------------------------------------------------------------------------------+
+
+2.1 INFLOWS (Capital Intake & Revenue Streams)
+---------------------------------------------
+1. Project Estimated Budget (`totalCost` / `projectCost` / `budget`):
+   - Defined during Site & Project Onboarding in `projects` and `Site` collections.
+   - Represents the total contract value agreed with the project owner.
+
+2. Client Milestone Receipts (`amountPaid` / `amountReceived` / `paid`):
+   - Injected into the project account when the client/customer makes a stage-based
+     progress payment (e.g., Foundation, Plinth, First Floor Slab, Finishing).
+   - Stored on both the `projects` and `Site` documents.
+
+3. Supervisor Petty Cash Advances (`totalAllocated` / `currentCycleAllocated`):
+   - Capital dispatched by Organization HQ or Project Managers into a site
+     supervisor's petty cash float account (`petty_cash_accounts`).
+
+4. SaaS Subscription Revenue (PayU Gateway):
+   - Recurring organization subscription revenue (Silver, Gold, Platinum, Enterprise)
+     processed via PayU S2S payment gateway, generating instant tax invoices.
+
+2.2 OUTFLOWS (The 5 Expense Categories + Petty Cash Disbursements)
+-----------------------------------------------------------------
+Every expenditure incurred across physical construction sites is routed into one of
+the 5 core expense categories managed by `ExpenseService`:
+
+Category 1: `siteSupervisorEntries` -> Micro on-site operational field costs.
+Category 2: `managerEntries` & `managerExpenseSummary` -> Manager procurement orders.
+Category 3: `organizationEntries` & `organizationExpenseSummary` -> Bulk HQ invoices.
+Category 4: `contractorEntries` -> Sub-contractor milestone payouts.
+Category 5: `siteSupervisorIncentives` -> Performance and productivity bonuses.
+
+================================================================================
+3. THE 5-CATEGORY EXPENSE ENGINE & CALCULATION LOGIC
+================================================================================
+
+3.1 Category 1: Supervisor Site Expenses (`siteSupervisorEntries`)
+-----------------------------------------------------------------
+- Source Screen: `lib/screens/supervisor/site_entry_page.dart`
+- Target Collection: `/organisation/{orgId}/data/siteSupervisorEntries`
+- Scope: Daily micro expenses recorded by Site Supervisors (emergency materials,
+  local transport, cement unloading charges, site refreshments, generator fuel).
+- Filtering Rule: Manager-created or Organization-created records stored in this
+  collection are excluded from this category to prevent double counting:
+  ```dart
+  if (data['isManagerEntry'] == true ||
+      data['createdBy'] == 'manager' ||
+      data['isOrgEntry'] == true ||
+      data['createdBy'] == 'manager_org') {
+    continue; // Skipped, counted under Manager or Org categories
+  }
+  ```
+
+3.2 Category 2: Manager Site Expenses (`managerEntries` & `managerExpenseSummary`)
+---------------------------------------------------------------------------------
+- Source Screens:
+  - `lib/screens/manager/manager_expenses.dart`
+  - `lib/screens/manager/manager_site_entry_page.dart`
+- Target Collections:
+  - `/organisation/{orgId}/data/managerEntries`
+  - `/organisation/{orgId}/data/managerExpenseSummary`
+  - Backward compatibility: `siteSupervisorEntries` where `isManagerEntry == true`.
+- Scope: Procurement of construction materials, structural steel invoices, machinery
+  rentals (JCB, concrete mixers), site layout survey fees, manager inspection travel.
+
+3.3 Category 3: Organization Direct Expenses (`organizationEntries` & `orgExpenseSummary`)
+------------------------------------------------------------------------------------------
+- Source Screens:
+  - `lib/screens/organization/organization_expenses.dart`
+  - `lib/screens/organization/org_site_payment_screen.dart`
+- Target Collections:
+  - `/organisation/{orgId}/data/organizationEntries`
+  - `/organisation/{orgId}/data/organizationExpenseSummary`
+  - Backward compatibility: `siteSupervisorEntries` where `isOrgEntry == true`.
+- Scope: Corporate bulk procurement orders, legal & municipal permit fees, architectural
+  consultant retainers, high-value asset acquisitions assigned directly to a site.
+
+3.4 Category 4: Contractor Milestone Billing & Payouts (`contractorEntries`)
+----------------------------------------------------------------------------
+- Source Screen: `lib/screens/manager/contractor_entry_page.dart`
+- Target Collection: `/organisation/{orgId}/data/contractorEntries`
+- Scope: Contract-based execution billing for specialized trade contractors (e.g.,
+  Bar Benders, Electrical Contractors, Plumbing Teams, Flooring/Tiling Crews).
+- Calculated as: Unit Rate x Measurement Quantity (or Lump Sum Milestone Payouts).
+
+3.5 Category 5: Supervisor & Worker Productivity Incentives (`siteSupervisorIncentives`)
+----------------------------------------------------------------------------------------
+- Source Screens:
+  - `lib/screens/reports/incentive_calculation_sheet.dart`
+  - `lib/screens/reports/incentive_calculation.dart`
+- Target Collection: `/organisation/{orgId}/data/siteSupervisorIncentives`
+- Scope: Target-driven bonuses calculated against square-footage completed, early
+  stage completion incentives, and specialized masonry bonuses.
+
+================================================================================
+4. ATOMIC RECONCILIATION & SYNC ENGINE (ExpenseService.dart)
+================================================================================
+Located at: `lib/services/expense_service.dart`
+
+4.1 Multi-Collection Aggregation Algorithm
+------------------------------------------
+Whenever an expense is created, edited, or deleted anywhere in the application,
+`ExpenseService.recalcTotalsAndSyncProject(siteId)` is triggered. It gathers and sums
+all 5 categories in parallel:
+
+```dart
+final supervisorTotal   = await _sumSupervisorExpenses(siteId);
+final managerTotal      = await _sumManagerExpenses(siteId);
+final organizationTotal = await _sumOrganizationExpenses(siteId);
+final contractorTotal   = await _sumContractorExpenses(siteId);
+final incentiveTotal    = await _sumIncentiveExpenses(siteId);
+
+final double totalAllExpenses = supervisorTotal +
+    managerTotal +
+    organizationTotal +
+    contractorTotal +
+    incentiveTotal;
+```
+
+4.2 Firestore Atomic Transaction Blueprint
+------------------------------------------
+To guarantee mathematical consistency without dirty reads or concurrent overwrite
+issues, `ExpenseService` executes an atomic Firestore transaction (`runTransaction`):
+
+```dart
+await firestore.runTransaction((txn) async {
+  final totalsRef = FirestoreService.getCollection('totalSiteExpensesPerDay').doc(siteId);
+  final projectRef = await _findExistingProjectDocBySiteId(siteId);
+  final siteRef = await _findExistingSiteDocBySiteId(siteId);
+
+  // 1. Transactional Reads
+  DocumentSnapshot<Map<String, dynamic>>? projectSnap;
+  if (projectRef != null) projectSnap = await txn.get(projectRef);
+
+  DocumentSnapshot<Map<String, dynamic>>? siteSnap;
+  if (siteRef != null) siteSnap = await txn.get(siteRef);
+
+  // 2. Upsert Category Totals Document
+  txn.set(
+    totalsRef,
+    {
+      'siteId': siteId,
+      'totalSiteExpense': supervisorTotal,
+      'totalMgrExpense': managerTotal,
+      'totalOrgExpense': organizationTotal,
+      'totalContractorExpense': contractorTotal,
+      'totalIncentiveExpenses': incentiveTotal,
+      'totalAllExpenses': totalAllExpenses,
+      'updatedAt': FieldValue.serverTimestamp(),
+    },
+    SetOptions(merge: true),
+  );
+
+  // 3. Compute Project Balance & Update Project Document
+  if (projectRef != null && projectSnap != null && projectSnap.exists) {
+    final data = projectSnap.data();
+    double amountPaid = (data?['amountPaid'] ?? data?['paid'] ?? data?['amountReceived'] ?? 0.0).toDouble();
+    final amountBalance = amountPaid - totalAllExpenses;
+
+    txn.update(projectRef, {
+      'amountSpent': totalAllExpenses,
+      'amountSpend': totalAllExpenses,
+      'amountBalance': amountBalance,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // 4. Update Site Collection Document
+  if (siteRef != null && siteSnap != null && siteSnap.exists) {
+    final sData = siteSnap.data();
+    double sAmountPaid = (sData?['amountPaid'] ?? sData?['paid'] ?? sData?['amountReceived'] ?? 0.0).toDouble();
+    final sAmountBalance = sAmountPaid - totalAllExpenses;
+
+    txn.update(siteRef, {
+      'amountSpent': totalAllExpenses,
+      'amountSpend': totalAllExpenses,
+      'amountBalance': sAmountBalance,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+});
+```
+
+4.3 Dynamic Balance Formula
+---------------------------
+At any point in time, the net site financial health is expressed as:
+```
++-------------------------------------------------------------+
+| Net Balance = Total Client Inflow - Total Category Outflow  |
+|                                                             |
+| amountBalance = amountPaid - (                              |
+|     totalSiteExpense        (Supervisor)                    |
+|   + totalMgrExpense         (Manager)                       |
+|   + totalOrgExpense         (Organization HQ)               |
+|   + totalContractorExpense  (Contractors)                   |
+|   + totalIncentiveExpenses  (Incentives)                    |
+| )                                                           |
++-------------------------------------------------------------+
+```
+- If `amountBalance > 0`: Site is operating with positive cash liquidity.
+- If `amountBalance < 0`: Site is in a cash deficit (expenditures have outpaced
+  client milestone receipts, alerting Organization HQ to request stage payment).
+
+4.4 Automatic Background Trigger Hooks Across the Application
+-------------------------------------------------------------
+`ExpenseService.recalcTotalsAndSyncProject(siteId)` is automatically invoked across:
+1. `site_entry_page.dart` -> When supervisor adds/updates field expense.
+2. `manager_expenses.dart` & `manager_site_entry_page.dart` -> On manager entries.
+3. `organization_expenses.dart` -> On corporate HQ direct expense logging.
+4. `contractor_entry_page.dart` -> On contractor milestone bill approval.
+5. `incentive_calculation_sheet.dart` -> On supervisor/worker bonus submission.
+6. `site_financial_details_page.dart` -> Lazy sync check upon viewing dashboard.
+
+================================================================================
+5. SUPERVISOR PETTY CASH ACCOUNT & CYCLE LIFECYCLE (PettyCashService.dart)
+================================================================================
+Located at: `lib/services/petty_cash_service.dart` & `lib/models/petty_cash_models.dart`
+
+5.1 Dual-Tier Model: Account Ledger vs. Transaction Journal
+-----------------------------------------------------------
+The petty cash module operates as an isolated sub-ledger with strict balance checks:
+- Account Document: `/organisation/{orgId}/data/petty_cash_accounts/{supervisorId}`
+- Transaction Subcollection: `.../petty_cash_accounts/{supervisorId}/transactions/{txnId}`
+- Archival Cycle Subcollection: `.../petty_cash_accounts/{supervisorId}/cycles/{cycleId}`
+
+```
++-----------------------------------------------------------------------+
+|                SUPERVISOR PETTY CASH DATA STRUCTURE                   |
++-----------------------------------------------------------------------+
+|  petty_cash_accounts/{supervisorId}                                  |
+|   ├── totalAllocated: double          (All-time capital allocated)    |
+|   ├── totalUsed: double               (All-time capital spent)        |
+|   ├── availableBalance: double        (Current spendable balance)     |
+|   ├── currentCycleAllocated: double   (Current cycle float)           |
+|   ├── lowBalanceThresholdPercent: 10% (Alert trigger point)           |
+|   ├── lowBalanceTriggered: bool       (Warning status)                |
+|   │                                                                   |
+|   ├── transactions/{txnId}            (Itemized disbursements)        |
+|   │    ├── amount, category, purpose, receiptUrl, isApproved, siteId |
+|   │                                                                   |
+|   └── cycles/{cycleId}                (Closed monthly/milestone logs) |
+|        ├── cycleAllocated, cycleUsed, openingBalance, closingBalance  |
++-----------------------------------------------------------------------+
+```
+
+5.2 Cycle Allocation & Advance Top-Up Pipeline
+----------------------------------------------
+When an Organization Admin or Manager allocates funds to a Supervisor:
+1. Manager enters amount and selects Supervisor in `manager_petty_cash_page.dart`.
+2. `PettyCashService.allocatePettyCash(...)` executes:
+   - Increments `totalAllocated += amount`
+   - Increments `availableBalance += amount`
+   - Increments `currentCycleAllocated += amount`
+   - Resets `lowBalanceTriggered = false`
+   - Logs an allocation transaction of type `credit`.
+   - Sends real-time FCM notification to Supervisor.
+
+5.3 Transaction Capture, Receipt Upload & Balance Subtraction
+-------------------------------------------------------------
+When a Supervisor spends money on-site:
+1. Supervisor opens `supervisor_petty_cash_page.dart`, snaps receipt image, selects
+   expense category (Fuel, Food, Hardware, Labour Advance, Transport), and enters amount.
+2. `PettyCashService.recordExpense(...)` executes inside a Firestore transaction:
+   - Validates that `amount <= availableBalance` (prevents overspending).
+   - Decrements `availableBalance -= amount`.
+   - Increments `totalUsed += amount`.
+   - Uploads receipt image to Firebase Storage.
+   - Evaluates whether new `availableBalance <= (currentCycleAllocated * 10%)`.
+   - If low: sets `lowBalanceTriggered = true` and dispatches high-priority push.
+
+5.4 Automated 10% Low-Balance Warning System
+--------------------------------------------
+```dart
+double get lowBalanceThresholdAmount =>
+    (currentCycleAllocated > 0 ? currentCycleAllocated : totalAllocated) *
+    (lowBalanceThresholdPercent / 100.0);
+
+bool get isLowBalance =>
+    totalAllocated > 0 && availableBalance <= lowBalanceThresholdAmount;
+```
+When `isLowBalance == true`:
+- The Supervisor UI displays a dynamic amber/red warning banner.
+- High-priority FCM push notification is dispatched to the assigned Manager:
+  "Alert: Supervisor [Name]'s petty cash balance has dropped below 10% (₹[Balance] remaining). Please review and top up."
+
+5.5 Cycle Closure & PDF Cashbook Statement Generation
+-----------------------------------------------------
+- Cycles can be closed at end-of-month or project milestones via `closePettyCashCycle(...)`.
+- The cycle is archived in the `cycles` subcollection with opening balance, all
+  transactions, total spent, and closing balance.
+- `petty_cash_report_pdf_helper.dart` exports a print-ready PDF statement featuring
+  the organization logo, itemized table of expenses, embedded receipt thumbnails,
+  and supervisor/manager digital signature blocks.
+
+================================================================================
+6. 5-STAGE REQUISITION APPROVAL TO EXPENSE SETTLEMENT PIPELINE
+================================================================================
+Located at: `lib/services/approval_workflow_service.dart`
+
+High-value site expenses (bulk material purchases, machinery hiring, large contractor
+advances) undergo a formal 5-stage approval lifecycle before being converted into
+settled expense entries:
+
+```
++-----------------------------------------------------------------------------------+
+|                     5-STAGE REQUISITION APPROVAL PIPELINE                         |
++-------------------+-------------------+--------------------+----------------------+
+| STAGE 1           | STAGE 2           | STAGE 3            | STAGE 4 & 5          |
+| Supervisor        | Manager           | Organization HQ    | Manager Release &    |
+| Requisition       | Verification      | Authorization      | Site Confirmation    |
++-------------------+-------------------+--------------------+----------------------+
+| Supervisor logs   | Manager checks    | Org Admin reviews  | Manager releases     |
+| request with item | rates, vendor     | corporate budget   | funds/PO. Supervisor |
+| specs & estimate. | quotes & urgency. | & authorizes pay.  | confirms receipt.    |
+| Status:           | Status:           | Status:            | Status:              |
+| pending_manager_  | pending_org_      | pending_manager_   | approved / received  |
+| review            | approval          | clearance          | (Expense Settled)    |
++-------------------+-------------------+--------------------+----------------------+
+```
+
+Requisition Settlement Flow:
+1. Requisition is submitted via `material_request_form.dart` or `org_site_payment_screen.dart`.
+2. Upon passing Stage 3 (Org HQ Authorization) and Stage 4 (Manager Clearance),
+   the requisition is marked `approved` or `received`.
+3. The cleared financial amount is automatically written to the corresponding
+   expense collection (`managerEntries` or `organizationEntries`).
+4. `ExpenseService.recalcTotalsAndSyncProject(siteId)` is triggered to immediately
+   reflect the approved expenditure in the project's financial balance sheet.
+
+================================================================================
+7. COMPLETE FIRESTORE FINANCIAL DATA SCHEMAS
+================================================================================
+
+7.1 `projects` / `Site` Collection Schema
+Path: `/organisation/{orgId}/data/projects/{siteId}` & `/organisation/{orgId}/data/Site/{siteId}`
+```json
+{
+  "siteId": "SITE_1001",
+  "siteName": "Skyline Heights - Tower A",
+  "projectName": "Skyline Heights Residential",
+  "clientName": "Acme Corp Developers",
+  "totalCost": 15000000.0,
+  "projectCost": 15000000.0,
+  "amountPaid": 5000000.0,
+  "amountReceived": 5000000.0,
+  "amountSpent": 3250000.0,
+  "amountBalance": 1750000.0,
+  "status": "In Progress",
+  "app_id": "cst_white_label",
+  "updatedAt": "2026-09-08T10:30:00Z"
+}
+```
+
+7.2 `totalSiteExpensesPerDay` Collection Schema
+Path: `/organisation/{orgId}/data/totalSiteExpensesPerDay/{siteId}`
+```json
+{
+  "siteId": "SITE_1001",
+  "totalSiteExpense": 450000.0,
+  "totalMgrExpense": 1200000.0,
+  "totalOrgExpense": 850000.0,
+  "totalContractorExpense": 650000.0,
+  "totalIncentiveExpenses": 100000.0,
+  "totalAllExpenses": 3250000.0,
+  "app_id": "cst_white_label",
+  "updatedAt": "2026-09-08T10:30:00Z"
+}
+```
+
+7.3 `siteSupervisorEntries` Collection Schema
+Path: `/organisation/{orgId}/data/siteSupervisorEntries/{entryId}`
+```json
+{
+  "entryId": "SSE_20260908_001",
+  "siteId": "SITE_1001",
+  "supervisorId": "SUP_042",
+  "supervisorName": "Alex Morgan",
+  "expenseType": "Emergency Cement Purchase",
+  "category": "Materials",
+  "totalAmount": 18500.0,
+  "paymentMode": "Cash / Petty Cash",
+  "vendorName": "Apex Building Supplies",
+  "billNumber": "INV-88392",
+  "billUrl": "https://firebasestorage.../receipts/bill1.jpg",
+  "entryDate": "2026-09-08",
+  "isManagerEntry": false,
+  "isOrgEntry": false,
+  "app_id": "cst_white_label",
+  "createdAt": "2026-09-08T09:15:00Z"
+}
+```
+
+7.4 `managerEntries` & `managerExpenseSummary` Schema
+Path: `/organisation/{orgId}/data/managerEntries/{entryId}`
+```json
+{
+  "entryId": "MGE_20260908_004",
+  "siteId": "SITE_1001",
+  "managerId": "MGR_007",
+  "managerName": "David Miller",
+  "expenseTitle": "RMC Concrete Pouring Batch 4",
+  "category": "Procurement",
+  "totalAmount": 240000.0,
+  "paymentStatus": "Paid",
+  "vendorDetails": {
+    "name": "UltraTech RMC",
+    "gstin": "29ABCDE1234F1Z5"
+  },
+  "invoiceUrl": "https://firebasestorage.../invoices/rmc_batch4.pdf",
+  "isManagerEntry": true,
+  "app_id": "cst_white_label",
+  "createdAt": "2026-09-08T08:00:00Z"
+}
+```
+
+7.5 `contractorEntries` Schema
+Path: `/organisation/{orgId}/data/contractorEntries/{entryId}`
+```json
+{
+  "contractorEntryId": "CE_20260908_012",
+  "siteId": "SITE_1001",
+  "contractorId": "CONT_105",
+  "contractorName": "Precision Electricals",
+  "workStage": "First Floor Conduit Laying",
+  "measurementUnit": "Sq. Ft",
+  "quantity": 4500.0,
+  "unitRate": 35.0,
+  "totalAmount": 157500.0,
+  "stageStatus": "Verified & Billed",
+  "approvedBy": "David Miller (Manager)",
+  "app_id": "cst_white_label",
+  "createdAt": "2026-09-08T11:00:00Z"
+}
+```
+
+7.6 `petty_cash_accounts` & `transactions` Schema
+Path: `/organisation/{orgId}/data/petty_cash_accounts/{supervisorId}`
+```json
+{
+  "accountId": "SUP_042",
+  "orgId": "cst_acme_construction",
+  "supervisorId": "SUP_042",
+  "supervisorName": "Alex Morgan",
+  "managerId": "MGR_007",
+  "managerName": "David Miller",
+  "totalAllocated": 100000.0,
+  "totalUsed": 65000.0,
+  "availableBalance": 35000.0,
+  "currentCycleAllocated": 50000.0,
+  "currentCycleId": "CYCLE_SEP_2026",
+  "lowBalanceThresholdPercent": 10.0,
+  "lowBalanceTriggered": false,
+  "app_id": "cst_white_label",
+  "updatedAt": "2026-09-08T10:00:00Z"
+}
+```
+
+Subcollection: `.../transactions/{txnId}`
+```json
+{
+  "transactionId": "TXN_99214",
+  "type": "debit",
+  "amount": 2500.0,
+  "category": "Fuel",
+  "purpose": "Site Generator Diesel Top-Up",
+  "receiptUrl": "https://firebasestorage.../receipts/diesel_bill.jpg",
+  "siteId": "SITE_1001",
+  "timestamp": "2026-09-08T09:45:00Z"
+}
+```
+
+================================================================================
+8. FINANCIAL REPORTING & PDF GENERATION SUITE
+================================================================================
+
+8.1 Site Financial Details Dashboard (`site_financial_details_page.dart`)
+------------------------------------------------------------------------
+- Comprehensive master dashboard presenting:
+  1. Top Financial KPI Cards: Total Budget, Amount Received from Client, Total Spent,
+     and Net Available Balance with dynamic color coding (Green = Positive, Red = Deficit).
+  2. 5-Category Breakdown Graph: Visual distribution of expenses across Supervisor,
+     Manager, Organization, Contractor, and Incentive spending.
+  3. Real-Time Cashbook Stream: Live Firestore stream of recent transactions.
+  4. Quick Navigation Actions: One-click jumping into Site Payments, Petty Cash Ledger,
+     and PDF Export engines.
+
+8.2 Overall Project Financial Status Report (`project_financial_status_report_page.dart`)
+-----------------------------------------------------------------------------------------
+- Aggregates multi-site enterprise financial data for Organization HQ.
+- Compares projected vs. actual cash burn rate across all ongoing sites.
+- Flags projects with low profit margins or cash deficits exceeding thresholds.
+
+8.3 Site Weekly Financial Reports (`site_weekly_financial_report.dart` & `2.dart`)
+----------------------------------------------------------------------------------
+- Generates 7-day rolling financial audit reports.
+- Itemizes day-by-day cash outflows, labor wage disbursements, and material receipts.
+- Exports formatted multi-page PDF documents for weekly client and management reviews.
+
+8.4 Incentive Calculation & Bonus Matrix (`incentive_calculation_sheet.dart`)
+-----------------------------------------------------------------------------
+- Calculates productivity bonuses based on completed square footage/units:
+  ```
+  Incentive = (Completed Sq. Ft * Rate per Sq. Ft) - Base Target Deductions
+  ```
+- Submits verified incentive records into `siteSupervisorIncentives`, triggering
+  automatic recalculation in `ExpenseService`.
+
+8.5 Petty Cash PDF Exporter (`petty_cash_report_pdf_helper.dart`)
+-----------------------------------------------------------------
+- Generates publication-grade PDF financial statements for petty cash accounts:
+  - Header: Organization White-Label Logo, Site Name, Supervisor Name, Cycle Dates.
+  - Summary Table: Opening Balance, Total Allocated, Total Disbursed, Closing Balance.
+  - Transaction Audit Trail: Date, Category, Purpose, Voucher No, Amount, Receipt Link.
+  - Signatures: Digital sign-off blocks for Site Supervisor and Approving Manager.
+
+8.6 Customer Financial Transparency Portal (`customer_project_financial_statusreport.dart`)
+--------------------------------------------------------------------------------------------
+- Dedicated client-facing financial summary:
+  - Displays Total Contract Value, Amount Paid by Client, and Next Stage Milestone Due.
+  - Shows verified stage completion percentages (e.g., Foundation: 100%, Framing: 75%).
+  - Masks internal contractor rates and proprietary vendor invoices to preserve commercial privacy.
+
+================================================================================
+9. END-TO-END FINANCIAL SEQUENCE DIAGRAMS (ASCII)
+================================================================================
+
+9.1 Site Expense Logging & Atomic Recalculation Flow
+---------------------------------------------------
+```
+Supervisor / Manager            Firestore               ExpenseService           projects / Site Doc
+      |                             |                          |                          |
+      | 1. Record Expense Entry     |                          |                          |
+      +---------------------------->|                          |                          |
+      |    (siteSupervisorEntries)  |                          |                          |
+      |                             | 2. Trigger Recalc        |                          |
+      |                             +------------------------->|                          |
+      |                             |                          | 3. Query 5 Categories    |
+      |                             |<-------------------------+                          |
+      |                             |                          |                          |
+      |                             |                          | 4. Sum All Categories    |
+      |                             |                          |    (supervisor + mgr +   |
+      |                             |                          |     org + cont + inc)    |
+      |                             |                          |                          |
+      |                             | 5. Run Atomic Txn        |                          |
+      |                             |<-------------------------+                          |
+      |                             |    (totalSiteExpenses)   |                          |
+      |                             |                          | 6. Update Spent & Bal    |
+      |                             |                          +------------------------->|
+      |                             |                          |    amountSpent = Total   |
+      |                             |                          |    balance = Paid - Spent|
+      | 7. UI Stream Updates        |                          |                          |
+      |<----------------------------+                          |                          |
+```
+
+9.2 Petty Cash Allocation, Spend & Low-Balance Alert Flow
+---------------------------------------------------------
+```
+Manager / Org Admin             PettyCashService           Supervisor UI           FCM Push Engine
+      |                                |                          |                       |
+      | 1. Allocate Capital (₹50,000)  |                          |                       |
+      +------------------------------->|                          |                       |
+      |                                | 2. Update Available Bal  |                       |
+      |                                |    totalAllocated += 50k |                       |
+      |                                +------------------------->|                       |
+      |                                |                          |                       |
+      |                                | 3. Record Field Spend    |                       |
+      |                                |<-------------------------+                       |
+      |                                |    (e.g., ₹46,000 spent) |                       |
+      |                                |                          |                       |
+      |                                | 4. Check Threshold       |                       |
+      |                                |    Bal (₹4k) <= 10% (₹5k)|                       |
+      |                                |                          |                       |
+      |                                | 5. Set lowBalTriggered   |                       |
+      |                                +------------------------->| (Show Amber Warning)  |
+      |                                |                          |                       |
+      |                                | 6. Dispatch High-Priority Push                   |
+      |<-------------------------------+--------------------------------------------------+
+      |    "Alert: Supervisor Petty    |
+      |     Cash below 10% (₹4,000)"   |
+```
+
+9.3 Client Stage Payment & Project Balance Reconciliation Flow
+--------------------------------------------------------------
+```
+Project Owner (Client)          Org Admin / Manager            Firestore               ExpenseService
+      |                                |                           |                          |
+      | 1. Pay Milestone (₹1,000,000)  |                           |                          |
+      +------------------------------->|                           |                          |
+      |                                | 2. Update amountPaid      |                          |
+      |                                +-------------------------->|                          |
+      |                                |    (in projects & Site)   | 3. Trigger Recalc        |
+      |                                |                           +------------------------->|
+      |                                |                           |                          |
+      |                                |                           | 4. Fetch totalAllExpenses|
+      |                                |                           |<-------------------------+
+      |                                |                           |                          |
+      |                                |                           | 5. Recompute Balance:    |
+      |                                |                           |    Balance = Paid - Spent|
+      |                                |                           |                          |
+      |                                |                           | 6. Write Balance Update  |
+      |                                |                           +------------------------->|
+      |                                | 7. Dashboard Live Stream  |
+      |                                |<--------------------------+
+```
+
+================================================================================
+10. PRODUCTION BEST PRACTICES, AUDIT TRAILS & INTEGRITY SAFEGUARDS
+================================================================================
+1. Zero Dirty Reads (Transactions):
+   All expense aggregation and balance recalculation in `ExpenseService` runs inside
+   `firestore.runTransaction()`. This completely prevents race conditions when
+   multiple supervisors and managers record expenses simultaneously.
+
+2. Multi-Tenant Namespace Partitioning:
+   All financial paths are strictly namespaced under `/organisation/{orgId}/data/...`.
+   Every document contains `app_id: 'cst_white_label'`, preventing data crossover in
+   shared Firebase environments.
+
+3. Complete Receipt Backing:
+   Disbursements in petty cash and supervisor entries require receipt image capture
+   stored in Firebase Storage with secure direct links embedded in the document.
+
+4. Dual-Key Project Synchronization:
+   `ExpenseService` automatically synchronizes both `projects` and `Site` collections
+   to ensure backward compatibility across all existing screens.
+
+5. Safe Number Parsing:
+   All financial UI components utilize `_parseNum(...)` and `_formatCurrency(...)`
+   to safely handle nulls, strings with currency symbols (₹, ,), and double precision
+   without throwing unhandled runtime exceptions.
+
+================================================================================
+END OF REPORT - CST WHITE LABEL APPLICATION INCOME & EXPENSES FLOW ANALYSIS
+================================================================================

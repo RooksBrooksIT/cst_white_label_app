@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/manager/project_configuration_screen.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:ebricks/screens/manager/project_configuration_screen.dart';
 
 class ProjectCategoryScreen extends StatelessWidget {
   const ProjectCategoryScreen({super.key});

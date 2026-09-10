@@ -1,8 +1,8 @@
-import 'package:demo_cst/screens/manager/manager_site_entry_page.dart';
+﻿import 'package:ebricks/screens/manager/manager_site_entry_page.dart';
 import 'package:flutter/material.dart';
-import 'package:demo_cst/screens/manager/manager_expenses.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/services/auth_service.dart';
+import 'package:ebricks/screens/manager/manager_expenses.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/services/auth_service.dart';
 
 class ManagerExpensesHomeScreen extends StatelessWidget {
   const ManagerExpensesHomeScreen({super.key});

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/supervisor/material_request_form.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_material_view_request_screen.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_tools_view_request_screen.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_work_schedule_page.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_view_request_screen.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/supervisor/material_request_form.dart';
+import 'package:ebricks/screens/supervisor/supervisor_material_view_request_screen.dart';
+import 'package:ebricks/screens/supervisor/supervisor_tools_view_request_screen.dart';
+import 'package:ebricks/screens/supervisor/supervisor_work_schedule_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_view_request_screen.dart';
 
 class SupervisorRequestsPage extends StatelessWidget {
   final String supervisorId;

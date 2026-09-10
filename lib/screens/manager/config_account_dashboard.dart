@@ -5,52 +5,52 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
 
-import 'package:demo_cst/screens/common/contact_support_screen.dart';
-import 'package:demo_cst/screens/manager/config_layout_and_drawing.dart';
-import 'package:demo_cst/screens/manager/config_material_information.dart';
-import 'package:demo_cst/screens/manager/config_materialavailability.dart';
-import 'package:demo_cst/screens/manager/contractor_entry_page.dart';
-import 'package:demo_cst/screens/manager/contractor_page.dart';
-import 'package:demo_cst/screens/manager/contractor_report_page.dart';
-import 'package:demo_cst/screens/manager/labour_screen.dart';
-import 'package:demo_cst/screens/manager/manager_approvals_center_page.dart';
-import 'package:demo_cst/screens/manager/manager_expenses.dart';
-import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
-import 'package:demo_cst/screens/manager/manager_petty_cash_page.dart';
-import 'package:demo_cst/screens/manager/manager_site_entry_page.dart';
-import 'package:demo_cst/screens/manager/manager_sites_list_page.dart';
-import 'package:demo_cst/screens/manager/material_screen.dart';
-import 'package:demo_cst/screens/manager/project_category_screen.dart';
-import 'package:demo_cst/screens/manager/project_configuration_screen.dart';
-import 'package:demo_cst/screens/manager/project_contract_screen.dart';
-import 'package:demo_cst/screens/manager/project_screen.dart';
-import 'package:demo_cst/screens/manager/project_setup_wizard.dart';
-import 'package:demo_cst/screens/manager/project_stage_config.dart';
-import 'package:demo_cst/screens/manager/project_status_screen.dart';
-import 'package:demo_cst/screens/manager/project_sub_category_screen.dart';
-import 'package:demo_cst/screens/manager/site_screen.dart';
-import 'package:demo_cst/screens/manager/site_supervisor_config.dart';
-import 'package:demo_cst/screens/manager/site_supervisor_map_screen.dart';
-import 'package:demo_cst/screens/manager/tools_master_page.dart';
-import 'package:demo_cst/screens/manager/vehicle_config_page.dart';
-import 'package:demo_cst/screens/manager/vehicle_details_page.dart';
-import 'package:demo_cst/screens/manager/vehicle_driver_config_page.dart';
-import 'package:demo_cst/screens/manager/vehicle_inventory_page.dart';
-import 'package:demo_cst/screens/manager/workers_config_page.dart';
-import 'package:demo_cst/screens/manager/workers_site_mapping_page.dart';
-import 'package:demo_cst/screens/organization/org_menu_screen.dart';
-import 'package:demo_cst/screens/manager/manager_notification_screen.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/screens/reports/material_report.dart';
-import 'package:demo_cst/screens/reports/tools_inventory_report.dart';
-import 'package:demo_cst/screens/reports/worker_summary_report_page.dart';
-import 'package:demo_cst/screens/reports/workers_availability_report_page.dart';
-import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
+import 'package:ebricks/screens/common/contact_support_screen.dart';
+import 'package:ebricks/screens/manager/config_layout_and_drawing.dart';
+import 'package:ebricks/screens/manager/config_material_information.dart';
+import 'package:ebricks/screens/manager/config_materialavailability.dart';
+import 'package:ebricks/screens/manager/contractor_entry_page.dart';
+import 'package:ebricks/screens/manager/contractor_page.dart';
+import 'package:ebricks/screens/manager/contractor_report_page.dart';
+import 'package:ebricks/screens/manager/labour_screen.dart';
+import 'package:ebricks/screens/manager/manager_approvals_center_page.dart';
+import 'package:ebricks/screens/manager/manager_expenses.dart';
+import 'package:ebricks/screens/manager/manager_material_approval_screen.dart';
+import 'package:ebricks/screens/manager/manager_petty_cash_page.dart';
+import 'package:ebricks/screens/manager/manager_site_entry_page.dart';
+import 'package:ebricks/screens/manager/manager_sites_list_page.dart';
+import 'package:ebricks/screens/manager/material_screen.dart';
+import 'package:ebricks/screens/manager/project_category_screen.dart';
+import 'package:ebricks/screens/manager/project_configuration_screen.dart';
+import 'package:ebricks/screens/manager/project_contract_screen.dart';
+import 'package:ebricks/screens/manager/project_screen.dart';
+import 'package:ebricks/screens/manager/project_setup_wizard.dart';
+import 'package:ebricks/screens/manager/project_stage_config.dart';
+import 'package:ebricks/screens/manager/project_status_screen.dart';
+import 'package:ebricks/screens/manager/project_sub_category_screen.dart';
+import 'package:ebricks/screens/manager/site_screen.dart';
+import 'package:ebricks/screens/manager/site_supervisor_config.dart';
+import 'package:ebricks/screens/manager/site_supervisor_map_screen.dart';
+import 'package:ebricks/screens/manager/tools_master_page.dart';
+import 'package:ebricks/screens/manager/vehicle_config_page.dart';
+import 'package:ebricks/screens/manager/vehicle_details_page.dart';
+import 'package:ebricks/screens/manager/vehicle_driver_config_page.dart';
+import 'package:ebricks/screens/manager/vehicle_inventory_page.dart';
+import 'package:ebricks/screens/manager/workers_config_page.dart';
+import 'package:ebricks/screens/manager/workers_site_mapping_page.dart';
+import 'package:ebricks/screens/organization/org_menu_screen.dart';
+import 'package:ebricks/screens/manager/manager_notification_screen.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/screens/reports/material_report.dart';
+import 'package:ebricks/screens/reports/tools_inventory_report.dart';
+import 'package:ebricks/screens/reports/worker_summary_report_page.dart';
+import 'package:ebricks/screens/reports/workers_availability_report_page.dart';
+import 'package:ebricks/screens/supervisor/tools_movement_page.dart';
 
 class ConfigAccountDashboard extends StatefulWidget {
   static const routeName = '/config-dashboard';
@@ -113,7 +113,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       "icon": Icons.assignment_rounded,
       "color": const Color(0xFF0A183D),
     },
-    "Site & Operations": {
+    "Supervisor & Site Operations": {
       "subtitle": "Supervisor profiles, site mappings, and daily logs",
       "icon": Icons.location_city_rounded,
       "color": const Color(0xFFEA580C),
@@ -135,10 +135,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       "icon": Icons.people_rounded,
       "color": const Color(0xFFF57C00),
     },
-    "Coming Soon": {
-      "subtitle": "Exciting new tools and features on the way",
-      "icon": Icons.sentiment_very_satisfied_rounded,
-      "color": const Color(0xFFF59E0B),
+    "Construction Field": {
+      "subtitle": "Smart site AI, 3D BIM & machinery tracking",
+      "icon": Icons.construction_rounded,
+      "color": const Color(0xFFEA580C),
       "isStatic": true,
     },
   };
@@ -234,15 +234,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         'Manage all 5 project settings in one place',
         const Color(0xFF0A183D),
       ),
-      DashboardItem(
-        'Update Project',
-        Icons.work_rounded,
-        Colors.indigo,
-        'Oversee project details',
-        Colors.indigo,
-      ),
     ],
-    "Site & Operations": [
+    "Supervisor & Site Operations": [
       DashboardItem(
         'Manager Daily Site Entry',
         Icons.edit_note_rounded,
@@ -355,7 +348,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFFF57C00),
       ),
     ],
-    "Coming Soon": [],
+    "Construction Field": [],
   };
 
   @override

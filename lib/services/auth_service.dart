@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/app_theme.dart';
 import 'firestore_service.dart';
+import 'notification_service.dart';
 
 enum UserRole { organization, manager, supervisor, customer, none }
 
@@ -120,12 +121,38 @@ class AuthService {
     // we also set the specific keys they expect.
     await _syncLegacyKeys(role, sanitizedData);
 
-    // Automatically refresh branding if orgId is available
+    // Automatically refresh branding asynchronously in background without blocking login navigation
     final orgId = sanitizedData['dynamicPath'] ?? sanitizedData['orgId'];
     if (orgId != null && orgId.toString().isNotEmpty) {
       FirestoreService.setOrgPath(orgId.toString());
-      await refreshBranding(orgId.toString());
+      refreshBranding(orgId.toString()).catchError((e) {
+        debugPrint('AuthService: Background branding refresh note: $e');
+      });
     }
+
+    // Register FCM device token and subscribe to topics for push notifications
+    final userId = (sanitizedData['uid'] ??
+            sanitizedData['username'] ??
+            sanitizedData['UserName'] ??
+            sanitizedData['Supervisor ID'] ??
+            sanitizedData['supervisorId'] ??
+            'user')
+        .toString();
+    final userName = (sanitizedData['FullName'] ??
+            sanitizedData['fullName'] ??
+            sanitizedData['username'] ??
+            sanitizedData['UserName'] ??
+            'User')
+        .toString();
+    final roleStr = NotificationService.normalizeRole(role.toString().split('.').last);
+
+    NotificationService.saveToken(
+      userId: userId,
+      userType: roleStr,
+      userName: userName,
+    ).catchError((e) {
+      debugPrint('AuthService: Notification token save error: $e');
+    });
   }
 
   /// Helper to convert non-JSON-encodable objects like Timestamp to standard strings
@@ -199,15 +226,23 @@ class AuthService {
     await _syncLegacyKeys(currentRole, currentData);
   }
 
-  /// Log out and clear all session data
+  /// Log out and clear all session data immediately
   Future<void> logout() async {
-    // Clear our unified keys
+    final currentRole = userRole;
+    final uData = userData;
+    final userId = (uData['uid'] ??
+            uData['username'] ??
+            uData['UserName'] ??
+            uData['Supervisor ID'] ??
+            uData['supervisorId'] ??
+            '')
+        .toString();
+    final roleStr = currentRole.toString().split('.').last;
+
+    // 1. Clear session and legacy keys IMMEDIATELY (instant < 2ms)
     await _prefs.remove(_isLoggedInKey);
     await _prefs.remove(_userRoleKey);
     await _prefs.remove(_userDataKey);
-
-    // Sign out from Firebase if needed
-    await _auth.signOut();
 
     // Clear all legacy keys to be safe
     final keys = _prefs.getKeys();
@@ -219,6 +254,20 @@ class AuthService {
         await _prefs.remove(key);
       }
     }
+
+    // 2. Perform network token pruning and Firebase sign-out in background without blocking UI
+    if (userId.isNotEmpty) {
+      NotificationService.deleteToken(
+        userId: userId,
+        userType: roleStr,
+      ).catchError((e) {
+        debugPrint('AuthService: Error pruning notification token on logout: $e');
+      });
+    }
+
+    _auth.signOut().catchError((e) {
+      debugPrint('AuthService: Firebase sign out note: $e');
+    });
   }
 
   /// Send a password reset email using Firebase Authentication

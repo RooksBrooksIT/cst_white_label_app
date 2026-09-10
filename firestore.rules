@@ -21,14 +21,30 @@ service cloud.firestore {
       allow create: if isCstOrg(orgId) || isCstDoc(request.resource.data);
       allow update, delete: if isCstOrg(orgId) || isCstDoc(resource.data);
 
+      // Vehicle Movements Subcollection: Read-only once created (Updates strictly disallowed)
+      match /vehicleMovements/{docId} {
+        allow read: if isCstOrg(orgId) || request.auth != null;
+        allow create: if isCstOrg(orgId) || request.auth != null;
+        allow update: if false; // Vehicle movements are strictly read-only after creation
+        allow delete: if isCstOrg(orgId) || request.auth != null;
+      }
+
       // Subcollections scoped under /organisation/{orgId}/...
       match /{collectionName}/{docId} {
-        allow read, write: if isCstOrg(orgId) || request.auth != null;
+        allow read, write: if collectionName != 'vehicleMovements' && (isCstOrg(orgId) || request.auth != null);
 
         match /{nestedSub=**} {
-          allow read, write: if isCstOrg(orgId) || request.auth != null;
+          allow read, write: if collectionName != 'vehicleMovements' && (isCstOrg(orgId) || request.auth != null);
         }
       }
+    }
+
+    // Direct vehicleMovements collection match (if accessed without org scoping)
+    match /vehicleMovements/{docId} {
+      allow read: if resource.data.app_id == 'cst_white_label' || resource == null;
+      allow create: if request.resource.data.app_id == 'cst_white_label' || request.auth != null;
+      allow update: if false; // Vehicle movements are strictly read-only after creation
+      allow delete: if request.auth != null;
     }
 
     // ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/firestore_error_handler.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/utils/firestore_error_handler.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class OrgResetPasswordScreen extends StatefulWidget {
   const OrgResetPasswordScreen({super.key});

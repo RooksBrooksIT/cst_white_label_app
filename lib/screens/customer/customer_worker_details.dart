@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/widgets/glass_card.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/widgets/glass_card.dart';
+import 'package:ebricks/utils/responsive.dart';
 
 class CustomerWorkerDetails extends StatefulWidget {
   final String siteId;

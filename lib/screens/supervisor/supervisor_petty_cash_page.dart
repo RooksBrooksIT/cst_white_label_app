@@ -1078,7 +1078,6 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
             ],
           ),
           const SizedBox(height: 6),
-
           Text(
             req.reason,
             style: const TextStyle(
@@ -1087,6 +1086,36 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
               color: Color(0xFF334155),
             ),
           ),
+          if (req.isSitePaymentLinked || (req.siteName != null && req.siteName!.isNotEmpty)) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.link_rounded, size: 14, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      'Linked Site Payment: ${req.linkedSitePaymentTitle ?? req.siteName ?? req.siteId}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1D4ED8),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 4),
           Text(
             'Submitted: $dateStr',
@@ -1148,46 +1177,35 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Allocated Amount',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF78350F),
-                            ),
-                          ),
-                          Text(
-                            PettyCashService.formatCurrency(
-                              req.allocatedAmount > 0 ? req.allocatedAmount : req.requestedAmount,
-                            ),
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'Amount Allocated: ${PettyCashService.formatCurrency(req.allocatedAmount > 0 ? req.allocatedAmount : req.requestedAmount)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFB45309),
+                        ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFD97706)),
+                          color: const Color(0xFFF59E0B),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
                           'Awaiting Confirmation',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFFB45309),
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Manager has processed allocation. Confirm physical receipt of cash to activate balance.',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF78350F)),
                   ),
                   const SizedBox(height: 10),
                   SizedBox(
@@ -1200,10 +1218,10 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                               height: 14,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Icon(Icons.check_circle_rounded, size: 16),
+                          : const Icon(Icons.verified_rounded, size: 16),
                       label: const Text(
                         'Confirm Amount Received',
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF059669),
@@ -1273,18 +1291,18 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
               ),
               const SizedBox(width: 10),
               const Expanded(
-                child: Text('Receipt Confirmation Needed', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                child: Text('Receipt Confirmation Required', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               ),
             ],
           ),
           content: Text(
             'You have ${PettyCashService.formatCurrency(amt)} allocated by your Manager awaiting physical receipt confirmation.\n\nYou cannot record expenses until you confirm that you have physically received the cash.',
-            style: const TextStyle(fontSize: 13.5, color: Color(0xFF334155), height: 1.4),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Dismiss', style: TextStyle(color: Color(0xFF64748B))),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
@@ -1296,7 +1314,7 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('Confirm Amount Received', style: TextStyle(fontWeight: FontWeight.w800)),
+              child: const Text('Confirm Receipt Now', style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           ],
         ),
@@ -1345,6 +1363,7 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
           supervisorName: widget.supervisorName,
           isReplenishment: isReplenishment,
           currentAccount: currentAccount,
+          assignedSites: _assignedSites,
           onRequestSubmitted: (reqId) {
             _tabController.animateTo(1);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1972,6 +1991,7 @@ class _CreateRequestDialog extends StatefulWidget {
   final String supervisorName;
   final bool isReplenishment;
   final PettyCashAccount? currentAccount;
+  final List<Map<String, String>> assignedSites;
   final ValueChanged<String> onRequestSubmitted;
 
   const _CreateRequestDialog({
@@ -1979,6 +1999,7 @@ class _CreateRequestDialog extends StatefulWidget {
     required this.supervisorName,
     required this.isReplenishment,
     this.currentAccount,
+    this.assignedSites = const [],
     required this.onRequestSubmitted,
   });
 
@@ -1991,7 +2012,42 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
+
+  String? _selectedSiteId;
+  String? _selectedSiteName;
+  List<Map<String, dynamic>> _pendingSitePayments = [];
+  bool _isLoadingSitePayments = false;
+  String? _selectedSitePaymentId;
+  String? _selectedSitePaymentTitle;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.assignedSites.isNotEmpty) {
+      _selectedSiteId = widget.assignedSites.first['siteId'];
+      _selectedSiteName = widget.assignedSites.first['siteName'];
+      _fetchPendingSitePayments();
+    }
+  }
+
+  Future<void> _fetchPendingSitePayments() async {
+    setState(() => _isLoadingSitePayments = true);
+    try {
+      final payments = await PettyCashService().fetchPendingSitePaymentsForSupervisor(
+        supervisorId: widget.supervisorId,
+        siteId: _selectedSiteId,
+      );
+      if (mounted) {
+        setState(() {
+          _pendingSitePayments = payments;
+          _isLoadingSitePayments = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingSitePayments = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -2039,6 +2095,141 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
                       Text(
                         'Allocated: ${PettyCashService.formatCurrency(totalAlloc)}',
                         style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Site Selection Dropdown
+              if (widget.assignedSites.isNotEmpty) ...[
+                const Text(
+                  'Associated Site (Optional)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedSiteId,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.location_city_rounded, size: 18, color: Color(0xFF64748B)),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('General / Unassigned Site', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                    ),
+                    ...widget.assignedSites.map((s) {
+                      return DropdownMenuItem<String>(
+                        value: s['siteId'],
+                        child: Text('${s['siteName']} (${s['siteId']})', style: const TextStyle(fontSize: 13)),
+                      );
+                    }),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedSiteId = val;
+                      final found = widget.assignedSites.firstWhere(
+                        (s) => s['siteId'] == val,
+                        orElse: () => {'siteId': '', 'siteName': ''},
+                      );
+                      _selectedSiteName = found['siteName']?.isNotEmpty == true ? found['siteName'] : null;
+                      _selectedSitePaymentId = null;
+                      _selectedSitePaymentTitle = null;
+                    });
+                    _fetchPendingSitePayments();
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Pending Site Payment Linkage Dropdown
+              if (_isLoadingSitePayments) ...[
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ] else if (_pendingSitePayments.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.link_rounded, size: 16, color: Color(0xFF2563EB)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Connect to Pending Site Payment',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1E40AF),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedSitePaymentId,
+                        decoration: InputDecoration(
+                          hintText: 'Select Site Payment Requisition',
+                          hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('None (Standalone Request)', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                          ),
+                          ..._pendingSitePayments.map((payment) {
+                            return DropdownMenuItem<String>(
+                              value: payment['id'].toString(),
+                              child: Text(
+                                payment['title'].toString(),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }),
+                        ],
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedSitePaymentId = val;
+                            if (val != null) {
+                              final p = _pendingSitePayments.firstWhere(
+                                (item) => item['id'].toString() == val,
+                                orElse: () => {},
+                              );
+                              if (p.isNotEmpty) {
+                                _selectedSitePaymentTitle = p['title']?.toString();
+                                if (p['amount'] != null && (p['amount'] as num) > 0) {
+                                  _amountController.text = (p['amount'] as num).toStringAsFixed(0);
+                                }
+                                _reasonController.text = 'Fund site payment: ${p['title']}';
+                              }
+                            } else {
+                              _selectedSitePaymentTitle = null;
+                            }
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -2155,6 +2346,10 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
         managerId: managerId,
         managerName: managerName,
         isReplenishment: widget.isReplenishment,
+        siteId: _selectedSiteId,
+        siteName: _selectedSiteName,
+        linkedSitePaymentId: _selectedSitePaymentId,
+        linkedSitePaymentTitle: _selectedSitePaymentTitle,
       );
 
       if (mounted) {

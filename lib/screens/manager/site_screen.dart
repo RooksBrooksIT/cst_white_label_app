@@ -7,10 +7,12 @@ import 'package:lottie/lottie.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/services/subscription_limit_service.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/services/subscription_limit_service.dart';
 
 class SiteScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -74,7 +76,6 @@ class _SiteScreenState extends State<SiteScreen>
   String? _selectedProjectId;
   bool _isLoadingSiteData = false;
   bool _isUpdating = false;
-  bool _isGettingUpdateLocation = false;
 
   final TextEditingController _updateSiteNameController = TextEditingController();
   final TextEditingController _updateLocationController = TextEditingController();
@@ -118,25 +119,31 @@ class _SiteScreenState extends State<SiteScreen>
   void _setupFinancialCalculationListeners() {
     _amountSpentController.text = '0.00';
     _balanceAmountController.text = '0.00';
-    _projectBudgetController.addListener(_recalcNewSetupBalance);
+    _amountPaidController.addListener(_recalcNewSetupBalance);
     _amountSpentController.addListener(_recalcNewSetupBalance);
 
-    _updateProjectBudgetController.addListener(_recalcUpdateBalance);
+    _updateAmountPaidController.addListener(_recalcUpdateBalance);
     _updateAmountSpentController.addListener(_recalcUpdateBalance);
   }
 
   void _recalcNewSetupBalance() {
-    final budget = double.tryParse(_projectBudgetController.text.trim()) ?? 0.0;
-    final spent = double.tryParse(_amountSpentController.text.trim()) ?? 0.0;
-    final balance = budget - spent;
-    _balanceAmountController.text = balance.toStringAsFixed(2);
+    final received = double.tryParse(_amountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final spent = double.tryParse(_amountSpentController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final balance = received - spent;
+    final formatted = balance.toStringAsFixed(2);
+    if (_balanceAmountController.text != formatted) {
+      _balanceAmountController.text = formatted;
+    }
   }
 
   void _recalcUpdateBalance() {
-    final budget = double.tryParse(_updateProjectBudgetController.text.trim()) ?? 0.0;
-    final spent = double.tryParse(_updateAmountSpentController.text.trim()) ?? 0.0;
-    final balance = budget - spent;
-    _updateBalanceAmountController.text = balance.toStringAsFixed(2);
+    final received = double.tryParse(_updateAmountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final spent = double.tryParse(_updateAmountSpentController.text.trim().replaceAll(',', '')) ?? 0.0;
+    final balance = received - spent;
+    final formatted = balance.toStringAsFixed(2);
+    if (_updateBalanceAmountController.text != formatted) {
+      _updateBalanceAmountController.text = formatted;
+    }
   }
 
   @override
@@ -298,30 +305,6 @@ class _SiteScreenState extends State<SiteScreen>
       return DateTime.tryParse(val.trim());
     }
     return null;
-  }
-
-  Future<void> _selectUpdateDate(BuildContext context, bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: isStartDate
-          ? (_updateStartDate ?? DateTime.now())
-          : (_updateEndDate ?? DateTime.now()),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-
-    if (picked != null) {
-      setState(() {
-        if (isStartDate) {
-          _updateStartDate = picked;
-          if (_updateEndDate != null && _updateEndDate!.isBefore(picked)) {
-            _updateEndDate = null;
-          }
-        } else {
-          _updateEndDate = picked;
-        }
-      });
-    }
   }
 
   Future<void> _loadSiteForUpdate(String docId) async {
@@ -501,8 +484,7 @@ class _SiteScreenState extends State<SiteScreen>
     }
 
     _updateAmountSpentController.text = amountSpent.toStringAsFixed(2);
-    final balance = budget - amountSpent;
-    _updateBalanceAmountController.text = balance.toStringAsFixed(2);
+    _recalcUpdateBalance();
   }
 
   Future<void> _loadReceivedPaymentsForSite(
@@ -522,6 +504,7 @@ class _SiteScreenState extends State<SiteScreen>
         }
         _updateAmountPaidController.text = total.toStringAsFixed(2);
       }
+      _recalcUpdateBalance();
     } catch (e) {
       debugPrint('Error loading received payments: $e');
     }
@@ -1056,11 +1039,9 @@ class _SiteScreenState extends State<SiteScreen>
       }
 
       // 3. Update project document & Site document
-      final double budget =
-          double.tryParse(_updateProjectBudgetController.text.replaceAll(',', '')) ?? 0.0;
       final double spent =
           double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
-      final double balance = budget - spent;
+      final double customerCashBalance = cumulativeAmountReceived - spent;
 
       if (_selectedProjectId != null && _selectedProjectId!.isNotEmpty) {
         try {
@@ -1069,7 +1050,7 @@ class _SiteScreenState extends State<SiteScreen>
               .set({
             'amountPaid': cumulativeAmountReceived,
             'amountReceived': cumulativeAmountReceived,
-            'amountBalance': balance,
+            'amountBalance': customerCashBalance,
             'receivedPayments': FieldValue.arrayUnion([paymentEntry]),
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
@@ -1085,6 +1066,7 @@ class _SiteScreenState extends State<SiteScreen>
               .set({
             'amountPaid': cumulativeAmountReceived,
             'amountReceived': cumulativeAmountReceived,
+            'amountBalance': customerCashBalance,
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         } catch (siteErr) {
@@ -1092,11 +1074,17 @@ class _SiteScreenState extends State<SiteScreen>
         }
       }
 
+      // Sync across central ExpenseService
+      final syncSiteId = _selectedSiteDocId ?? _selectedProjectId ?? '';
+      if (syncSiteId.isNotEmpty) {
+        await ExpenseService.recalcTotalsAndSyncProject(syncSiteId);
+      }
+
       if (!mounted) return;
       setState(() {
         _updateAmountPaidController.text =
             cumulativeAmountReceived.toStringAsFixed(2);
-        _updateBalanceAmountController.text = balance.toStringAsFixed(2);
+        _updateBalanceAmountController.text = customerCashBalance.toStringAsFixed(2);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1320,90 +1308,6 @@ class _SiteScreenState extends State<SiteScreen>
     );
   }
 
-  Future<void> _getCurrentUpdateLocation() async {
-    setState(() => _isGettingUpdateLocation = true);
-
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() => _isGettingUpdateLocation = false);
-        await _showEnableLocationDialog();
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw 'Location permissions are denied';
-        }
-      }
-      if (permission == LocationPermission.deniedForever) {
-        throw 'Location permissions are permanently denied';
-      }
-
-      Position? position;
-      try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 8),
-          ),
-        );
-      } catch (_) {
-        position = await Geolocator.getLastKnownPosition();
-      }
-
-      if (position == null) {
-        throw 'Failed to acquire location signal.';
-      }
-
-      String address = '';
-      if (kIsWeb) {
-        address = 'Web Location';
-      } else {
-        try {
-          List<Placemark> placemarks = await placemarkFromCoordinates(
-            position.latitude,
-            position.longitude,
-          );
-          if (placemarks.isNotEmpty) {
-            Placemark place = placemarks.first;
-            address = [
-              place.street,
-              place.locality,
-              place.administrativeArea,
-              place.country,
-            ].where((part) => part?.isNotEmpty ?? false).join(', ');
-          }
-        } catch (_) {
-          address =
-              'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
-        }
-      }
-
-      setState(() {
-        _updateLatitudeController.text = position!.latitude.toStringAsFixed(6);
-        _updateLongitudeController.text = position.longitude.toStringAsFixed(6);
-        if (_updateLocationController.text.isEmpty ||
-            _updateLocationController.text == 'Web Location') {
-          _updateLocationController.text = address;
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error getting location: $e'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isGettingUpdateLocation = false);
-    }
-  }
-
   Future<void> _updateSiteAndProject() async {
     if (_selectedSiteDocId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1430,43 +1334,18 @@ class _SiteScreenState extends State<SiteScreen>
     try {
       final siteName = _updateSiteNameController.text.trim();
       final location = _updateLocationController.text.trim();
-      final latitude = _updateLatitudeController.text.trim();
-      final longitude = _updateLongitudeController.text.trim();
       final projectName = _updateProjectNameController.text.trim().isEmpty
           ? siteName
           : _updateProjectNameController.text.trim();
 
-      // 1. Update Site document
+      // 1. Update Site document (Only editable fields allowed: Site Status, Actual Start/End Date)
       final siteUpdateData = {
-        'siteName': siteName,
-        'location': location,
-        'latitude': latitude.isNotEmpty ? double.tryParse(latitude) : null,
-        'longitude': longitude.isNotEmpty ? double.tryParse(longitude) : null,
-        'projectCategory': _updateProjectCategory ?? '',
-        'startDate': _updateStartDate != null
-            ? DateFormat('yyyy-MM-dd').format(_updateStartDate!)
-            : '',
-        'endDate': _updateEndDate != null
-            ? DateFormat('yyyy-MM-dd').format(_updateEndDate!)
-            : '',
         'status': _updateStatus,
         'actualStartDate': _updateActualStartDate != null
             ? Timestamp.fromDate(_updateActualStartDate!)
             : null,
         'actualEndDate': _updateActualEndDate != null
             ? Timestamp.fromDate(_updateActualEndDate!)
-            : null,
-        'isContractWork': _updateIsContractWork,
-        'contractorName':
-            _updateIsContractWork ? _updateContractorNameController.text.trim() : null,
-        'contractorBudget': _updateIsContractWork
-            ? (double.tryParse(_updateContractorBudgetController.text) ?? 0.0)
-            : null,
-        'contractStartDate': _updateContractStartDate != null
-            ? Timestamp.fromDate(_updateContractStartDate!)
-            : null,
-        'contractEndDate': _updateContractEndDate != null
-            ? Timestamp.fromDate(_updateContractEndDate!)
             : null,
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -1475,55 +1354,25 @@ class _SiteScreenState extends State<SiteScreen>
           .doc(_selectedSiteDocId)
           .update(siteUpdateData);
 
-      // 2. Update linked project document
-      final double budget =
-          double.tryParse(_updateProjectBudgetController.text) ?? 0.0;
+      // 2. Update linked project document (Only editable fields allowed: Project Stage, Site Status, Amount Received, Actual Start/End Date)
       final double amountPaid =
-          double.tryParse(_updateAmountPaidController.text) ?? 0.0;
+          double.tryParse(_updateAmountPaidController.text.replaceAll(',', '')) ?? 0.0;
       final double amountSpent =
-          double.tryParse(_updateAmountSpentController.text) ?? 0.0;
-      final double amountBalance = budget - amountSpent;
+          double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
+      final double amountBalance = amountPaid - amountSpent;
 
       final projectUpdateData = {
-        'projectName': projectName,
-        'ownerName': _updateOwnerNameController.text.trim(),
-        'ownerPhoneNumber': _updateOwnerPhoneController.text.trim(),
-        'projectBudget': budget,
         'amountPaid': amountPaid,
         'amountReceived': amountPaid,
-        'amountSpent': amountSpent,
         'amountBalance': amountBalance,
-        'projectCategory': _updateProjectCategory ?? '',
-        'projectSubCategory': _updateProjectSubCategory ?? '',
-        'projectContract': _updateProjectContract ?? '',
         'projectStage': _updateProjectStage ?? '',
         'currentStatus': _updateProjectStatus ?? _updateStatus,
         'status': _updateProjectStatus ?? _updateStatus,
-        'siteName': siteName,
-        'siteLocation': location,
-        'plannedStartDate': _updateStartDate != null
-            ? Timestamp.fromDate(_updateStartDate!)
-            : null,
-        'plannedEndDate': _updateEndDate != null
-            ? Timestamp.fromDate(_updateEndDate!)
-            : null,
         'actualStateDate': _updateActualStartDate != null
             ? Timestamp.fromDate(_updateActualStartDate!)
             : null,
         'actualEndDate': _updateActualEndDate != null
             ? Timestamp.fromDate(_updateActualEndDate!)
-            : null,
-        'contractStartDate': _updateContractStartDate != null
-            ? Timestamp.fromDate(_updateContractStartDate!)
-            : null,
-        'contractEndDate': _updateContractEndDate != null
-            ? Timestamp.fromDate(_updateContractEndDate!)
-            : null,
-        'isContractWork': _updateIsContractWork,
-        'contractorName':
-            _updateIsContractWork ? _updateContractorNameController.text.trim() : null,
-        'contractorBudget': _updateIsContractWork
-            ? (double.tryParse(_updateContractorBudgetController.text) ?? 0.0)
             : null,
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -1542,13 +1391,17 @@ class _SiteScreenState extends State<SiteScreen>
         }
       }
 
-      // Notification
+      // Real-time Notification to Organization
       try {
+        final ud = AuthService().userData;
+        final currentManager = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Manager').toString();
+
         await NotificationService.notifySiteCreatedOrUpdated(
           siteId: _selectedSiteId ?? _selectedSiteDocId!,
           siteName: siteName,
           location: location,
           projectName: projectName,
+          managerName: currentManager,
           isCreated: false,
         );
       } catch (notifErr) {
@@ -1787,6 +1640,17 @@ class _SiteScreenState extends State<SiteScreen>
       return;
     }
 
+    final ownerPhone = _ownerPhoneController.text.trim();
+    if (ownerPhone.isEmpty || ownerPhone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(ownerPhone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid 10-digit client phone number.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final siteName = _siteNameController.text.trim();
     final location = _locationController.text.trim();
     final latitude = _latitudeController.text.trim();
@@ -1883,11 +1747,15 @@ class _SiteScreenState extends State<SiteScreen>
 
       // Trigger real-time notification to Organization
       try {
+        final ud = AuthService().userData;
+        final currentManager = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Manager').toString();
+
         await NotificationService.notifySiteCreatedOrUpdated(
           siteId: nextSiteId,
           siteName: siteName,
           location: location,
           projectName: projectName,
+          managerName: currentManager,
           isCreated: true,
         );
       } catch (notifErr) {
@@ -1911,29 +1779,35 @@ class _SiteScreenState extends State<SiteScreen>
         final nextPrDocId = 'PR${(maxPRNum + 1).toString().padLeft(3, '0')}';
 
         final double budget =
-            double.tryParse(_projectBudgetController.text) ?? 0.0;
+            double.tryParse(_projectBudgetController.text.replaceAll(',', '')) ?? 0.0;
         final double amountPaid =
-            double.tryParse(_amountPaidController.text) ?? 0.0;
-        final double balance = budget - 0.0;
+            double.tryParse(_amountPaidController.text.replaceAll(',', '')) ?? 0.0;
+        final double amountSpent =
+            double.tryParse(_amountSpentController.text.replaceAll(',', '')) ?? 0.0;
+        final double balance = amountPaid - amountSpent;
 
         Map<String, dynamic>? initialPaymentEntry;
         if (amountPaid > 0) {
           final entryId = 'PAY_${DateTime.now().millisecondsSinceEpoch}';
+          final nowTimestamp = Timestamp.now();
           initialPaymentEntry = {
             'paymentId': entryId,
             'projectId': nextPrDocId,
             'siteId': createdSiteDocId,
             'siteName': siteName,
             'amount': amountPaid,
-            'date': Timestamp.now(),
+            'date': nowTimestamp,
             'paymentMode': 'Initial Payment',
             'referenceNo': 'SETUP',
             'remarks': 'Initial advance/payment received on site creation',
-            'createdAt': FieldValue.serverTimestamp(),
+            'createdAt': nowTimestamp,
           };
           await FirestoreService.getCollection('projectPayments')
               .doc(entryId)
-              .set(initialPaymentEntry);
+              .set({
+            ...initialPaymentEntry,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
         }
 
         final projectData = {
@@ -1943,7 +1817,7 @@ class _SiteScreenState extends State<SiteScreen>
           'ownerPhoneNumber': _ownerPhoneController.text.trim(),
           'amountPaid': amountPaid,
           'amountReceived': amountPaid,
-          'amountSpent': 0.0,
+          'amountSpent': amountSpent,
           'amountBalance': balance,
           'receivedPayments': initialPaymentEntry != null ? [initialPaymentEntry] : [],
           'projectBudget': budget,
@@ -1994,8 +1868,25 @@ class _SiteScreenState extends State<SiteScreen>
           'totalMgrExpense': 0.0,
           'totalOrgExpense': 0.0,
           'totalSiteExpense': 0.0,
+          'totalContractorExpense': 0.0,
+          'totalIncentiveExpenses': 0.0,
+          'totalAllExpenses': 0.0,
           'createdAt': FieldValue.serverTimestamp(),
         });
+
+        // Ensure Site document is synced with initial financial state
+        await FirestoreService.getCollection('Site')
+            .doc(createdSiteDocId)
+            .set({
+          'amountPaid': amountPaid,
+          'amountReceived': amountPaid,
+          'amountSpent': 0.0,
+          'amountBalance': balance,
+          'projectBudget': budget,
+        }, SetOptions(merge: true));
+
+        // Sync central ExpenseService
+        await ExpenseService.recalcTotalsAndSyncProject(createdSiteDocId);
       } catch (projectError) {
         // Rollback Site document if Project creation fails
         try {
@@ -2846,17 +2737,24 @@ class _SiteScreenState extends State<SiteScreen>
                           label: 'Estimated Budget (₹)',
                           hintText: 'e.g. 2500000',
                           primaryColor: primaryColor,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildTextField(
                           controller: _amountPaidController,
-                          label: 'Amount Received (₹)',
+                          label: 'Customer Received (₹)',
                           hintText: 'e.g. 500000',
                           primaryColor: primaryColor,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                          ],
+                          onChanged: (_) => _recalcNewSetupBalance(),
                         ),
                       ),
                     ],
@@ -2877,7 +2775,7 @@ class _SiteScreenState extends State<SiteScreen>
                       Expanded(
                         child: _buildTextField(
                           controller: _balanceAmountController,
-                          label: 'Balance Amount (₹)',
+                          label: 'Balance (₹)',
                           hintText: '0.00',
                           primaryColor: primaryColor,
                           readOnly: true,
@@ -2904,6 +2802,20 @@ class _SiteScreenState extends State<SiteScreen>
                           hintText: 'e.g. 9876543210',
                           primaryColor: primaryColor,
                           keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                          validator: (val) {
+                            final phone = val?.trim() ?? '';
+                            if (phone.isEmpty) {
+                              return 'Please enter client phone number';
+                            }
+                            if (phone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(phone)) {
+                              return 'Client phone must be exactly 10 digits';
+                            }
+                            return null;
+                          },
                         ),
                       ),
                     ],
@@ -3330,70 +3242,18 @@ class _SiteScreenState extends State<SiteScreen>
                         const SizedBox(height: 18),
                         _buildTextField(
                           controller: _updateSiteNameController,
-                          label: 'Site Name *',
+                          label: 'Site Name',
                           hintText: 'e.g. Green Valley Site',
                           primaryColor: primaryColor,
-                          validator: (value) =>
-                              value?.trim().isEmpty ?? true ? 'Please enter site name' : null,
+                          readOnly: true,
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _updateLocationController,
-                                label: 'Location / Address *',
-                                hintText: 'Enter site address or fetch GPS',
-                                primaryColor: primaryColor,
-                                validator: (value) =>
-                                    value?.trim().isEmpty ?? true ? 'Please enter location' : null,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 1),
-                              child: InkWell(
-                                onTap: _isGettingUpdateLocation ? null : _getCurrentUpdateLocation,
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        primaryColor.withValues(alpha: 0.15),
-                                        primaryColor.withValues(alpha: 0.06),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: primaryColor.withValues(alpha: 0.25),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: _isGettingUpdateLocation
-                                        ? SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: primaryColor,
-                                            ),
-                                          )
-                                        : Icon(
-                                            Icons.gps_fixed_rounded,
-                                            color: primaryColor,
-                                            size: 22,
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        _buildTextField(
+                          controller: _updateLocationController,
+                          label: 'Location / Address',
+                          hintText: 'Enter site address',
+                          primaryColor: primaryColor,
+                          readOnly: true,
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -3432,7 +3292,7 @@ class _SiteScreenState extends State<SiteScreen>
                               label: 'Project Category',
                               hint: 'Select Category',
                               primaryColor: primaryColor,
-                              onChanged: (val) => setState(() => _updateProjectCategory = val),
+                              onChanged: null,
                             );
                           },
                         ),
@@ -3444,7 +3304,7 @@ class _SiteScreenState extends State<SiteScreen>
                                 label: 'Site Start Date',
                                 date: _updateStartDate,
                                 primaryColor: primaryColor,
-                                onTap: () => _selectUpdateDate(context, true),
+                                onTap: null,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -3453,7 +3313,7 @@ class _SiteScreenState extends State<SiteScreen>
                                 label: 'Site End Date',
                                 date: _updateEndDate,
                                 primaryColor: primaryColor,
-                                onTap: () => _selectUpdateDate(context, false),
+                                onTap: null,
                               ),
                             ),
                           ],
@@ -3566,7 +3426,7 @@ class _SiteScreenState extends State<SiteScreen>
                             Switch(
                               value: _updateIsContractWork,
                               activeThumbColor: primaryColor,
-                              onChanged: (val) => setState(() => _updateIsContractWork = val),
+                              onChanged: null,
                             ),
                           ],
                         ),
@@ -3577,6 +3437,7 @@ class _SiteScreenState extends State<SiteScreen>
                             label: 'Contractor Name',
                             hintText: 'e.g. Apex Builders Ltd',
                             primaryColor: primaryColor,
+                            readOnly: true,
                           ),
                           const SizedBox(height: 16),
                           _buildTextField(
@@ -3585,6 +3446,7 @@ class _SiteScreenState extends State<SiteScreen>
                             hintText: 'e.g. 500000',
                             primaryColor: primaryColor,
                             keyboardType: TextInputType.number,
+                            readOnly: true,
                           ),
                           const SizedBox(height: 16),
                           Row(
@@ -3594,10 +3456,7 @@ class _SiteScreenState extends State<SiteScreen>
                                   label: 'Contract Start',
                                   date: _updateContractStartDate,
                                   primaryColor: primaryColor,
-                                  onTap: () async {
-                                    final date = await _pickCustomDate(_updateContractStartDate);
-                                    if (date != null) setState(() => _updateContractStartDate = date);
-                                  },
+                                  onTap: null,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -3606,10 +3465,7 @@ class _SiteScreenState extends State<SiteScreen>
                                   label: 'Contract End',
                                   date: _updateContractEndDate,
                                   primaryColor: primaryColor,
-                                  onTap: () async {
-                                    final date = await _pickCustomDate(_updateContractEndDate);
-                                    if (date != null) setState(() => _updateContractEndDate = date);
-                                  },
+                                  onTap: null,
                                 ),
                               ),
                             ],
@@ -3648,11 +3504,10 @@ class _SiteScreenState extends State<SiteScreen>
                         const SizedBox(height: 18),
                         _buildTextField(
                           controller: _updateProjectNameController,
-                          label: 'Project Name *',
+                          label: 'Project Name',
                           hintText: 'e.g. Tower A Construction',
                           primaryColor: primaryColor,
-                          validator: (val) =>
-                              val?.trim().isEmpty ?? true ? 'Please enter project name' : null,
+                          readOnly: true,
                         ),
                         const SizedBox(height: 16),
                         FutureBuilder<List<String>>(
@@ -3665,7 +3520,7 @@ class _SiteScreenState extends State<SiteScreen>
                               label: 'Project Sub-Category',
                               hint: 'Select Sub-Category',
                               primaryColor: primaryColor,
-                              onChanged: (val) => setState(() => _updateProjectSubCategory = val),
+                              onChanged: null,
                             );
                           },
                         ),
@@ -3695,7 +3550,7 @@ class _SiteScreenState extends State<SiteScreen>
                               label: 'Project Contract Type',
                               hint: 'Select Contract Type',
                               primaryColor: primaryColor,
-                              onChanged: (val) => setState(() => _updateProjectContract = val),
+                              onChanged: null,
                             );
                           },
                         ),
@@ -3738,7 +3593,7 @@ class _SiteScreenState extends State<SiteScreen>
                             Expanded(
                               child: _buildTextField(
                                 controller: _updateBalanceAmountController,
-                                label: 'Balance Amount (₹)',
+                                label: 'Balance (₹)',
                                 hintText: '0.00',
                                 primaryColor: primaryColor,
                                 readOnly: true,
@@ -3755,6 +3610,7 @@ class _SiteScreenState extends State<SiteScreen>
                                 label: 'Client / Owner Name',
                                 hintText: 'e.g. John Doe',
                                 primaryColor: primaryColor,
+                                readOnly: true,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -3765,6 +3621,18 @@ class _SiteScreenState extends State<SiteScreen>
                                 hintText: 'e.g. 9876543210',
                                 primaryColor: primaryColor,
                                 keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(10),
+                                ],
+                                validator: (val) {
+                                  final phone = val?.trim() ?? '';
+                                  if (phone.isNotEmpty && (phone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(phone))) {
+                                    return 'Client phone must be exactly 10 digits';
+                                  }
+                                  return null;
+                                },
+                                readOnly: true,
                               ),
                             ),
                           ],
@@ -4002,6 +3870,7 @@ class _SiteScreenState extends State<SiteScreen>
     TextInputType keyboardType = TextInputType.text,
     bool readOnly = false,
     void Function(String)? onChanged,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
 
@@ -4020,6 +3889,7 @@ class _SiteScreenState extends State<SiteScreen>
         TextFormField(
           controller: controller,
           validator: validator,
+          inputFormatters: inputFormatters,
           keyboardType: keyboardType,
           readOnly: readOnly,
           onChanged: onChanged,
@@ -4061,7 +3931,7 @@ class _SiteScreenState extends State<SiteScreen>
     required String label,
     required String hint,
     Color? primaryColor,
-    required void Function(String?) onChanged,
+    void Function(String?)? onChanged,
   }) {
     final isValidValue = value != null && items.contains(value);
     final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
@@ -4098,6 +3968,10 @@ class _SiteScreenState extends State<SiteScreen>
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
@@ -4105,7 +3979,11 @@ class _SiteScreenState extends State<SiteScreen>
                 width: 1.8,
               ),
             ),
+            suffixIcon: onChanged == null
+                ? const Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF94A3B8))
+                : null,
           ),
+          icon: onChanged == null ? const SizedBox.shrink() : null,
           hint: Text(
             hint,
             style: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
@@ -4125,12 +4003,12 @@ class _SiteScreenState extends State<SiteScreen>
   Widget _buildDateField({
     required String label,
     required DateTime? date,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     Color? primaryColor,
   }) {
     final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
     final formattedDate =
-        date == null ? 'Select Date' : DateFormat('dd MMM yyyy').format(date);
+        date == null ? 'Not Set' : DateFormat('dd MMM yyyy').format(date);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4167,9 +4045,9 @@ class _SiteScreenState extends State<SiteScreen>
                   ),
                 ),
                 Icon(
-                  Icons.calendar_today_rounded,
-                  size: 18,
-                  color: effectivePrimary,
+                  onTap != null ? Icons.calendar_today_rounded : Icons.lock_outline_rounded,
+                  size: onTap != null ? 18 : 16,
+                  color: onTap != null ? effectivePrimary : const Color(0xFF94A3B8),
                 ),
               ],
             ),

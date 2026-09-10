@@ -4,12 +4,14 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/expense_service.dart';
-import 'package:demo_cst/services/app_storage_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/app_storage_service.dart';
+import 'package:ebricks/services/offline_sync_service.dart';
+import 'package:ebricks/widgets/offline_sync_banner.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
 
 class ManagerExpenses extends StatefulWidget {
   final bool hideAppBar;
@@ -36,7 +38,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   String? selectedProjectName;
   String? selectedSupervisorId;
   String? selectedSupervisorName;
-  String? selectedProjectPhase;
+  String? selectedProjectStage;
   DateTime selectedDate = DateTime.now();
 
   List<String> siteIds = [];
@@ -51,7 +53,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   final billAmountController = TextEditingController();
 
   final supervisorIdController = TextEditingController();
-  final projectPhaseController = TextEditingController();
+  final projectStageController = TextEditingController();
   final projectNameController = TextEditingController();
 
   String? managerId;
@@ -113,7 +115,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
     billVendorController.dispose();
     billAmountController.dispose();
     supervisorIdController.dispose();
-    projectPhaseController.dispose();
+    projectStageController.dispose();
     projectNameController.dispose();
     _logSearchController.dispose();
     super.dispose();
@@ -122,20 +124,38 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   Future<void> _loadSiteIds() async {
     setState(() => isLoadingSites = true);
     try {
-      final sitesSnapshot = await FirestoreService.sites.get();
-      final Map<String, String> names = {
-        for (var doc in sitesSnapshot.docs)
-          doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
-      };
+      if (OfflineSyncService().isOnline) {
+        final sitesSnapshot = await FirestoreService.sites.get();
+        final Map<String, String> names = {
+          for (var doc in sitesSnapshot.docs)
+            doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
+        };
 
-      final fetchedSiteIds = sitesSnapshot.docs
-          .map((doc) => doc.id)
-          .where((id) => id.isNotEmpty)
-          .toList();
+        final fetchedSiteIds = sitesSnapshot.docs
+            .map((doc) => doc.id)
+            .where((id) => id.isNotEmpty)
+            .toList();
 
-      setState(() {
         siteNameMap = names;
         siteIds = fetchedSiteIds..sort();
+
+        await OfflineSyncService.cacheMasterData('sites_list', siteIds);
+        await OfflineSyncService.cacheMasterData('sites_map', siteNameMap);
+      } else {
+        final cachedIds = await OfflineSyncService.getCachedMasterData('sites_list');
+        final cachedMap = await OfflineSyncService.getCachedMasterData('sites_map');
+
+        if (cachedIds is List) {
+          siteIds = cachedIds.map((e) => e.toString()).toList();
+        }
+        if (cachedMap is Map) {
+          siteNameMap = Map<String, String>.from(
+            cachedMap.map((k, v) => MapEntry(k.toString(), v.toString())),
+          );
+        }
+      }
+
+      setState(() {
         isLoadingSites = false;
 
         if (siteIds.length == 1) {
@@ -145,8 +165,71 @@ class _ManagerExpensesState extends State<ManagerExpenses>
       });
     } catch (e) {
       debugPrint('Error loading site IDs: $e');
+      final cachedIds = await OfflineSyncService.getCachedMasterData('sites_list');
+      final cachedMap = await OfflineSyncService.getCachedMasterData('sites_map');
+
+      if (cachedIds is List) {
+        siteIds = cachedIds.map((e) => e.toString()).toList();
+      }
+      if (cachedMap is Map) {
+        siteNameMap = Map<String, String>.from(
+          cachedMap.map((k, v) => MapEntry(k.toString(), v.toString())),
+        );
+      }
+
       setState(() => isLoadingSites = false);
     }
+  }
+
+  Future<String?> _resolveSupervisorName(String? nameOrId) async {
+    if (nameOrId == null || nameOrId.trim().isEmpty) return null;
+    final clean = nameOrId.trim();
+
+    try {
+      final supDoc = await FirestoreService.supervisors.doc(clean).get();
+      if (supDoc.exists && supDoc.data() != null) {
+        final data = supDoc.data()!;
+        final fullName = (data['FullName'] ??
+                data['fullName'] ??
+                data['username'] ??
+                data['UserName'] ??
+                data['name'])
+            ?.toString()
+            .trim();
+        if (fullName != null && fullName.isNotEmpty) {
+          return fullName;
+        }
+      }
+
+      final queries = [
+        FirestoreService.supervisors.where('SupervisorId', isEqualTo: clean),
+        FirestoreService.supervisors.where('supervisorId', isEqualTo: clean),
+        FirestoreService.supervisors.where('Supervisor ID', isEqualTo: clean),
+        FirestoreService.supervisors.where('username', isEqualTo: clean),
+        FirestoreService.supervisors.where('UserName', isEqualTo: clean),
+      ];
+
+      for (var q in queries) {
+        final snap = await q.get();
+        if (snap.docs.isNotEmpty) {
+          final data = snap.docs.first.data();
+          final fullName = (data['FullName'] ??
+                  data['fullName'] ??
+                  data['username'] ??
+                  data['UserName'] ??
+                  data['name'])
+              ?.toString()
+              .trim();
+          if (fullName != null && fullName.isNotEmpty) {
+            return fullName;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error resolving supervisor name: $e');
+    }
+
+    return clean;
   }
 
   Future<void> _loadSiteDetails(String siteId) async {
@@ -156,56 +239,193 @@ class _ManagerExpensesState extends State<ManagerExpenses>
     String? projectName;
 
     try {
-      final docRef = FirestoreService.siteSupervisorMap.doc(siteId);
-      final docSnap = await docRef.get();
+      // 1. Check Site collection doc
+      final siteDoc = await FirestoreService.sites.doc(siteId).get();
+      if (siteDoc.exists && siteDoc.data() != null) {
+        final data = siteDoc.data()!;
+        projectName = (data['projectName'] ?? data['siteName'] ?? data['site'] ?? data['name'])?.toString();
+        projectPhase = (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
 
-      if (docSnap.exists) {
-        final data = docSnap.data()!;
-        supervisorId = data['supervisor']?.toString();
-        projectPhase = data['projectStage']?.toString();
-        projectName = (data['projectName'] ?? data['project_name'])?.toString();
-      } else {
-        final mapSnapshot = await FirestoreService.siteSupervisorMap
-            .where('site', isEqualTo: siteId)
-            .limit(1)
-            .get();
-        if (mapSnapshot.docs.isNotEmpty) {
-          final data = mapSnapshot.docs.first.data();
-          supervisorId = data['supervisor']?.toString();
-          projectPhase = data['projectStage']?.toString();
-          projectName =
-              (data['projectName'] ?? data['project_name'])?.toString();
+        final sup = data['Supervisor'] ??
+            data['supervisor'] ??
+            data['supervisorName'] ??
+            data['supervisor_name'] ??
+            data['FullName'] ??
+            data['fullName'] ??
+            data['name'] ??
+            data['username'] ??
+            data['UserName'];
+        final supId = data['Supervisor ID'] ??
+            data['supervisorId'] ??
+            data['SupervisorId'] ??
+            data['supervisor_id'] ??
+            data['assignedSupervisor'];
+
+        if (sup != null && sup.toString().trim().isNotEmpty) {
+          supervisorName = sup.toString().trim();
+        }
+        if (supId != null && supId.toString().trim().isNotEmpty) {
+          supervisorId = supId.toString().trim();
         }
       }
 
-      if (supervisorId != null && supervisorId.isNotEmpty) {
-        try {
-          final supDoc =
-              await FirestoreService.supervisors.doc(supervisorId).get();
-          if (supDoc.exists) {
-            final supData = supDoc.data();
-            supervisorName =
-                supData?['username'] ?? supData?['UserName'] ?? supData?['name'];
+      // 2. Direct lookup in siteSupervisorMap by docId = siteId
+      if (supervisorName == null && supervisorId == null) {
+        final mapDoc = await FirestoreService.siteSupervisorMap.doc(siteId).get();
+        if (mapDoc.exists && mapDoc.data() != null) {
+          final data = mapDoc.data()!;
+          projectPhase ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
+          projectName ??= (data['projectName'] ?? data['project_name'] ?? data['project'])?.toString();
+
+          final sup = data['supervisor'] ??
+              data['supervisorName'] ??
+              data['Supervisor'] ??
+              data['supervisor_name'] ??
+              data['FullName'] ??
+              data['fullName'] ??
+              data['name'] ??
+              data['username'] ??
+              data['UserName'];
+          final supId = data['Supervisor ID'] ??
+              data['supervisorId'] ??
+              data['SupervisorId'] ??
+              data['supervisor_id'];
+
+          if (sup != null && sup.toString().trim().isNotEmpty) {
+            supervisorName = sup.toString().trim();
           }
-        } catch (e) {
-          debugPrint('Error fetching supervisor details: $e');
+          if (supId != null && supId.toString().trim().isNotEmpty) {
+            supervisorId = supId.toString().trim();
+          }
         }
       }
+
+      // 3. Query siteSupervisorMap by site / siteId / siteName fields
+      final effectiveSiteName = projectName ?? siteNameMap[siteId] ?? '';
+      if (supervisorName == null && supervisorId == null) {
+        final queriesToTry = [
+          FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: siteId),
+          FirestoreService.siteSupervisorMap.where('site', isEqualTo: siteId),
+          FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: siteId),
+        ];
+        if (effectiveSiteName.isNotEmpty) {
+          queriesToTry.add(FirestoreService.siteSupervisorMap.where('site', isEqualTo: effectiveSiteName));
+          queriesToTry.add(FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: effectiveSiteName));
+          queriesToTry.add(FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: effectiveSiteName));
+        }
+
+        for (var q in queriesToTry) {
+          final snap = await q.get();
+          if (snap.docs.isNotEmpty) {
+            final data = snap.docs.first.data();
+            projectPhase ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
+            projectName ??= (data['projectName'] ?? data['project_name'] ?? data['project'])?.toString();
+
+            final sup = data['supervisor'] ??
+                data['supervisorName'] ??
+                data['Supervisor'] ??
+                data['supervisor_name'] ??
+                data['FullName'] ??
+                data['fullName'] ??
+                data['name'] ??
+                data['username'] ??
+                data['UserName'];
+            final supId = data['Supervisor ID'] ??
+                data['supervisorId'] ??
+                data['SupervisorId'] ??
+                data['supervisor_id'];
+
+            if (sup != null && sup.toString().trim().isNotEmpty) {
+              supervisorName = sup.toString().trim();
+            }
+            if (supId != null && supId.toString().trim().isNotEmpty) {
+              supervisorId = supId.toString().trim();
+            }
+            if (supervisorName != null || supervisorId != null) break;
+          }
+        }
+      }
+
+      // 4. Broad scan in siteSupervisorMap
+      if (supervisorName == null && supervisorId == null) {
+        final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
+        final targetSiteIdLower = siteId.toLowerCase().trim();
+        final targetSiteNameLower = effectiveSiteName.toLowerCase().trim();
+
+        for (var doc in mapSnapshot.docs) {
+          final data = doc.data();
+          final docSite = (data['site'] ?? '').toString().toLowerCase().trim();
+          final docSiteName = (data['siteName'] ?? '').toString().toLowerCase().trim();
+          final docSiteId = (data['siteId'] ?? '').toString().toLowerCase().trim();
+          final docId = doc.id.toLowerCase().trim();
+
+          final isMatch = docId == targetSiteIdLower ||
+              docId.startsWith('${targetSiteIdLower}_') ||
+              docId.contains(targetSiteIdLower) ||
+              (targetSiteNameLower.isNotEmpty && docId.contains(targetSiteNameLower)) ||
+              (docSite.isNotEmpty && (docSite == targetSiteIdLower || docSite.contains(targetSiteIdLower) || (targetSiteNameLower.isNotEmpty && docSite.contains(targetSiteNameLower)))) ||
+              (docSiteName.isNotEmpty && (docSiteName == targetSiteIdLower || docSiteName.contains(targetSiteNameLower) || (targetSiteNameLower.isNotEmpty && docSiteName.contains(targetSiteNameLower)))) ||
+              (docSiteId.isNotEmpty && (docSiteId == targetSiteIdLower || docSiteId.contains(targetSiteIdLower) || (targetSiteNameLower.isNotEmpty && docSiteId.contains(targetSiteNameLower))));
+
+          if (isMatch) {
+            projectPhase ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
+            projectName ??= (data['projectName'] ?? data['project_name'] ?? data['project'])?.toString();
+
+            final sup = data['supervisor'] ??
+                data['supervisorName'] ??
+                data['Supervisor'] ??
+                data['supervisor_name'] ??
+                data['FullName'] ??
+                data['fullName'] ??
+                data['name'] ??
+                data['username'] ??
+                data['UserName'];
+            final supId = data['Supervisor ID'] ??
+                data['supervisorId'] ??
+                data['SupervisorId'] ??
+                data['supervisor_id'];
+
+            if (sup != null && sup.toString().trim().isNotEmpty) {
+              supervisorName = sup.toString().trim();
+            }
+            if (supId != null && supId.toString().trim().isNotEmpty) {
+              supervisorId = supId.toString().trim();
+            }
+            if (supervisorName != null || supervisorId != null) break;
+          }
+        }
+      }
+
+      // Resolve supervisor name if we have supervisorName or supervisorId
+      String? resolvedName;
+      if (supervisorName != null && supervisorName.isNotEmpty) {
+        resolvedName = await _resolveSupervisorName(supervisorName);
+      }
+      if ((resolvedName == null || resolvedName.isEmpty) && supervisorId != null && supervisorId.isNotEmpty) {
+        resolvedName = await _resolveSupervisorName(supervisorId);
+      }
+
+      final finalSupervisorName = (resolvedName != null && resolvedName.isNotEmpty)
+          ? resolvedName
+          : (supervisorName ?? supervisorId);
 
       projectName ??= siteNameMap[siteId] ?? 'N/A';
 
       if (mounted) {
         setState(() {
-          selectedSupervisorId = supervisorId ?? 'NOT_ASSIGNED';
-          selectedSupervisorName = supervisorName ?? supervisorId ?? 'N/A';
-          selectedProjectPhase = projectPhase ?? 'N/A';
+          selectedSupervisorId = supervisorId ?? finalSupervisorName ?? 'NOT_ASSIGNED';
+          selectedSupervisorName = finalSupervisorName ?? supervisorId ?? 'N/A';
+          selectedProjectStage = projectPhase ?? 'N/A';
           selectedProjectName = projectName;
 
-          supervisorIdController.text =
-              supervisorName != null && supervisorName.isNotEmpty
-                  ? '$supervisorName ($supervisorId)'
-                  : (supervisorId ?? 'Not Assigned');
-          projectPhaseController.text = projectPhase ?? 'Not Assigned';
+          final displaySup = (finalSupervisorName != null && finalSupervisorName.isNotEmpty)
+              ? (supervisorId != null && supervisorId.isNotEmpty && supervisorId != finalSupervisorName && supervisorId != 'NOT_ASSIGNED'
+                  ? '$finalSupervisorName ($supervisorId)'
+                  : finalSupervisorName)
+              : (supervisorId ?? 'Not Assigned');
+
+          supervisorIdController.text = displaySup;
+          projectStageController.text = projectPhase ?? 'Not Assigned';
           projectNameController.text = projectName ?? 'Not Assigned';
         });
       }
@@ -346,7 +566,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   Future<void> _handleSubmit() async {
     if (selectedSiteId == null ||
         selectedSupervisorId == null ||
-        selectedProjectPhase == null ||
+        selectedProjectStage == null ||
         selectedProjectName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -414,6 +634,81 @@ class _ManagerExpensesState extends State<ManagerExpenses>
 
     if (confirm != true) return;
 
+    if (!OfflineSyncService().isOnline) {
+      setState(() => isSubmitting = true);
+      try {
+        final payload = {
+          'docId': docId,
+          'siteId': selectedSiteId,
+          'supervisorId': selectedSupervisorId,
+          'projectStage': selectedProjectStage,
+          'projectName': selectedProjectName,
+          'managerId': managerId,
+          'managerName': managerName,
+          'userRole': managerRole,
+          'bills': bills,
+          'selectedDate': selectedDate.toIso8601String(),
+        };
+
+        await OfflineSyncService().enqueueEntry(
+          type: 'manager_expense',
+          data: payload,
+          idempotencyKey: '${docId}_${DateTime.now().millisecondsSinceEpoch}',
+        );
+
+        if (!mounted) return;
+
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.wifi_off_rounded, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Saved Offline'),
+              ],
+            ),
+            content: const Text(
+              'Your manager expense entry has been saved locally because there is no active internet connection.\n\nIt will automatically sync with the server once network connectivity is restored.',
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+
+        setState(() {
+          bills = [];
+          initialBills = [];
+          existingDailyTotal = 0.0;
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save offline: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => isSubmitting = false);
+        }
+      }
+      return;
+    }
+
     setState(() => isSubmitting = true);
 
     try {
@@ -464,7 +759,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
           'raisedBy': managerId,
           'raisedByName': managerName,
           'projectName': selectedProjectName,
-          'projectStage': selectedProjectPhase,
+          'projectStage': selectedProjectStage,
           'siteId': selectedSiteId,
           'supervisorName': selectedSupervisorId,
           'totalAmount': newSessionTotal,
@@ -488,7 +783,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
         'managerId': managerId ?? '',
         'managerName': managerName ?? '',
         'projectName': selectedProjectName ?? '',
-        'projectStage': selectedProjectPhase ?? '',
+        'projectStage': selectedProjectStage ?? '',
         'siteId': selectedSiteId ?? '',
       };
 
@@ -804,7 +1099,8 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              const SyncStatusCard(margin: EdgeInsets.only(top: 14)),
+              const SizedBox(height: 14),
 
               // SECTION 1: SITE & PROJECT INFO
               _buildSectionHeader(
@@ -871,29 +1167,32 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                                   BorderSide(color: primaryColor, width: 1.8),
                             ),
                           ),
-                          items: siteIds
-                              .map(
-                                (site) => DropdownMenuItem<String>(
-                                  value: site,
-                                  child: Text(
-                                    site,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFF0A183D),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                          items: siteIds.map((site) {
+                            final siteName = siteNameMap[site] ?? '';
+                            final display = (siteName.isNotEmpty &&
+                                    !site.toLowerCase().contains(siteName.toLowerCase()))
+                                ? '${site}_$siteName'
+                                : site;
+                            return DropdownMenuItem<String>(
+                              value: site,
+                              child: Text(
+                                display,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF0A183D),
+                                  fontWeight: FontWeight.w600,
                                 ),
-                              )
-                              .toList(),
+                              ),
+                            );
+                          }).toList(),
                           onChanged: (value) {
                             setState(() {
                               selectedSiteId = value;
                               selectedSupervisorId = null;
-                              selectedProjectPhase = null;
+                              selectedProjectStage = null;
                               selectedProjectName = null;
                               supervisorIdController.clear();
-                              projectPhaseController.clear();
+                              projectStageController.clear();
                               projectNameController.clear();
                               bills = [];
                               initialBills = [];
@@ -914,8 +1213,8 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                 readOnly: true,
               ),
               _buildCustomField(
-                label: 'Project Phase',
-                controller: projectPhaseController,
+                label: 'Project Stage',
+                controller: projectStageController,
                 icon: Icons.timeline_rounded,
                 readOnly: true,
               ),
@@ -2285,7 +2584,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                                   Icons.assignment_rounded),
                               const Divider(
                                   height: 14, color: Color(0xFFF1F5F9)),
-                              _buildModalInfoRow('Project Phase', projectStage,
+                              _buildModalInfoRow('Project Stage', projectStage,
                                   Icons.timeline_rounded),
                               const Divider(
                                   height: 14, color: Color(0xFFF1F5F9)),

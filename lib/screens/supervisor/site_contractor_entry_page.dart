@@ -6,7 +6,7 @@ import '/services/firestore_service.dart';
 import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_dashboard.dart';
+import 'package:ebricks/screens/supervisor/supervisor_dashboard.dart';
 
 class SiteContractorEntryPage extends StatefulWidget {
   final String supervisorId;

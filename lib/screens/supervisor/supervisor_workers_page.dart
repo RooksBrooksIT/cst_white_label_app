@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/supervisor/supervisor_worker_att_page.dart';
-import 'package:demo_cst/screens/reports/workers_availability_report_page.dart';
-import 'package:demo_cst/screens/reports/worker_summary_report_page.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/supervisor/supervisor_worker_att_page.dart';
+import 'package:ebricks/screens/reports/workers_availability_report_page.dart';
+import 'package:ebricks/screens/reports/worker_summary_report_page.dart';
 
 class SupervisorWorkersPage extends StatelessWidget {
   final String supervisorId;

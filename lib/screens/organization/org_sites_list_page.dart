@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/screens/manager/project_setup_wizard.dart';
-import 'package:demo_cst/screens/organization/site_financial_details_page.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/widgets/bottom_nav.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/screens/manager/project_setup_wizard.dart';
+import 'package:ebricks/screens/organization/site_financial_details_page.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/widgets/bottom_nav.dart';
 
 class OrgSitesListPage extends StatefulWidget {
   final String initialFilter;
@@ -425,28 +425,32 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                                   stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
                                   builder: (context, mapSnap) {
-                                    final supervisorDocs = mapSnap.hasData ? mapSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                      stream: FirestoreService.getCollection('totalSiteExpensesPerDay').snapshots(),
+                                      builder: (context, expSnap) {
+                                        final supervisorDocs = mapSnap.hasData ? mapSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                                        final totalsDocs = expSnap.hasData ? expSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-                                    final supervisorMap = <String, String>{};
-                                    for (var d in supervisorDocs) {
-                                      final data = d.data();
-                                      final sName = data['supervisor'] ?? data['supervisorName'];
-                                      final sId = (data['siteId'] ?? data['site'] ?? d.id).toString();
-                                      if (sName != null) {
-                                        supervisorMap[sId] = sName.toString();
-                                      }
-                                    }
+                                        final supervisorMap = <String, String>{};
+                                        for (var d in supervisorDocs) {
+                                          final data = d.data();
+                                          final sName = data['supervisor'] ?? data['supervisorName'];
+                                          final sId = (data['siteId'] ?? data['site'] ?? d.id).toString();
+                                          if (sName != null) {
+                                            supervisorMap[sId] = sName.toString();
+                                          }
+                                        }
 
-                                    final unifiedMap = _buildUnifiedSiteDocs(
-                                      siteDocs: siteDocs,
-                                      projectDocs: projectDocs,
-                                      supervisorDocs: supervisorDocs,
-                                    );
+                                        final unifiedMap = _buildUnifiedSiteDocs(
+                                          siteDocs: siteDocs,
+                                          projectDocs: projectDocs,
+                                          supervisorDocs: supervisorDocs,
+                                          totalsDocs: totalsDocs,
+                                        );
 
-                                    final rawDocs = unifiedMap.entries
-                                        .map((e) => _SiteEntry(docId: e.key, data: e.value))
-                                        .toList();
-
+                                        final rawDocs = unifiedMap.entries
+                                            .map((e) => _SiteEntry(docId: e.key, data: e.value))
+                                            .toList();
                                     // Compute Dynamic Tab Counts from Actual Backend Documents
                                     int allCount = rawDocs.length;
                                     int liveCount = 0;
@@ -700,13 +704,15 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                                 ),
                                         ),
                                       ],
-                                    );
-                                  },
-                                );
-                              },
-                            );
-                          },
-                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
                       ),
                     ],
                   ),
@@ -719,12 +725,18 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
     );
   }
 
+  double _parseNum(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0.0;
+  }
+
   double _calculateProgress(Map<String, dynamic> data) {
     if (data['progress'] is num) {
       return (data['progress'] as num).toDouble();
     }
-    final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : 0.0);
-    final spent = (data['amountSpent'] is num ? (data['amountSpent'] as num).toDouble() : 0.0);
+    final budget = _parseNum(data['projectBudget'] ?? data['budget']);
+    final spent = _parseNum(data['amountSpent'] ?? data['amountSpend'] ?? data['spent'] ?? data['totalAllExpenses']);
     if (budget > 0) {
       final p = (spent / budget) * 100;
       return p > 100 ? 100.0 : p;
@@ -762,8 +774,14 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
     final rawStatus = (data['currentStatus'] ?? data['status'] ?? 'Live').toString();
     final statusBadge = _getStatusBadge(rawStatus, data);
 
-    final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : (data['budget'] is num ? (data['budget'] as num).toDouble() : (double.tryParse(data['projectBudget']?.toString() ?? '') ?? 0.0)));
-    final balance = (data['amountBalance'] is num ? (data['amountBalance'] as num).toDouble() : (data['balance'] is num ? (data['balance'] as num).toDouble() : (data['amountPaid'] is num ? (data['amountPaid'] as num).toDouble() : budget)));
+    final budget = _parseNum(data['projectBudget'] ?? data['budget']);
+    final paid = _parseNum(data['amountPaid'] ?? data['paid'] ?? data['amountReceived']);
+    final spent = _parseNum(data['amountSpent'] ?? data['amountSpend'] ?? data['spent'] ?? data['totalAllExpenses']);
+    final balance = data.containsKey('amountBalance') && data['amountBalance'] != null
+        ? _parseNum(data['amountBalance'])
+        : (data.containsKey('balance') && data['balance'] != null
+            ? _parseNum(data['balance'])
+            : (budget > 0 ? (budget - spent) : (paid > 0 ? (paid - spent) : 0.0)));
     final progress = _calculateProgress(data);
 
     return Container(
@@ -1084,6 +1102,7 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> siteDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> projectDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> supervisorDocs,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> totalsDocs = const [],
   }) {
     final unifiedMap = <String, Map<String, dynamic>>{};
 
@@ -1162,6 +1181,38 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
         }
         if (data['amountBalance'] != null && target['amountBalance'] == null) {
           target['amountBalance'] = data['amountBalance'];
+        }
+      }
+    }
+
+    // 4. Ingest totalSiteExpensesPerDay summaries
+    for (var doc in totalsDocs) {
+      final data = doc.data();
+      final sId = (data['siteId'] ?? doc.id).toString().trim();
+      final sName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
+      final existingKey = findMatchingKey(sId, doc.id, sName);
+      final target = existingKey != null ? unifiedMap[existingKey] : null;
+
+      if (target != null) {
+        double totalExp = 0.0;
+        if (data['totalAllExpenses'] is num) {
+          totalExp = (data['totalAllExpenses'] as num).toDouble();
+        } else {
+          final sExp = _parseNum(data['totalSiteExpense']);
+          final mExp = _parseNum(data['totalMgrExpense']);
+          final oExp = _parseNum(data['totalOrgExpense']);
+          final cExp = _parseNum(data['totalContractorExpense']);
+          final iExp = _parseNum(data['totalIncentiveExpenses']);
+          totalExp = sExp + mExp + oExp + cExp + iExp;
+        }
+
+        final currentSpent = _parseNum(target['amountSpent'] ?? target['amountSpend'] ?? target['spent']);
+        if (totalExp > 0 || currentSpent == 0) {
+          target['amountSpent'] = totalExp > 0 ? totalExp : currentSpent;
+          final budget = _parseNum(target['projectBudget'] ?? target['budget']);
+          final income = _parseNum(target['amountPaid'] ?? target['paid'] ?? target['amountReceived']);
+          final effectiveSpent = (target['amountSpent'] as num).toDouble();
+          target['amountBalance'] = budget > 0 ? (budget - effectiveSpent) : (income - effectiveSpent);
         }
       }
     }

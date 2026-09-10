@@ -4,22 +4,22 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/screens/organization/org_site_payment_menu_page.dart';
-import 'package:demo_cst/screens/organization/org_supervisor_in_site_page.dart';
-import 'package:demo_cst/screens/organization/organization_expenses.dart';
-import 'package:demo_cst/screens/organization/org_approvals_menu_page.dart';
-import 'package:demo_cst/screens/organization/org_materials_tools_inventory_page.dart';
-import 'package:demo_cst/screens/organization/org_petty_cash_page.dart';
-import 'package:demo_cst/screens/organization/org_notification_page.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/organization/org_menu_screen.dart';
-import 'package:demo_cst/screens/organization/org_sites_list_page.dart';
-import 'package:demo_cst/screens/manager/manager_config_screen.dart';
-import 'package:demo_cst/widgets/bottom_nav.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/screens/organization/org_site_payment_menu_page.dart';
+import 'package:ebricks/screens/organization/org_supervisor_in_site_page.dart';
+import 'package:ebricks/screens/organization/organization_expenses.dart';
+import 'package:ebricks/screens/organization/org_approvals_menu_page.dart';
+import 'package:ebricks/screens/organization/org_materials_tools_inventory_page.dart';
+import 'package:ebricks/screens/organization/org_petty_cash_page.dart';
+import 'package:ebricks/screens/organization/org_notification_page.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/organization/org_menu_screen.dart';
+import 'package:ebricks/screens/organization/org_sites_list_page.dart';
+import 'package:ebricks/screens/manager/manager_config_screen.dart';
+import 'package:ebricks/widgets/bottom_nav.dart';
 
 class OrganizationDashboard extends StatefulWidget {
   const OrganizationDashboard({super.key});
@@ -61,6 +61,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     _initStreams();
     _loadUserData();
     _startAutoPlayCarousel();
+    NotificationService.ensureRealtimeBridgeActive(
+      role: 'organisation',
+      userName: _userName,
+    );
   }
 
   void _initStreams() {
@@ -144,7 +148,17 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         _userName = name.isNotEmpty ? name : 'User';
         _userRole = userData['role'] ?? 'Organization Head';
       });
+      NotificationService.ensureRealtimeBridgeActive(
+        role: 'organisation',
+        userName: _userName,
+      );
     }
+  }
+
+  double _parseNum(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0.0;
   }
 
   String _formatCurrency(num value) {
@@ -635,182 +649,189 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: _siteSupervisorMapStream,
                   builder: (context, mapSnap) {
-                    final siteDocs = siteSnap.hasData ? siteSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                    final projectDocs = projSnap.hasData ? projSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                    final supervisorDocs = mapSnap.hasData ? mapSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-                    final allSiteDocsMap = _buildUnifiedSiteDocs(
-                      siteDocs: siteDocs,
-                      projectDocs: projectDocs,
-                      supervisorDocs: supervisorDocs,
-                    );
-
-                    int totalSitesCount = allSiteDocsMap.length;
-                    int projectsInProgressCount = 0;
-                    int planningCount = 0;
-                    int overdueCount = 0;
-                    int pendingSitesCount = 0;
-                    double totalAmountSpent = 0.0;
-                    double totalAmountBalance = 0.0;
-                    double totalAmountPaid = 0.0;
-                    double totalBudget = 0.0;
-
-                    final now = DateTime.now();
-                    for (var entry in allSiteDocsMap.entries) {
-                      final data = entry.value;
-                      final s = (data['currentStatus'] ?? data['status'] ?? 'OnProgress')
-                          .toString()
-                          .trim()
-                          .toLowerCase();
-
-                      final endDate = _parseFlexibleDate(
-                        data['actualEndDate'] ?? data['plannedEndDate'] ?? data['endDate'] ?? data['expectedCompletionDate'] ?? data['contractEndDate'],
-                      );
-
-                      final isCompleted = s.contains('complete') || s.contains('finish') || s.contains('closed') || s.contains('done');
-                      final isPlanning = !isCompleted && (s.contains('plan') || s.contains('draft') || s.contains('upcoming') || s.contains('setup'));
-                      final isOnHold = !isCompleted && (s.contains('hold') || s.contains('pending') || s.contains('pause') || s.contains('suspend'));
-                      final isOverdue = !isCompleted && (s.contains('delay') || s.contains('overdue') || (endDate != null && endDate.isBefore(now) && !isCompleted));
-
-                      if (isCompleted) {
-                        // Completed site
-                      } else if (isOverdue) {
-                        overdueCount++;
-                      } else if (isPlanning) {
-                        planningCount++;
-                      } else if (isOnHold) {
-                        pendingSitesCount++;
-                      } else {
-                        projectsInProgressCount++;
-                      }
-
-                      final b = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : (data['budget'] is num ? (data['budget'] as num).toDouble() : (double.tryParse(data['projectBudget']?.toString() ?? '') ?? 0.0)));
-                      final sp = (data['amountSpent'] is num ? (data['amountSpent'] as num).toDouble() : (data['spent'] is num ? (data['spent'] as num).toDouble() : (double.tryParse(data['amountSpent']?.toString() ?? '') ?? 0.0)));
-                      final pd = (data['amountPaid'] is num ? (data['amountPaid'] as num).toDouble() : (data['paid'] is num ? (data['paid'] as num).toDouble() : (double.tryParse(data['amountPaid']?.toString() ?? '') ?? 0.0)));
-                      final bal = (data['amountBalance'] is num ? (data['amountBalance'] as num).toDouble() : (data['balance'] is num ? (data['balance'] as num).toDouble() : (b > 0 ? (b - sp) : 0.0)));
-
-                      totalBudget += b;
-                      totalAmountSpent += sp;
-                      totalAmountPaid += pd;
-                      totalAmountBalance += bal;
-                    }
-
-                    final displayTotalSites = totalSitesCount < 10
-                        ? '0$totalSitesCount'
-                        : '$totalSitesCount';
-                    final displayProjects = projectsInProgressCount < 10
-                        ? '0$projectsInProgressCount'
-                        : '$projectsInProgressCount';
-                    final displayPlanning = planningCount < 10
-                        ? '0$planningCount'
-                        : '$planningCount';
-                    final displayOverdue = overdueCount < 10
-                        ? '0$overdueCount'
-                        : '$overdueCount';
-                    final displayPendingSites = pendingSitesCount < 10
-                        ? '0$pendingSitesCount'
-                        : '$pendingSitesCount';
-
                     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: _materialRequestsStream,
-                      builder: (context, matSnap) {
+                      stream: _expensesStream,
+                      builder: (context, expSnap) {
+                        final siteDocs = siteSnap.hasData ? siteSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                        final projectDocs = projSnap.hasData ? projSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                        final supervisorDocs = mapSnap.hasData ? mapSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                        final totalsDocs = expSnap.hasData ? expSnap.data!.docs : <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+                        final allSiteDocsMap = _buildUnifiedSiteDocs(
+                          siteDocs: siteDocs,
+                          projectDocs: projectDocs,
+                          supervisorDocs: supervisorDocs,
+                          totalsDocs: totalsDocs,
+                        );
+
+                        int totalSitesCount = allSiteDocsMap.length;
+                        int projectsInProgressCount = 0;
+                        int planningCount = 0;
+                        int overdueCount = 0;
+                        int pendingSitesCount = 0;
+                        double totalAmountSpent = 0.0;
+                        double totalAmountBalance = 0.0;
+                        double totalAmountPaid = 0.0;
+                        double totalBudget = 0.0;
+
+                        final now = DateTime.now();
+                        for (var entry in allSiteDocsMap.entries) {
+                          final data = entry.value;
+                          final s = (data['currentStatus'] ?? data['status'] ?? 'OnProgress')
+                              .toString()
+                              .trim()
+                              .toLowerCase();
+
+                          final endDate = _parseFlexibleDate(
+                            data['actualEndDate'] ?? data['plannedEndDate'] ?? data['endDate'] ?? data['expectedCompletionDate'] ?? data['contractEndDate'],
+                          );
+
+                          final isCompleted = s.contains('complete') || s.contains('finish') || s.contains('closed') || s.contains('done');
+                          final isPlanning = !isCompleted && (s.contains('plan') || s.contains('draft') || s.contains('upcoming') || s.contains('setup'));
+                          final isOnHold = !isCompleted && (s.contains('hold') || s.contains('pending') || s.contains('pause') || s.contains('suspend'));
+                          final isOverdue = !isCompleted && (s.contains('delay') || s.contains('overdue') || (endDate != null && endDate.isBefore(now) && !isCompleted));
+
+                          if (isCompleted) {
+                            // Completed site
+                          } else if (isOverdue) {
+                            overdueCount++;
+                          } else if (isPlanning) {
+                            planningCount++;
+                          } else if (isOnHold) {
+                            pendingSitesCount++;
+                          } else {
+                            projectsInProgressCount++;
+                          }
+
+                          final b = _parseNum(data['projectBudget'] ?? data['budget']);
+                          final sp = _parseNum(data['amountSpent'] ?? data['amountSpend'] ?? data['spent'] ?? data['totalAllExpenses']);
+                          final pd = _parseNum(data['amountPaid'] ?? data['paid'] ?? data['amountReceived']);
+                          final bal = data.containsKey('amountBalance') && data['amountBalance'] != null
+                              ? _parseNum(data['amountBalance'])
+                              : (data.containsKey('balance') && data['balance'] != null
+                                  ? _parseNum(data['balance'])
+                                  : (b > 0 ? (b - sp) : (pd - sp)));
+
+                          totalBudget += b;
+                          totalAmountSpent += sp;
+                          totalAmountPaid += pd;
+                          totalAmountBalance += bal;
+                        }
+
+                        final displayTotalSites = totalSitesCount < 10
+                            ? '0$totalSitesCount'
+                            : '$totalSitesCount';
+                        final displayProjects = projectsInProgressCount < 10
+                            ? '0$projectsInProgressCount'
+                            : '$projectsInProgressCount';
+                        final displayPlanning = planningCount < 10
+                            ? '0$planningCount'
+                            : '$planningCount';
+                        final displayOverdue = overdueCount < 10
+                            ? '0$overdueCount'
+                            : '$overdueCount';
+                        final displayPendingSites = pendingSitesCount < 10
+                            ? '0$pendingSitesCount'
+                            : '$pendingSitesCount';
+
                         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: _siteScheduleStream,
-                          builder: (context, wsSnap) {
+                          stream: _notificationsStream,
+                          builder: (context, notifSnap) {
                             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                              stream: _supervisorRequestsStream,
-                              builder: (context, supSnap) {
-                                int pendingApprovalsCount = 0;
-                                if (matSnap.hasData) {
-                                  pendingApprovalsCount += matSnap.data!.docs.where((d) {
-                                    final s = (d.data()['status'] ?? 'Processing').toString().toLowerCase();
-                                    return s.contains('pending') || s.contains('processing');
-                                  }).length;
-                                }
-                                if (wsSnap.hasData) {
-                                  pendingApprovalsCount += wsSnap.data!.docs.where((d) {
-                                    final s = (d.data()['approvalStatus'] ?? d.data()['status'] ?? 'Pending').toString().toLowerCase();
-                                    return s.contains('pending') || s.contains('processing');
-                                  }).length;
-                                }
-                                if (supSnap.hasData) {
-                                  pendingApprovalsCount += supSnap.data!.docs.where((d) {
-                                    final s = (d.data()['status'] ?? 'Pending').toString().toLowerCase();
-                                    return s.contains('pending') || s.contains('processing');
-                                  }).length;
-                                }
-
-                                final displayPending = pendingApprovalsCount < 10
-                                    ? '0$pendingApprovalsCount'
-                                    : '$pendingApprovalsCount';
-
+                              stream: _materialRequestsStream,
+                              builder: (context, matSnap) {
                                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                                  stream: _supervisorEntriesStream,
-                                  builder: (context, entrySnap) {
+                                  stream: _siteScheduleStream,
+                                  builder: (context, wsSnap) {
                                     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                                      stream: _expensesStream,
-                                      builder: (context, expSnap) {
-                                        double computedExpenses = 0.0;
-
-                                        // 1. Ingest detailed daily supervisor & site entries
-                                        if (entrySnap.hasData && entrySnap.data!.docs.isNotEmpty) {
-                                          for (var doc in entrySnap.data!.docs) {
-                                            final data = doc.data();
-                                            double amount = 0.0;
-                                            if (data['totalAmount'] is num) {
-                                              amount = (data['totalAmount'] as num).toDouble();
-                                            } else if (data['amount'] is num) {
-                                              amount = (data['amount'] as num).toDouble();
-                                            } else {
-                                              amount = double.tryParse(data['totalAmount']?.toString() ?? '') ??
-                                                  (double.tryParse(data['amount']?.toString() ?? '') ?? 0.0);
-                                            }
-
-                                            if (amount > 0) {
-                                              final docDateStr = (data['date'] ?? '').toString();
-                                              final docDate = _parseFlexibleDate(
-                                                data['updatedAt'] ?? data['createdAt'] ?? data['timestamp'] ?? docDateStr,
-                                              );
-                                              if (_isDateInPeriod(docDate, docDateStr, _selectedKpiPeriod)) {
-                                                computedExpenses += amount;
-                                              }
-                                            }
-                                          }
+                                      stream: _supervisorRequestsStream,
+                                      builder: (context, supSnap) {
+                                        int pendingApprovalsCount = 0;
+                                        if (matSnap.hasData) {
+                                          pendingApprovalsCount += matSnap.data!.docs.where((d) {
+                                            final s = (d.data()['status'] ?? 'Processing').toString().toLowerCase();
+                                            return s.contains('pending') || s.contains('processing');
+                                          }).length;
+                                        }
+                                        if (wsSnap.hasData) {
+                                          pendingApprovalsCount += wsSnap.data!.docs.where((d) {
+                                            final s = (d.data()['approvalStatus'] ?? d.data()['status'] ?? 'Pending').toString().toLowerCase();
+                                            return s.contains('pending') || s.contains('processing');
+                                          }).length;
+                                        }
+                                        if (supSnap.hasData) {
+                                          pendingApprovalsCount += supSnap.data!.docs.where((d) {
+                                            final s = (d.data()['status'] ?? 'Pending').toString().toLowerCase();
+                                            return s.contains('pending') || s.contains('processing');
+                                          }).length;
                                         }
 
-                                        // 2. Ingest totalSiteExpensesPerDay summaries
-                                        if (expSnap.hasData && expSnap.data!.docs.isNotEmpty) {
-                                          for (var doc in expSnap.data!.docs) {
-                                            final data = doc.data();
-                                            double amount = 0.0;
-                                            if (data['totalAllExpenses'] is num) {
-                                              amount = (data['totalAllExpenses'] as num).toDouble();
-                                            } else {
-                                              final sExp = (data['totalSiteExpense'] is num ? (data['totalSiteExpense'] as num).toDouble() : (double.tryParse(data['totalSiteExpense']?.toString() ?? '') ?? 0.0));
-                                              final mExp = (data['totalMgrExpense'] is num ? (data['totalMgrExpense'] as num).toDouble() : (double.tryParse(data['totalMgrExpense']?.toString() ?? '') ?? 0.0));
-                                              final oExp = (data['totalOrgExpense'] is num ? (data['totalOrgExpense'] as num).toDouble() : (double.tryParse(data['totalOrgExpense']?.toString() ?? '') ?? 0.0));
-                                              final cExp = (data['totalContractorExpense'] is num ? (data['totalContractorExpense'] as num).toDouble() : (double.tryParse(data['totalContractorExpense']?.toString() ?? '') ?? 0.0));
-                                              final iExp = (data['totalIncentiveExpenses'] is num ? (data['totalIncentiveExpenses'] as num).toDouble() : (double.tryParse(data['totalIncentiveExpenses']?.toString() ?? '') ?? 0.0));
-                                              amount = sExp + mExp + oExp + cExp + iExp;
-                                            }
+                                        final displayPending = pendingApprovalsCount < 10
+                                            ? '0$pendingApprovalsCount'
+                                            : '$pendingApprovalsCount';
 
-                                            if (amount > 0) {
-                                              final docDateStr = (data['date'] ?? '').toString();
-                                              final docDate = _parseFlexibleDate(
-                                                data['updatedAt'] ?? data['createdAt'] ?? data['timestamp'] ?? docDateStr,
-                                              );
-                                              if (_isDateInPeriod(docDate, docDateStr, _selectedKpiPeriod)) {
-                                                if (computedExpenses == 0.0) {
-                                                  computedExpenses += amount;
+                                        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                          stream: _supervisorEntriesStream,
+                                          builder: (context, entrySnap) {
+                                            double computedExpenses = 0.0;
+
+                                            // 1. Ingest detailed daily supervisor & site entries
+                                            if (entrySnap.hasData && entrySnap.data!.docs.isNotEmpty) {
+                                              for (var doc in entrySnap.data!.docs) {
+                                                final data = doc.data();
+                                                final amount = _parseNum(data['totalAmount'] ?? data['amount']);
+
+                                                if (amount > 0) {
+                                                  final docDateStr = (data['date'] ?? '').toString();
+                                                  final docDate = _parseFlexibleDate(
+                                                    data['updatedAt'] ?? data['createdAt'] ?? data['timestamp'] ?? docDateStr,
+                                                  );
+                                                  if (_isDateInPeriod(docDate, docDateStr, _selectedKpiPeriod)) {
+                                                    computedExpenses += amount;
+                                                  }
                                                 }
                                               }
                                             }
-                                          }
-                                        }
 
-                                        if (computedExpenses == 0.0 && _selectedKpiPeriod == 'All Time') {
-                                          computedExpenses = totalAmountSpent;
-                                        }
+                                            // 2. Ingest totalSiteExpensesPerDay summaries
+                                            double totalFromTotals = 0.0;
+                                            if (expSnap.hasData && expSnap.data!.docs.isNotEmpty) {
+                                              for (var doc in expSnap.data!.docs) {
+                                                final data = doc.data();
+                                                double amount = 0.0;
+                                                if (data['totalAllExpenses'] != null) {
+                                                  amount = _parseNum(data['totalAllExpenses']);
+                                                }
+                                                if (amount <= 0.0) {
+                                                  final sExp = _parseNum(data['totalSiteExpense']);
+                                                  final mExp = _parseNum(data['totalMgrExpense']);
+                                                  final oExp = _parseNum(data['totalOrgExpense']);
+                                                  final cExp = _parseNum(data['totalContractorExpense']);
+                                                  final iExp = _parseNum(data['totalIncentiveExpenses']);
+                                                  amount = sExp + mExp + oExp + cExp + iExp;
+                                                }
+
+                                                if (amount > 0) {
+                                                  final docDateStr = (data['date'] ?? '').toString();
+                                                  final docDate = _parseFlexibleDate(
+                                                    data['updatedAt'] ?? data['createdAt'] ?? data['timestamp'] ?? docDateStr,
+                                                  );
+                                                  if (_isDateInPeriod(docDate, docDateStr, _selectedKpiPeriod)) {
+                                                    totalFromTotals += amount;
+                                                  }
+                                                }
+                                              }
+                                            }
+
+                                            if (computedExpenses < totalFromTotals) {
+                                              computedExpenses = totalFromTotals;
+                                            }
+
+                                            if ((computedExpenses == 0.0 || _selectedKpiPeriod == 'All Time') && totalAmountSpent > 0.0) {
+                                              if (computedExpenses < totalAmountSpent) {
+                                                computedExpenses = totalAmountSpent;
+                                              }
+                                            }
 
                                         double availableBalance = totalAmountBalance;
                                         if (availableBalance <= 0.0 && totalAmountPaid > 0.0) {
@@ -828,13 +849,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                                                     : "Total Expenses"));
 
                                         final displayExpenses = _formatCurrency(computedExpenses);
-                                        final displayBalance = _formatCurrency(availableBalance);
+                                        final displayBalance = _formatCurrency(totalAmountPaid - totalAmountSpent);
+                                        final displayTreasury = _formatCurrency(totalAmountPaid);
 
                                         // Build Carousel Slides
                                         final slides = [
-                                          // Slide 1: Financial Overview (Hero Gradient Card)
+                                          // Slide 1: Financial Overview (Hero Gradient Card - Treasury: Actual Customer Receipts)
                                           _buildHeroBalanceSlide(
                                             context,
+                                            treasuryTotal: displayTreasury,
                                             balance: displayBalance,
                                             expenses: displayExpenses,
                                             expenseLabel: expenseLabel,
@@ -993,14 +1016,17 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               },
             );
           },
-        ),
+        );
+      },
+    ),
       ],
     );
   }
 
-  // Slide 1: Treasury & Available Balance
+  // Slide 1: Treasury & Available Balance (Strictly Customer Receipts for Treasury)
   Widget _buildHeroBalanceSlide(
     BuildContext context, {
+    required String treasuryTotal,
     required String balance,
     required String expenses,
     required String expenseLabel,
@@ -1100,7 +1126,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
               ],
             ),
 
-            // Middle Amount
+            // Middle Amount (Treasury = Total Actual Customer Receipts)
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1109,7 +1135,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Net Available Balance',
+                      'Customer Receipts (Treasury)',
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
@@ -1118,7 +1144,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '₹ $balance',
+                      '₹ $treasuryTotal',
                       style: const TextStyle(
                         fontSize: 27,
                         fontWeight: FontWeight.w900,
@@ -1186,12 +1212,12 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'Live Balance Sync Active',
-                        style: TextStyle(
+                      Text(
+                        'Cash Balance: ₹ $balance',
+                        style: const TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF475569),
+                          color: Color(0xFF166534),
                         ),
                       ),
                     ],
@@ -2215,6 +2241,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> siteDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> projectDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> supervisorDocs,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> totalsDocs = const [],
   }) {
     final unifiedMap = <String, Map<String, dynamic>>{};
 
@@ -2293,6 +2320,38 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         }
         if (data['amountBalance'] != null && target['amountBalance'] == null) {
           target['amountBalance'] = data['amountBalance'];
+        }
+      }
+    }
+
+    // 4. Ingest totalSiteExpensesPerDay summaries
+    for (var doc in totalsDocs) {
+      final data = doc.data();
+      final sId = (data['siteId'] ?? doc.id).toString().trim();
+      final sName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
+      final existingKey = findMatchingKey(sId, doc.id, sName);
+      final target = existingKey != null ? unifiedMap[existingKey] : null;
+
+      if (target != null) {
+        double totalExp = 0.0;
+        if (data['totalAllExpenses'] is num) {
+          totalExp = (data['totalAllExpenses'] as num).toDouble();
+        } else {
+          final sExp = _parseNum(data['totalSiteExpense']);
+          final mExp = _parseNum(data['totalMgrExpense']);
+          final oExp = _parseNum(data['totalOrgExpense']);
+          final cExp = _parseNum(data['totalContractorExpense']);
+          final iExp = _parseNum(data['totalIncentiveExpenses']);
+          totalExp = sExp + mExp + oExp + cExp + iExp;
+        }
+
+        final currentSpent = _parseNum(target['amountSpent'] ?? target['amountSpend'] ?? target['spent']);
+        if (totalExp > 0 || currentSpent == 0) {
+          target['amountSpent'] = totalExp > 0 ? totalExp : currentSpent;
+          final budget = _parseNum(target['projectBudget'] ?? target['budget']);
+          final income = _parseNum(target['amountPaid'] ?? target['paid'] ?? target['amountReceived']);
+          final effectiveSpent = (target['amountSpent'] as num).toDouble();
+          target['amountBalance'] = budget > 0 ? (budget - effectiveSpent) : (income - effectiveSpent);
         }
       }
     }

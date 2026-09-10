@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/screens/manager/config_material_information.dart';
-import 'package:demo_cst/screens/supervisor/tools_movement_page.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/screens/manager/config_material_information.dart';
+import 'package:ebricks/screens/supervisor/tools_movement_page.dart';
 
 class OrgMaterialsToolsMovementPage extends StatelessWidget {
   const OrgMaterialsToolsMovementPage({super.key});

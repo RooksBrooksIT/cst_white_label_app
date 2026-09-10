@@ -1,15 +1,15 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/responsive.dart';
-import 'package:demo_cst/services/approval_workflow_service.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/screens/manager/manager_material_approval_screen.dart';
-import 'package:demo_cst/screens/manager/manager_tools_approval_screen.dart';
-import 'package:demo_cst/screens/manager/manager_site_payment_approval_page.dart';
-import 'package:demo_cst/screens/manager/manager_approval_screen.dart';
-import 'package:demo_cst/screens/manager/manager_petty_cash_page.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/services/approval_workflow_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/screens/manager/manager_material_approval_screen.dart';
+import 'package:ebricks/screens/manager/manager_tools_approval_screen.dart';
+import 'package:ebricks/screens/manager/manager_site_payment_approval_page.dart';
+import 'package:ebricks/screens/manager/manager_approval_screen.dart';
+import 'package:ebricks/screens/manager/manager_petty_cash_page.dart';
 
 class ManagerApprovalsCenterPage extends StatefulWidget {
   final bool hideAppBar;

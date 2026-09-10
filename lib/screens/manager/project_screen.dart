@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class ProjectScreen extends StatefulWidget {
   final String? projectId;
@@ -230,9 +232,9 @@ class _ProjectScreenState extends State<ProjectScreen>
   }
 
   void _calculateBalance() {
-    final budget = double.tryParse(_projectBudgetController.text) ?? 0;
+    final paid = double.tryParse(_amountPaidController.text) ?? 0;
     final spent = double.tryParse(_amountSpentController.text) ?? 0;
-    final balance = budget - spent;
+    final balance = paid - spent;
     _balanceAmountController.text = balance.toStringAsFixed(2);
   }
 
@@ -623,6 +625,18 @@ class _ProjectScreenState extends State<ProjectScreen>
         } else {
           await FirestoreService.getCollection('projects').add(projectData);
         }
+
+        try {
+          await NotificationService.notifyProjectCreatedOrUpdated(
+            projectId: _selectedSiteId ?? '',
+            projectName: _projectNameController.text.trim(),
+            siteId: _selectedSiteId ?? '',
+            siteName: _selectedSiteId ?? '',
+            isCreated: true,
+          );
+        } catch (notifErr) {
+          debugPrint('Error notifying project create: $notifErr');
+        }
       } else {
         if (selectedProjectId == null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -636,6 +650,23 @@ class _ProjectScreenState extends State<ProjectScreen>
         await FirestoreService.getCollection(
           'projects',
         ).doc(selectedProjectId).update(projectData);
+
+        try {
+          await NotificationService.notifyProjectCreatedOrUpdated(
+            projectId: selectedProjectId!,
+            projectName: _projectNameController.text.trim(),
+            siteId: _selectedSiteId ?? selectedProjectData?['siteId'] ?? '',
+            siteName: _selectedSiteId ?? selectedProjectData?['siteName'] ?? '',
+            isCreated: false,
+          );
+        } catch (notifErr) {
+          debugPrint('Error notifying project update: $notifErr');
+        }
+      }
+
+      final syncSiteId = _selectedSiteId ?? selectedProjectData?['siteId'] ?? selectedProjectId ?? '';
+      if (syncSiteId.isNotEmpty) {
+        await ExpenseService.recalcTotalsAndSyncProject(syncSiteId);
       }
 
       if (!mounted) return;

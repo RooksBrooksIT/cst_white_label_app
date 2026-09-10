@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/material_inventory_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/material_inventory_service.dart';
+import 'package:ebricks/services/notification_service.dart';
 import 'package:intl/intl.dart';
 
 /// Represents the 5-stage approval lifecycle states.
@@ -219,9 +219,9 @@ class ApprovalWorkflowService {
     final reqType = getRequestType(collectionName);
     final reqTypeName = getRequestTypeDisplayName(reqType);
 
-    await NotificationService.notifyManager(
+    await NotificationService.notifyManagerAndOrganisation(
       title: '📋 New $reqTypeName Submitted',
-      body: '$supervisorName (Site: $siteId) submitted $reqTypeName #$reqId for your review.',
+      body: '$supervisorName (Site: $siteId) submitted $reqTypeName #$reqId for review and authorization.',
       requestType: reqType,
       requestId: reqId,
       docId: docId,
@@ -230,6 +230,7 @@ class ApprovalWorkflowService {
       senderRole: 'Supervisor',
       senderName: supervisorName,
       remarks: initialRemarks,
+      requiredAction: 'Action Required: Manager Review & Verification',
     );
   }
 
@@ -285,6 +286,7 @@ class ApprovalWorkflowService {
       senderRole: 'Manager',
       senderName: managerName,
       remarks: remarks,
+      requiredAction: 'Action Required: HQ Authorization',
     );
   }
 
@@ -394,6 +396,8 @@ class ApprovalWorkflowService {
       senderRole: 'Organization',
       senderName: orgUserName,
       remarks: remarks,
+      requiredAction: 'Action Required: Final Clearance & Dispatch',
+      forManagerName: managerName,
     );
   }
 
@@ -595,6 +599,9 @@ class ApprovalWorkflowService {
         senderRole: 'Manager',
         senderName: managerName,
         remarks: remarks,
+        data: {
+          'requiredAction': 'Action Required: Confirm Physical Arrival upon receipt',
+        },
       );
     }
   }
@@ -821,8 +828,8 @@ class ApprovalWorkflowService {
     final reqTypeName = getRequestTypeDisplayName(reqType);
     final displayReqId = (matReqId != null && matReqId.isNotEmpty) ? matReqId : docId;
 
-    // Real-time notification to Manager(s) confirming material has arrived on site!
-    await NotificationService.notifyManager(
+    // Real-time notification to Manager and Organization confirming material has arrived on site!
+    await NotificationService.notifyManagerAndOrganisation(
       title: '📦 $reqTypeName Arrival Confirmed',
       body: '$supervisorName (Site: ${targetSiteId.isNotEmpty ? targetSiteId : 'N/A'}) confirmed physical arrival & uploaded proof photo for $reqTypeName #$displayReqId.',
       requestType: reqType,
@@ -833,6 +840,7 @@ class ApprovalWorkflowService {
       senderRole: 'Supervisor',
       senderName: supervisorName,
       remarks: remarks,
+      requiredAction: 'Stock Arrived & Confirmed at Site',
     );
   }
 
@@ -910,8 +918,8 @@ class ApprovalWorkflowService {
 
     await reqRef.update(updates);
 
-    // Real-time notification to Manager(s) confirming tools arrival on site!
-    await NotificationService.notifyManager(
+    // Real-time notification to Manager and Organization confirming tools arrival on site!
+    await NotificationService.notifyManagerAndOrganisation(
       title: '🚚 Tool Arrival Confirmed',
       body: '$supervisorName (Site: ${targetSiteId.isNotEmpty ? targetSiteId : 'N/A'}) confirmed physical arrival & uploaded proof photo for Tools Requisition #$displayReqId.',
       requestType: 'tools',
@@ -922,6 +930,7 @@ class ApprovalWorkflowService {
       senderRole: 'Supervisor',
       senderName: supervisorName,
       remarks: remarks,
+      requiredAction: 'Tools Arrived & Confirmed at Site',
     );
   }
 }

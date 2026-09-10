@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class OrgNotificationPage extends StatefulWidget {
   const OrgNotificationPage({super.key});
@@ -204,6 +204,10 @@ class _OrgNotificationPageState extends State<OrgNotificationPage> {
     final title = data['title']?.toString() ?? 'Notification';
     final body = data['body']?.toString() ?? '';
     final reqType = (data['requestType'] ?? '').toString().toLowerCase();
+    final siteId = data['siteId']?.toString() ?? '';
+    final senderName = data['senderName']?.toString() ?? '';
+    final senderRole = data['senderRole']?.toString() ?? '';
+    final requiredAction = data['requiredAction']?.toString() ?? '';
     final createdAt = data['createdAt'];
 
     String timeStr = '';
@@ -303,6 +307,103 @@ class _OrgNotificationPageState extends State<OrgNotificationPage> {
                           color: Color(0xFF475569),
                           height: 1.35,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Tags & Metadata Row
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          if (siteId.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.place_rounded,
+                                    size: 11,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    siteId,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (senderName.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                senderRole.isNotEmpty
+                                    ? '$senderRole: $senderName'
+                                    : senderName,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ),
+                          if (requiredAction.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF7ED),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFFFFEDD5),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.pending_actions_rounded,
+                                    size: 11,
+                                    color: Color(0xFFEA580C),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      requiredAction,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFC2410C),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Row(

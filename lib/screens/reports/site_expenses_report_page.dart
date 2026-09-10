@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/firestore_service.dart';
+import 'package:ebricks/services/firestore_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -45,7 +45,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
     _entriesFuture = _fetchEntriesForRange();
   }
 
-  /// Fetches supervisor, manager, organization, and contractor entries for each date in range.
+  /// Fetches supervisor, manager, organization, contractor, and incentive entries for each date in range.
   Future<List<Map<String, dynamic>>> _fetchEntriesForRange() async {
     final List<Map<String, dynamic>> entries = [];
     final DateFormat docIdDateFormat = DateFormat('ddMMyyyy');
@@ -55,33 +55,38 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
     while (!current.isAfter(widget.toDate)) {
       final docId = '${widget.siteId}_${docIdDateFormat.format(current)}';
 
-      // Supervisor entry
+      // 1. Supervisor entry
       final supervisorDoc = await FirestoreService.getCollection(
         'siteSupervisorEntries',
       ).doc(docId).get();
       Map<String, dynamic>? supervisorData;
       if (supervisorDoc.exists) {
         final data = supervisorDoc.data();
-        if (widget.projectStage != null) {
-          final docStage = (data?['projectStage'] ?? data?['projectField'])
-              ?.toString()
-              .trim();
-          if (docStage == widget.projectStage?.trim()) {
+        // Skip manager or org flagged entries to avoid duplicate counting
+        if (data?['isManagerEntry'] != true &&
+            data?['createdBy'] != 'manager' &&
+            data?['isOrgEntry'] != true &&
+            data?['createdBy'] != 'manager_org') {
+          if (widget.projectStage != null) {
+            final docStage = (data?['projectStage'] ?? data?['projectField'])
+                ?.toString()
+                .trim();
+            if (docStage == widget.projectStage?.trim()) {
+              supervisorData = data;
+            }
+          } else {
             supervisorData = data;
           }
-        } else {
-          supervisorData = data;
         }
       }
 
-      // Manager bills for this date
+      // 2. Manager bills for this date
       final managerQuery = await FirestoreService.getCollection(
         'managerExpenses',
       ).where('siteId', isEqualTo: widget.siteId).get();
       List<Map<String, dynamic>> managerBills = [];
       for (final doc in managerQuery.docs) {
         final data = doc.data();
-        // Filter by stage if provided
         if (widget.projectStage != null) {
           final docStage = (data['projectStage'] ?? data['projectField'])
               ?.toString()
@@ -107,14 +112,13 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         }
       }
 
-      // Organization bills for this date
+      // 3. Organization bills for this date
       final orgQuery = await FirestoreService.getCollection(
         'organizationEntries',
       ).where('siteId', isEqualTo: widget.siteId).get();
       List<Map<String, dynamic>> orgBills = [];
       for (final doc in orgQuery.docs) {
         final data = doc.data();
-        // Filter by stage if provided
         if (widget.projectStage != null) {
           final docStage = (data['projectStage'] ?? data['projectField'])
               ?.toString()
@@ -137,30 +141,77 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               orgBills.add(Map<String, dynamic>.from(bill));
             }
           }
+        } else if (data['totalAmount'] != null || data['amount'] != null) {
+          DateTime? entryDate;
+          if (data['date'] is String) {
+            entryDate = DateTime.tryParse(data['date']);
+          } else if (data['createdAt'] is Timestamp) {
+            entryDate = (data['createdAt'] as Timestamp).toDate();
+          }
+          if (entryDate != null &&
+              entryDate.year == current.year &&
+              entryDate.month == current.month &&
+              entryDate.day == current.day) {
+            orgBills.add({
+              'billNo': data['billNo'] ?? data['entryId'] ?? 'ORG-${orgBills.length + 1}',
+              'billVendor': data['vendorName'] ?? data['vendor'] ?? 'Direct Organization',
+              'billAmount': data['totalAmount'] ?? data['amount'] ?? 0,
+              'billDate': data['date'] ?? current.toIso8601String(),
+            });
+          }
         }
       }
 
-      // Contractor expenses for this date
+      // 4. Contractor expenses for this date
       Query<Map<String, dynamic>> contractorQuery =
           FirestoreService.getCollection('contractorEntries')
-              .where('siteId', isEqualTo: widget.siteId)
-              .where(
-                'date',
-                isEqualTo: DateFormat('yyyy-MM-dd').format(current),
-              );
+              .where('siteId', isEqualTo: widget.siteId);
 
       final contractorSnapshot = await contractorQuery.get();
       List<Map<String, dynamic>> contractorEntries = [];
       for (final doc in contractorSnapshot.docs) {
         final data = doc.data();
-        // Filter by stage if provided
-        if (widget.projectStage != null) {
-          final docStage = (data['projectStage'] ?? data['projectField'])
-              ?.toString()
-              .trim();
-          if (docStage != widget.projectStage?.trim()) continue;
+        DateTime? cDate;
+        if (data['date'] is String) {
+          cDate = DateTime.tryParse(data['date']);
+        } else if (data['createdAt'] is Timestamp) {
+          cDate = (data['createdAt'] as Timestamp).toDate();
         }
-        contractorEntries.add(data);
+        if (cDate != null &&
+            cDate.year == current.year &&
+            cDate.month == current.month &&
+            cDate.day == current.day) {
+          if (widget.projectStage != null) {
+            final docStage = (data['projectStage'] ?? data['projectField'] ?? data['workStage'])
+                ?.toString()
+                .trim();
+            if (docStage != widget.projectStage?.trim()) continue;
+          }
+          contractorEntries.add(data);
+        }
+      }
+
+      // 5. Supervisor / Worker Incentives for this date
+      final incentiveQuery = await FirestoreService.siteSupervisorIncentives
+          .where('siteId', isEqualTo: widget.siteId)
+          .get();
+      List<Map<String, dynamic>> incentiveEntries = [];
+      for (final doc in incentiveQuery.docs) {
+        final data = doc.data();
+        DateTime? iDate;
+        if (data['date'] is String) {
+          iDate = DateTime.tryParse(data['date']);
+        } else if (data['createdAt'] is Timestamp) {
+          iDate = (data['createdAt'] as Timestamp).toDate();
+        } else if (data['timestamp'] is Timestamp) {
+          iDate = (data['timestamp'] as Timestamp).toDate();
+        }
+        if (iDate != null &&
+            iDate.year == current.year &&
+            iDate.month == current.month &&
+            iDate.day == current.day) {
+          incentiveEntries.add(data);
+        }
       }
 
       final hasSupervisor =
@@ -168,14 +219,16 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       final hasManager = managerBills.isNotEmpty;
       final hasOrg = orgBills.isNotEmpty;
       final hasContractor = contractorEntries.isNotEmpty;
+      final hasIncentives = incentiveEntries.isNotEmpty;
 
-      if (hasSupervisor || hasManager || hasOrg || hasContractor) {
+      if (hasSupervisor || hasManager || hasOrg || hasContractor || hasIncentives) {
         entries.add({
           'date': displayDateFormat.format(current),
           'supervisorData': supervisorData,
           'managerBills': managerBills,
           'orgBills': orgBills,
           'contractorEntries': contractorEntries,
+          'incentiveEntries': incentiveEntries,
         });
       }
       current = current.add(const Duration(days: 1));
@@ -281,8 +334,25 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               }
             }
 
+            num incentiveTotal = 0;
+            final incentiveEntries = entry['incentiveEntries'] ?? [];
+            for (final inc in incentiveEntries) {
+              final amt = inc['incentiveAmount'] ?? inc['amount'];
+              if (amt is num) {
+                incentiveTotal += amt;
+              } else if (amt is String) {
+                final parsed = double.tryParse(
+                  amt.toString().replaceAll(
+                    RegExp(r'[^0-9.]'),
+                    '',
+                  ),
+                );
+                if (parsed != null) incentiveTotal += parsed;
+              }
+            }
+
             num dateTotal =
-                supervisorTotal + managerTotal + orgTotal + contractorTotal;
+                supervisorTotal + managerTotal + orgTotal + contractorTotal + incentiveTotal;
 
             return pw.Container(
               margin: const pw.EdgeInsets.only(bottom: 12),
@@ -396,6 +466,35 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                             ),
                           );
                         }),
+                      ],
+                    ),
+                  if (incentiveEntries.isNotEmpty)
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          'Supervisor / Extra Incentives:',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        pw.SizedBox(height: 4),
+                        ...incentiveEntries.map<pw.Widget>((inc) {
+                          final name = inc['supervisorName'] ?? inc['name'] ?? 'Supervisor';
+                          final role = inc['role'] ?? 'Incentive';
+                          final amt = inc['incentiveAmount'] ?? inc['amount'] ?? 0;
+                          return pw.Text(
+                            '$name ($role): Rs. $amt',
+                            style: pw.TextStyle(fontSize: 10),
+                          );
+                        }),
+                        pw.SizedBox(height: 2),
+                        pw.Text(
+                          'Incentives Total: Rs. $incentiveTotal',
+                          style: pw.TextStyle(fontSize: 11),
+                        ),
                       ],
                     ),
                   pw.SizedBox(height: 4),
@@ -579,11 +678,28 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                         if (parsed != null) contractorTotal += parsed;
                       }
                     }
+                    num incentiveTotal = 0;
+                    final incentiveEntries = entry['incentiveEntries'] ?? [];
+                    for (final inc in incentiveEntries) {
+                      final amt = inc['incentiveAmount'] ?? inc['amount'];
+                      if (amt is num) {
+                        incentiveTotal += amt;
+                      } else if (amt is String) {
+                        final parsed = double.tryParse(
+                          amt.toString().replaceAll(
+                            RegExp(r'[^0-9.]'),
+                            '',
+                          ),
+                        );
+                        if (parsed != null) incentiveTotal += parsed;
+                      }
+                    }
                     num dateTotal =
                         supervisorTotal +
                         managerTotal +
                         orgTotal +
-                        contractorTotal;
+                        contractorTotal +
+                        incentiveTotal;
                     grandTotal += dateTotal;
 
                     cards.add(
@@ -651,6 +767,11 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                               _buildContractorSection(
                                 'Contractor Expenses',
                                 contractorEntries,
+                              ),
+                              SizedBox(height: 12),
+                              _buildIncentiveSection(
+                                'Supervisor & Extra Incentives',
+                                incentiveEntries,
                               ),
                               SizedBox(height: 16),
                               Align(
@@ -992,6 +1113,58 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
     );
   }
 
+  Widget _buildIncentiveSection(
+    String title,
+    List<dynamic> incentiveEntries,
+  ) {
+    if (incentiveEntries.isEmpty) {
+      return _noDataSection(title);
+    }
+    num total = 0;
+    for (final inc in incentiveEntries) {
+      final amt = inc['incentiveAmount'] ?? inc['amount'];
+      if (amt is num) {
+        total += amt;
+      } else if (amt is String) {
+        final parsed = double.tryParse(
+          amt.toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+        );
+        if (parsed != null) total += parsed;
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: primaryColor,
+            fontSize: 14,
+          ),
+        ),
+        SizedBox(height: 4),
+        ...incentiveEntries.map((inc) {
+          final name = inc['supervisorName'] ?? inc['name'] ?? 'Supervisor';
+          final role = inc['role'] ?? 'Incentive';
+          final amt = inc['incentiveAmount'] ?? inc['amount'] ?? 0;
+          return Padding(
+            padding: const EdgeInsets.only(left: 8.0, bottom: 2.0),
+            child: Text(
+              '• $name ($role): Rs. $amt',
+              style: TextStyle(fontSize: 13, color: textColor),
+            ),
+          );
+        }),
+        SizedBox(height: 4),
+        Text(
+          'Total: Rs. $total',
+          style: TextStyle(fontWeight: FontWeight.w500, color: textColor),
+        ),
+      ],
+    );
+  }
+
   Widget _noDataSection(String title) {
     return Text(
       '$title: No data',
@@ -999,3 +1172,4 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
     );
   }
 }
+

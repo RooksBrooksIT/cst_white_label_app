@@ -1,4 +1,4 @@
-import 'dart:io' show File;
+﻿import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -6,13 +6,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/app_storage_service.dart';
-import 'package:demo_cst/services/subscription_limit_service.dart';
-import 'package:demo_cst/screens/organization/pricing_screen.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/dialog_utils.dart';
-import 'package:demo_cst/screens/common/web_view_screen.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/app_storage_service.dart';
+import 'package:ebricks/services/subscription_limit_service.dart';
+import 'package:ebricks/screens/organization/pricing_screen.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/dialog_utils.dart';
+import 'package:ebricks/screens/common/web_view_screen.dart';
 
 /// Model representing an individual drawing document item
 class DrawingDocItem {

@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/utils/terms_helper.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/screens/organization/pricing_screen.dart';
-import 'package:demo_cst/screens/common/contact_support_screen.dart';
+import 'package:ebricks/utils/terms_helper.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/organization/pricing_screen.dart';
+import 'package:ebricks/screens/common/contact_support_screen.dart';
 
-import 'package:demo_cst/services/subscription_limit_service.dart';
+import 'package:ebricks/services/subscription_limit_service.dart';
 
 class OrganizationSubscriptionPage extends StatefulWidget {
   const OrganizationSubscriptionPage({super.key});

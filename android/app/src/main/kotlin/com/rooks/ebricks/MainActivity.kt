@@ -1,4 +1,4 @@
-package com.rooksandbrooks.cstwhitelabel
+package com.rooks.ebricks
 
 import io.flutter.embedding.android.FlutterActivity
 

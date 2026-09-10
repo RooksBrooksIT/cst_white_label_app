@@ -1,10 +1,10 @@
-import 'package:demo_cst/screens/customer/customer_site_status_report.dart';
+﻿import 'package:ebricks/screens/customer/customer_site_status_report.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:demo_cst/screens/customer/customer_insights_screen.dart';
-import 'package:demo_cst/screens/customer/customer_project_financial_statusreport.dart';
-import 'package:demo_cst/screens/organization/org_sub_menu_screen.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
+import 'package:ebricks/screens/customer/customer_insights_screen.dart';
+import 'package:ebricks/screens/customer/customer_project_financial_statusreport.dart';
+import 'package:ebricks/screens/organization/org_sub_menu_screen.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
 
 class CustomerWorkProgress extends StatelessWidget {
   const CustomerWorkProgress({

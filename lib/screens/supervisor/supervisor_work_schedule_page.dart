@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/notification_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class SupervisorWorkSchedulePage extends StatefulWidget {
   final String supervisorId;
@@ -445,8 +445,8 @@ class _SupervisorWorkSchedulePageState
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Notify the manager and organisation about the new work schedule request
-      await NotificationService.notifyManager(
+      // Notify both manager and organisation in a single unified record without duplicates
+      await NotificationService.notifyManagerAndOrganisation(
         title: '📅 New Work Schedule Submitted',
         body: '$supervisorName (Site: $siteId) submitted Work Schedule #$wsReqId for $projectStage.',
         requestType: 'workforce',
@@ -456,20 +456,14 @@ class _SupervisorWorkSchedulePageState
         status: 'pending_manager_review',
         senderRole: 'Supervisor',
         senderName: supervisorName,
-      );
-
-      await NotificationService.notifyOrganisation(
-        title: '📅 New Work Schedule Request',
-        body: '$supervisorName (Site: $siteId) submitted $wsReqId for $projectStage.',
-        requestType: 'workforce',
-        requestId: wsReqId,
-        docId: docId,
-        siteId: siteId,
-        data: {
+        requiredAction: 'Action Required: Review & Approve Schedule',
+        forSupervisorName: supervisorName,
+        extraData: {
           'type': 'work_schedule',
           'wsReqId': wsReqId,
           'siteId': siteId,
           'supervisorName': supervisorName,
+          'projectStage': projectStage,
         },
       );
 

@@ -5,9 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/subscription_limit_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/subscription_limit_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class ProjectSetupWizard extends StatefulWidget {
   const ProjectSetupWizard({super.key});
@@ -520,6 +521,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         'ownerName': _ownerNameController.text.trim(),
         'ownerPhoneNumber': _ownerPhoneController.text.trim(),
         'amountPaid': double.tryParse(_amountPaidController.text) ?? 0,
+        'amountReceived': double.tryParse(_amountPaidController.text) ?? 0,
         'amountSpent': 0.0,
         'amountBalance': double.tryParse(_amountPaidController.text) ?? 0,
         'projectBudget': double.tryParse(_projectBudgetController.text) ?? 0,
@@ -548,14 +550,16 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ? Timestamp.fromDate(_contractEndDate!)
             : null,
         'isContractWork': _isContractWork,
-        'contractorName': _isContractWork
-            ? _contractorNameController.text
-            : null,
+        'contractorName':
+            _isContractWork ? _contractorNameController.text.trim() : null,
         'contractorBudget': _isContractWork
-            ? (double.tryParse(_contractorBudgetController.text) ?? 0)
+            ? (double.tryParse(_contractorBudgetController.text) ?? 0.0)
             : null,
         'siteId': siteDocId,
+        'siteName': _siteNameController.text.trim(),
+        'siteLocation': _locationController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
         'projectType': _siteProjectCategory ?? '',
         'status':
             _projectStatus ?? (_statuses.isNotEmpty ? _statuses.first : ''),
@@ -572,8 +576,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         'totalMgrExpense': 0.0,
         'totalOrgExpense': 0.0,
         'totalSiteExpense': 0.0,
+        'totalContractorExpense': 0.0,
+        'totalIncentiveExpenses': 0.0,
+        'totalAllExpenses': 0.0,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // Central financial sync
+      await ExpenseService.recalcTotalsAndSyncProject(siteDocId);
 
       if (!skipSupervisorMapping && _selectedSupervisorId != null) {
         // Map Supervisor
@@ -1451,19 +1461,19 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 Row(
                   children: [
                     _buildFinancialMiniPill(
-                      'Budget',
+                      'Estimated Budget',
                       '₹${NumberFormat('#,##,###').format(budget)}',
                       const Color(0xFF3B82F6),
                     ),
                     const SizedBox(width: 8),
                     _buildFinancialMiniPill(
-                      'Paid',
+                      'Customer Received',
                       '₹${NumberFormat('#,##,###').format(paid)}',
                       const Color(0xFF10B981),
                     ),
                     const SizedBox(width: 8),
                     _buildFinancialMiniPill(
-                      'Remaining',
+                      'Budget to Collect',
                       '₹${NumberFormat('#,##,###').format(balance)}',
                       balance < 0
                           ? const Color(0xFFEF4444)

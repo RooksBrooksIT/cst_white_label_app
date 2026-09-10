@@ -1,11 +1,12 @@
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/material_inventory_service.dart';
-import 'package:demo_cst/utils/app_theme.dart';
-import 'package:demo_cst/utils/dialog_utils.dart';
-import 'package:demo_cst/utils/responsive.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/material_inventory_service.dart';
+import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/dialog_utils.dart';
+import 'package:ebricks/utils/responsive.dart';
 
 class AddVehicleLogPage extends StatefulWidget {
   const AddVehicleLogPage({super.key});
@@ -26,6 +27,13 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   final TextEditingController _distanceController = TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
 
+  // Other material specific controllers
+  final TextEditingController _otherMaterialNameController = TextEditingController();
+  final TextEditingController _otherQuantityController = TextEditingController();
+  final TextEditingController _otherUnitController = TextEditingController();
+  final TextEditingController _otherShopNameController = TextEditingController();
+  final TextEditingController _otherVendorController = TextEditingController();
+
   String _movementType = 'Company → Site';
   DateTime _selectedDate = DateTime.now();
   List<String> _driverNames = [];
@@ -42,6 +50,13 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   bool _isLoading = true;
   bool _isSubmitting = false;
 
+  // Real-time vehicle assignment tracking
+  List<Map<String, dynamic>> _driversList = [];
+  String? _assignedDriverName;
+  String? _assignedDriverId;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _vehiclesSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _driversSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +66,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
 
   @override
   void dispose() {
+    _vehiclesSubscription?.cancel();
+    _driversSubscription?.cancel();
     _fromLocationController.dispose();
     _toLocationController.dispose();
     _startTimeController.dispose();
@@ -58,6 +75,11 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
     _quantityController.dispose();
     _distanceController.dispose();
     _remarksController.dispose();
+    _otherMaterialNameController.dispose();
+    _otherQuantityController.dispose();
+    _otherUnitController.dispose();
+    _otherShopNameController.dispose();
+    _otherVendorController.dispose();
     super.dispose();
   }
 
@@ -130,6 +152,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         _loadVehicles(),
         _loadMaterials(),
       ]);
+      _listenToRealtimeUpdates();
     } catch (e) {
       _showErrorSnackBar('Error loading initial data: ${e.toString()}');
     } finally {
@@ -141,15 +164,138 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
     }
   }
 
+  void _listenToRealtimeUpdates() {
+    _vehiclesSubscription = FirestoreService.getCollection('vehicleDetails')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final vehicles = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': data['id'] as String? ?? doc.id,
+          'modelName': data['modelName'] as String? ?? '',
+          'numberPlate': data['numberPlate'] as String? ?? '',
+          'isAssigned': data['isAssigned'] as bool? ?? false,
+          'assignedDriverId': data['assignedDriverId'] as String?,
+          'assignedDriverName': data['assignedDriverName'] as String?,
+        };
+      }).toList();
+
+      setState(() {
+        _vehicles = vehicles;
+        if (_selectedVehicle != null) {
+          _updateAssignedDriverForSelectedVehicle();
+        }
+      });
+    }, onError: (e) {
+      debugPrint('Error listening to vehicleDetails: $e');
+    });
+
+    _driversSubscription = FirestoreService.getCollection('drivers')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final names = <String>[];
+      final drivers = <Map<String, dynamic>>[];
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final name = data['driverName'] as String? ?? '';
+        if (name.isNotEmpty) {
+          names.add(name);
+          drivers.add({
+            'driverId': data['driverId'] ?? doc.id,
+            'driverName': name,
+            'status': data['status'] ?? 'Active',
+            'assignedVehicleId': data['assignedVehicleId'] as String?,
+          });
+        }
+      }
+      setState(() {
+        _driverNames = names;
+        _driversList = drivers;
+        if (_selectedVehicle != null) {
+          _updateAssignedDriverForSelectedVehicle();
+        }
+      });
+    }, onError: (e) {
+      debugPrint('Error listening to drivers: $e');
+    });
+  }
+
+  void _updateAssignedDriverForSelectedVehicle() {
+    if (_selectedVehicle == null || _selectedVehicle!.isEmpty) {
+      _assignedDriverName = null;
+      _assignedDriverId = null;
+      _selectedDriver = null;
+      return;
+    }
+
+    // 1. Check in vehicles collection
+    final vehicle = _vehicles.firstWhere(
+      (v) => v['id'] == _selectedVehicle,
+      orElse: () => {},
+    );
+
+    String? foundDriverName;
+    String? foundDriverId;
+
+    if (vehicle.isNotEmpty) {
+      final isAssigned = vehicle['isAssigned'] as bool? ?? false;
+      final assignedName = vehicle['assignedDriverName'] as String?;
+      final assignedId = vehicle['assignedDriverId'] as String?;
+
+      if (isAssigned && assignedName != null && assignedName.trim().isNotEmpty) {
+        foundDriverName = assignedName.trim();
+        foundDriverId = assignedId;
+      }
+    }
+
+    // 2. Fallback check: look up in drivers collection if not populated on vehicle doc
+    if (foundDriverName == null && _driversList.isNotEmpty) {
+      final driver = _driversList.firstWhere(
+        (d) =>
+            d['assignedVehicleId'] == _selectedVehicle &&
+            (d['status'] ?? 'Active') == 'Active',
+        orElse: () => {},
+      );
+      if (driver.isNotEmpty) {
+        foundDriverName = driver['driverName'] as String?;
+        foundDriverId = driver['driverId'] as String?;
+      }
+    }
+
+    _assignedDriverName = foundDriverName;
+    _assignedDriverId = foundDriverId;
+
+    if (foundDriverName != null && foundDriverName.isNotEmpty) {
+      _selectedDriver = foundDriverName;
+      if (!_driverNames.contains(foundDriverName)) {
+        _driverNames.add(foundDriverName);
+      }
+    }
+  }
+
   Future<void> _loadDrivers() async {
     try {
       final snapshot = await FirestoreService.getCollection('drivers').get();
-      final names = snapshot.docs
-          .map((doc) => doc['driverName'] as String? ?? '')
-          .where((name) => name.isNotEmpty)
-          .toList();
+      final names = <String>[];
+      final drivers = <Map<String, dynamic>>[];
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final name = data['driverName'] as String? ?? '';
+        if (name.isNotEmpty) {
+          names.add(name);
+          drivers.add({
+            'driverId': data['driverId'] ?? doc.id,
+            'driverName': name,
+            'status': data['status'] ?? 'Active',
+            'assignedVehicleId': data['assignedVehicleId'] as String?,
+          });
+        }
+      }
       setState(() {
         _driverNames = names;
+        _driversList = drivers;
       });
     } catch (e) {
       debugPrint('Error loading drivers: $e');
@@ -181,6 +327,9 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
           'id': data['id'] as String? ?? doc.id,
           'modelName': data['modelName'] as String? ?? '',
           'numberPlate': data['numberPlate'] as String? ?? '',
+          'isAssigned': data['isAssigned'] as bool? ?? false,
+          'assignedDriverId': data['assignedDriverId'] as String?,
+          'assignedDriverName': data['assignedDriverName'] as String?,
         };
       }).toList();
       setState(() {
@@ -234,7 +383,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       _selectedUnit = '';
       _materialAvailableCount = null;
 
-      if (materialName != null && materialName.isNotEmpty) {
+      if (materialName != null && materialName != 'Other' && materialName.isNotEmpty) {
         final selectedMaterial = _materials.firstWhere(
           (material) =>
               (material['materialName'] as String? ?? '') == materialName,
@@ -246,7 +395,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         }
       }
     });
-    if (materialName != null && materialName.isNotEmpty) {
+    if (materialName != null && materialName != 'Other' && materialName.isNotEmpty) {
       _fetchMaterialAvailableCount(materialName);
     }
   }
@@ -301,9 +450,7 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       final movementId = await _getNextMovementId();
       final dateFormatted = DateFormat('yyyy-MM-dd').format(_selectedDate);
       final timestamp = FieldValue.serverTimestamp();
-
-      final docId =
-          '${movementId}_${_selectedVehicle}_${DateTime.now().millisecondsSinceEpoch}';
+      final docId = '${movementId}_${_selectedVehicle}_${DateTime.now().millisecondsSinceEpoch}';
 
       String fromLocation = '';
       String toLocation = '';
@@ -328,6 +475,13 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         orElse: () => {'id': '', 'modelName': '', 'numberPlate': ''},
       );
 
+      final bool isOther = _selectedMaterial == 'Other';
+      final otherMatName = _otherMaterialNameController.text.trim();
+      final otherShop = _otherShopNameController.text.trim();
+      final otherVendor = _otherVendorController.text.trim();
+      final otherUnit = _otherUnitController.text.trim();
+      final otherQty = _otherQuantityController.text.trim();
+
       final movementData = {
         'movementId': movementId,
         'docId': docId,
@@ -340,12 +494,17 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         'fromLocation': fromLocation,
         'toLocation': toLocation,
         'driverName': _selectedDriver ?? '',
+        'assignedDriverId': _assignedDriverId ?? '',
         'startTime': _startTimeController.text.trim(),
         'endTime': _endTimeController.text.trim(),
-        'materialType': _selectedMaterial ?? '',
-        'materialUnit': _selectedUnit,
-        'quantity': _quantityController.text.trim(),
-        'quantityValue': double.tryParse(_quantityController.text.trim()) ?? 0,
+        'materialType': isOther ? (otherMatName.isNotEmpty ? otherMatName : 'Other') : (_selectedMaterial ?? ''),
+        'isOtherMaterial': isOther,
+        'otherMaterialName': isOther ? otherMatName : null,
+        'otherShopName': isOther ? otherShop : null,
+        'otherVendor': isOther ? otherVendor : null,
+        'materialUnit': isOther ? otherUnit : _selectedUnit,
+        'quantity': isOther ? otherQty : _quantityController.text.trim(),
+        'quantityValue': double.tryParse(isOther ? otherQty : _quantityController.text.trim()) ?? 0,
         'distanceKm': _distanceController.text.trim(),
         'distanceValue': double.tryParse(_distanceController.text.trim()) ?? 0,
         'remarks': _remarksController.text.trim(),
@@ -382,6 +541,8 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       _selectedMaterial = null;
       _selectedUnit = '';
       _selectedDate = DateTime.now();
+      _assignedDriverName = null;
+      _assignedDriverId = null;
     });
     _setCurrentTime();
     _startTimeController.clear();
@@ -389,6 +550,11 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
     _quantityController.clear();
     _distanceController.clear();
     _remarksController.clear();
+    _otherMaterialNameController.clear();
+    _otherQuantityController.clear();
+    _otherUnitController.clear();
+    _otherShopNameController.clear();
+    _otherVendorController.clear();
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -524,28 +690,57 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         _buildCustomField(
           label: 'Select Vehicle *',
           child: DropdownButtonFormField<String>(
+            key: ValueKey('vehicle_$_selectedVehicle'),
             initialValue: _selectedVehicle,
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Choose vehicle',
-              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              prefixIcon: Icon(Icons.local_shipping_rounded, color: Color(0xFF64748B), size: 20),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              prefixIcon: const Icon(Icons.local_shipping_rounded, color: Color(0xFF64748B), size: 20),
+              suffixIcon: _selectedVehicle != null
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                      tooltip: 'Clear vehicle selection',
+                      onPressed: () {
+                        setState(() {
+                          _selectedVehicle = null;
+                          _updateAssignedDriverForSelectedVehicle();
+                        });
+                      },
+                    )
+                  : null,
             ),
             style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
             items: _vehicles.map<DropdownMenuItem<String>>((v) {
+              final model = v['modelName'] as String? ?? '';
+              final plate = v['numberPlate'] as String? ?? '';
+              final id = v['id'] as String;
               return DropdownMenuItem<String>(
-                value: v['id'],
-                child: Text('${v['modelName']} (${v['numberPlate']})', overflow: TextOverflow.ellipsis),
+                value: id,
+                child: Text(
+                  '$model ($plate) - $id',
+                  overflow: TextOverflow.ellipsis,
+                ),
               );
             }).toList(),
-            onChanged: _vehicles.isEmpty ? null : (val) => setState(() => _selectedVehicle = val),
+            onChanged: _vehicles.isEmpty
+                ? null
+                : (val) {
+                    setState(() {
+                      _selectedVehicle = val;
+                      _updateAssignedDriverForSelectedVehicle();
+                    });
+                  },
             validator: (val) => val == null ? 'Please select a vehicle' : null,
             isExpanded: true,
           ),
         ),
+        if (_selectedVehicle != null) ...[
+          _buildAssignedDriverBanner(primaryColor),
+        ],
         const SizedBox(height: 12),
         _buildCustomField(
           label: 'Log Date *',
@@ -568,6 +763,138 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildAssignedDriverBanner(Color primaryColor) {
+    final bool hasDriver = _assignedDriverName != null && _assignedDriverName!.isNotEmpty;
+
+    if (hasDriver) {
+      return Container(
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFECFDF5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFA7F3D0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                color: Color(0xFF10B981),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_rounded, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'CURRENTLY ASSIGNED DRIVER',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF047857),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$_assignedDriverName${_assignedDriverId != null && _assignedDriverId!.isNotEmpty ? " ($_assignedDriverId)" : ""}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF065F46),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD1FAE5),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Assigned',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF047857),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF59E0B),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_off_rounded, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'VEHICLE ASSIGNMENT STATUS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFB45309),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'No Driver Assigned',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Unassigned',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFFB45309),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildMovementTypeSection(Color primaryColor) {
@@ -653,6 +980,11 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
   }
 
   Widget _buildDriverAndMaterialSection(Color primaryColor) {
+    final allDriverOptions = <String>{..._driverNames};
+    if (_selectedDriver != null && _selectedDriver!.isNotEmpty) {
+      allDriverOptions.add(_selectedDriver!);
+    }
+
     return _buildSectionCard(
       title: 'Driver & Material',
       icon: Icons.person_pin_rounded,
@@ -661,98 +993,336 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         _buildCustomField(
           label: 'Select Driver *',
           child: DropdownButtonFormField<String>(
+            key: ValueKey('driver_${_selectedDriver}_$_selectedVehicle'),
             initialValue: _selectedDriver,
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(14),
             isExpanded: true,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Assign driver for trip',
-              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              prefixIcon: Icon(Icons.person_rounded, color: Color(0xFF64748B), size: 20),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              prefixIcon: const Icon(Icons.person_rounded, color: Color(0xFF64748B), size: 20),
+              suffixIcon: (_assignedDriverName != null && _selectedDriver == _assignedDriverName)
+                  ? Container(
+                      margin: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: const Tooltip(
+                        message: 'Assigned Driver from Configuration',
+                        child: Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 18),
+                      ),
+                    )
+                  : null,
             ),
             style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            items: _driverNames.map((d) => DropdownMenuItem(value: d, child: Text(d, overflow: TextOverflow.ellipsis))).toList(),
+            items: allDriverOptions.map((d) {
+              final isVehicleDriver = d == _assignedDriverName;
+              return DropdownMenuItem(
+                value: d,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        d,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: isVehicleDriver ? FontWeight.w800 : FontWeight.w700,
+                          color: isVehicleDriver ? const Color(0xFF059669) : const Color(0xFF0A183D),
+                        ),
+                      ),
+                    ),
+                    if (isVehicleDriver)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                        ),
+                        child: const Text(
+                          'Assigned',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF059669),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }).toList(),
             onChanged: (val) => setState(() => _selectedDriver = val),
-            validator: (val) => val == null ? 'Please select driver' : null,
+            validator: (val) => (val == null || val.isEmpty) ? 'Please select driver' : null,
           ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 2,
-              child: _buildCustomField(
-                label: 'Material Type *',
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedMaterial,
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Material',
-                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                    prefixIcon: Icon(Icons.inventory_2_rounded, color: Color(0xFF64748B), size: 18),
-                  ),
-                  style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
-                  items: _materials.map((m) {
-                    final name = m['materialName'] as String;
-                    return DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis));
-                  }).toList(),
-                  onChanged: _materials.isEmpty ? null : _onMaterialSelected,
-                  validator: (val) => val == null ? 'Select material' : null,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 1,
-              child: _buildCustomField(
-                label: 'Quantity *',
-                child: TextFormField(
-                  controller: _quantityController,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                  decoration: InputDecoration(
-                    hintText: 'Qty',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    suffixText: _selectedUnit.isNotEmpty ? _selectedUnit : null,
-                    suffixStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 12),
-                  ),
-                  validator: (val) => val == null || val.isEmpty ? 'Enter qty' : null,
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (_selectedMaterial != null) ...[
-          const SizedBox(height: 6),
+        if (_assignedDriverName != null && _assignedDriverName!.isNotEmpty) ...[
+          const SizedBox(height: 4),
           Row(
             children: [
-              Icon(
-                Icons.check_circle_rounded,
-                size: 14,
-                color: (_materialAvailableCount ?? 0) > 0 ? const Color(0xFF059669) : Colors.redAccent,
+              const Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF059669)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Auto-assigned to $_assignedDriverName from Driver Configuration',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF059669),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                'Available Stock: ${_materialAvailableCount ?? "..."} ${_selectedUnit.isNotEmpty ? _selectedUnit : ""}',
-                style: TextStyle(
-                  color: (_materialAvailableCount ?? 0) > 0 ? const Color(0xFF059669) : Colors.redAccent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+            ],
+          ),
+        ] else if (_selectedVehicle != null) ...[
+          const SizedBox(height: 4),
+          const Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFB45309)),
+              SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'No Driver Assigned to this vehicle. Please select a driver manually.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFB45309),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
         ],
+        const SizedBox(height: 12),
+        _buildCustomField(
+          label: 'Material Type *',
+          child: DropdownButtonFormField<String>(
+            key: ValueKey('material_$_selectedMaterial'),
+            initialValue: _selectedMaterial,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            isExpanded: true,
+            decoration: const InputDecoration(
+              hintText: 'Select material',
+              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              prefixIcon: Icon(Icons.inventory_2_rounded, color: Color(0xFF64748B), size: 18),
+            ),
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
+            items: [
+              ..._materials.map((m) {
+                final name = m['materialName'] as String;
+                return DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis));
+              }),
+              const DropdownMenuItem(
+                value: 'Other',
+                child: Row(
+                  children: [
+                    Icon(Icons.category_rounded, size: 16, color: Color(0xFF2563EB)),
+                    SizedBox(width: 8),
+                    Text(
+                      'Other (Custom Material)',
+                      style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2563EB)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            onChanged: _onMaterialSelected,
+            validator: (val) => (val == null || val.isEmpty) ? 'Select material' : null,
+          ),
+        ),
+        if (_selectedMaterial == 'Other') ...[
+          _buildOtherMaterialSection(primaryColor),
+        ] else ...[
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildCustomField(
+                  label: 'Quantity *',
+                  child: TextFormField(
+                    controller: _quantityController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
+                    decoration: InputDecoration(
+                      hintText: 'Enter quantity',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      suffixText: _selectedUnit.isNotEmpty ? _selectedUnit : null,
+                      suffixStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 12),
+                    ),
+                    validator: (val) => (_selectedMaterial != 'Other' && (val == null || val.isEmpty)) ? 'Enter qty' : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_selectedMaterial != null && _selectedMaterial != 'Other') ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 14,
+                  color: (_materialAvailableCount ?? 0) > 0 ? const Color(0xFF059669) : Colors.redAccent,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Available Stock: ${_materialAvailableCount ?? "..."} ${_selectedUnit.isNotEmpty ? _selectedUnit : ""}',
+                  style: TextStyle(
+                    color: (_materialAvailableCount ?? 0) > 0 ? const Color(0xFF059669) : Colors.redAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ],
+    );
+  }
+
+  Widget _buildOtherMaterialSection(Color primaryColor) {
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E40AF).withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.category_rounded, size: 16, color: Color(0xFF2563EB)),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Other Material Details',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E3A8A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildCustomField(
+            label: 'Material Name *',
+            child: TextFormField(
+              controller: _otherMaterialNameController,
+              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
+              decoration: const InputDecoration(
+                hintText: 'Enter material name',
+                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                prefixIcon: Icon(Icons.drive_file_rename_outline_rounded, color: Color(0xFF64748B), size: 18),
+              ),
+              validator: (val) => (_selectedMaterial == 'Other' && (val == null || val.trim().isEmpty))
+                  ? 'Please enter material name'
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: _buildCustomField(
+                  label: 'Quantity *',
+                  child: TextFormField(
+                    controller: _otherQuantityController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
+                    decoration: const InputDecoration(
+                      hintText: 'Enter quantity',
+                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      prefixIcon: Icon(Icons.numbers_rounded, color: Color(0xFF64748B), size: 18),
+                    ),
+                    validator: (val) => (_selectedMaterial == 'Other' && (val == null || val.trim().isEmpty))
+                        ? 'Please enter quantity'
+                        : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 1,
+                child: _buildCustomField(
+                  label: 'Unit',
+                  child: TextFormField(
+                    controller: _otherUnitController,
+                    style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
+                    decoration: const InputDecoration(
+                      hintText: 'Kg/Nos',
+                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildCustomField(
+            label: 'Shop Name (Optional)',
+            child: TextFormField(
+              controller: _otherShopNameController,
+              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
+              decoration: const InputDecoration(
+                hintText: 'Enter shop name (optional)',
+                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                prefixIcon: Icon(Icons.storefront_rounded, color: Color(0xFF64748B), size: 18),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildCustomField(
+            label: 'Vendor (Optional)',
+            child: TextFormField(
+              controller: _otherVendorController,
+              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
+              decoration: const InputDecoration(
+                hintText: 'Enter vendor name (optional)',
+                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                prefixIcon: Icon(Icons.business_rounded, color: Color(0xFF64748B), size: 18),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

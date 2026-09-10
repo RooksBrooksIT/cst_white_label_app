@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:demo_cst/screens/customer/customer_dashboard.dart';
-import 'package:demo_cst/services/firestore_service.dart';
-import 'package:demo_cst/services/auth_service.dart';
-import 'package:demo_cst/widgets/glass_scaffold.dart';
-import 'package:demo_cst/utils/firestore_error_handler.dart';
-import 'package:demo_cst/utils/app_theme.dart';
+import 'package:ebricks/screens/customer/customer_dashboard.dart';
+import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/utils/firestore_error_handler.dart';
+import 'package:ebricks/utils/app_theme.dart';
 
 class CustomerLoginPage extends StatefulWidget {
   const CustomerLoginPage({super.key});
