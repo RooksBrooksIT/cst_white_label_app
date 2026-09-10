@@ -2034,8 +2034,8 @@ class MaterialInventoryService {
             '${now.day.toString().padLeft(2, '0')}-${now.month.toString().padLeft(2, '0')}-${now.year}';
         final legacyDocId = '${materialName}_$formattedDate';
 
-        // 1. Sync materialsavailablity daily doc
-        await FirestoreService.getCollection('materialsavailablity').doc(legacyDocId).set({
+        // 1. Sync materialsAvailability daily doc
+        await FirestoreService.getCollection('materialsAvailability').doc(legacyDocId).set({
           'materialName': materialName,
           'count': companyCount,
           'lastupdated': FieldValue.serverTimestamp(),

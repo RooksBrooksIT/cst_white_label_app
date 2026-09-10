@@ -281,6 +281,8 @@ class FirestoreService {
       getCollection('labours');
   static CollectionReference<Map<String, dynamic>> get materials =>
       getCollection('materials');
+  static CollectionReference<Map<String, dynamic>> get materialsAvailability =>
+      getCollection('materialsAvailability');
   static CollectionReference<Map<String, dynamic>> get contractors =>
       getCollection('contractors');
   static CollectionReference<Map<String, dynamic>> get materialCategories =>

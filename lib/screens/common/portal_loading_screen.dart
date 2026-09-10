@@ -258,9 +258,9 @@ class _PortalLoadingScreenState extends State<PortalLoadingScreen>
     HapticFeedback.lightImpact();
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
+    Navigator.pushNamedAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const OrganisationLandingPage()),
+      '/landing',
       (route) => false,
     );
   }

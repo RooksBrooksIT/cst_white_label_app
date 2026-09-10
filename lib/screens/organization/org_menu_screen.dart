@@ -414,7 +414,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       if (context.mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/orgLogin',
+          '/landing',
           (route) => false,
         );
       }

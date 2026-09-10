@@ -6,7 +6,7 @@ import '/services/firestore_service.dart';
 import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
-import 'package:ebricks/screens/supervisor/supervisor_dashboard.dart';
+import '/services/auth_service.dart';
 
 class SiteContractorEntryPage extends StatefulWidget {
   final String supervisorId;
@@ -445,18 +445,16 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
       actions: [
         IconButton(
           icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SupervisorDashboard(
-                  username: widget.userName,
-                  supervisorId: '',
-                  supervisorName: '',
-                ),
-              ),
-              (route) => false,
-            );
+          tooltip: 'Logout',
+          onPressed: () async {
+            await AuthService().logout();
+            if (context.mounted) {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/landing',
+                (route) => false,
+              );
+            }
           },
         ),
       ],
