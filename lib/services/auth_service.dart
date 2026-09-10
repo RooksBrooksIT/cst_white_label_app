@@ -244,16 +244,23 @@ class AuthService {
     await _prefs.remove(_userRoleKey);
     await _prefs.remove(_userDataKey);
 
-    // Clear all legacy keys to be safe
+    // Clear all legacy and role keys to be safe
     final keys = _prefs.getKeys();
     for (String key in keys) {
       if (key.startsWith('org_') ||
           key.startsWith('config_') ||
           key.startsWith('sup_') ||
-          key.startsWith('cust_')) {
+          key.startsWith('cust_') ||
+          key.startsWith('auth_') ||
+          key == 'user_role' ||
+          key == 'user_id' ||
+          key == 'is_logged_in') {
         await _prefs.remove(key);
       }
     }
+
+    // Reset FirestoreService organization context
+    FirestoreService.setOrgPath('');
 
     // 2. Perform network token pruning and Firebase sign-out in background without blocking UI
     if (userId.isNotEmpty) {

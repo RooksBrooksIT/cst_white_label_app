@@ -231,7 +231,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
 
       try {
         final availSnap =
-            await FirestoreService.getCollection('materialsavailablity').get();
+            await FirestoreService.getCollection('materialsAvailability').get();
         for (final doc in availSnap.docs) {
           final data = doc.data();
           final name = (data['materialName'] ??
