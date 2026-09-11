@@ -1,8 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:ebricks/widgets/glass_card.dart';
-import 'package:ebricks/widgets/glass_button.dart';
 import 'package:ebricks/utils/responsive.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:pdf/pdf.dart';
@@ -15,7 +13,7 @@ class ContractorReportPage extends StatefulWidget {
   const ContractorReportPage({super.key});
 
   @override
-  _ContractorReportPageState createState() => _ContractorReportPageState();
+  State<ContractorReportPage> createState() => _ContractorReportPageState();
 }
 
 class _ContractorReportPageState extends State<ContractorReportPage> {
@@ -214,26 +212,29 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
 
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
-        final cardAccent = AppTheme.getCardAccent(primaryColor);
-
         final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF1F5F9),
+          backgroundColor: const Color(0xFFF8FAFC),
           appBar: AppBar(
             iconTheme: const IconThemeData(color: Colors.white),
             title: const Text(
               'Contractor Report',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                letterSpacing: -0.3,
+              ),
             ),
             centerTitle: true,
             elevation: 0,
+            backgroundColor: Colors.transparent,
             flexibleSpace: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -261,30 +262,34 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
               ),
             ],
           ),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isMobile ? double.infinity : 600,
-              ),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(isMobile ? 16 : 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildFilterCard(theme, cardAccent),
-                    const SizedBox(height: 24),
-                    if (isLoadingExpenses)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(40),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    else if (expenses.isNotEmpty)
-                      _buildReportSection(theme)
-                    else if (selectedContractor != null && selectedSiteId != null)
-                      _buildEmptyState(theme),
-                  ],
+          body: SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isMobile ? double.infinity : 680,
+                ),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.all(isMobile ? 16 : 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildFilterCard(primaryColor, darkAccent),
+                      const SizedBox(height: 20),
+                      if (isLoadingExpenses)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(48),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else if (expenses.isNotEmpty)
+                        _buildReportSection(primaryColor)
+                      else if (selectedContractor != null && selectedSiteId != null)
+                        _buildEmptyState(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -294,61 +299,113 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     );
   }
 
-  Widget _buildFilterCard(ThemeData theme, Color cardAccent) {
-    return GlassCard(
+  Widget _buildFilterCard(Color primaryColor, Color darkAccent) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'REPORT PARAMETERS',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: cardAccent,
-              letterSpacing: 1.2,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.tune_rounded, color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Report Parameters',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Select contractor & site location',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           _buildDropdown(
-            'Contractor Name',
-            contractorNames,
-            selectedContractor,
-            (v) async {
+            label: 'Contractor Name',
+            items: contractorNames,
+            value: selectedContractor,
+            onChanged: (v) async {
               setState(() => selectedContractor = v);
               if (v != null) {
                 await _fetchSiteIdsForContractor(v);
-                _fetchExpenses(); // Auto-refresh report
+                _fetchExpenses();
               }
             },
-            isLoadingContractors,
-            cardAccent,
+            loading: isLoadingContractors,
+            icon: Icons.person_rounded,
+            primaryColor: primaryColor,
           ),
           const SizedBox(height: 16),
-          _buildDropdown('Site ID', siteIdOptions, selectedSiteId, (v) {
-            setState(() => selectedSiteId = v);
-            _fetchExpenses(); // Auto-refresh report
-          }, isLoadingSites, cardAccent),
-          const SizedBox(height: 24),
+          _buildDropdown(
+            label: 'Site ID',
+            items: siteIdOptions,
+            value: selectedSiteId,
+            onChanged: (v) {
+              setState(() => selectedSiteId = v);
+              _fetchExpenses();
+            },
+            loading: isLoadingSites,
+            icon: Icons.location_on_rounded,
+            primaryColor: primaryColor,
+          ),
+          const SizedBox(height: 22),
           SizedBox(
-            height: 52,
+            height: 48,
             width: double.infinity,
             child: ElevatedButton.icon(
               icon: const Icon(Icons.analytics_rounded, size: 20),
               label: const Text(
                 'GENERATE REPORT',
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: 0.5,
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
+                backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFFE2E8F0),
+                disabledForegroundColor: const Color(0xFF94A3B8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                elevation: 3,
+                elevation: 2,
+                shadowColor: primaryColor.withValues(alpha: 0.25),
               ),
               onPressed: selectedContractor != null && selectedSiteId != null
                   ? _fetchExpenses
@@ -360,108 +417,189 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     );
   }
 
-  Widget _buildDropdown(
-    String label,
-    List<String> items,
-    String? value,
-    Function(String?) onChanged,
-    bool loading,
-    Color cardAccent,
-  ) {
-    return DropdownButtonFormField<String>(
-      initialValue: (value != null && items.contains(value)) ? value : null,
-      dropdownColor: Colors.white,
-      iconEnabledColor: cardAccent,
-      style: const TextStyle(
-        color: Color(0xFF0A183D),
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(
-          color: Color(0xFF5A759E),
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-        prefixIcon: Icon(
-          label.contains('Contractor')
-              ? Icons.person_outline
-              : Icons.location_on_outlined,
-          color: cardAccent,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        suffixIcon: loading
-            ? const SizedBox(
-                width: 12,
-                height: 12,
-                child: Padding(
-                  padding: EdgeInsets.all(12),
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            : null,
-      ),
-      items: items
-          .map((s) => DropdownMenuItem(
-                value: s,
-                child: Text(
-                  s,
-                  style: const TextStyle(
-                    color: Color(0xFF0A183D),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ))
-          .toList(),
-      onChanged: onChanged,
-    );
-  }
-
-  Widget _buildReportSection(ThemeData theme) {
+  Widget _buildDropdown({
+    required String label,
+    required List<String> items,
+    required String? value,
+    required Function(String?) onChanged,
+    required bool loading,
+    required IconData icon,
+    required Color primaryColor,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GlassCard(
-          color: theme.primaryColor,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'TOTAL PAYABLE',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF64748B),
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 7),
+        DropdownButtonFormField<String>(
+          initialValue: (value != null && items.contains(value)) ? value : null,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          icon: loading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Color(0xFF64748B),
                 ),
-              ),
-              Text(
-                '₹ ${totalAmount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontSize: 14.5,
+            fontWeight: FontWeight.w700,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Select $label',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Icon(icon, color: primaryColor, size: 20),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
+          ),
+          items: items
+              .map(
+                (s) => DropdownMenuItem(
+                  value: s,
+                  child: Text(
+                    s,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+              )
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReportSection(Color primaryColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Summary KPI Cards ──────────────────────────────────────────
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: _buildKpiCard(
+                title: 'Total Payable',
+                value: '₹ ${totalAmount.toStringAsFixed(2)}',
+                subtitle: selectedContractor ?? '',
+                icon: Icons.payments_rounded,
+                accentColor: const Color(0xFFDC2626),
               ),
-            ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: _buildKpiCard(
+                title: 'Total Entries',
+                value: '${expenses.length}',
+                subtitle: 'Site: ${selectedSiteId ?? '-'}',
+                icon: Icons.receipt_long_rounded,
+                accentColor: primaryColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // ── Export PDF Action Button ─────────────────────────────────
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
+            label: const Text(
+              'EXPORT CONTRACTOR PDF',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 2,
+              shadowColor: primaryColor.withValues(alpha: 0.25),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            onPressed: expenses.isNotEmpty ? _generatePdf : null,
           ),
         ),
         const SizedBox(height: 24),
-        Text(
-          'ENTRY LOG',
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+
+        // ── Section Title ───────────────────────────────────────────
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'EXPENSE ENTRIES LOG',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.8,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${expenses.length} Records',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
+
+        // ── Entries List ────────────────────────────────────────────
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -471,46 +609,150 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
             final exp = expenses[i];
             final date = _formatDate(exp['date']);
             final amt = exp['totalAmount'] ?? exp['amount'] ?? 0;
-            return GlassCard(
-              onTap: () => _showEntryDetails(exp),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.receipt_outlined,
-                      color: theme.primaryColor,
-                      size: 20,
-                    ),
+            final double numAmt = (amt is num)
+                ? amt.toDouble()
+                : (double.tryParse(amt.toString()) ?? 0.0);
+
+            final food = (exp['food'] is num)
+                ? (exp['food'] as num).toDouble()
+                : (double.tryParse(exp['food']?.toString() ?? '') ?? 0.0);
+            final fuel = (exp['fuel'] is num)
+                ? (exp['fuel'] as num).toDouble()
+                : (double.tryParse(exp['fuel']?.toString() ?? '') ?? 0.0);
+            final transport = (exp['transport'] is num)
+                ? (exp['transport'] as num).toDouble()
+                : (double.tryParse(exp['transport']?.toString() ?? '') ?? 0.0);
+            final hasBreakdown = food > 0 || fuel > 0 || transport > 0;
+
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0A183D).withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => _showEntryDetails(exp, primaryColor),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          date,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.receipt_long_rounded,
+                                color: primaryColor,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    date,
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.location_on_rounded,
+                                        size: 13,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'Site: ${exp['siteId'] ?? selectedSiteId}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '₹ ${numAmt.toStringAsFixed(numAmt == numAmt.roundToDouble() ? 0 : 2)}',
+                                  style: const TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'View Breakdown',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: primaryColor,
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.chevron_right_rounded,
+                                      size: 15,
+                                      color: primaryColor,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        Text(
-                          'Site: ${exp['siteId']}',
-                          style: theme.textTheme.bodySmall,
-                        ),
+                        if (hasBreakdown) ...[
+                          const SizedBox(height: 12),
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              if (food > 0)
+                                _buildCostPill('Food: ₹${food.toStringAsFixed(0)}', const Color(0xFFD97706)),
+                              if (fuel > 0)
+                                _buildCostPill('Fuel: ₹${fuel.toStringAsFixed(0)}', const Color(0xFF2563EB)),
+                              if (transport > 0)
+                                _buildCostPill('Transport: ₹${transport.toStringAsFixed(0)}', const Color(0xFF059669)),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  Text(
-                    '₹ $amt',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: theme.primaryColor,
-                    ),
-                  ),
-                ],
+                ),
               ),
             );
           },
@@ -519,11 +761,151 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(40.0),
-        child: Text('No records found for this selection.'),
+  Widget _buildKpiCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF64748B),
+                  letterSpacing: 0.6,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 16, color: accentColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.5,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (subtitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF94A3B8),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCostPill(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A183D).withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.receipt_long_outlined,
+              size: 40,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'No Expense Records Found',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'No expense entries found for $selectedContractor at $selectedSiteId.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF64748B),
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -535,72 +917,166 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     return '-';
   }
 
-  void _showEntryDetails(Map<String, dynamic> exp) {
-    final theme = Theme.of(context);
+  void _showEntryDetails(Map<String, dynamic> exp, Color primaryColor) {
+    final amt = exp['totalAmount'] ?? exp['amount'] ?? 0;
+    final date = _formatDate(exp['date']);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => GlassCard(
-        borderRadius: 24,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Entry Breakdown',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 24),
-              _detailRow('Date', _formatDate(exp['date'])),
-              _detailRow('Food', '₹ ${exp['food'] ?? 0}'),
-              _detailRow('Fuel', '₹ ${exp['fuel'] ?? 0}'),
-              _detailRow('Transport', '₹ ${exp['transport'] ?? 0}'),
-              const Divider(height: 32),
-              _detailRow(
-                'Total Amount',
-                '₹ ${exp['totalAmount'] ?? exp['amount'] ?? 0}',
-                isBold: true,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.receipt_long_rounded, color: primaryColor, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Contractor Entry Breakdown',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Entry date: $date',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              const SizedBox(height: 24),
-              GlassButton(
-                label: 'CLOSE',
+              child: Column(
+                children: [
+                  _detailRow('Contractor', exp['contractorName'] ?? selectedContractor ?? '-'),
+                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                  _detailRow('Site ID', exp['siteId'] ?? selectedSiteId ?? '-'),
+                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                  _detailRow('Food Cost', '₹ ${exp['food'] ?? 0}'),
+                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                  _detailRow('Fuel Cost', '₹ ${exp['fuel'] ?? 0}'),
+                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                  _detailRow('Transport Cost', '₹ ${exp['transport'] ?? 0}'),
+                  const Divider(height: 20, color: Color(0xFFCBD5E1)),
+                  _detailRow(
+                    'Total Payable',
+                    '₹ $amt',
+                    isBold: true,
+                    highlightColor: const Color(0xFF0F172A),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                isSecondary: true,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  foregroundColor: const Color(0xFF0F172A),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'CLOSE',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    letterSpacing: 0.4,
+                  ),
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _detailRow(String label, String value, {bool isBold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 14)),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            ),
+  Widget _detailRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? highlightColor,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: isBold ? 14.5 : 13.5,
+            fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+            color: isBold ? const Color(0xFF0F172A) : const Color(0xFF64748B),
           ),
-        ],
-      ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isBold ? 16 : 13.5,
+            fontWeight: isBold ? FontWeight.w900 : FontWeight.w700,
+            color: highlightColor ?? (isBold ? const Color(0xFF0F172A) : const Color(0xFF0F172A)),
+          ),
+        ),
+      ],
     );
   }
 
   Future<void> _generatePdf() async {
+    final primaryColor = Theme.of(context).primaryColor;
     await PdfTemplates.loadFonts();
     final pdf = pw.Document();
     final pdfPrimaryColor = PdfColor.fromInt(
-      Theme.of(context).primaryColor.toARGB32(),
+      primaryColor.toARGB32(),
     );
     final orgDetails = await PdfTemplates.fetchOrgDetails();
 
@@ -635,7 +1111,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
             ],
           ),
           pw.SizedBox(height: 24),
-          pw.Table.fromTextArray(
+          pw.TableHelper.fromTextArray(
             headers: ['Date', 'Details', 'Amount'],
             data: expenses.map((exp) {
               final date = _formatDate(exp['date']);

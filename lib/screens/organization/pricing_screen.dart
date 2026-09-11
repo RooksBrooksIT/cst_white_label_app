@@ -12,7 +12,6 @@ import 'package:ebricks/screens/organization/organization_dashboard.dart';
 import 'package:ebricks/screens/organization/transaction_completed_screen.dart';
 import 'package:ebricks/screens/organization/org_subscription_page.dart';
 import 'package:ebricks/screens/common/contact_support_screen.dart';
-import 'package:ebricks/widgets/glass_scaffold.dart';
 
 class PricingScreen extends StatefulWidget {
   final String orgName;
@@ -1176,10 +1175,51 @@ class _PricingScreenState extends State<PricingScreen> {
     final isMobile = screenWidth < 600;
     final isDesktop = screenWidth >= 1024;
 
+    final darkAccent = AppTheme.getDarkAccent(widget.selectedColor);
+
     return Theme(
       data: AppTheme.getTheme(widget.selectedColor),
-      child: GlassScaffold(
-        padding: EdgeInsets.zero,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: Text(
+            widget.isManagingExisting
+                ? 'Manage Subscription Plan'
+                : 'Choose Your Plan',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              letterSpacing: -0.3,
+            ),
+          ),
+          centerTitle: true,
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  darkAccent,
+                  Color.alphaBlend(
+                    widget.selectedColor.withValues(alpha: 0.35),
+                    darkAccent,
+                  ),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -1194,51 +1234,6 @@ class _PricingScreenState extends State<PricingScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Back Button & Title
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0B1942),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF0B1942,
-                                    ).withValues(alpha: 0.25),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: IconButton(
-                                padding: EdgeInsets.zero,
-                                icon: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                onPressed: () => Navigator.pop(context),
-                              ),
-                            ),
-                            Text(
-                              widget.isManagingExisting
-                                  ? 'Manage Subscription Plan'
-                                  : 'Choose Your Plan',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0A183D),
-                                letterSpacing: -0.4,
-                              ),
-                            ),
-                            const SizedBox(width: 40),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
 
                         // Registration Step Indicator
                         if (!widget.isManagingExisting) ...[

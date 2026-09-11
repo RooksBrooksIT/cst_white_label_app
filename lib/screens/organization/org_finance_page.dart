@@ -227,25 +227,14 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
         final darkAccent = AppTheme.getDarkAccent(primaryColor);
-        final dynamicGradientColors =
-            AppTheme.getBackgroundGradientColors(primaryColor);
 
         return Theme(
           data: AppTheme.getTheme(primaryColor),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: dynamicGradientColors,
-                stops: const [0.0, 0.35, 0.7, 1.0],
-              ),
-            ),
-            child: Scaffold(
-              backgroundColor: Colors.transparent,
-              extendBody: true,
-              bottomNavigationBar: const BottomNav(currentIndex: 2),
-              appBar: _buildAppBar(context, primaryColor, darkAccent),
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF8FAFC),
+            extendBody: true,
+            bottomNavigationBar: const BottomNav(currentIndex: 2),
+            appBar: _buildAppBar(context, primaryColor, darkAccent),
               body: SafeArea(
                 bottom: false,
                 child: Center(
@@ -303,10 +292,9 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                 ),
               ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
   }
 
   PreferredSizeWidget _buildAppBar(
@@ -314,48 +302,42 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     Color primaryColor,
     Color darkAccent,
   ) {
-    final isSmall = Responsive.isSmallMobile(context);
     return AppBar(
+      iconTheme: const IconThemeData(color: Colors.white),
+      title: const Text(
+        'Financial Overview',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 18,
+          letterSpacing: -0.3,
+        ),
+      ),
+      centerTitle: true,
       elevation: 0,
-      backgroundColor: Colors.transparent,
-      systemOverlayStyle: SystemUiOverlayStyle.light,
       flexibleSpace: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [primaryColor, darkAccent],
+            colors: [
+              darkAccent,
+              Color.alphaBlend(
+                primaryColor.withValues(alpha: 0.35),
+                darkAccent,
+              ),
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(20),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
       ),
       leading: IconButton(
         icon: const Icon(
           Icons.arrow_back_ios_new_rounded,
           color: Colors.white,
-          size: 20,
+          size: 18,
         ),
         onPressed: () => Navigator.pop(context),
       ),
-      title: Text(
-        'Financial Overview',
-        style: TextStyle(
-          fontSize: isSmall ? 16 : 18,
-          fontWeight: FontWeight.w900,
-          color: Colors.white,
-          letterSpacing: -0.3,
-        ),
-      ),
-      centerTitle: true,
       actions: [
         PopupMenuButton<String>(
           icon: const Icon(Icons.sort_rounded, color: Colors.white, size: 22),
@@ -372,7 +354,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
             const PopupMenuItem(value: 'Name', child: Text('Site Name (A-Z)')),
           ],
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
       ],
     );
   }
@@ -776,24 +758,17 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     return Container(
       padding: EdgeInsets.all(cardPadding),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF0F172A),
-            darkAccent,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: darkAccent.withValues(alpha: 0.35),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.15),
+          color: const Color(0xFFE2E8F0),
           width: 1.2,
         ),
       ),
@@ -806,12 +781,12 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: primaryColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.account_balance_wallet_rounded,
-                  color: Colors.white,
+                  color: primaryColor,
                   size: 15,
                 ),
               ),
@@ -820,10 +795,10 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                 child: Text(
                   'Total Organization Finance',
                   style: TextStyle(
-                    fontSize: isSmall ? 12 : 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white.withValues(alpha: 0.9),
-                    letterSpacing: 0.2,
+                    fontSize: isSmall ? 12.5 : 14,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                    letterSpacing: -0.2,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -836,10 +811,10 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                   vertical: 3.5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -859,7 +834,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF10B981),
+                        color: Color(0xFF059669),
                       ),
                     ),
                   ],
@@ -880,10 +855,10 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                     vertical: isSmall ? 10 : 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: const Color(0xFFF0FDF4),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.25),
                     ),
                   ),
                   child: Column(
@@ -895,13 +870,13 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                           Container(
                             padding: const EdgeInsets.all(2.5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.arrow_downward_rounded,
                               size: 11,
-                              color: Color(0xFF10B981),
+                              color: Color(0xFF059669),
                             ),
                           ),
                           const SizedBox(width: 5),
@@ -911,7 +886,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                               style: TextStyle(
                                 fontSize: isSmall ? 10.5 : 11.5,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white70,
+                                color: const Color(0xFF64748B),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -928,7 +903,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                           style: TextStyle(
                             fontSize: isSmall ? 15 : 17,
                             fontWeight: FontWeight.w900,
-                            color: const Color(0xFF10B981),
+                            color: const Color(0xFF059669),
                             letterSpacing: -0.4,
                           ),
                           maxLines: 1,
@@ -948,10 +923,10 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                     vertical: isSmall ? 10 : 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: const Color(0xFFFEF2F2),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.25),
                     ),
                   ),
                   child: Column(
@@ -963,13 +938,13 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                           Container(
                             padding: const EdgeInsets.all(2.5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.arrow_upward_rounded,
                               size: 11,
-                              color: Color(0xFFEF4444),
+                              color: Color(0xFFDC2626),
                             ),
                           ),
                           const SizedBox(width: 5),
@@ -979,7 +954,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                               style: TextStyle(
                                 fontSize: isSmall ? 10.5 : 11.5,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white70,
+                                color: const Color(0xFF64748B),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -996,7 +971,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                           style: TextStyle(
                             fontSize: isSmall ? 15 : 17,
                             fontWeight: FontWeight.w900,
-                            color: const Color(0xFFEF4444),
+                            color: const Color(0xFFDC2626),
                             letterSpacing: -0.4,
                           ),
                           maxLines: 1,
@@ -1017,8 +992,9 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
               vertical: isSmall ? 8 : 10,
             ),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Row(
               children: [
@@ -1026,7 +1002,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                   child: _buildCountIndicator(
                     label: 'Live Sites',
                     count: liveSitesCount < 10 ? '0$liveSitesCount' : '$liveSitesCount',
-                    color: const Color(0xFF38BDF8),
+                    color: const Color(0xFF0284C7),
                     icon: Icons.domain_rounded,
                     isSmall: isSmall,
                   ),
@@ -1034,13 +1010,13 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                 Container(
                   width: 1,
                   height: 22,
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: const Color(0xFFE2E8F0),
                 ),
                 Expanded(
                   child: _buildCountIndicator(
                     label: 'Completed',
                     count: completedSitesCount < 10 ? '0$completedSitesCount' : '$completedSitesCount',
-                    color: const Color(0xFF34D399),
+                    color: const Color(0xFF059669),
                     icon: Icons.check_circle_rounded,
                     isSmall: isSmall,
                   ),
@@ -1048,13 +1024,13 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                 Container(
                   width: 1,
                   height: 22,
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: const Color(0xFFE2E8F0),
                 ),
                 Expanded(
                   child: _buildCountIndicator(
                     label: 'Planning',
                     count: planningSitesCount < 10 ? '0$planningSitesCount' : '$planningSitesCount',
-                    color: const Color(0xFFA78BFA),
+                    color: const Color(0xFF7C3AED),
                     icon: Icons.architecture_rounded,
                     isSmall: isSmall,
                   ),
@@ -1102,7 +1078,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                   style: TextStyle(
                     fontSize: isSmall ? 9 : 10,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.75),
+                    color: const Color(0xFF64748B),
                     height: 1.1,
                   ),
                 ),

@@ -111,7 +111,12 @@ class _OrganizationPettyCashInsightsScreenState
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Petty Cash Insights',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
         ),
         centerTitle: true,
         elevation: 0,

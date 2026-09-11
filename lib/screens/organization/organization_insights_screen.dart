@@ -344,7 +344,12 @@ class _OrganizationInsightsScreenState
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Site/Project Expenses Report',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
         ),
         centerTitle: true,
         elevation: 0,

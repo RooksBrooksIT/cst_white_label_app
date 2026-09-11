@@ -42,6 +42,7 @@ class _OrgNotificationPageState extends State<OrgNotificationPage> {
             color: Colors.white,
             fontWeight: FontWeight.w800,
             fontSize: 18,
+            letterSpacing: -0.3,
           ),
         ),
         centerTitle: true,

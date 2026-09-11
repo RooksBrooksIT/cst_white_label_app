@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -321,18 +321,6 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Export Master PDF',
-            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
-            onPressed: _materials.isNotEmpty ? _exportMasterPdf : null,
-          ),
-          IconButton(
-            tooltip: 'Refresh Inventory',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
-            onPressed: _loadInventoryData,
-          ),
-        ],
       ),
       body: SafeArea(
         child: Align(
@@ -513,6 +501,36 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                     ],
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Export PDF Action Button ────────────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _materials.isNotEmpty ? _exportMasterPdf : null,
+                icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
+                label: const Text(
+                  'EXPORT INVENTORY PDF',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFE2E8F0),
+                  disabledForegroundColor: const Color(0xFF94A3B8),
+                  elevation: 2,
+                  shadowColor: primaryColor.withValues(alpha: 0.25),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 14),

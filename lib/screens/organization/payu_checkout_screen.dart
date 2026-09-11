@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:ebricks/services/payu_service.dart';
-import 'package:ebricks/widgets/glass_scaffold.dart';
+import 'package:ebricks/utils/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PayUCheckoutScreen extends StatefulWidget {
@@ -713,61 +713,61 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
   Widget build(BuildContext context) {
     const Color darkNavy = Color(0xFF0B1942);
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _onWillPop();
-      },
-      child: GlassScaffold(
-        padding: EdgeInsets.zero,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Custom Top Header Row
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: darkNavy,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: darkNavy.withValues(alpha: 0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        onPressed: () => _onWillPop(),
-                      ),
-                    ),
-                    const Text(
-                      'PayU Secure Checkout',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0A183D),
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(width: 40),
-                  ],
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
+
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) _onWillPop();
+          },
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF8FAFC),
+            appBar: AppBar(
+              iconTheme: const IconThemeData(color: Colors.white),
+              title: const Text(
+                'PayU Secure Checkout',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  letterSpacing: -0.3,
                 ),
               ),
+              centerTitle: true,
+              elevation: 0,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      darkAccent,
+                      Color.alphaBlend(
+                        primaryColor.withValues(alpha: 0.35),
+                        darkAccent,
+                      ),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                onPressed: () => _onWillPop(),
+              ),
+            ),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
 
-              // SSL Encryption Badge
+                  // SSL Encryption Badge
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                 child: Container(
@@ -850,6 +850,8 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

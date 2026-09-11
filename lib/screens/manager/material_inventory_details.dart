@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
@@ -408,18 +408,6 @@ class _MaterialInventoryDetailsPageState
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Export PDF Report',
-            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
-            onPressed: _siteBreakdown.isNotEmpty || _companyQty > 0 ? _exportPdfReport : null,
-          ),
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
-            onPressed: _fetchMaterialDetails,
-          ),
-        ],
       ),
       body: SafeArea(
         child: Align(
@@ -671,6 +659,8 @@ class _MaterialInventoryDetailsPageState
                                 ],
                               ),
                             ),
+                            const SizedBox(height: 14),
+                            _buildActionButtons(context),
                             const SizedBox(height: 20),
 
                             // ── Section Title ───────────────────────────
@@ -1056,6 +1046,35 @@ class _MaterialInventoryDetailsPageState
             overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
+        label: const Text(
+          'EXPORT PDF REPORT',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.4,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: const Color(0xFFE2E8F0),
+          disabledForegroundColor: const Color(0xFF94A3B8),
+          elevation: 2,
+          shadowColor: primaryColor.withValues(alpha: 0.25),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        onPressed: _siteBreakdown.isNotEmpty || _companyQty > 0 ? _exportPdfReport : null,
       ),
     );
   }

@@ -14,7 +14,11 @@ class OrganizationExpenses extends StatefulWidget {
   OrganizationExpensesState createState() => OrganizationExpensesState();
 }
 
-class OrganizationExpensesState extends State<OrganizationExpenses> {
+class OrganizationExpensesState extends State<OrganizationExpenses>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  // --- ENTRY TAB STATE ---
   String? selectedSiteId;
   String? selectedSupervisorId;
   String? selectedProjectStage;
@@ -34,16 +38,27 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
 
   List<Map<String, String>> bills = [];
 
+  // --- LOGS TAB STATE ---
+  final TextEditingController _logSearchController = TextEditingController();
+  String _logSearchQuery = '';
+  String _selectedLogSite = 'All';
+  String _selectedLogStage = 'All';
+  String _selectedLogDateFilter = 'All Time'; // 'All Time', 'Today', 'This Month'
+
   Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
     _loadSiteIds();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
+    _logSearchController.dispose();
     billNoController.dispose();
     billVendorController.dispose();
     billAmountController.dispose();
@@ -763,6 +778,10 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
               ],
             ),
             actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+              ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
@@ -771,8 +790,11 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
                     borderRadius: BorderRadius.circular(10.0),
                   ),
                 ),
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _tabController.animateTo(1);
+                },
+                child: const Text('View Logs', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -996,7 +1018,12 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Organization Expenses',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -1019,21 +1046,41 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-            onPressed: _loadSiteIds,
-            tooltip: 'Refresh Sites',
-          ),
-        ],
       ),
       body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: isDesktop ? 850.0 : (isTablet ? 680.0 : double.infinity),
+        child: Column(
+          children: [
+            const OfflineSyncBanner(),
+            _buildCustomTabBar(primaryColor),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildEntryTab(context, primaryColor, darkAccent, isDesktop, isTablet, isMobile),
+                  _buildLogsTab(context, primaryColor, darkAccent),
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEntryTab(
+    BuildContext context,
+    Color primaryColor,
+    Color darkAccent,
+    bool isDesktop,
+    bool isTablet,
+    bool isMobile,
+  ) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isDesktop ? 850.0 : (isTablet ? 680.0 : double.infinity),
+        ),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.all(isDesktop ? 28.0 : 16.0),
@@ -1432,9 +1479,1673 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
               ),
             ),
           ),
+        );
+  }
+
+  // --- CUSTOM TAB BAR ---
+  Widget _buildCustomTabBar(Color primaryColor) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          color: primaryColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withValues(alpha: 0.28),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: Colors.white,
+        unselectedLabelColor: const Color(0xFF64748B),
+        labelStyle: const TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+        ),
+        tabs: const [
+          Tab(
+            iconMargin: EdgeInsets.only(bottom: 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.edit_document, size: 17),
+                SizedBox(width: 8),
+                Text('Expense Entry'),
+              ],
+            ),
+          ),
+          Tab(
+            iconMargin: EdgeInsets.only(bottom: 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.receipt_long_rounded, size: 17),
+                SizedBox(width: 8),
+                Text('Expense Logs'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- LOGS TAB ---
+  Widget _buildLogsTab(
+      BuildContext context, Color primaryColor, Color darkAccent) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreService.organizationEntries.snapshots(),
+      builder: (context, orgSnap) {
+        if (orgSnap.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                'Error loading expense logs: ${orgSnap.error}',
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          );
+        }
+
+        if (orgSnap.connectionState == ConnectionState.waiting &&
+            !orgSnap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirestoreService.getCollection('organizationExpenses').snapshots(),
+          builder: (context, altOrgSnap) {
+            final Map<String, Map<String, dynamic>> dedupedMap = {};
+
+            void processDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc, String source) {
+              final data = doc.data();
+              final docId = doc.id;
+              if (dedupedMap.containsKey(docId)) return;
+
+              final siteId = (data['siteId'] ??
+                      data['site'] ??
+                      docId.split('_').firstOrNull ??
+                      'N/A')
+                  .toString();
+              final projectName = (data['projectName'] ??
+                      data['project'] ??
+                      siteNameMap[siteId] ??
+                      'Unnamed Project')
+                  .toString();
+              final siteName = siteNameMap[siteId] ?? projectName;
+              final projectStage = (data['projectStage'] ??
+                      data['stage'] ??
+                      data['category'] ??
+                      'General')
+                  .toString();
+              final supervisorName = (data['supervisorName'] ??
+                      data['supervisor'] ??
+                      data['raisedByName'] ??
+                      data['raisedBy'] ??
+                      'Organization Admin')
+                  .toString();
+              final raisedById = (data['raisedById'] ??
+                      data['orgId'] ??
+                      data['userId'] ??
+                      'Organization')
+                  .toString();
+              final userRole = (data['userRole'] ??
+                      data['role'] ??
+                      'Organization')
+                  .toString();
+
+              final rawEntryDate = data['entryDate'] ??
+                  data['createdAt'] ??
+                  data['date'] ??
+                  data['timestamp'];
+              DateTime recordDate = DateTime.now();
+              if (rawEntryDate is Timestamp) {
+                recordDate = rawEntryDate.toDate();
+              } else if (rawEntryDate is String) {
+                recordDate = DateTime.tryParse(rawEntryDate) ?? DateTime.now();
+              }
+
+              final rawBills = data['bills'] as List<dynamic>? ?? [];
+              final List<Map<String, dynamic>> parsedBills = [];
+              double totalAmt = 0.0;
+
+              for (var b in rawBills) {
+                if (b is Map) {
+                  final bAmt = _parseNum(b['billAmount'] ?? b['amount']).toDouble();
+                  totalAmt += bAmt;
+
+                  DateTime bDate = recordDate;
+                  final rawBDate = b['billDate'];
+                  if (rawBDate is Timestamp) {
+                    bDate = rawBDate.toDate();
+                  } else if (rawBDate is String) {
+                    bDate = DateTime.tryParse(rawBDate) ?? recordDate;
+                  }
+
+                  DateTime? bCreatedAt;
+                  final rawBCreatedAt = b['createdAt'];
+                  if (rawBCreatedAt is Timestamp) {
+                    bCreatedAt = rawBCreatedAt.toDate();
+                  }
+
+                  parsedBills.add({
+                    'billNo': (b['billNo'] ?? 'N/A').toString(),
+                    'billVendor': (b['billVendor'] ?? b['vendor'] ?? 'Vendor').toString(),
+                    'billAmount': bAmt,
+                    'billCopy': (b['billCopy'] ?? '').toString(),
+                    'billDate': bDate,
+                    'createdAt': bCreatedAt ?? recordDate,
+                    'raisedBy': (b['raisedBy'] ?? raisedById).toString(),
+                    'raisedByName': (b['raisedByName'] ?? supervisorName).toString(),
+                    'userRole': (b['userRole'] ?? userRole).toString(),
+                  });
+                }
+              }
+
+              if (totalAmt == 0.0 && data['totalAmount'] != null) {
+                totalAmt = _parseNum(data['totalAmount']).toDouble();
+              } else if (totalAmt == 0.0 && data['orgExpenseTotalAmount'] != null) {
+                totalAmt = _parseNum(data['orgExpenseTotalAmount']).toDouble();
+              } else if (totalAmt == 0.0 && data['amount'] != null) {
+                totalAmt = _parseNum(data['amount']).toDouble();
+              }
+
+              dedupedMap[docId] = {
+                'docId': docId,
+                'source': source,
+                'siteId': siteId,
+                'siteName': siteName,
+                'projectName': projectName,
+                'projectStage': projectStage,
+                'supervisorName': supervisorName,
+                'raisedById': raisedById,
+                'raisedByName': supervisorName,
+                'userRole': userRole,
+                'totalAmount': totalAmt,
+                'recordDate': recordDate,
+                'bills': parsedBills,
+                'rawData': data,
+              };
+            }
+
+            if (orgSnap.hasData) {
+              for (var doc in orgSnap.data!.docs) {
+                processDoc(doc, 'Organization Entries');
+              }
+            }
+            if (altOrgSnap.hasData) {
+              for (var doc in altOrgSnap.data!.docs) {
+                processDoc(doc, 'Organization Expenses');
+              }
+            }
+
+            final List<Map<String, dynamic>> allLogs = dedupedMap.values.toList();
+
+            // Sort logs descending (newest first)
+            allLogs.sort((a, b) {
+              final DateTime dateA = a['recordDate'] as DateTime;
+              final DateTime dateB = b['recordDate'] as DateTime;
+              return dateB.compareTo(dateA);
+            });
+
+            // Available stages for filtering
+            final Set<String> availableStages = {'All'};
+            for (var log in allLogs) {
+              final st = log['projectStage'].toString().trim();
+              if (st.isNotEmpty && st != 'N/A') {
+                availableStages.add(st);
+              }
+            }
+
+            // Apply filters & search
+            final filteredLogs = allLogs.where((log) {
+              final query = _logSearchQuery.toLowerCase();
+              final matchesSearch = query.isEmpty ||
+                  log['siteId'].toString().toLowerCase().contains(query) ||
+                  log['siteName'].toString().toLowerCase().contains(query) ||
+                  log['projectName'].toString().toLowerCase().contains(query) ||
+                  log['projectStage'].toString().toLowerCase().contains(query) ||
+                  log['supervisorName'].toString().toLowerCase().contains(query) ||
+                  log['raisedById'].toString().toLowerCase().contains(query) ||
+                  (log['bills'] as List<Map<String, dynamic>>).any((b) =>
+                      b['billNo'].toString().toLowerCase().contains(query) ||
+                      b['billVendor'].toString().toLowerCase().contains(query));
+
+              final matchesSite = _selectedLogSite == 'All' ||
+                  log['siteId'].toString().toLowerCase() ==
+                      _selectedLogSite.toLowerCase();
+
+              final matchesStage = _selectedLogStage == 'All' ||
+                  log['projectStage'].toString().toLowerCase() ==
+                      _selectedLogStage.toLowerCase();
+
+              bool matchesDate = true;
+              final now = DateTime.now();
+              final logDate = log['recordDate'] as DateTime;
+              if (_selectedLogDateFilter == 'Today') {
+                matchesDate = logDate.year == now.year &&
+                    logDate.month == now.month &&
+                    logDate.day == now.day;
+              } else if (_selectedLogDateFilter == 'This Month') {
+                matchesDate =
+                    logDate.year == now.year && logDate.month == now.month;
+              }
+
+              return matchesSearch && matchesSite && matchesStage && matchesDate;
+            }).toList();
+
+            // Calculate KPI totals
+            double totalExpenseSum = 0.0;
+            int totalBillsCount = 0;
+            final Set<String> uniqueSites = {};
+
+            for (var log in filteredLogs) {
+              totalExpenseSum += (log['totalAmount'] as double);
+              totalBillsCount += (log['bills'] as List).length;
+              uniqueSites.add(log['siteId'].toString());
+            }
+
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth >= 1024;
+                final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
+
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isDesktop ? 900.0 : (isTablet ? 720.0 : double.infinity),
+                    ),
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        isDesktop ? 28.0 : 16.0,
+                        12.0,
+                        isDesktop ? 28.0 : 16.0,
+                        40.0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // KPI Summary Header Banner
+                          _buildLogsKpiHeader(
+                            primaryColor: primaryColor,
+                            darkAccent: darkAccent,
+                            totalExpense: totalExpenseSum,
+                            totalLogs: filteredLogs.length,
+                            totalBills: totalBillsCount,
+                            totalSites: uniqueSites.length,
+                          ),
+                          const SizedBox(height: 18),
+
+                          // Filter & Search Controls
+                          _buildLogsFilterControls(primaryColor, availableStages.toList()),
+                          const SizedBox(height: 16),
+
+                          // Section Title & Count Badge
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: primaryColor,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Activity Logs & Audit Records',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: primaryColor.withValues(alpha: 0.16)),
+                                ),
+                                child: Text(
+                                  '${filteredLogs.length} Records',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Logs List or Empty State
+                          if (filteredLogs.isEmpty)
+                            _buildEmptyLogsState(primaryColor)
+                          else
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: filteredLogs.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 14),
+                              itemBuilder: (context, index) {
+                                final log = filteredLogs[index];
+                                return _buildExpenseLogCard(
+                                  log: log,
+                                  primaryColor: primaryColor,
+                                  onTap: () => _showLogDetailsModal(context, log),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- LOGS KPI HEADER ---
+  Widget _buildLogsKpiHeader({
+    required Color primaryColor,
+    required Color darkAccent,
+    required double totalExpense,
+    required int totalLogs,
+    required int totalBills,
+    required int totalSites,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            darkAccent,
+            Color.alphaBlend(primaryColor.withValues(alpha: 0.45), darkAccent),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: darkAccent.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.analytics_rounded,
+                          color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Organization Expense Audit',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                ),
+                child: const Text(
+                  'Live Sync',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          Text(
+            '₹${_formatCurrency(totalExpense)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.6,
+            ),
+          ),
+          const Text(
+            'Total Logged Organization Expenditure',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white24, height: 1),
+          const SizedBox(height: 14),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildLogsKpiSubItem(
+                label: 'Total Logs',
+                value: '$totalLogs',
+                icon: Icons.receipt_long_rounded,
+              ),
+              _buildLogsKpiSubItem(
+                label: 'Attached Bills',
+                value: '$totalBills',
+                icon: Icons.attach_file_rounded,
+              ),
+              _buildLogsKpiSubItem(
+                label: 'Active Sites',
+                value: '$totalSites',
+                icon: Icons.domain_rounded,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogsKpiSubItem({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white70, size: 14),
+            const SizedBox(width: 5),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white60,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- LOGS FILTER CONTROLS ---
+  Widget _buildLogsFilterControls(Color primaryColor, List<String> stageList) {
+    final List<String> siteFilterList = ['All', ...siteIds];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Search Input
+          Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: TextField(
+              controller: _logSearchController,
+              onChanged: (val) {
+                setState(() => _logSearchQuery = val.trim());
+              },
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search by Supervisor, Vendor, Bill No, Site...',
+                hintStyle: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade400,
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: primaryColor,
+                  size: 18,
+                ),
+                suffixIcon: _logSearchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 16),
+                        onPressed: () {
+                          _logSearchController.clear();
+                          setState(() => _logSearchQuery = '');
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Filter Dropdowns Row
+          Row(
+            children: [
+              // Site Dropdown
+              Expanded(
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: siteFilterList.contains(_selectedLogSite)
+                          ? _selectedLogSite
+                          : 'All',
+                      isExpanded: true,
+                      icon: const Icon(Icons.arrow_drop_down_rounded,
+                          color: Color(0xFF64748B), size: 20),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                      items: siteFilterList
+                          .map((site) => DropdownMenuItem<String>(
+                                value: site,
+                                child: Text(
+                                  site == 'All' ? 'All Sites' : site,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedLogSite = val);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Stage Dropdown
+              Expanded(
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: stageList.contains(_selectedLogStage)
+                          ? _selectedLogStage
+                          : 'All',
+                      isExpanded: true,
+                      icon: const Icon(Icons.arrow_drop_down_rounded,
+                          color: Color(0xFF64748B), size: 20),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                      items: stageList
+                          .map((stage) => DropdownMenuItem<String>(
+                                value: stage,
+                                child: Text(
+                                  stage == 'All' ? 'All Stages' : stage,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedLogStage = val);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Date Timeline Filter
+              Expanded(
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedLogDateFilter,
+                      isExpanded: true,
+                      icon: const Icon(Icons.arrow_drop_down_rounded,
+                          color: Color(0xFF64748B), size: 20),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                      items: ['All Time', 'Today', 'This Month']
+                          .map((filter) => DropdownMenuItem<String>(
+                                value: filter,
+                                child: Text(filter,
+                                    overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedLogDateFilter = val);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- LOG CARD COMPONENT ---
+  Widget _buildExpenseLogCard({
+    required Map<String, dynamic> log,
+    required Color primaryColor,
+    required VoidCallback onTap,
+  }) {
+    final String supervisorName = log['supervisorName']?.toString() ?? 'Organization Admin';
+    final String raisedById = log['raisedById']?.toString() ?? 'Organization';
+    final String userRole = log['userRole']?.toString() ?? 'Organization';
+    final String siteId = log['siteId']?.toString() ?? 'N/A';
+    final String siteName = log['siteName']?.toString() ?? siteId;
+    final String projectStage = log['projectStage']?.toString() ?? 'General';
+    final double totalAmount = (log['totalAmount'] is num) ? (log['totalAmount'] as num).toDouble() : 0.0;
+    final DateTime recordDate = log['recordDate'] as DateTime;
+    final List<Map<String, dynamic>> billsList =
+        (log['bills'] as List).cast<Map<String, dynamic>>();
+
+    const roleColor = Color(0xFF0284C7);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Row: Role Badge, Supervisor & Timestamp
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              roleColor.withValues(alpha: 0.18),
+                              roleColor.withValues(alpha: 0.08),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: roleColor.withValues(alpha: 0.25),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.corporate_fare_rounded,
+                            color: roleColor,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    supervisorName,
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: roleColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    userRole.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: roleColor,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              'Logged by: $raisedById',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Date & Time Chip
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.schedule_rounded,
+                          size: 12, color: Color(0xFF64748B)),
+                      const SizedBox(width: 4),
+                      Text(
+                        DateFormat('dd MMM, hh:mm a').format(recordDate),
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(color: Color(0xFFF1F5F9), height: 1),
+            const SizedBox(height: 12),
+
+            // Middle: Site & Stage Badges + Expense Amount
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(6),
+                              border:
+                                  Border.all(color: const Color(0xFFA7F3D0)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.apartment_rounded,
+                                    size: 12, color: Color(0xFF059669)),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    siteId,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF059669),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (projectStage != 'N/A' && projectStage.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: const Color(0xFFBFDBFE)),
+                                ),
+                                child: Text(
+                                  projectStage,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1D4ED8),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        siteName,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Total Amount
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₹${_formatCurrency(totalAmount)}',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: primaryColor,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    Text(
+                      '${billsList.length} ${billsList.length == 1 ? "Bill" : "Bills"} logged',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            // Itemized Bills Chips / Preview if present
+            if (billsList.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: billsList.take(2).map((bill) {
+                    final vendor = bill['billVendor']?.toString() ?? 'Vendor';
+                    final bNo = bill['billNo']?.toString() ?? 'N/A';
+                    final bAmt = (bill['billAmount'] is num)
+                        ? (bill['billAmount'] as num).toDouble()
+                        : 0.0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        children: [
+                          Icon(Icons.receipt_rounded,
+                              size: 14, color: primaryColor),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '$vendor ($bNo)',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF334155),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            '₹${_formatCurrency(bAmt)}',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 10),
+            // Bottom Action Bar: View Audit Details Pill
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'View Audit Breakdown',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 11,
+                      color: primaryColor,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  // --- LOG DETAILS MODAL ---
+  void _showLogDetailsModal(BuildContext context, Map<String, dynamic> log) {
+    final String supervisorName = log['supervisorName']?.toString() ?? 'Organization Admin';
+    final String raisedById = log['raisedById']?.toString() ?? 'Organization';
+    final String userRole = log['userRole']?.toString() ?? 'Organization';
+    final String siteId = log['siteId']?.toString() ?? 'N/A';
+    final String siteName = log['siteName']?.toString() ?? siteId;
+    final String projectName = log['projectName']?.toString() ?? 'N/A';
+    final String projectStage = log['projectStage']?.toString() ?? 'N/A';
+    final double totalAmount = (log['totalAmount'] is num) ? (log['totalAmount'] as num).toDouble() : 0.0;
+    final DateTime recordDate = log['recordDate'] as DateTime;
+    final List<Map<String, dynamic>> billsList =
+        (log['bills'] as List).cast<Map<String, dynamic>>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Modal Handle
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    width: 42,
+                    height: 4.5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+
+                // Modal Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Expense Audit Details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          Text(
+                            'Detailed raiser info and itemized bill copies',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded,
+                            size: 22, color: Color(0xFF64748B)),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+                // Modal Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // User Raiser Profile Card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'ORGANIZATION AUDIT PROFILE',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor:
+                                        primaryColor.withValues(alpha: 0.15),
+                                    child: Icon(Icons.corporate_fare_rounded,
+                                        color: primaryColor, size: 22),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          supervisorName,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                        Text(
+                                          '$userRole • Logged ID: $raisedById',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF64748B),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Site & Timestamp Card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: [
+                              _buildModalInfoRow(
+                                  'Site ID', siteId, Icons.business_rounded),
+                              const Divider(
+                                  height: 14, color: Color(0xFFF1F5F9)),
+                              _buildModalInfoRow('Site Name', siteName,
+                                  Icons.location_on_rounded),
+                              const Divider(
+                                  height: 14, color: Color(0xFFF1F5F9)),
+                              _buildModalInfoRow('Project', projectName,
+                                  Icons.assignment_rounded),
+                              const Divider(
+                                  height: 14, color: Color(0xFFF1F5F9)),
+                              _buildModalInfoRow('Project Stage', projectStage,
+                                  Icons.timeline_rounded),
+                              const Divider(
+                                  height: 14, color: Color(0xFFF1F5F9)),
+                              _buildModalInfoRow(
+                                'Recorded Date & Time',
+                                DateFormat('dd MMM yyyy, hh:mm a')
+                                    .format(recordDate),
+                                Icons.calendar_today_rounded,
+                              ),
+                              const Divider(
+                                  height: 14, color: Color(0xFFF1F5F9)),
+                              _buildModalInfoRow(
+                                'Total Expense',
+                                '₹${_formatCurrency(totalAmount)}',
+                                Icons.currency_rupee_rounded,
+                                isBoldValue: true,
+                                valueColor: primaryColor,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Itemized Bills Title
+                        Text(
+                          'Itemized Bills (${billsList.length})',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Itemized Bills List
+                        if (billsList.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Text(
+                              'No individual bills attached for this entry.',
+                              style: TextStyle(
+                                  fontSize: 13, color: Color(0xFF64748B)),
+                            ),
+                          )
+                        else
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: billsList.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final b = billsList[index];
+                              final vendor =
+                                  b['billVendor']?.toString() ?? 'Vendor';
+                              final bNo = b['billNo']?.toString() ?? 'N/A';
+                              final bAmt = (b['billAmount'] is num)
+                                  ? (b['billAmount'] as num).toDouble()
+                                  : 0.0;
+                              final bCopy = b['billCopy']?.toString() ?? '';
+                              final bDate = b['billDate'] as DateTime?;
+
+                              return Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border:
+                                      Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            vendor,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          '₹${_formatCurrency(bAmt)}',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            color: primaryColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Bill No: $bNo',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        if (bDate != null) ...[
+                                          const Text(' • ',
+                                              style: TextStyle(
+                                                  color: Color(0xFF94A3B8))),
+                                          Text(
+                                            DateFormat('dd MMM yyyy')
+                                                .format(bDate),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF64748B),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    if (bCopy.isNotEmpty &&
+                                        bCopy != 'billURL') ...[
+                                      const SizedBox(height: 8),
+                                      InkWell(
+                                        onTap: () {
+                                          _showBillImagePreview(context, bCopy);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: primaryColor
+                                                .withValues(alpha: 0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.image_rounded,
+                                                  size: 14,
+                                                  color: primaryColor),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'View Attached Bill Copy',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: primaryColor,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModalInfoRow(
+    String label,
+    String value,
+    IconData icon, {
+    bool isBoldValue = false,
+    Color? valueColor,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF94A3B8)),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF64748B),
+          ),
+        ),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: isBoldValue ? 14 : 12.5,
+              fontWeight: isBoldValue ? FontWeight.w800 : FontWeight.w700,
+              color: valueColor ?? const Color(0xFF0F172A),
+            ),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showBillImagePreview(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: const Text('Bill Attachment',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              foregroundColor: const Color(0xFF0F172A),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return const Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Padding(
+                    padding: const EdgeInsets.all(30),
+                    child: Column(
+                      children: const [
+                        Icon(Icons.broken_image_rounded,
+                            size: 40, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text('Unable to load bill image preview',
+                            style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyLogsState(Color primaryColor) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.receipt_long_rounded, size: 54, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
+          const Text(
+            'No expense logs found',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Organization expense records and bills logged for sites will appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          ),
+          if (_logSearchQuery.isNotEmpty ||
+              _selectedLogSite != 'All' ||
+              _selectedLogStage != 'All' ||
+              _selectedLogDateFilter != 'All Time') ...[
+            const SizedBox(height: 16),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
+                ),
+              ),
+              onPressed: () {
+                _logSearchController.clear();
+                setState(() {
+                  _logSearchQuery = '';
+                  _selectedLogSite = 'All';
+                  _selectedLogStage = 'All';
+                  _selectedLogDateFilter = 'All Time';
+                });
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text(
+                'Reset Filters',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatCurrency(num value) {
+    if (value == 0) return '0.00';
+    final isNegative = value < 0;
+    final absVal = value.abs();
+    final parts = absVal.toStringAsFixed(2).split('.');
+    final intPart = parts[0];
+    final decPart = parts[1];
+
+    if (intPart.length <= 3) {
+      final res = '$intPart.$decPart';
+      return isNegative ? '-$res' : res;
+    }
+
+    final last3 = intPart.substring(intPart.length - 3);
+    final remaining = intPart.substring(0, intPart.length - 3);
+    final buffer = StringBuffer();
+    for (int i = 0; i < remaining.length; i++) {
+      if (i > 0 && (remaining.length - i) % 2 == 0) {
+        buffer.write(',');
+      }
+      buffer.write(remaining[i]);
+    }
+    buffer.write(',');
+    buffer.write(last3);
+    final res = '${buffer.toString()}.$decPart';
+    return isNegative ? '-$res' : res;
+  }
+
+  num _parseNum(dynamic val) {
+    if (val == null) return 0;
+    if (val is num) return val;
+    final s = val.toString().replaceAll(',', '').trim();
+    return num.tryParse(s) ?? 0;
   }
 
   Widget _buildSectionHeader({

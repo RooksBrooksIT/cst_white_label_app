@@ -83,6 +83,14 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
         ),
         centerTitle: true,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 22),

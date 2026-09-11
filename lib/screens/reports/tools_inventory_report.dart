@@ -1,4 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/screens/manager/tools_inventory_details.dart';
 import 'package:ebricks/services/firestore_service.dart';
@@ -161,6 +165,117 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
     ).then((_) => _loadInventoryData());
   }
 
+  Future<void> _exportMasterPdf() async {
+    try {
+      final pdf = pw.Document();
+      final filtered = _filteredInventory;
+      final totalAtCompany = _toolsAtCompany.fold<int>(0, (acc, t) => acc + t.availableCount);
+      final totalAtSite = _toolsAtSite.fold<int>(0, (acc, t) => acc + t.availableCount);
+      final totalTools = totalAtCompany + totalAtSite;
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context context) => [
+            pw.Header(
+              level: 0,
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'TOOLS INVENTORY MASTER REPORT',
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue900,
+                        ),
+                      ),
+                      pw.Text(
+                        'Comprehensive Equipment & Tools Distribution Overview',
+                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                      ),
+                    ],
+                  ),
+                  pw.Text(
+                    DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now()),
+                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 14),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                children: [
+                  pw.Column(
+                    children: [
+                      pw.Text('Total Items', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text('${filtered.length}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Text('Company Stock', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text('$totalAtCompany', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue700)),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Text('Site Stock', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text('$totalAtSite', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.green700)),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Text('Total Units', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text('$totalTools', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.purple700)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 18),
+            pw.TableHelper.fromTextArray(
+              headers: ['Tool Code', 'Tool Name', 'Owner', 'Company', 'Sites', 'Total'],
+              data: filtered.map((t) => [
+                t.toolCode,
+                t.toolName,
+                t.toolOwner,
+                '${t.atCompany}',
+                '${t.atSite}',
+                '${t.totalTools}',
+              ]).toList(),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.blue800),
+              rowDecoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5))),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellPadding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            ),
+          ],
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'Tools_Inventory_Summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        AppTheme.showErrorToast(context, 'Failed to export master PDF: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final darkAccent = AppTheme.getDarkAccent(primaryColor);
@@ -201,13 +316,6 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Inventory',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
-            onPressed: _loadInventoryData,
-          ),
-        ],
       ),
       body: SafeArea(
         child: Align(
@@ -388,6 +496,36 @@ class _ToolsInventoryPageState extends State<ToolsInventoryPage> {
                     ],
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Export PDF Action Button ────────────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _mergedInventory.isNotEmpty ? _exportMasterPdf : null,
+                icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
+                label: const Text(
+                  'EXPORT INVENTORY PDF',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFE2E8F0),
+                  disabledForegroundColor: const Color(0xFF94A3B8),
+                  elevation: 2,
+                  shadowColor: primaryColor.withValues(alpha: 0.25),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -796,4 +934,6 @@ class ToolInventorySummary {
     required this.atCompany,
     required this.atSite,
   });
+
+  int get totalTools => atCompany + atSite;
 }

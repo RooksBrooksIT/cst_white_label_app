@@ -531,56 +531,53 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     Color darkAccent,
   ) {
     return AppBar(
+      iconTheme: const IconThemeData(color: Colors.white),
       elevation: 0,
-      backgroundColor: Colors.transparent,
+      centerTitle: true,
       flexibleSpace: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [primaryColor, darkAccent],
+            colors: [
+              darkAccent,
+              Color.alphaBlend(
+                primaryColor.withValues(alpha: 0.35),
+                darkAccent,
+              ),
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(20),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
       ),
       leading: IconButton(
         icon: const Icon(
           Icons.arrow_back_ios_new_rounded,
           color: Colors.white,
-          size: 20,
+          size: 18,
         ),
         onPressed: () => Navigator.pop(context),
       ),
       title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
             'Site Financial Details',
             style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
               color: Colors.white,
               letterSpacing: -0.3,
             ),
           ),
-          Text(
-            widget.siteName.isNotEmpty ? widget.siteName : widget.siteId,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withValues(alpha: 0.85),
+          if (widget.siteName.isNotEmpty || widget.siteId.isNotEmpty)
+            Text(
+              widget.siteName.isNotEmpty ? widget.siteName : widget.siteId,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
             ),
-          ),
         ],
       ),
       actions: [

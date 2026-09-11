@@ -143,7 +143,7 @@ class _OrganizationSubscriptionPageState
             'Manage Subscription',
             style: TextStyle(
               color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
               fontSize: 18,
               letterSpacing: -0.3,
             ),
