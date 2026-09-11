@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/screens/reports/incentive_calculation_sheet.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
@@ -46,12 +47,15 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
       final globalStages = <String>{};
 
       void processDoc(Map<String, dynamic> data, String fallbackId) {
-        final site = (data['siteId'] ??
-                data['site'] ??
-                data['siteCode'] ??
-                fallbackId)
-            .toString()
-            .trim();
+        final sCode = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+        final sName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? '').toString().trim();
+        final sDocId = (data['siteDocId'] ?? fallbackId).toString().trim();
+        final site = ExpenseService.formatCanonicalSiteId(
+          rawId: sDocId,
+          siteCode: sCode.isNotEmpty ? sCode : null,
+          siteName: sName.isNotEmpty ? sName : null,
+        );
+
         final supervisor = (data['supervisor'] ??
                 data['supervisorName'] ??
                 data['Supervisor ID'] ??
@@ -122,7 +126,13 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
       try {
         final siteSnap = await FirestoreService.sites.get();
         for (var doc in siteSnap.docs) {
-          siteIds.add(doc.id);
+          final data = doc.data();
+          final site = ExpenseService.formatCanonicalSiteId(
+            rawId: doc.id,
+            siteCode: data['siteCode']?.toString(),
+            siteName: data['siteName']?.toString(),
+          );
+          if (site.isNotEmpty) siteIds.add(site);
         }
       } catch (e) {
         debugPrint('IncentiveCalc: Error fetching Site collection: $e');
@@ -141,15 +151,17 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
         debugPrint('IncentiveCalc: Error fetching projectStages collection: $e');
       }
 
+      final validSiteIds = ExpenseService.sanitizeSiteIds(siteIds);
+
       // Ensure every site has at least the global project stages if none specific found
       final allGlobalList = globalStages.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-      for (var site in siteIds) {
+      for (var site in validSiteIds) {
         if (!siteProjectStages.containsKey(site) || siteProjectStages[site]!.isEmpty) {
           siteProjectStages[site] = Set<String>.from(allGlobalList);
         }
       }
 
-      final sortedSites = siteIds.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      final sortedSites = validSiteIds.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
       if (!mounted) return;
       setState(() {
@@ -289,7 +301,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                     label: 'Site ID *',
                                     value: _selectedSiteId,
                                     items: _siteIds,
-                                    onChanged: (newValue) {
+                                    onChanged: (newValue) async {
                                       setState(() {
                                         _selectedSiteId = newValue;
                                         _supervisorName = newValue != null
@@ -306,6 +318,15 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                             : List.from(_allProjectStages);
                                         _selectedProjectStage = null;
                                       });
+
+                                      if (newValue != null && _supervisorName.isEmpty) {
+                                        final details = await ExpenseService.resolveSiteDetails(newValue);
+                                        if (mounted && _selectedSiteId == newValue && details.supervisor != null) {
+                                          setState(() {
+                                            _supervisorName = details.supervisor!;
+                                          });
+                                        }
+                                      }
                                     },
                                     validator: (value) => value == null
                                         ? 'Please select Site ID'

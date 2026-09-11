@@ -111,8 +111,12 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   void initState() {
     super.initState();
     // Pre-initialize state directly from passed userDetails if available
-    final passedSiteId = (widget.userDetails['siteId'] ?? '').toString().trim();
-    if (passedSiteId.isNotEmpty) {
+    final rawPassedSiteId = (widget.userDetails['siteId'] ?? '').toString().trim();
+    if (rawPassedSiteId.isNotEmpty) {
+      var passedSiteId = ExpenseService.formatCanonicalSiteId(rawId: rawPassedSiteId);
+      if (passedSiteId.toUpperCase().startsWith('PR')) {
+        passedSiteId = 'ST${passedSiteId.substring(2)}';
+      }
       selectedSiteId = passedSiteId;
       siteCode = passedSiteId;
     }
@@ -219,46 +223,192 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         }).toList();
       }
 
-      if (allDocs.isNotEmpty) {
-        final sites = allDocs
-            .map((doc) {
-              final data = doc.data();
-              final sId = (data['site'] ?? data['siteId'] ?? doc.id).toString().trim();
-              return <String, String>{
-                'siteId': sId,
-                'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? widget.userName).toString(),
+      final List<Map<String, String>> rawSites = [];
+
+      for (var doc in allDocs) {
+        final data = doc.data();
+        final sDocId = (data['siteDocId'] ?? '').toString().trim();
+        final rawSite = (data['site'] ?? data['siteDocId'] ?? '').toString().trim();
+        final rawSiteId = (data['siteCode'] ?? data['siteId'] ?? '').toString().trim();
+        final rawSiteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
+
+        String baseId = sDocId.isNotEmpty ? sDocId : rawSite;
+        if (baseId.isEmpty && doc.id.contains('_') && (doc.id.startsWith('ST') || doc.id.startsWith('PR'))) {
+          baseId = doc.id;
+        }
+
+        var canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: baseId.isNotEmpty ? baseId : (rawSiteId.isNotEmpty ? rawSiteId : doc.id),
+          siteCode: rawSiteId.isNotEmpty ? rawSiteId : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+        );
+
+        if (!canonicalId.contains('_') && canonicalId.isNotEmpty) {
+          final resolved = await ExpenseService.resolveCanonicalSiteDocId(canonicalId);
+          if (resolved.isNotEmpty && resolved.contains('_')) {
+            canonicalId = resolved;
+          }
+        }
+
+        if (canonicalId.toUpperCase().startsWith('PR')) {
+          canonicalId = 'ST${canonicalId.substring(2)}';
+        }
+
+        if (canonicalId.isNotEmpty) {
+          rawSites.add({
+            'siteId': canonicalId,
+            'supervisor': (data['supervisor'] ?? data['supervisorName'] ?? widget.userName).toString(),
+            'location': (data['location'] ?? 'Unknown').toString(),
+            'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'] ?? '').toString(),
+            'projectName': (data['projectName'] ?? data['project'] ?? '').toString(),
+            'projectStage': (data['projectStage'] ?? data['stage'] ?? '').toString(),
+          });
+        }
+      }
+
+      // If siteSupervisorMap had no sites for this supervisor, check Site collection
+      if (rawSites.isEmpty) {
+        final siteSnap = await FirestoreService.sites.get();
+        for (var doc in siteSnap.docs) {
+          final data = doc.data();
+          final sId = (data['Supervisor ID'] ?? data['supervisorId'] ?? '').toString().trim().toLowerCase();
+          final sName = (data['supervisor'] ?? data['supervisorName'] ?? '').toString().trim().toLowerCase();
+          if ((passedSupervisorId != null && passedSupervisorId.isNotEmpty && sId == passedSupervisorId.toLowerCase()) ||
+              (passedName.isNotEmpty && sName == passedName.toLowerCase())) {
+            final code = (data['siteCode'] ?? data['siteId'])?.toString().trim();
+            final name = (data['siteName'] ?? data['projectName'])?.toString().trim();
+            var canonicalId = ExpenseService.formatCanonicalSiteId(
+              rawId: doc.id,
+              siteCode: code,
+              siteName: name,
+            );
+            if (!canonicalId.contains('_') && canonicalId.isNotEmpty) {
+              final resolved = await ExpenseService.resolveCanonicalSiteDocId(canonicalId);
+              if (resolved.isNotEmpty && resolved.contains('_')) {
+                canonicalId = resolved;
+              }
+            }
+            if (canonicalId.toUpperCase().startsWith('PR')) {
+              canonicalId = 'ST${canonicalId.substring(2)}';
+            }
+            if (canonicalId.isNotEmpty) {
+              rawSites.add({
+                'siteId': canonicalId,
+                'supervisor': (data['supervisor'] ?? widget.userName).toString(),
                 'location': (data['location'] ?? 'Unknown').toString(),
                 'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'] ?? '').toString(),
-                'projectName': (data['projectName'] ?? data['project'] ?? '').toString(),
-                'projectStage': (data['projectStage'] ?? data['stage'] ?? '').toString(),
-              };
-            })
-            .where((site) => site['siteId']!.isNotEmpty)
-            .toList();
-        setState(() {
-          supervisorSites = sites;
-          if (sites.isNotEmpty) {
-            String passedSiteId = widget.userDetails['siteId']?.toString() ?? '';
-            var matchedSite = sites.first;
-            if (passedSiteId.isNotEmpty) {
-              matchedSite = sites.firstWhere(
-                (s) => s['siteId'] == passedSiteId || s['siteId']!.toLowerCase() == passedSiteId.toLowerCase(),
-                orElse: () => sites.first,
-              );
+                'projectName': (data['projectName'] ?? name ?? '').toString(),
+                'projectStage': (data['projectStage'] ?? '').toString(),
+              });
             }
-            selectedSiteId = matchedSite['siteId'];
-            siteCode = matchedSite['siteId']!;
-            supervisorName = matchedSite['supervisor']!;
-            siteLocation = matchedSite['location']!;
-            supervisorId = matchedSite['supervisorId']!;
-            projectName = matchedSite['projectName']!;
-            selectedProjectPhase = matchedSite['projectStage']!.isNotEmpty
-                ? matchedSite['projectStage']
-                : (projectPhases.isNotEmpty ? projectPhases.first : null);
           }
-        });
-        _fetchSiteMaterialPool();
+        }
       }
+
+      // If still empty, check widget.userDetails['siteId']
+      if (rawSites.isEmpty && (widget.userDetails['siteId'] ?? '').toString().trim().isNotEmpty) {
+        final userSite = widget.userDetails['siteId'].toString().trim();
+        final details = await ExpenseService.resolveSiteDetails(userSite);
+        rawSites.add({
+          'siteId': details.canonicalDocId,
+          'supervisor': details.supervisor ?? widget.userName,
+          'location': details.location ?? 'Unknown',
+          'supervisorId': details.supervisorId ?? widget.userDetails['supervisorId']?.toString() ?? '',
+          'projectName': details.projectName ?? 'Not found',
+          'projectStage': details.projectStage ?? '',
+        });
+      }
+
+      final validIds = ExpenseService.sanitizeSiteIds(
+        rawSites.map((s) => s['siteId']!).where((id) => id.isNotEmpty),
+      ).where((id) => id.contains('_') && id.startsWith('ST')).toSet();
+
+      final Map<String, Map<String, String>> uniqueSites = {};
+      for (var s in rawSites) {
+        final id = s['siteId']!;
+        if (!validIds.contains(id)) continue;
+        if (!uniqueSites.containsKey(id)) {
+          uniqueSites[id] = Map.from(s);
+        } else {
+          final existing = uniqueSites[id]!;
+          for (var entry in s.entries) {
+            if ((existing[entry.key] == null ||
+                    existing[entry.key] == '' ||
+                    existing[entry.key] == 'Unknown' ||
+                    existing[entry.key] == 'Not found') &&
+                entry.value.isNotEmpty &&
+                entry.value != 'Unknown' &&
+                entry.value != 'Not found') {
+              existing[entry.key] = entry.value;
+            }
+          }
+        }
+      }
+
+      final sites = uniqueSites.values.toList();
+      sites.sort((a, b) => (a['siteId'] ?? '').compareTo(b['siteId'] ?? ''));
+
+      setState(() {
+        supervisorSites = sites;
+        if (sites.isNotEmpty) {
+          String passedSiteId = ExpenseService.formatCanonicalSiteId(
+            rawId: widget.userDetails['siteId']?.toString() ?? '',
+          );
+          if (passedSiteId.toUpperCase().startsWith('PR')) {
+            passedSiteId = 'ST${passedSiteId.substring(2)}';
+          }
+          var matchedSite = sites.first;
+          if (passedSiteId.isNotEmpty) {
+            matchedSite = sites.firstWhere(
+              (s) => s['siteId'] == passedSiteId || s['siteId']!.toLowerCase() == passedSiteId.toLowerCase(),
+              orElse: () => sites.first,
+            );
+          }
+          selectedSiteId = matchedSite['siteId'];
+          siteCode = matchedSite['siteId']!;
+          supervisorName = matchedSite['supervisor']!;
+          siteLocation = matchedSite['location']!;
+          supervisorId = matchedSite['supervisorId']!;
+          projectName = matchedSite['projectName']!;
+          selectedProjectPhase = matchedSite['projectStage']!.isNotEmpty
+              ? matchedSite['projectStage']
+              : (projectPhases.isNotEmpty ? projectPhases.first : null);
+        }
+      });
+
+      if (selectedSiteId != null) {
+        final details = await ExpenseService.resolveSiteDetails(selectedSiteId!);
+        if (mounted && selectedSiteId == details.canonicalDocId) {
+          setState(() {
+            if (supervisorName == null || supervisorName!.isEmpty || supervisorName == widget.userName) {
+              if (details.supervisor != null && details.supervisor!.isNotEmpty) {
+                supervisorName = details.supervisor;
+              }
+            }
+            if (supervisorId == null || supervisorId!.isEmpty) {
+              if (details.supervisorId != null && details.supervisorId!.isNotEmpty) {
+                supervisorId = details.supervisorId;
+              }
+            }
+            if (siteLocation.isEmpty || siteLocation == 'Unknown') {
+              if (details.location != null && details.location!.isNotEmpty) {
+                siteLocation = details.location!;
+              }
+            }
+            if (projectName == null || projectName!.isEmpty || projectName == 'Not found') {
+              if (details.projectName != null && details.projectName!.isNotEmpty) {
+                projectName = details.projectName;
+              }
+            }
+            if (selectedProjectPhase == null || selectedProjectPhase!.isEmpty) {
+              if (details.projectStage != null && details.projectStage!.isNotEmpty) {
+                selectedProjectPhase = details.projectStage;
+              }
+            }
+          });
+        }
+      }
+      _fetchSiteMaterialPool();
     } catch (e) {
       debugPrint('Error fetching supervisor data in site_entry_page: $e');
       setState(() {
@@ -780,9 +930,26 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         });
         return;
       }
-      // Check for existing entry for this site and date
-      final existing = await entriesColl.doc(docId).get();
-      final bool isSameDate = existing.exists;
+      // Check for existing entry for this site and date across canonical and alias keys
+      bool isSameDate = false;
+      DocumentSnapshot<Map<String, dynamic>>? existing;
+      final keys = await ExpenseService.resolveSiteKeys(siteCode);
+      for (final k in keys) {
+        final candidateDocId = '${k}_$dateForId';
+        final snap = await entriesColl.doc(candidateDocId).get();
+        if (snap.exists) {
+          existing = snap;
+          isSameDate = true;
+          break;
+        }
+      }
+      if (!isSameDate) {
+        final directSnap = await entriesColl.doc(docId).get();
+        if (directSnap.exists) {
+          existing = directSnap;
+          isSameDate = true;
+        }
+      }
 
       if (isSameDate) {
         if (!mounted) return;
@@ -831,7 +998,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
 
       Map<String, dynamic> data;
 
-      if (isSameDate) {
+      if (isSameDate && existing != null && existing.data() != null) {
         // Merge with existing entry
         final existingData = existing.data()!;
         final List<dynamic> existingMaterials =
@@ -1486,7 +1653,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: DropdownButtonFormField<String>(
-                                  initialValue: selectedSiteId,
+                                  initialValue: supervisorSites.any((s) => s['siteId'] == selectedSiteId)
+                                      ? selectedSiteId
+                                      : null,
                                   isExpanded: true,
                                   dropdownColor: dropdownBg,
                                   style: TextStyle(
@@ -1539,7 +1708,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                       .toList(),
                                   onChanged: supervisorSites.isEmpty
                                       ? null
-                                      : (value) {
+                                      : (value) async {
                                           final selected = supervisorSites
                                               .firstWhere(
                                                 (site) =>
@@ -1573,6 +1742,30 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                       ? projectPhases.first
                                                       : null);
                                           });
+
+                                          if (value != null) {
+                                            final details = await ExpenseService.resolveSiteDetails(value);
+                                            if (mounted && selectedSiteId == value) {
+                                              setState(() {
+                                                if (details.supervisor != null && details.supervisor!.isNotEmpty) {
+                                                  supervisorName = details.supervisor;
+                                                }
+                                                if (details.supervisorId != null && details.supervisorId!.isNotEmpty) {
+                                                  supervisorId = details.supervisorId;
+                                                }
+                                                if (details.location != null && details.location!.isNotEmpty) {
+                                                  siteLocation = details.location!;
+                                                }
+                                                if (details.projectName != null && details.projectName!.isNotEmpty) {
+                                                  projectName = details.projectName;
+                                                }
+                                                if (details.projectStage != null && details.projectStage!.isNotEmpty) {
+                                                  selectedProjectPhase = details.projectStage;
+                                                }
+                                              });
+                                            }
+                                          }
+
                                           _fetchSiteMaterialPool();
                                         },
                                 ),

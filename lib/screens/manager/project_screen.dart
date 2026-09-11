@@ -128,9 +128,16 @@ class _ProjectScreenState extends State<ProjectScreen>
     for (var doc in projectsSnapshot.docs) {
       final siteId = doc.data()['siteId'];
       if (siteId != null) {
-        final expenseSnapshot = await FirestoreService.getCollection(
+        final canonicalDocId = await ExpenseService.resolveCanonicalSiteDocId(
+            siteId.toString());
+        var expenseSnapshot = await FirestoreService.getCollection(
           'totalSiteExpensesPerDay',
-        ).doc(siteId).get();
+        ).doc(canonicalDocId).get();
+        if (!expenseSnapshot.exists && canonicalDocId != siteId.toString()) {
+          expenseSnapshot = await FirestoreService.getCollection(
+            'totalSiteExpensesPerDay',
+          ).doc(siteId.toString()).get();
+        }
         if (expenseSnapshot.exists) {
           final data = expenseSnapshot.data()!;
           final totalMgrExpense = (data['totalMgrExpense'] ?? 0).toDouble();
@@ -1700,9 +1707,16 @@ class _ProjectScreenState extends State<ProjectScreen>
       _balanceAmountController.text = '';
       return;
     }
-    final expenseSnapshot = await FirestoreService.getCollection(
+    final canonicalDocId =
+        await ExpenseService.resolveCanonicalSiteDocId(siteId);
+    var expenseSnapshot = await FirestoreService.getCollection(
       'totalSiteExpensesPerDay',
-    ).doc(siteId).get();
+    ).doc(canonicalDocId).get();
+    if (!expenseSnapshot.exists && canonicalDocId != siteId) {
+      expenseSnapshot = await FirestoreService.getCollection(
+        'totalSiteExpensesPerDay',
+      ).doc(siteId).get();
+    }
     if (expenseSnapshot.exists) {
       final data = expenseSnapshot.data()!;
       final totalMgrExpense = (data['totalMgrExpense'] ?? 0).toDouble();

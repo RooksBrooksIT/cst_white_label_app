@@ -6,6 +6,7 @@ import 'firestore_service.dart';
 import 'notification_service.dart';
 import 'approval_workflow_service.dart';
 import 'offline_sync_service.dart';
+import 'expense_service.dart';
 
 class PettyCashService {
   static final PettyCashService _instance = PettyCashService._internal();
@@ -112,14 +113,20 @@ class PettyCashService {
             cleanSupId.isEmpty;
 
         if (isMatch) {
-          final sId = (data['siteId'] ?? data['site'] ?? data['site_id'] ?? doc.id)
+          final rawId = (data['siteId'] ?? data['site'] ?? data['site_id'] ?? doc.id)
               .toString()
               .trim();
-          final sName = (data['siteName'] ?? data['site'] ?? sId).toString().trim();
+          final sName = (data['siteName'] ?? data['site'] ?? rawId).toString().trim();
+          final sCode = (data['siteCode'] ?? data['SiteCode'])?.toString().trim();
+          final canonicalId = ExpenseService.formatCanonicalSiteId(
+            rawId: rawId,
+            siteCode: sCode,
+            siteName: sName,
+          );
 
-          if (sId.isNotEmpty && !seenSiteIds.contains(sId.toLowerCase())) {
-            seenSiteIds.add(sId.toLowerCase());
-            assignedSites.add({'siteId': sId, 'siteName': sName});
+          if (canonicalId.isNotEmpty && !seenSiteIds.contains(canonicalId.toLowerCase())) {
+            seenSiteIds.add(canonicalId.toLowerCase());
+            assignedSites.add({'siteId': canonicalId, 'siteName': sName});
           }
         }
       }
@@ -129,14 +136,23 @@ class PettyCashService {
         final siteSnap = await FirestoreService.sites.get();
         for (final doc in siteSnap.docs) {
           final data = doc.data();
-          final sId = (data['siteId'] ?? doc.id).toString().trim();
-          final sName = (data['siteName'] ?? data['name'] ?? sId).toString().trim();
-          if (sId.isNotEmpty && !seenSiteIds.contains(sId.toLowerCase())) {
-            seenSiteIds.add(sId.toLowerCase());
-            assignedSites.add({'siteId': sId, 'siteName': sName});
+          final rawId = (data['siteId'] ?? doc.id).toString().trim();
+          final sName = (data['siteName'] ?? data['name'] ?? rawId).toString().trim();
+          final sCode = (data['siteCode'] ?? data['SiteCode'])?.toString().trim();
+          final canonicalId = ExpenseService.formatCanonicalSiteId(
+            rawId: rawId,
+            siteCode: sCode,
+            siteName: sName,
+          );
+          if (canonicalId.isNotEmpty && !seenSiteIds.contains(canonicalId.toLowerCase())) {
+            seenSiteIds.add(canonicalId.toLowerCase());
+            assignedSites.add({'siteId': canonicalId, 'siteName': sName});
           }
         }
       }
+
+      final sanitized = ExpenseService.sanitizeSiteIds(assignedSites.map((e) => e['siteId']!)).toSet();
+      return assignedSites.where((e) => sanitized.contains(e['siteId'])).toList();
     } catch (e) {
       debugPrint('PettyCashService: Error fetching assigned sites: $e');
     }
@@ -153,6 +169,9 @@ class PettyCashService {
     try {
       final cleanSupId = supervisorId.trim().toLowerCase();
       final filterSiteId = (siteId ?? '').trim().toLowerCase();
+      final siteKeys = siteId != null && siteId.trim().isNotEmpty
+          ? (await ExpenseService.resolveSiteKeys(siteId)).map((k) => k.toLowerCase()).toSet()
+          : <String>{};
 
       // 1. Query siteSupervisorEntries collection
       final entriesSnap =
@@ -173,7 +192,9 @@ class PettyCashService {
         final isFunded = data['fundedViaPettyCash'] == true;
         final isPending = !isFunded && status != 'rejected_by_manager' && status != 'rejected_by_org';
         final matchSup = cleanSupId.isEmpty || sSupId == cleanSupId || sSupId.isEmpty;
-        final matchSite = filterSiteId.isEmpty || sSiteId.toLowerCase() == filterSiteId;
+        final matchSite = filterSiteId.isEmpty ||
+            sSiteId.toLowerCase() == filterSiteId ||
+            siteKeys.contains(sSiteId.toLowerCase());
 
         if (isPending && matchSup && matchSite) {
           final amt = (data['amount'] is num)

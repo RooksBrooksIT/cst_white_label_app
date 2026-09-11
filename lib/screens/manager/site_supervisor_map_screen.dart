@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
 class SiteSupervisorMapScreen extends StatefulWidget {
@@ -522,13 +523,20 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           ? selectedSupervisor!.trim()
           : (selectedSupervisorId ?? 'SUPERVISOR').trim();
 
-      // Document ID generated as siteid_with supervisor name (e.g. ST001_Shyju)
       final cleanSite = sId.replaceAll(' ', '');
       final cleanSup = supName.replaceAll(' ', '');
       final docId = '${cleanSite}_$cleanSup';
 
+      final canonicalSiteDocId = ExpenseService.formatCanonicalSiteDocId(
+        selectedSiteId ?? '',
+        selectedSite ?? '',
+      );
+
       final mappingData = {
-        'site': selectedSite ?? selectedSiteId,
+        'site': canonicalSiteDocId.isNotEmpty
+            ? canonicalSiteDocId
+            : (selectedSiteId ?? selectedSite),
+        'siteDocId': canonicalSiteDocId,
         'siteName': selectedSite ?? selectedSiteId,
         'siteId': selectedSiteId ?? selectedSite ?? '',
         'projectName': projectName ?? projectNameController.text.trim(),

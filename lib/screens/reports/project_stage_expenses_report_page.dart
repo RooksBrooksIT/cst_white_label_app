@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import '/widgets/glass_card.dart';
@@ -72,14 +73,17 @@ class _ProjectStageExpensesReportPageState
     String amountField,
   ) async {
     double total = 0;
-    // Check both siteId and site field for broader compatibility
+    final siteKeys =
+        (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
+    final keysToQuery = siteKeys.take(10).toList();
+    // Check both siteId and site field for broader compatibility across all aliases
     final results = await Future.wait([
       FirestoreService.getCollection(
         collection,
-      ).where('siteId', isEqualTo: widget.siteId).get(),
+      ).where('siteId', whereIn: keysToQuery).get(),
       FirestoreService.getCollection(
         collection,
-      ).where('site', isEqualTo: widget.siteId).get(),
+      ).where('site', whereIn: keysToQuery).get(),
     ]);
 
     final allDocs = {...results[0].docs, ...results[1].docs};
@@ -147,12 +151,6 @@ class _ProjectStageExpensesReportPageState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isMobile = Responsive.isMobile(context);
-    final grandTotal =
-        supervisorTotal +
-        managerTotal +
-        organizationTotal +
-        contractorTotal +
-        incentiveTotal;
 
     final primaryColor = theme.primaryColor;
     final darkAccent = AppTheme.getDarkAccent(primaryColor);

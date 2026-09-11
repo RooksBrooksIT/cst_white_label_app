@@ -58,36 +58,84 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
     });
     try {
       if (OfflineSyncService().isOnline) {
-        final Set<String> ids = {};
         final Map<String, String> names = {};
+        final Map<String, String> nameOrCodeToCanonical = {};
+        final Set<String> canonicalIds = {};
 
+        // 1. Fetch from Site collection (Primary Source)
         final siteSnapshot = await FirestoreService.getCollection('Site').get();
         for (var doc in siteSnapshot.docs) {
-          if (doc.id.isNotEmpty) {
-            ids.add(doc.id);
-            final data = doc.data();
-            final sName = (data['siteName'] ?? data['name'] ?? data['projectName'] ?? data['site'] ?? '').toString().trim();
-            if (sName.isNotEmpty && sName != doc.id) {
-              names[doc.id] = sName;
-            }
+          if (doc.id.isEmpty) continue;
+          final data = doc.data();
+          final sCode = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+          final sName = (data['siteName'] ?? data['name'] ?? data['projectName'] ?? data['site'] ?? '').toString().trim();
+
+          final canonical = ExpenseService.formatCanonicalSiteId(
+            rawId: doc.id,
+            siteCode: sCode,
+            siteName: sName,
+          );
+
+          canonicalIds.add(canonical);
+          if (sName.isNotEmpty) {
+            names[canonical] = sName;
+            nameOrCodeToCanonical[sName.toLowerCase()] = canonical;
+            nameOrCodeToCanonical[sName.replaceAll(' ', '').toLowerCase()] = canonical;
           }
+          if (sCode.isNotEmpty) {
+            nameOrCodeToCanonical[sCode.toLowerCase()] = canonical;
+          }
+          nameOrCodeToCanonical[doc.id.toLowerCase()] = canonical;
         }
 
+        // 2. Fetch from siteSupervisorMap
         final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
         for (var doc in mapSnapshot.docs) {
           final data = doc.data();
-          final sId = (data['site'] ?? data['siteId'] ?? doc.id).toString().trim();
+          final sDocId = (data['siteDocId'] ?? '').toString().trim();
+          final sId = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+          final sSite = (data['site'] ?? '').toString().trim();
           final sName = (data['siteName'] ?? data['projectName'] ?? data['site_name'] ?? data['location'] ?? '').toString().trim();
-          if (sId.isNotEmpty) {
-            ids.add(sId);
-            if (sName.isNotEmpty && sName != sId && (!names.containsKey(sId) || names[sId]!.isEmpty)) {
-              names[sId] = sName;
+
+          // Check if already mapped
+          String? mapped = nameOrCodeToCanonical[sDocId.toLowerCase()] ??
+              nameOrCodeToCanonical[sSite.toLowerCase()] ??
+              nameOrCodeToCanonical[sId.toLowerCase()] ??
+              nameOrCodeToCanonical[sName.toLowerCase()] ??
+              nameOrCodeToCanonical[doc.id.toLowerCase()];
+
+          if (mapped == null || !mapped.contains('_')) {
+            final formatted = ExpenseService.formatCanonicalSiteId(
+              rawId: sDocId.isNotEmpty ? sDocId : (sSite.isNotEmpty ? sSite : doc.id),
+              siteCode: sId,
+              siteName: sName,
+            );
+            if (formatted.contains('_')) {
+              mapped = formatted;
+            }
+          }
+
+          if (mapped != null && mapped.isNotEmpty) {
+            canonicalIds.add(mapped);
+            if (sName.isNotEmpty && (!names.containsKey(mapped) || names[mapped]!.isEmpty)) {
+              names[mapped] = sName;
+            }
+          } else {
+            final raw = sDocId.isNotEmpty ? sDocId : (sId.isNotEmpty ? sId : (sSite.isNotEmpty ? sSite : doc.id));
+            if (raw.isNotEmpty) {
+              final resolved = await ExpenseService.resolveCanonicalSiteDocId(raw);
+              if (resolved.isNotEmpty) {
+                canonicalIds.add(resolved);
+                if (sName.isNotEmpty && (!names.containsKey(resolved) || names[resolved]!.isEmpty)) {
+                  names[resolved] = sName;
+                }
+              }
             }
           }
         }
 
         siteNameMap = names;
-        siteIds = ids.toList()..sort();
+        siteIds = ExpenseService.sanitizeSiteIds(canonicalIds);
 
         await OfflineSyncService.cacheMasterData('sites_list', siteIds);
         await OfflineSyncService.cacheMasterData('sites_map', siteNameMap);
@@ -96,7 +144,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
         final cachedMap = await OfflineSyncService.getCachedMasterData('sites_map');
 
         if (cachedIds is List) {
-          siteIds = cachedIds.map((e) => e.toString()).toList();
+          siteIds = ExpenseService.sanitizeSiteIds(cachedIds.map((e) => e.toString()));
         }
         if (cachedMap is Map) {
           siteNameMap = Map<String, String>.from(cachedMap.map((k, v) => MapEntry(k.toString(), v.toString())));
@@ -111,7 +159,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
       final cachedMap = await OfflineSyncService.getCachedMasterData('sites_map');
 
       if (cachedIds is List) {
-        siteIds = cachedIds.map((e) => e.toString()).toList();
+        siteIds = ExpenseService.sanitizeSiteIds(cachedIds.map((e) => e.toString()));
       }
       if (cachedMap is Map) {
         siteNameMap = Map<String, String>.from(cachedMap.map((k, v) => MapEntry(k.toString(), v.toString())));
@@ -754,19 +802,18 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
 
     if (siteId.contains('_')) {
       final parts = siteId.split('_');
-      final code = parts[0];
-      final namePart = parts.sublist(1).join('_').trim();
+      final code = parts[0].trim();
+      final namePart = parts.sublist(1).join('_').trim().replaceAll(' ', '');
       if (namePart.isNotEmpty) {
         final formattedName = namePart[0].toUpperCase() + namePart.substring(1);
         return '${code}_$formattedName';
       }
-      return siteId;
+      return siteId.replaceAll(' ', '');
     }
 
     final sName = siteNameMap[siteId]?.trim();
     if (sName != null && sName.isNotEmpty && sName.toLowerCase() != siteId.toLowerCase()) {
-      final formattedName = sName[0].toUpperCase() + sName.substring(1);
-      return '${siteId}_$formattedName';
+      return ExpenseService.formatCanonicalSiteDocId(siteId, sName);
     }
 
     return siteId;
@@ -829,36 +876,25 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
     String? foundProjectStage;
 
     try {
-      // 1. Check Site collection document
-      final siteDoc = await FirestoreService.getCollection('Site').doc(siteId).get();
-      if (siteDoc.exists && siteDoc.data() != null) {
-        final data = siteDoc.data()!;
-        foundProjectStage = (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
-        foundSupervisorId = await _resolveSupervisorId(data);
-      }
+      final siteKeys = await ExpenseService.resolveSiteKeys(siteId);
 
-      // 2. Check siteSupervisorMap doc by doc ID == siteId
-      if (foundSupervisorId == null || foundProjectStage == null) {
-        final mapDoc = await FirestoreService.siteSupervisorMap.doc(siteId).get();
-        if (mapDoc.exists && mapDoc.data() != null) {
-          final data = mapDoc.data()!;
+      // 1. Check Site collection document for any matching alias
+      for (final key in siteKeys) {
+        final siteDoc = await FirestoreService.getCollection('Site').doc(key).get();
+        if (siteDoc.exists && siteDoc.data() != null) {
+          final data = siteDoc.data()!;
           foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
           foundSupervisorId ??= await _resolveSupervisorId(data);
+          if (foundSupervisorId != null && foundProjectStage != null) break;
         }
       }
 
-      // 3. Query siteSupervisorMap by site / siteId fields
+      // 2. Check siteSupervisorMap doc by doc ID == key
       if (foundSupervisorId == null || foundProjectStage == null) {
-        final queriesToTry = [
-          FirestoreService.siteSupervisorMap.where('site', isEqualTo: siteId),
-          FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: siteId),
-          FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: siteId),
-        ];
-
-        for (var q in queriesToTry) {
-          final snap = await q.get();
-          if (snap.docs.isNotEmpty) {
-            final data = snap.docs.first.data();
+        for (final key in siteKeys) {
+          final mapDoc = await FirestoreService.siteSupervisorMap.doc(key).get();
+          if (mapDoc.exists && mapDoc.data() != null) {
+            final data = mapDoc.data()!;
             foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
             foundSupervisorId ??= await _resolveSupervisorId(data);
             if (foundSupervisorId != null && foundProjectStage != null) break;
@@ -866,18 +902,64 @@ class OrganizationExpensesState extends State<OrganizationExpenses> {
         }
       }
 
+      // 3. Query siteSupervisorMap by site / siteId / siteName / siteDocId fields across all siteKeys
+      if (foundSupervisorId == null || foundProjectStage == null) {
+        for (final key in siteKeys) {
+          final queriesToTry = [
+            FirestoreService.siteSupervisorMap.where('siteDocId', isEqualTo: key),
+            FirestoreService.siteSupervisorMap.where('site', isEqualTo: key),
+            FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: key),
+            FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: key),
+          ];
+
+          for (var q in queriesToTry) {
+            final snap = await q.get();
+            if (snap.docs.isNotEmpty) {
+              final data = snap.docs.first.data();
+              foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+              foundSupervisorId ??= await _resolveSupervisorId(data);
+              if (foundSupervisorId != null && foundProjectStage != null) break;
+            }
+          }
+          if (foundSupervisorId != null && foundProjectStage != null) break;
+        }
+      }
+
       // 4. Broad scan in siteSupervisorMap if still missing
       if (foundSupervisorId == null || foundProjectStage == null) {
         final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
-        final targetSiteLower = siteId.toLowerCase().trim();
+        final lowerKeys = siteKeys.map((k) => k.toLowerCase().trim()).toSet();
 
         for (var doc in mapSnapshot.docs) {
           final data = doc.data();
-          final dSite = (data['site'] ?? data['siteId'] ?? data['siteName'] ?? doc.id).toString().toLowerCase().trim();
-          if (dSite == targetSiteLower || doc.id.toLowerCase().trim() == targetSiteLower) {
+          final dSite = (data['site'] ?? '').toString().toLowerCase().trim();
+          final dSiteId = (data['siteId'] ?? '').toString().toLowerCase().trim();
+          final dSiteName = (data['siteName'] ?? '').toString().toLowerCase().trim();
+          final dDocId = doc.id.toLowerCase().trim();
+
+          final matches = lowerKeys.contains(dSite) ||
+              lowerKeys.contains(dSiteId) ||
+              lowerKeys.contains(dSiteName) ||
+              lowerKeys.contains(dDocId) ||
+              lowerKeys.any((k) => dDocId.startsWith('${k}_') || dDocId.contains(k));
+
+          if (matches) {
             foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
             foundSupervisorId ??= await _resolveSupervisorId(data);
-            break;
+            if (foundSupervisorId != null && foundProjectStage != null) break;
+          }
+        }
+      }
+
+      // 5. Check projects collection if still missing
+      if (foundSupervisorId == null || foundProjectStage == null) {
+        for (final key in siteKeys) {
+          final projDoc = await FirestoreService.projects.doc(key).get();
+          if (projDoc.exists && projDoc.data() != null) {
+            final data = projDoc.data()!;
+            foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+            foundSupervisorId ??= await _resolveSupervisorId(data);
+            if (foundSupervisorId != null && foundProjectStage != null) break;
           }
         }
       }

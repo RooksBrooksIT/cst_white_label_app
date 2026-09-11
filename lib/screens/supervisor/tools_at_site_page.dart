@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/screens/supervisor/supervisor_tools_view_request_screen.dart';
 
@@ -53,18 +54,24 @@ class _ToolsAtSitePageState extends State<ToolsAtSitePage> {
     final location = (data['location'] ?? '').toString().trim();
     final site = (data['site'] ?? '').toString().trim();
     final siteId = (data['siteId'] ?? '').toString().trim();
+    final siteCode = (data['siteCode'] ?? data['SiteCode'] ?? '').toString().trim();
+    final siteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
 
-    // Prefer 'site' or 'siteId' if it does not match the full address/location
+    String raw = '';
     if (site.isNotEmpty && site != location) {
-      return site;
+      raw = site;
+    } else if (siteId.isNotEmpty && siteId != location) {
+      raw = siteId;
+    } else if (docId.isNotEmpty && docId != location) {
+      raw = docId.trim();
+    } else {
+      raw = site.isNotEmpty ? site : (siteId.isNotEmpty ? siteId : docId);
     }
-    if (siteId.isNotEmpty && siteId != location) {
-      return siteId;
-    }
-    if (docId.isNotEmpty && docId != location) {
-      return docId.trim();
-    }
-    return site.isNotEmpty ? site : (siteId.isNotEmpty ? siteId : docId);
+    return ExpenseService.formatCanonicalSiteId(
+      rawId: raw,
+      siteCode: siteCode.isNotEmpty ? siteCode : null,
+      siteName: siteName.isNotEmpty ? siteName : null,
+    );
   }
 
   /// Fetches sites assigned to the current supervisor from `siteSupervisorMap`
@@ -132,13 +139,14 @@ class _ToolsAtSitePageState extends State<ToolsAtSitePage> {
       }
 
       // Deduplicate site IDs
-      final uniqueSiteIds = parsedSiteIds.toSet().toList();
+      final uniqueSiteIds = ExpenseService.sanitizeSiteIds(parsedSiteIds).toList()..sort();
 
       if (mounted) {
         setState(() {
           assignedSiteIds = uniqueSiteIds;
           isLoadingSites = false;
-          if (uniqueSiteIds.isNotEmpty) {
+          if (uniqueSiteIds.isNotEmpty &&
+              (selectedSiteId == null || !uniqueSiteIds.contains(selectedSiteId))) {
             selectedSiteId = uniqueSiteIds.first;
           }
         });
@@ -209,6 +217,9 @@ class _ToolsAtSitePageState extends State<ToolsAtSitePage> {
       final Map<String, Map<String, dynamic>> siteToolsMap = {};
 
       final cleanLow = cleanSiteId.toLowerCase();
+      final siteKeys = (await ExpenseService.resolveSiteKeys(cleanSiteId))
+          .map((k) => k.toLowerCase())
+          .toSet();
 
       for (final doc in inventorySnap.docs) {
         final data = doc.data();
@@ -222,7 +233,8 @@ class _ToolsAtSitePageState extends State<ToolsAtSitePage> {
           final sitesMap = Map<String, dynamic>.from(data['availableCountAtSites']);
           sitesMap.forEach((k, v) {
             final kLow = k.toString().trim().toLowerCase();
-            final bool isMatch = kLow == cleanLow ||
+            final bool isMatch = siteKeys.contains(kLow) ||
+                kLow == cleanLow ||
                 (cleanLow.contains('_') && kLow.isNotEmpty && (cleanLow.startsWith('$kLow' '_') || cleanLow.endsWith('_$kLow'))) ||
                 (kLow.contains('_') && cleanLow.isNotEmpty && (kLow.startsWith('$cleanLow' '_') || kLow.endsWith('_$cleanLow')));
 
@@ -242,7 +254,8 @@ class _ToolsAtSitePageState extends State<ToolsAtSitePage> {
             final sId = (sMap['siteId'] ?? sMap['siteid'] ?? '').toString().trim().toLowerCase();
             final sName = (sMap['siteName'] ?? sMap['sitename'] ?? '').toString().trim().toLowerCase();
 
-            final bool isMatch = sId == cleanLow ||
+            final bool isMatch = siteKeys.contains(sId) ||
+                sId == cleanLow ||
                 (sName.isNotEmpty && sName == cleanLow) ||
                 (cleanLow.contains('_') && sId.isNotEmpty && (cleanLow.startsWith('$sId' '_') || cleanLow.endsWith('_$sId'))) ||
                 (sId.contains('_') && cleanLow.isNotEmpty && (sId.startsWith('$cleanLow' '_') || sId.endsWith('_$cleanLow')));

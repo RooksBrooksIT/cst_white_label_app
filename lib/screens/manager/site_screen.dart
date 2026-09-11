@@ -1865,6 +1865,8 @@ class _SiteScreenState extends State<SiteScreen>
             .doc(createdSiteDocId)
             .set({
           'siteId': createdSiteDocId,
+          'siteCode': nextSiteId,
+          'siteName': siteName,
           'totalMgrExpense': 0.0,
           'totalOrgExpense': 0.0,
           'totalSiteExpense': 0.0,

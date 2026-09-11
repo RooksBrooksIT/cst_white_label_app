@@ -1935,16 +1935,36 @@ class MaterialInventoryService {
       final allItems = await fetchAllMaterialsInventory();
       final List<Map<String, dynamic>> siteMaterials = [];
 
+      final cleanLow = siteId.trim().toLowerCase();
+
       for (final item in allItems) {
+        bool matchesSite(SiteInventoryEntry s) {
+          final sId = s.siteId.trim().toLowerCase();
+          final sName = s.siteName.trim().toLowerCase();
+          if (sId == cleanLow || (sName.isNotEmpty && sName == cleanLow)) return true;
+          if (cleanLow.contains('_')) {
+            final parts = cleanLow.split('_');
+            final codePart = parts.first;
+            final namePart = parts.skip(1).join('_');
+            if (sId == codePart || sId == namePart || (sName.isNotEmpty && sName == namePart)) return true;
+            if (sId.startsWith('pr') && 'st${sId.substring(2)}' == cleanLow) return true;
+          }
+          if (sId.contains('_')) {
+            final parts = sId.split('_');
+            final codePart = parts.first;
+            final namePart = parts.skip(1).join('_');
+            if (cleanLow == codePart || cleanLow == namePart) return true;
+          }
+          return false;
+        }
+
         final siteEntry = item.siteInventories.firstWhere(
-          (s) => s.siteId.trim().toLowerCase() == siteId.trim().toLowerCase(),
+          matchesSite,
           orElse: () => SiteInventoryEntry(siteId: siteId, availableCount: 0),
         );
 
         // Include if transferred to this site or present in site inventories
-        final bool hasTransferred = item.siteInventories.any(
-          (s) => s.siteId.trim().toLowerCase() == siteId.trim().toLowerCase(),
-        );
+        final bool hasTransferred = item.siteInventories.any(matchesSite);
 
         if (siteEntry.availableCount > 0 || hasTransferred) {
           siteMaterials.add({

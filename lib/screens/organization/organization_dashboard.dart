@@ -14,6 +14,7 @@ import 'package:ebricks/screens/organization/org_materials_tools_inventory_page.
 import 'package:ebricks/screens/organization/org_petty_cash_page.dart';
 import 'package:ebricks/screens/organization/org_notification_page.dart';
 import 'package:ebricks/services/notification_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
 import 'package:ebricks/screens/organization/org_menu_screen.dart';
@@ -65,6 +66,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
       role: 'organisation',
       userName: _userName,
     );
+    Future.microtask(() => ExpenseService.cleanupDuplicateSiteExpenseDocs());
   }
 
   void _initStreams() {

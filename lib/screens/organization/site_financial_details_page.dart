@@ -70,17 +70,26 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
       final projectsCol = FirestoreService.getCollection('projects');
       final siteCol = FirestoreService.getCollection('Site');
       final totalsCol = FirestoreService.getCollection('totalSiteExpensesPerDay');
+      final canonicalSiteDocId =
+          await ExpenseService.resolveCanonicalSiteDocId(widget.siteId);
 
       // 1. Fetch initial documents concurrently in parallel
       final results = await Future.wait([
         projectsCol.doc(widget.siteId).get(),
         siteCol.doc(widget.siteId).get(),
-        totalsCol.doc(widget.siteId).get(),
+        totalsCol.doc(canonicalSiteDocId).get(),
       ]);
 
       final directProjDoc = results[0];
       final directSiteDoc = results[1];
-      final directTotalsDoc = results[2];
+      var directTotalsDoc = results[2];
+
+      if (!directTotalsDoc.exists && widget.siteId != canonicalSiteDocId) {
+        final fallbackTotals = await totalsCol.doc(widget.siteId).get();
+        if (fallbackTotals.exists) {
+          directTotalsDoc = fallbackTotals;
+        }
+      }
 
       if (directProjDoc.exists && directProjDoc.data() != null) {
         _projectData = directProjDoc.data();
@@ -114,14 +123,9 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
         });
       }
 
-      // Set category totals if available
+      // Ingest totals data if directly found
       if (directTotalsDoc.exists && directTotalsDoc.data() != null) {
         _siteTotalsData = directTotalsDoc.data();
-      } else {
-        final queryTotals = await totalsCol.where('siteId', isEqualTo: widget.siteId).limit(1).get();
-        if (queryTotals.docs.isNotEmpty) {
-          _siteTotalsData = queryTotals.docs.first.data();
-        }
       }
 
       // Display data immediately to the user
@@ -132,10 +136,10 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
       }
 
       // 2. Perform background fresh recalculation & sync without blocking page render
-      ExpenseService.recalcTotalsAndSyncProject(widget.siteId).then((_) async {
+      ExpenseService.recalcTotalsAndSyncProject(canonicalSiteDocId).then((_) async {
         if (!mounted) return;
         try {
-          final refreshedDoc = await totalsCol.doc(widget.siteId).get();
+          final refreshedDoc = await totalsCol.doc(canonicalSiteDocId).get();
           final refreshedProj = await projectsCol.doc(widget.siteId).get();
           if (mounted) {
             setState(() {

@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'dart:async';
 import 'package:ebricks/screens/reports/site_weekly_financial_report2.dart';
@@ -62,9 +63,35 @@ class _SiteWeeklyFinancialReportState
 
       if (!mounted) return;
 
-      supervisorMaps = snapshot.docs.isEmpty
-          ? []
-          : snapshot.docs.map((doc) => doc.data()).toList();
+      final List<Map<String, dynamic>> rawMaps = [];
+      for (var doc in snapshot.docs) {
+        final data = Map<String, dynamic>.from(doc.data());
+        final rawSiteCode = (data['siteCode'] ?? data['siteId'] ?? '').toString().trim();
+        final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? '').toString().trim();
+        final sDocId = (data['siteDocId'] ?? '').toString().trim();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: sDocId.isNotEmpty ? sDocId : doc.id,
+          siteCode: rawSiteCode.isNotEmpty ? rawSiteCode : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+        );
+        data['site'] = canonicalId;
+        data['siteId'] = canonicalId;
+        rawMaps.add(data);
+      }
+
+      final validIds = ExpenseService.sanitizeSiteIds(rawMaps.map((m) => m['site'].toString()));
+      final Map<String, Map<String, dynamic>> uniqueMaps = {};
+      for (var m in rawMaps) {
+        final id = m['site'].toString();
+        if (!validIds.contains(id)) continue;
+        if (!uniqueMaps.containsKey(id)) {
+          uniqueMaps[id] = m;
+        }
+      }
+
+      final result = uniqueMaps.values.toList();
+      result.sort((a, b) => (a['site'] ?? '').toString().compareTo((b['site'] ?? '').toString()));
+      supervisorMaps = result;
 
       if (mounted) {
         setState(() {

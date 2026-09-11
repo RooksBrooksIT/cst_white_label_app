@@ -1,4 +1,4 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
@@ -974,14 +974,31 @@ class _IncentiveCalculationSheetState extends State<IncentiveCalculationSheet> {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // 2) Update totalIncentiveExpenses in totalSiteExpensesPerDay for this siteId
-      await FirestoreService.totalSiteExpensesPerDay.doc(widget.siteId).set({
+      // 2) Update totalIncentiveExpenses in totalSiteExpensesPerDay for this siteId (strictly using canonical doc ID)
+      final canonicalSiteDocId =
+          await ExpenseService.resolveCanonicalSiteDocId(widget.siteId);
+      await FirestoreService.totalSiteExpensesPerDay.doc(canonicalSiteDocId).set({
+        'siteId': canonicalSiteDocId,
         'totalIncentiveExpenses': amountToAdd,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // Clean up legacy duplicate document if widget.siteId was non-canonical (e.g. site name alone)
+      if (widget.siteId != canonicalSiteDocId) {
+        try {
+          final legacyDoc = await FirestoreService.totalSiteExpensesPerDay
+              .doc(widget.siteId)
+              .get();
+          if (legacyDoc.exists) {
+            await FirestoreService.totalSiteExpensesPerDay
+                .doc(widget.siteId)
+                .delete();
+          }
+        } catch (_) {}
+      }
+
       // 3) Trigger totals recalculation for this site (sync all values)
-      await ExpenseService.updateTotalSiteExpense(widget.siteId);
+      await ExpenseService.recalcTotalsAndSyncProject(canonicalSiteDocId);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

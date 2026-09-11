@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/material_inventory_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
 class MaterialAtSiteEntryPage extends StatefulWidget {
@@ -54,18 +55,24 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
     final location = (data['location'] ?? '').toString().trim();
     final site = (data['site'] ?? '').toString().trim();
     final siteId = (data['siteId'] ?? '').toString().trim();
+    final siteCode = (data['siteCode'] ?? data['SiteCode'] ?? '').toString().trim();
+    final siteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
 
-    // Prefer 'site' or 'siteId' if it does not match the full address/location
+    String raw = '';
     if (site.isNotEmpty && site != location) {
-      return site;
+      raw = site;
+    } else if (siteId.isNotEmpty && siteId != location) {
+      raw = siteId;
+    } else if (docId.isNotEmpty && docId != location) {
+      raw = docId.trim();
+    } else {
+      raw = site.isNotEmpty ? site : (siteId.isNotEmpty ? siteId : docId);
     }
-    if (siteId.isNotEmpty && siteId != location) {
-      return siteId;
-    }
-    if (docId.isNotEmpty && docId != location) {
-      return docId.trim();
-    }
-    return site.isNotEmpty ? site : (siteId.isNotEmpty ? siteId : docId);
+    return ExpenseService.formatCanonicalSiteId(
+      rawId: raw,
+      siteCode: siteCode.isNotEmpty ? siteCode : null,
+      siteName: siteName.isNotEmpty ? siteName : null,
+    );
   }
 
   /// Fetches sites assigned to the current supervisor from `siteSupervisorMap`
@@ -133,13 +140,14 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       }
 
       // Deduplicate site IDs
-      final uniqueSiteIds = parsedSiteIds.toSet().toList();
+      final uniqueSiteIds = ExpenseService.sanitizeSiteIds(parsedSiteIds).toList()..sort();
 
       if (mounted) {
         setState(() {
           assignedSiteIds = uniqueSiteIds;
           isLoadingSites = false;
-          if (uniqueSiteIds.isNotEmpty) {
+          if (uniqueSiteIds.isNotEmpty &&
+              (selectedSiteId == null || !uniqueSiteIds.contains(selectedSiteId))) {
             selectedSiteId = uniqueSiteIds.first;
           }
         });
@@ -215,6 +223,10 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
       final availSnap = await FirestoreService.getCollection('materialsAvailability').get();
       final allDocs = [...transferSnap.docs, ...availSnap.docs];
 
+      final siteKeys = (await ExpenseService.resolveSiteKeys(cleanSiteId))
+          .map((k) => k.toLowerCase())
+          .toSet();
+
       for (final doc in allDocs) {
         final data = doc.data();
         final matName = (data['materialName'] ?? data['displayName'] ?? doc.id).toString().trim();
@@ -235,7 +247,9 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           final sIdLow = sId.toLowerCase();
           final sNameLow = sName.toLowerCase();
 
-          final bool isMatch = sIdLow == cleanLow ||
+          final bool isMatch = siteKeys.contains(sIdLow) ||
+              siteKeys.contains(sNameLow) ||
+              sIdLow == cleanLow ||
               (sNameLow.isNotEmpty && sNameLow == cleanLow) ||
               (cleanLow.contains('_') && sIdLow.isNotEmpty && (cleanLow.startsWith('$sIdLow' '_') || cleanLow.endsWith('_$sIdLow'))) ||
               (cleanLow.contains('_') && sNameLow.isNotEmpty && (cleanLow.startsWith('$sNameLow' '_') || cleanLow.endsWith('_$sNameLow'))) ||

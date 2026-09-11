@@ -113,11 +113,19 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
           .where('supervisor', isEqualTo: widget.userName)
           .get();
       if (snapshot.docs.isNotEmpty) {
-        final sites = snapshot.docs
+        final rawSites = snapshot.docs
             .map((doc) {
               final data = doc.data();
+              final sDocId = (data['siteDocId'] ?? '').toString().trim();
+              final rawSiteId = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+              final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? '').toString().trim();
+              final canonicalId = ExpenseService.formatCanonicalSiteId(
+                rawId: sDocId.isNotEmpty ? sDocId : doc.id,
+                siteCode: rawSiteId.isNotEmpty ? rawSiteId : null,
+                siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+              );
               return {
-                'siteId': data['site']?.toString() ?? '',
+                'siteId': canonicalId,
                 'location': data['location']?.toString() ?? 'Unknown',
                 'supervisorId': data['Supervisor ID']?.toString() ?? '',
                 'projectName': data['projectName']?.toString() ?? '',
@@ -126,6 +134,22 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
             })
             .where((site) => site['siteId']!.isNotEmpty)
             .toList();
+
+        final validIds = ExpenseService.sanitizeSiteIds(
+          rawSites.map((s) => s['siteId']!).where((id) => id.isNotEmpty),
+        );
+
+        final Map<String, Map<String, String>> uniqueSites = {};
+        for (var s in rawSites) {
+          final id = s['siteId']!;
+          if (!validIds.contains(id)) continue;
+          if (!uniqueSites.containsKey(id)) {
+            uniqueSites[id] = Map.from(s);
+          }
+        }
+        final sites = uniqueSites.values.toList();
+        sites.sort((a, b) => (a['siteId'] ?? '').compareTo(b['siteId'] ?? ''));
+
         if (!mounted) return;
         setState(() {
           supervisorSites = sites;
@@ -338,7 +362,9 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
   }
 
   Future<void> _saveToFirestore() async {
-    final siteIdForEntry = siteCode;
+    final canonicalSite =
+        await ExpenseService.resolveCanonicalSiteDocId(siteCode);
+    final siteIdForEntry = canonicalSite.isNotEmpty ? canonicalSite : siteCode;
 
     if (_selectedContractorName == null ||
         _selectedContractorName!.isEmpty ||
@@ -346,6 +372,7 @@ class _SiteContractorEntryPageState extends State<SiteContractorEntryPage> {
         _selectedProjectField!.isEmpty ||
         selectedDate == null ||
         siteIdForEntry.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Select contractor, project field, date and site ID'),

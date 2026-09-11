@@ -37,7 +37,9 @@ class SiteDropdown extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
         isExpanded: true,
-      initialValue: selectedSiteId,
+      initialValue: (selectedSiteId != null && siteIds.contains(selectedSiteId))
+          ? selectedSiteId
+          : null,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
@@ -57,11 +59,10 @@ class SiteDropdown extends StatelessWidget {
       dropdownColor: theme.cardColor,
       style: TextStyle(color: colorScheme.onSurface),
       items: siteIds.map((id) {
-        final name = siteNameMap[id] ?? 'Unnamed Site';
         return DropdownMenuItem<String>(
           value: id,
           child: Text(
-            '$id - $name',
+            id,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 14),
           ),

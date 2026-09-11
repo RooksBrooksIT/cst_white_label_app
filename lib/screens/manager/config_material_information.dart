@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/material_inventory_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -260,36 +261,78 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
   Future<void> _loadSiteData() async {
     try {
       final sitesSnapshot = await FirestoreService.getCollection('Site').get();
-      final Map<String, Map<String, dynamic>> siteDetails = {
-        for (var doc in sitesSnapshot.docs)
-          doc.id: doc.data()
-      };
 
       final mapSnapshot = await FirestoreService.getCollection('siteSupervisorMap').get();
       final Map<String, Map<String, dynamic>> supervisorMap = {};
       for (var doc in mapSnapshot.docs) {
         final data = doc.data();
-        final siteField = data['site']?.toString().trim();
-        if (siteField != null && siteField.isNotEmpty) {
-          supervisorMap[siteField] = data;
+        final rawSiteCode = (data['siteCode'] ?? data['siteId'] ?? '').toString().trim();
+        final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? '').toString().trim();
+        final sDocId = (data['siteDocId'] ?? '').toString().trim();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: sDocId.isNotEmpty ? sDocId : doc.id,
+          siteCode: rawSiteCode.isNotEmpty ? rawSiteCode : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+        );
+        if (canonicalId.isNotEmpty) {
+          supervisorMap[canonicalId] = data;
         }
       }
 
+      final List<Map<String, dynamic>> rawList = [];
+      for (var doc in sitesSnapshot.docs) {
+        final sData = doc.data();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: doc.id,
+          siteCode: sData['siteCode']?.toString(),
+          siteName: sData['siteName']?.toString(),
+        );
+        final siteName = sData['siteName']?.toString() ?? canonicalId;
+        final mapping = supervisorMap[canonicalId] ?? supervisorMap[doc.id] ?? supervisorMap[siteName];
+
+        rawList.add({
+          'siteId': canonicalId,
+          'siteName': siteName,
+          'projectName': mapping?['projectName'] ?? sData['projectName'] ?? '',
+          'supervisorName': mapping?['supervisorName'] ?? mapping?['supervisor'] ?? sData['supervisorName'] ?? '',
+        });
+      }
+
+      for (var entry in supervisorMap.entries) {
+        final sId = entry.key;
+        final mapping = entry.value;
+        rawList.add({
+          'siteId': sId,
+          'siteName': mapping['siteName']?.toString() ?? sId,
+          'projectName': mapping['projectName']?.toString() ?? '',
+          'supervisorName': mapping['supervisorName'] ?? mapping['supervisor'] ?? '',
+        });
+      }
+
+      final validIds = ExpenseService.sanitizeSiteIds(rawList.map((s) => s['siteId'].toString()));
+      final Map<String, Map<String, dynamic>> uniqueSites = {};
+      for (var s in rawList) {
+        final id = s['siteId'].toString();
+        if (!validIds.contains(id)) continue;
+        if (!uniqueSites.containsKey(id)) {
+          uniqueSites[id] = Map.from(s);
+        } else {
+          final existing = uniqueSites[id]!;
+          for (var entry in s.entries) {
+            if ((existing[entry.key] == null || existing[entry.key].toString().isEmpty) &&
+                entry.value.toString().isNotEmpty) {
+              existing[entry.key] = entry.value;
+            }
+          }
+        }
+      }
+
+      final result = uniqueSites.values.toList();
+      result.sort((a, b) => (a['siteId'] ?? '').compareTo(b['siteId'] ?? ''));
+
       if (mounted) {
         setState(() {
-          sitesList = siteDetails.entries.map<Map<String, dynamic>>((entry) {
-            final sId = entry.key;
-            final sData = entry.value;
-            final siteName = sData['siteName']?.toString() ?? sId;
-            final mapping = supervisorMap[sId] ?? supervisorMap[siteName];
-
-            return <String, dynamic>{
-              'siteId': sId,
-              'siteName': siteName,
-              'projectName': mapping?['projectName'] ?? sData['projectName'] ?? '',
-              'supervisorName': mapping?['supervisorName'] ?? sData['supervisorName'] ?? '',
-            };
-          }).toList();
+          sitesList = result;
           _isLoadingSites = false;
         });
       }
@@ -449,6 +492,18 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       _siteToCompanySiteNameController.text = site['siteName'] ?? '';
       _projectNameController.text = site['projectName'] ?? '';
       _siteToCompanySupervisorController.text = site['supervisorName'] ?? '';
+    }
+
+    if (_projectNameController.text.isEmpty || _supervisorNameController.text.isEmpty) {
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      if (mounted) {
+        if (_projectNameController.text.isEmpty && details.projectName != null) {
+          _projectNameController.text = details.projectName!;
+        }
+        if (_supervisorNameController.text.isEmpty && details.supervisor != null) {
+          _supervisorNameController.text = details.supervisor!;
+        }
+      }
     }
   }
 
@@ -1754,7 +1809,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     return DropdownMenuItem<String>(
                       value: site['siteId'],
                       child: Text(
-                        site['siteName'] ?? site['siteId'],
+                        site['siteId'] ?? '',
                         overflow: TextOverflow.ellipsis,
                       ),
                     );

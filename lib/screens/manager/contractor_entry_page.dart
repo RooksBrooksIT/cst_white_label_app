@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/expense_service.dart';
@@ -215,19 +215,34 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
       for (var doc in docs) {
         final data = doc.data() as Map<String, dynamic>;
-        final siteId = data['site'] as String?;
-        final siteName = data['projectName'] as String?;
-        if (siteId != null && siteId.isNotEmpty) {
-          ids.add(siteId);
-          names[siteId] = siteName ?? 'Unnamed Site';
+        final sDocId = (data['siteDocId'] ?? '').toString().trim();
+        final rawSiteId = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+        final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? '').toString().trim();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: sDocId.isNotEmpty ? sDocId : doc.id,
+          siteCode: rawSiteId.isNotEmpty ? rawSiteId : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+        );
+        final siteName = (data['siteName'] ?? data['projectName'] ?? 'Unnamed Site').toString().trim();
+        if (canonicalId.isNotEmpty) {
+          ids.add(canonicalId);
+          names[canonicalId] = siteName;
         }
       }
 
+      final validIds = ExpenseService.sanitizeSiteIds(ids);
+      final finalIds = validIds.toList()..sort();
+      final Map<String, String> finalNames = {
+        for (var id in finalIds) id: names[id] ?? 'Unnamed Site'
+      };
+
       setState(() {
-        siteIdOptions = ids;
-        siteNameMap = names;
+        siteIdOptions = finalIds;
+        siteNameMap = finalNames;
         if (siteIdOptions.isNotEmpty) {
-          selectedSiteIdForEntry = siteIdOptions.first;
+          if (selectedSiteIdForEntry == null || !siteIdOptions.contains(selectedSiteIdForEntry)) {
+            selectedSiteIdForEntry = siteIdOptions.first;
+          }
           _fetchContractDates(selectedSiteIdForEntry!);
         } else {
           selectedSiteIdForEntry = null;
@@ -244,16 +259,22 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
   Future<void> _fetchContractDates(String siteId) async {
     try {
-      final snap = await FirestoreService.getCollection('siteSupervisorMap')
-          .where('site', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (snap.docs.isNotEmpty) {
-        final data = snap.docs.first.data();
-        setState(() {
-          contractStartDate = data['contractStartDate'];
-          contractEndDate = data['contractEndDate'];
-        });
+      final keys = await ExpenseService.resolveSiteKeys(siteId);
+      for (final key in keys) {
+        final snap = await FirestoreService.getCollection('siteSupervisorMap')
+            .where('site', isEqualTo: key)
+            .limit(1)
+            .get();
+        if (snap.docs.isNotEmpty) {
+          final data = snap.docs.first.data();
+          if (mounted) {
+            setState(() {
+              contractStartDate = data['contractStartDate'];
+              contractEndDate = data['contractEndDate'];
+            });
+          }
+          return;
+        }
       }
     } catch (e) {
       debugPrint('Error fetching contract dates: $e');
@@ -537,7 +558,10 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
 
       await FirestoreService.getCollection('ContractorEntry').doc(docId).set(data);
 
-      await ExpenseService.recalcTotalsAndSyncProject(selectedSiteIdForEntry!);
+      final canonicalSiteId =
+          await ExpenseService.resolveCanonicalSiteDocId(selectedSiteIdForEntry!);
+      await ExpenseService.recalcTotalsAndSyncProject(
+          canonicalSiteId.isNotEmpty ? canonicalSiteId : selectedSiteIdForEntry!);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -826,7 +850,9 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                     label: 'Site ID',
                     child: DropdownButtonFormField<String>(
                       isExpanded: true,
-                      initialValue: selectedSiteIdForEntry,
+                      initialValue: siteIdOptions.contains(selectedSiteIdForEntry)
+                          ? selectedSiteIdForEntry
+                          : null,
                       dropdownColor: Colors.white,
                       borderRadius: BorderRadius.circular(14),
                       style: TextStyle(color: _textColor, fontSize: 14.5, fontWeight: FontWeight.w700),
@@ -835,7 +861,7 @@ class _ContractorEntryPageState extends State<ContractorEntryPage> {
                             (id) => DropdownMenuItem<String>(
                               value: id,
                               child: Text(
-                                '$id - ${siteNameMap[id] ?? "Unnamed Site"}',
+                                id,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),

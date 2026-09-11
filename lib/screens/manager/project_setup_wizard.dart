@@ -573,6 +573,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         'totalSiteExpensesPerDay',
       ).doc(siteDocId).set({
         'siteId': siteDocId,
+        'siteCode': siteId,
+        'siteName': _siteNameController.text.trim(),
         'totalMgrExpense': 0.0,
         'totalOrgExpense': 0.0,
         'totalSiteExpense': 0.0,

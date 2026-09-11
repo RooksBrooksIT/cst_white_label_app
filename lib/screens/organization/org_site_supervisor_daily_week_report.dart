@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/pdf_templates.dart';
 import 'dart:async';
@@ -61,7 +62,14 @@ class DailySitePaymentReportScreenState
 
       for (var doc in mappingSnapshot.docs) {
         final data = doc.data();
-        final siteId = data['site']?.toString() ?? doc.id;
+        final rawSiteId = data['site']?.toString() ?? doc.id;
+        final siteName = data['siteName']?.toString();
+        final siteCode = data['siteCode']?.toString();
+        final siteId = ExpenseService.formatCanonicalSiteId(
+          rawId: rawSiteId,
+          siteCode: siteCode,
+          siteName: siteName,
+        );
         if (siteId.isNotEmpty) {
           ids.add(siteId);
 
@@ -84,18 +92,25 @@ class DailySitePaymentReportScreenState
       final projectsSnapshot = await FirestoreService.projects.get();
       for (var doc in projectsSnapshot.docs) {
         final data = doc.data();
-        final siteId = data['siteId']?.toString();
-        final fetchedProjectName = data['projectName']?.toString() ?? '';
-        if (siteId != null &&
-            details.containsKey(siteId) &&
-            fetchedProjectName.isNotEmpty) {
-          details[siteId]!['project'] = fetchedProjectName;
+        final rawSiteId = data['siteId']?.toString();
+        if (rawSiteId != null && rawSiteId.isNotEmpty) {
+          final canonicalId = ExpenseService.formatCanonicalSiteId(
+            rawId: rawSiteId,
+            siteCode: data['siteCode']?.toString(),
+            siteName: data['projectName']?.toString(),
+          );
+          final fetchedProjectName = data['projectName']?.toString() ?? '';
+          if (details.containsKey(canonicalId) && fetchedProjectName.isNotEmpty) {
+            details[canonicalId]!['project'] = fetchedProjectName;
+          }
         }
       }
 
+      final sanitized = ExpenseService.sanitizeSiteIds(ids).toList()..sort();
+
       if (mounted) {
         setState(() {
-          siteIds = ids.toList()..sort();
+          siteIds = sanitized;
           siteDetails = details;
         });
       }
@@ -109,23 +124,36 @@ class DailySitePaymentReportScreenState
     }
   }
 
-  void _updateProjectAndSupervisor() {
-    if (selectedSiteId != null && siteDetails.containsKey(selectedSiteId)) {
-      final project = siteDetails[selectedSiteId]!['project'] ?? '';
-      final supervisor = siteDetails[selectedSiteId]!['supervisor'] ?? '';
-      projectController.text = project;
-      supervisorController.text = supervisor;
-      setState(() {
-        selectedProject = project.isNotEmpty ? project : null;
-        selectedSupervisor = supervisor.isNotEmpty ? supervisor : null;
-      });
+  Future<void> _updateProjectAndSupervisor() async {
+    if (selectedSiteId != null) {
+      String project = siteDetails[selectedSiteId]?['project'] ?? '';
+      String supervisor = siteDetails[selectedSiteId]?['supervisor'] ?? '';
+
+      if (project.isEmpty || supervisor.isEmpty) {
+        try {
+          final res = await ExpenseService.resolveSiteDetails(selectedSiteId!);
+          if (project.isEmpty && res.projectName != null) project = res.projectName!;
+          if (supervisor.isEmpty && res.supervisor != null) supervisor = res.supervisor!;
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        projectController.text = project;
+        supervisorController.text = supervisor;
+        setState(() {
+          selectedProject = project.isNotEmpty ? project : null;
+          selectedSupervisor = supervisor.isNotEmpty ? supervisor : null;
+        });
+      }
     } else {
-      projectController.text = '';
-      supervisorController.text = '';
-      setState(() {
-        selectedProject = null;
-        selectedSupervisor = null;
-      });
+      if (mounted) {
+        projectController.text = '';
+        supervisorController.text = '';
+        setState(() {
+          selectedProject = null;
+          selectedSupervisor = null;
+        });
+      }
     }
   }
 
@@ -172,9 +200,10 @@ class DailySitePaymentReportScreenState
     if (selectedSiteId == null || dates.isEmpty) return;
 
     try {
+      final siteKeys = (await ExpenseService.resolveSiteKeys(selectedSiteId!)).toList();
       final snapshot = await FirestoreService.getCollection(
         'siteSupervisorPayments',
-      ).where('siteId', isEqualTo: selectedSiteId).get();
+      ).where('siteId', whereIn: siteKeys).get();
 
       final List<Map<String, dynamic>> records = [];
       double sum = 0.0;

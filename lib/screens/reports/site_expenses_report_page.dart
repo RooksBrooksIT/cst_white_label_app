@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -51,31 +52,40 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
     final DateFormat docIdDateFormat = DateFormat('ddMMyyyy');
     final DateFormat displayDateFormat = DateFormat('dd-MM-yy');
 
+    final siteKeys =
+        (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
+    final keysToQuery = siteKeys.take(10).toList();
+
     DateTime current = widget.fromDate;
     while (!current.isAfter(widget.toDate)) {
-      final docId = '${widget.siteId}_${docIdDateFormat.format(current)}';
+      final dateStr = docIdDateFormat.format(current);
 
-      // 1. Supervisor entry
-      final supervisorDoc = await FirestoreService.getCollection(
-        'siteSupervisorEntries',
-      ).doc(docId).get();
+      // 1. Supervisor entry across siteKeys
       Map<String, dynamic>? supervisorData;
-      if (supervisorDoc.exists) {
-        final data = supervisorDoc.data();
-        // Skip manager or org flagged entries to avoid duplicate counting
-        if (data?['isManagerEntry'] != true &&
-            data?['createdBy'] != 'manager' &&
-            data?['isOrgEntry'] != true &&
-            data?['createdBy'] != 'manager_org') {
-          if (widget.projectStage != null) {
-            final docStage = (data?['projectStage'] ?? data?['projectField'])
-                ?.toString()
-                .trim();
-            if (docStage == widget.projectStage?.trim()) {
+      for (final k in siteKeys) {
+        final docId = '${k}_$dateStr';
+        final supervisorDoc = await FirestoreService.getCollection(
+          'siteSupervisorEntries',
+        ).doc(docId).get();
+        if (supervisorDoc.exists) {
+          final data = supervisorDoc.data();
+          // Skip manager or org flagged entries to avoid duplicate counting
+          if (data?['isManagerEntry'] != true &&
+              data?['createdBy'] != 'manager' &&
+              data?['isOrgEntry'] != true &&
+              data?['createdBy'] != 'manager_org') {
+            if (widget.projectStage != null) {
+              final docStage = (data?['projectStage'] ?? data?['projectField'])
+                  ?.toString()
+                  .trim();
+              if (docStage == widget.projectStage?.trim()) {
+                supervisorData = data;
+                break;
+              }
+            } else {
               supervisorData = data;
+              break;
             }
-          } else {
-            supervisorData = data;
           }
         }
       }
@@ -83,7 +93,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       // 2. Manager bills for this date
       final managerQuery = await FirestoreService.getCollection(
         'managerExpenses',
-      ).where('siteId', isEqualTo: widget.siteId).get();
+      ).where('siteId', whereIn: keysToQuery).get();
       List<Map<String, dynamic>> managerBills = [];
       for (final doc in managerQuery.docs) {
         final data = doc.data();
@@ -115,7 +125,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       // 3. Organization bills for this date
       final orgQuery = await FirestoreService.getCollection(
         'organizationEntries',
-      ).where('siteId', isEqualTo: widget.siteId).get();
+      ).where('siteId', whereIn: keysToQuery).get();
       List<Map<String, dynamic>> orgBills = [];
       for (final doc in orgQuery.docs) {
         final data = doc.data();
@@ -163,11 +173,9 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       }
 
       // 4. Contractor expenses for this date
-      Query<Map<String, dynamic>> contractorQuery =
-          FirestoreService.getCollection('contractorEntries')
-              .where('siteId', isEqualTo: widget.siteId);
-
-      final contractorSnapshot = await contractorQuery.get();
+      final contractorSnapshot = await FirestoreService.getCollection(
+        'contractorEntries',
+      ).where('siteId', whereIn: keysToQuery).get();
       List<Map<String, dynamic>> contractorEntries = [];
       for (final doc in contractorSnapshot.docs) {
         final data = doc.data();
@@ -193,7 +201,7 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
 
       // 5. Supervisor / Worker Incentives for this date
       final incentiveQuery = await FirestoreService.siteSupervisorIncentives
-          .where('siteId', isEqualTo: widget.siteId)
+          .where('siteId', whereIn: keysToQuery)
           .get();
       List<Map<String, dynamic>> incentiveEntries = [];
       for (final doc in incentiveQuery.docs) {

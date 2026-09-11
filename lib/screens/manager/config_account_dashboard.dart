@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
 
@@ -357,6 +358,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     _initStreams();
     _fetchManagerData();
     _startAutoPlayCarousel();
+    Future.microtask(() => ExpenseService.cleanupDuplicateSiteExpenseDocs());
   }
 
   void _initStreams() {

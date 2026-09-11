@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:intl/intl.dart';
 
@@ -114,27 +115,120 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
       };
       final snapshot = await FirestoreService.siteSupervisorMap.get();
-      siteList = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            final sId = data['site']?.toString() ?? '';
-            return {
-              'siteId': sId,
-              'siteName': siteNames[sId] ?? 'Unnamed Site',
-              'supervisor': data['supervisor']?.toString() ?? 'Not Available',
-              'supervisorId':
-                  (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ??
-                  'Not Available',
-              'location': data['location']?.toString() ?? 'Not Available',
-              'projectStage':
-                  data['projectStage']?.toString() ?? 'Not Available',
-            };
-          })
-          .where((site) => site['siteId']!.isNotEmpty)
-          .toList();
+      final List<Map<String, String>> rawSites = [];
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final rawSite = (data['site'] ?? data['siteDocId'] ?? '').toString().trim();
+        final rawSiteCode = (data['siteCode'] ?? data['siteId'] ?? '').toString().trim();
+        final rawSiteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
+        final sDocId = (data['siteDocId'] ?? '').toString().trim();
+
+        String baseId = sDocId.isNotEmpty ? sDocId : rawSite;
+        if (baseId.isEmpty && doc.id.contains('_') && (doc.id.startsWith('ST') || doc.id.startsWith('PR'))) {
+          baseId = doc.id;
+        }
+
+        var canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: baseId.isNotEmpty ? baseId : (rawSiteCode.isNotEmpty ? rawSiteCode : doc.id),
+          siteCode: rawSiteCode.isNotEmpty ? rawSiteCode : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+        );
+
+        if (!canonicalId.contains('_') && canonicalId.isNotEmpty) {
+          final resolved = await ExpenseService.resolveCanonicalSiteDocId(canonicalId);
+          if (resolved.isNotEmpty && resolved.contains('_')) {
+            canonicalId = resolved;
+          }
+        }
+
+        if (canonicalId.toUpperCase().startsWith('PR')) {
+          canonicalId = 'ST${canonicalId.substring(2)}';
+        }
+
+        if (canonicalId.isNotEmpty) {
+          rawSites.add({
+            'siteId': canonicalId,
+            'siteName': siteNames[canonicalId] ??
+                (data['siteName']?.toString() ??
+                    (rawSiteName.isNotEmpty ? rawSiteName : 'Unnamed Site')),
+            'supervisor': data['supervisor']?.toString() ?? 'Not Available',
+            'supervisorId':
+                (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ??
+                    'Not Available',
+            'location': data['location']?.toString() ?? 'Not Available',
+            'projectStage': data['projectStage']?.toString() ?? 'Not Available',
+          });
+        }
+      }
+
+      for (var doc in sitesSnapshot.docs) {
+        final data = doc.data();
+        final siteCode = (data['siteCode'] ?? data['siteId'])?.toString().trim();
+        final siteName = (data['siteName'] ?? data['projectName'])?.toString().trim();
+        var canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: doc.id,
+          siteCode: siteCode,
+          siteName: siteName,
+        );
+
+        if (!canonicalId.contains('_') && canonicalId.isNotEmpty) {
+          final resolved = await ExpenseService.resolveCanonicalSiteDocId(canonicalId);
+          if (resolved.isNotEmpty && resolved.contains('_')) {
+            canonicalId = resolved;
+          }
+        }
+
+        if (canonicalId.toUpperCase().startsWith('PR')) {
+          canonicalId = 'ST${canonicalId.substring(2)}';
+        }
+
+        if (canonicalId.isNotEmpty) {
+          rawSites.add({
+            'siteId': canonicalId,
+            'siteName': data['siteName']?.toString() ?? 'Unnamed Site',
+            'supervisor': data['supervisor']?.toString() ?? 'Not Available',
+            'supervisorId':
+                (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ??
+                    'Not Available',
+            'location': data['location']?.toString() ?? 'Not Available',
+            'projectStage': data['projectStage']?.toString() ?? 'Not Available',
+          });
+        }
+      }
+
+      final validIds = ExpenseService.sanitizeSiteIds(
+        rawSites.map((s) => s['siteId']!).where((id) => id.isNotEmpty),
+      ).where((id) => id.contains('_') && id.startsWith('ST')).toSet();
+
+      final Map<String, Map<String, String>> uniqueSites = {};
+      for (var s in rawSites) {
+        final id = s['siteId']!;
+        if (!validIds.contains(id)) continue;
+        if (!uniqueSites.containsKey(id)) {
+          uniqueSites[id] = Map.from(s);
+        } else {
+          final existing = uniqueSites[id]!;
+          for (var entry in s.entries) {
+            if ((existing[entry.key] == null ||
+                    existing[entry.key] == 'Not Available' ||
+                    existing[entry.key] == 'Unnamed Site') &&
+                entry.value.isNotEmpty &&
+                entry.value != 'Not Available' &&
+                entry.value != 'Unnamed Site') {
+              existing[entry.key] = entry.value;
+            }
+          }
+        }
+      }
+
+      siteList = uniqueSites.values.toList();
+      siteList.sort((a, b) => (a['siteId'] ?? '').compareTo(b['siteId'] ?? ''));
 
       if (siteList.isNotEmpty) {
-        selectedSiteId = siteList.first['siteId'];
+        if (selectedSiteId == null || !siteList.any((s) => s['siteId'] == selectedSiteId)) {
+          selectedSiteId = siteList.first['siteId'];
+        }
         _onSiteSelected(selectedSiteId!);
       }
     } catch (e) {
@@ -144,7 +238,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     }
   }
 
-  void _onSiteSelected(String siteId) {
+  Future<void> _onSiteSelected(String siteId) async {
     final site = siteList.firstWhere(
       (element) => element['siteId'] == siteId,
       orElse: () => {
@@ -172,26 +266,93 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       }
     });
 
+    if (supervisorName == 'Not Available' ||
+        supervisorName == null ||
+        supervisorName!.isEmpty ||
+        projectStage == 'Not Available' ||
+        projectStage == null ||
+        projectStage!.isEmpty ||
+        siteLocation == 'Not Available' ||
+        siteLocation == null ||
+        siteLocation!.isEmpty ||
+        supervisorId == 'Not Available' ||
+        supervisorId == null ||
+        supervisorId!.isEmpty) {
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      if (mounted && selectedSiteId == siteId) {
+        setState(() {
+          if (details.supervisor != null && details.supervisor!.isNotEmpty) {
+            supervisorName = details.supervisor;
+          }
+          if (details.supervisorId != null && details.supervisorId!.isNotEmpty) {
+            supervisorId = details.supervisorId;
+          }
+          if (details.location != null && details.location!.isNotEmpty) {
+            siteLocation = details.location;
+          }
+          if (details.projectStage != null && details.projectStage!.isNotEmpty) {
+            projectStage = details.projectStage;
+          }
+          if (details.projectName != null && details.projectName!.isNotEmpty) {
+            projectName = details.projectName;
+          }
+        });
+      }
+    }
+
     _fetchProjectNameForSite(siteId);
   }
 
   Future<void> _fetchProjectNameForSite(String siteId) async {
     try {
-      final query = await FirestoreService.siteSupervisorMap
-          .where('site', isEqualTo: siteId)
-          .limit(1)
-          .get();
-
-      if (query.docs.isNotEmpty) {
-        final data = query.docs.first.data();
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      if (details.projectName != null && details.projectName!.isNotEmpty) {
         if (mounted) {
           setState(() {
-            projectName = data['projectName']?.toString() ?? 'Not Available';
+            projectName = details.projectName;
           });
         }
-      } else {
-        if (mounted) setState(() => projectName = 'Not Available');
+        return;
       }
+
+      final keys = details.allKeys;
+      for (final key in keys) {
+        final query = await FirestoreService.siteSupervisorMap
+            .where('site', isEqualTo: key)
+            .limit(1)
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          final data = query.docs.first.data();
+          final pName = (data['projectName'] ?? data['siteName'])?.toString();
+          if (pName != null && pName.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                projectName = pName;
+              });
+            }
+            return;
+          }
+        }
+      }
+
+      for (final key in keys) {
+        final siteDoc = await FirestoreService.sites.doc(key).get();
+        if (siteDoc.exists && siteDoc.data() != null) {
+          final data = siteDoc.data()!;
+          final pName = (data['projectName'] ?? data['siteName'])?.toString();
+          if (pName != null && pName.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                projectName = pName;
+              });
+            }
+            return;
+          }
+        }
+      }
+
+      if (mounted) setState(() => projectName = 'Not Available');
     } catch (e) {
       if (mounted) setState(() => projectName = 'Not Available');
     }
@@ -405,9 +566,11 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     setState(() => isLoadingEntryDates = true);
 
     try {
+      final keys = (await ExpenseService.resolveSiteKeys(selectedSiteId!))
+          .take(10)
+          .toList();
       final snapshot = await FirestoreService.getCollection('ManagerSiteEntry')
-          .where('siteCode', isEqualTo: selectedSiteId)
-          .orderBy('createdAt', descending: true)
+          .where('siteCode', whereIn: keys)
           .get();
 
       _existingEntries = snapshot.docs.map((doc) {
@@ -424,6 +587,15 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
           'data': data,
         };
       }).toList();
+
+      _existingEntries.sort((a, b) {
+        final da = a['date'] as DateTime?;
+        final db = b['date'] as DateTime?;
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        return db.compareTo(da);
+      });
 
       if (!mounted) return;
 
@@ -879,7 +1051,9 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                         border: Border.all(color: const Color(0xFFCBD5E1)),
                                       ),
                                       child: DropdownButtonFormField<String>(
-                                        initialValue: selectedSiteId,
+                                        initialValue: siteList.any((s) => s['siteId'] == selectedSiteId)
+                                            ? selectedSiteId
+                                            : null,
                                         isExpanded: true,
                                         dropdownColor: Colors.white,
                                         iconEnabledColor: const Color(0xFF0A183D),
@@ -907,7 +1081,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                               (site) => DropdownMenuItem(
                                                 value: site['siteId'],
                                                 child: Text(
-                                                  '${site['siteId']} - ${site['siteName']}',
+                                                  site['siteId'] ?? '',
                                                   overflow: TextOverflow.ellipsis,
                                                   style: const TextStyle(
                                                     color: Color(0xFF0A183D),

@@ -1467,18 +1467,22 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
                         elevation: 2,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_rounded, size: 18),
-                          SizedBox(width: 6),
-                          Text('Add Material',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                        ],
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_rounded, size: 18),
+                            SizedBox(width: 6),
+                            Text('Add Material',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1716,18 +1720,22 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
                         elevation: 2,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_rounded, size: 18),
-                          SizedBox(width: 6),
-                          Text('Add Material',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                        ],
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_rounded, size: 18),
+                            SizedBox(width: 6),
+                            Text('Add Material',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                       ),
                     ),
                   ),

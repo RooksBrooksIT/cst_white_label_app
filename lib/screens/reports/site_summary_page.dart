@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:flutter/services.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import '/services/expense_service.dart';
 import '/utils/pdf_templates.dart';
 import '/utils/app_theme.dart';
 
@@ -207,24 +208,19 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, num>> fetchContractorAndIncentiveExpenses() async {
     try {
-      final query = await FirestoreService.getCollection(
-        'totalSiteExpensesPerDay',
-      ).where('siteId', isEqualTo: widget.siteId).get();
+      final canonicalDocId =
+          await ExpenseService.resolveCanonicalSiteDocId(widget.siteId);
 
       num totalContractorExpense = 0;
       num totalIncentiveExpenses = 0;
 
-      for (var doc in query.docs) {
-        final data = doc.data();
+      // Direct lookup by canonical document ID
+      final totalsDoc = await FirestoreService.getCollection(
+        'totalSiteExpensesPerDay',
+      ).doc(canonicalDocId).get();
 
-        // Filter by stage if provided
-        if (widget.projectStage != null) {
-          final docStage = (data['projectStage'] ?? data['projectField'])
-              ?.toString()
-              .trim();
-          if (docStage != widget.projectStage?.trim()) continue;
-        }
-
+      if (totalsDoc.exists && totalsDoc.data() != null) {
+        final data = totalsDoc.data()!;
         if (data['totalContractorExpense'] != null) {
           final value = data['totalContractorExpense'];
           if (value is int || value is double) {
@@ -245,6 +241,45 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
               value.replaceAll(RegExp(r'[^0-9.]'), ''),
             );
             if (parsed != null) totalIncentiveExpenses += parsed;
+          }
+        }
+      } else {
+        // Fallback query across siteId aliases
+        final query = await FirestoreService.getCollection(
+          'totalSiteExpensesPerDay',
+        ).where('siteId', isEqualTo: widget.siteId).get();
+
+        for (var doc in query.docs) {
+          final data = doc.data();
+
+          if (widget.projectStage != null) {
+            final docStage = (data['projectStage'] ?? data['projectField'])
+                ?.toString()
+                .trim();
+            if (docStage != widget.projectStage?.trim()) continue;
+          }
+
+          if (data['totalContractorExpense'] != null) {
+            final value = data['totalContractorExpense'];
+            if (value is int || value is double) {
+              totalContractorExpense += value;
+            } else if (value is String) {
+              final parsed = num.tryParse(
+                value.replaceAll(RegExp(r'[^0-9.]'), ''),
+              );
+              if (parsed != null) totalContractorExpense += parsed;
+            }
+          }
+          if (data['totalIncentiveExpenses'] != null) {
+            final value = data['totalIncentiveExpenses'];
+            if (value is int || value is double) {
+              totalIncentiveExpenses += value;
+            } else if (value is String) {
+              final parsed = num.tryParse(
+                value.replaceAll(RegExp(r'[^0-9.]'), ''),
+              );
+              if (parsed != null) totalIncentiveExpenses += parsed;
+            }
           }
         }
       }

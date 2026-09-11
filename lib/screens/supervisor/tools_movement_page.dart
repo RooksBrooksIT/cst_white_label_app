@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/auth_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/dialog_utils.dart';
 
@@ -260,18 +261,24 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     final location = (data['location'] ?? '').toString().trim();
     final site = (data['site'] ?? '').toString().trim();
     final siteId = (data['siteId'] ?? '').toString().trim();
+    final siteCode = (data['siteCode'] ?? data['SiteCode'] ?? '').toString().trim();
+    final siteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
 
-    // Prefer 'site' or 'siteId' if it does not match the full address/location
+    String raw = '';
     if (site.isNotEmpty && site != location) {
-      return site;
+      raw = site;
+    } else if (siteId.isNotEmpty && siteId != location) {
+      raw = siteId;
+    } else if (docId.isNotEmpty && docId != location) {
+      raw = docId.trim();
+    } else {
+      raw = site.isNotEmpty ? site : (siteId.isNotEmpty ? siteId : docId);
     }
-    if (siteId.isNotEmpty && siteId != location) {
-      return siteId;
-    }
-    if (docId.isNotEmpty && docId != location) {
-      return docId.trim();
-    }
-    return site.isNotEmpty ? site : (siteId.isNotEmpty ? siteId : docId);
+    return ExpenseService.formatCanonicalSiteId(
+      rawId: raw,
+      siteCode: siteCode.isNotEmpty ? siteCode : null,
+      siteName: siteName.isNotEmpty ? siteName : null,
+    );
   }
 
   Future<void> _fetchSitesData() async {
@@ -295,9 +302,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       try {
         final sitesSnapshot = await FirestoreService.getCollection('Site').get();
         for (var doc in sitesSnapshot.docs) {
-          final sId = doc.id.trim();
+          final data = doc.data();
+          final sId = ExpenseService.formatCanonicalSiteId(
+            rawId: doc.id.trim(),
+            siteCode: data['siteCode']?.toString(),
+            siteName: (data['siteName'] ?? data['projectName'])?.toString(),
+          );
           if (sId.isNotEmpty) {
-            final data = doc.data();
             final pName = (data['projectName'] ?? data['siteName'] ?? '').toString();
             final sup = (data['supervisorName'] ?? data['supervisor'] ?? '').toString();
 
@@ -309,42 +320,21 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                 siteMap[sId]!['supervisor'] = sup;
               }
             } else {
-              final existingMatch = ids.firstWhere(
-                (existing) => existing == sId || existing.startsWith('${sId}_') || sId.startsWith('${existing}_'),
-                orElse: () => '',
-              );
-              if (existingMatch.isNotEmpty) {
-                if (siteMap[existingMatch]!['projectName']!.isEmpty && pName.isNotEmpty) {
-                  siteMap[existingMatch]!['projectName'] = pName;
-                }
-                if (siteMap[existingMatch]!['supervisor']!.isEmpty && sup.isNotEmpty) {
-                  siteMap[existingMatch]!['supervisor'] = sup;
-                }
-              } else {
-                ids.add(sId);
-                siteMap[sId] = {
-                  'projectName': pName,
-                  'supervisor': sup,
-                };
-              }
+              ids.add(sId);
+              siteMap[sId] = {
+                'projectName': pName,
+                'supervisor': sup,
+              };
             }
           }
         }
       } catch (_) {}
 
-      // Deduplicate so shorter prefixes like 'ST001' don't duplicate 'ST001_shek'
-      final List<String> rawList = ids.toList();
-      final Set<String> cleanSet = {};
-      for (final id in rawList) {
-        bool hasMoreSpecific = rawList.any((other) => other != id && other.startsWith('${id}_'));
-        if (!hasMoreSpecific) {
-          cleanSet.add(id);
-        }
-      }
+      final sanitized = ExpenseService.sanitizeSiteIds(ids).toList()..sort();
 
       if (mounted) {
         setState(() {
-          _siteIds = cleanSet.toList()..sort();
+          _siteIds = sanitized;
           _siteDetailsMap = siteMap;
         });
       }
@@ -442,7 +432,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
     }
   }
 
-  void _onSiteSelected(String? siteId, bool isReturn) {
+  Future<void> _onSiteSelected(String? siteId, bool isReturn) async {
     if (siteId == null) return;
     final info = _siteDetailsMap[siteId] ?? {};
     var projectName = info['projectName'] ?? '';
@@ -462,20 +452,34 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       }
     }
 
-    setState(() {
-      if (isReturn) {
-        _returnSelectedSiteId = siteId;
-        _returnProjectNameController.text = projectName;
-        _returnSupervisorNameController.text = supervisor;
-        if (_returnSelectedTool != null) {
-          _fetchAvailableCountForReturnSelectedTool(_returnSelectedTool);
+    if (projectName.isEmpty || supervisor.isEmpty) {
+      try {
+        final details = await ExpenseService.resolveSiteDetails(siteId);
+        if (projectName.isEmpty && details.projectName != null) {
+          projectName = details.projectName!;
         }
-      } else {
-        _selectedSiteId = siteId;
-        _projectNameController.text = projectName;
-        _supervisorNameController.text = supervisor;
-      }
-    });
+        if (supervisor.isEmpty && details.supervisor != null) {
+          supervisor = details.supervisor!;
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() {
+        if (isReturn) {
+          _returnSelectedSiteId = siteId;
+          _returnProjectNameController.text = projectName;
+          _returnSupervisorNameController.text = supervisor;
+          if (_returnSelectedTool != null) {
+            _fetchAvailableCountForReturnSelectedTool(_returnSelectedTool);
+          }
+        } else {
+          _selectedSiteId = siteId;
+          _projectNameController.text = projectName;
+          _supervisorNameController.text = supervisor;
+        }
+      });
+    }
   }
 
   Future<void> _fetchAvailableCountForSelectedTool(String? toolId) async {
@@ -541,7 +545,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         final data = querySnapshot.data() as Map<String, dynamic>;
         final Map<String, dynamic> availableCountAtSites =
             Map<String, dynamic>.from(data['availableCountAtSites'] ?? {});
-        count = (availableCountAtSites[_returnSelectedSiteId] as int?) ?? 0;
+        final siteKeys = await ExpenseService.resolveSiteKeys(_returnSelectedSiteId!);
+        for (final key in siteKeys) {
+          if (availableCountAtSites.containsKey(key)) {
+            count = (availableCountAtSites[key] as int?) ?? 0;
+            break;
+          }
+        }
       }
       if (mounted) {
         setState(() => _returnSelectedToolAvailableCount = count);

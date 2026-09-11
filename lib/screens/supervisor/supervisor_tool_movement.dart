@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '/utils/responsive.dart';
 import '/services/firestore_service.dart';
 import '/services/notification_service.dart';
+import '/services/expense_service.dart';
 import '/widgets/glass_scaffold.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_text_field.dart';
@@ -65,12 +66,16 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
     for (var doc in snapshot.docs) {
       final data = doc.data();
       final site = data['site'];
-      if (site != null && site is String) {
-        siteSet.add(site);
+      if (site != null && site is String && site.trim().isNotEmpty) {
+        siteSet.add(ExpenseService.formatCanonicalSiteId(rawId: site.trim()));
       }
     }
+    final sanitized = ExpenseService.sanitizeSiteIds(siteSet).toList()..sort();
     setState(() {
-      _siteIds = siteSet.toList();
+      _siteIds = sanitized;
+      if (_selectedSiteId != null && !_siteIds.contains(_selectedSiteId)) {
+        _selectedSiteId = null;
+      }
     });
   }
 
@@ -121,19 +126,43 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   Future<void> _fetchAndSetProjectName(String? siteId) async {
     if (siteId == null || siteId.trim().isEmpty) return;
 
-    final snapshot = await FirestoreService
-        .getCollection('siteSupervisorMap')
-        .where('site', isEqualTo: siteId)
-        .limit(1)
-        .get();
+    final siteKeys = await ExpenseService.resolveSiteKeys(siteId);
+    for (final key in siteKeys) {
+      final snapshot = await FirestoreService
+          .getCollection('siteSupervisorMap')
+          .where('site', isEqualTo: key)
+          .limit(1)
+          .get();
 
-    if (snapshot.docs.isNotEmpty) {
-      final data = snapshot.docs.first.data();
-      setState(() {
-        _projectNameController.text = data['projectName'] ?? '';
-        _supervisorNameController.text = data['supervisor'] ?? '';
-      });
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        final pName = data['projectName']?.toString() ?? '';
+        final sup = data['supervisor']?.toString() ?? '';
+        if (pName.isNotEmpty || sup.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _projectNameController.text = pName;
+              _supervisorNameController.text = sup;
+            });
+          }
+          return;
+        }
+      }
     }
+
+    try {
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      if (mounted) {
+        setState(() {
+          if (details.projectName != null) {
+            _projectNameController.text = details.projectName!;
+          }
+          if (details.supervisor != null) {
+            _supervisorNameController.text = details.supervisor!;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchAvailableCountForSelectedTool(String? toolName) async {
@@ -306,6 +335,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
           .doc(docId)
           .set(data);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tools returned successfully')),
       );
@@ -332,6 +362,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
 
       _resetForm();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving return: $e')),
       );
@@ -523,7 +554,7 @@ class _SiteToCompanyReturnState extends State<SiteToCompanyReturn> {
   }) {
     final cs = Theme.of(context).colorScheme;
     return DropdownButtonFormField<String>(
-      initialValue: value,
+      initialValue: (value != null && items.contains(value)) ? value : null,
       onChanged: onChanged,
       isExpanded: true,
       dropdownColor: cs.surfaceContainerHighest,

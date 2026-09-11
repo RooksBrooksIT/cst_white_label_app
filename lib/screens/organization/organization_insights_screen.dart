@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/screens/reports/daily_site_report.dart';
 import 'package:ebricks/screens/reports/site_expenses_report_page.dart';
 import 'package:ebricks/screens/reports/site_summary_page.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/list_extensions.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
@@ -31,10 +32,18 @@ class SupervisorEntry {
   factory SupervisorEntry.fromFirestore(DocumentSnapshot doc) {
     if (doc.data() == null) return SupervisorEntry(supervisorId: '');
     final data = doc.data() as Map<String, dynamic>;
+    final rawSiteId = (data['siteId'] ?? '').toString();
+    final siteName = data['siteName']?.toString();
+    final siteCode = data['siteCode']?.toString();
+    final canonicalId = ExpenseService.formatCanonicalSiteId(
+      rawId: rawSiteId,
+      siteCode: siteCode,
+      siteName: siteName,
+    );
     return SupervisorEntry(
       supervisorId: data['supervisorId'] ?? '',
-      siteId: data['siteId'] ?? '',
-      siteName: data['siteName'],
+      siteId: canonicalId,
+      siteName: siteName,
       date: data['date'] != null
           ? (data['date'] is Timestamp
               ? (data['date'] as Timestamp).toDate()
@@ -78,25 +87,97 @@ class _OrganizationInsightsScreenState
 
   Future<List<SupervisorEntry>> _fetchSupervisorEntriesFromFirestore() async {
     try {
-      final querySnapshot = await FirestoreService.getCollection('siteSupervisorEntries').get();
-      final List<SupervisorEntry> entries = querySnapshot.docs
+      final querySnapshot =
+          await FirestoreService.getCollection('siteSupervisorEntries').get();
+      final List<SupervisorEntry> rawEntries = querySnapshot.docs
           .map((doc) => SupervisorEntry.fromFirestore(doc))
           .toList();
 
-      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
-      final Set<String> loggedSiteIds = entries
-          .where((e) => e.siteId != null && e.siteId!.isNotEmpty)
-          .map((e) => e.siteId!)
-          .toSet();
+      final List<SupervisorEntry> entries = [];
+      final Set<String> resolvedCanonicalSiteIds = {};
 
+      for (final e in rawEntries) {
+        final rawSite = e.siteId ?? '';
+        String canonicalSite = rawSite;
+        if (rawSite.isNotEmpty) {
+          if (rawSite.contains('_')) {
+            canonicalSite = ExpenseService.formatCanonicalSiteId(
+              rawId: rawSite,
+              siteName: e.siteName,
+            );
+          } else {
+            final res = await ExpenseService.resolveCanonicalSiteDocId(rawSite);
+            canonicalSite = res.isNotEmpty
+                ? res
+                : ExpenseService.formatCanonicalSiteId(
+                    rawId: rawSite,
+                    siteName: e.siteName,
+                  );
+          }
+        }
+
+        resolvedCanonicalSiteIds.add(canonicalSite);
+        entries.add(SupervisorEntry(
+          supervisorId: e.supervisorId,
+          siteId: canonicalSite,
+          siteName: e.siteName,
+          date: e.date,
+          amount: e.amount,
+          totalamount: e.totalamount,
+        ));
+      }
+
+      final sitesSnapshot = await FirestoreService.getCollection('Site').get();
       for (var doc in sitesSnapshot.docs) {
-        final sId = doc.id;
-        if (!loggedSiteIds.contains(sId)) {
-          final sData = doc.data();
+        final sData = doc.data();
+        final rawId = doc.id;
+        final siteCode = sData['siteCode']?.toString();
+        final siteName =
+            (sData['siteName'] ?? sData['projectName'])?.toString();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: rawId,
+          siteCode: siteCode,
+          siteName: siteName,
+        );
+        if (canonicalId.isNotEmpty &&
+            !resolvedCanonicalSiteIds.contains(canonicalId)) {
+          resolvedCanonicalSiteIds.add(canonicalId);
           entries.add(SupervisorEntry(
-            supervisorId: 'Not Assigned',
-            siteId: sId,
-            siteName: sData['siteName']?.toString() ?? sId,
+            supervisorId: sData['supervisor']?.toString() ??
+                sData['supervisorName']?.toString() ??
+                'Not Assigned',
+            siteId: canonicalId,
+            siteName: siteName ?? canonicalId,
+          ));
+        }
+      }
+
+      // Also add sites from siteSupervisorMap
+      final mapSnapshot =
+          await FirestoreService.getCollection('siteSupervisorMap').get();
+      for (var doc in mapSnapshot.docs) {
+        final data = doc.data();
+        final rawSite = (data['site'] ?? data['siteId'] ?? doc.id).toString();
+        final siteCode = data['siteCode']?.toString();
+        final siteName = (data['siteName'] ?? data['projectName'])?.toString();
+        String canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: rawSite,
+          siteCode: siteCode,
+          siteName: siteName,
+        );
+        if (!canonicalId.contains('_')) {
+          final res =
+              await ExpenseService.resolveCanonicalSiteDocId(canonicalId);
+          if (res.isNotEmpty) canonicalId = res;
+        }
+        if (canonicalId.isNotEmpty &&
+            !resolvedCanonicalSiteIds.contains(canonicalId)) {
+          resolvedCanonicalSiteIds.add(canonicalId);
+          entries.add(SupervisorEntry(
+            supervisorId:
+                (data['supervisor'] ?? data['Supervisor ID'] ?? '').toString(),
+            siteId: canonicalId,
+            siteName: siteName ?? canonicalId,
           ));
         }
       }
@@ -311,19 +392,23 @@ class _OrganizationInsightsScreenState
                 );
               }
               final supervisorEntries = snapshot.data!;
-              final uniqueSiteIds = supervisorEntries
+              final rawSiteIds = supervisorEntries
                   .where(
                       (entry) => entry.siteId != null && entry.siteId!.isNotEmpty)
                   .map((entry) => entry.siteId!)
-                  .toSet()
-                  .toList();
+                  .toSet();
+              final uniqueSiteIds =
+                  ExpenseService.sanitizeSiteIds(rawSiteIds).toList()..sort();
 
               if (uniqueSiteIds.isNotEmpty) {
-                selectedSupervisorEntry ??= supervisorEntries.firstWhereOrNull(
-                  (entry) => entry.siteId == uniqueSiteIds.first,
-                ) ?? supervisorEntries.firstOrNull;
+                if (selectedSupervisorEntry == null ||
+                    !uniqueSiteIds.contains(selectedSupervisorEntry!.siteId)) {
+                  selectedSupervisorEntry = supervisorEntries.firstWhereOrNull(
+                    (entry) => entry.siteId == uniqueSiteIds.first,
+                  ) ?? supervisorEntries.firstOrNull;
+                }
               } else {
-                selectedSupervisorEntry ??= supervisorEntries.firstOrNull;
+                selectedSupervisorEntry = supervisorEntries.firstOrNull;
               }
 
               return SingleChildScrollView(
@@ -364,13 +449,22 @@ class _OrganizationInsightsScreenState
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
-                            initialValue: selectedSupervisorEntry?.siteId,
+                            initialValue: (selectedSupervisorEntry?.siteId !=
+                                        null &&
+                                    uniqueSiteIds.contains(
+                                        selectedSupervisorEntry!.siteId))
+                                ? selectedSupervisorEntry!.siteId
+                                : (uniqueSiteIds.isNotEmpty
+                                    ? uniqueSiteIds.first
+                                    : null),
                             items: uniqueSiteIds.map((siteId) {
                               return DropdownMenuItem<String>(
                                 value: siteId,
                                 child: Text(
                                   siteId,
-                                  style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      color: colorScheme.onSurface),
                                 ),
                               );
                             }).toList(),
@@ -387,7 +481,8 @@ class _OrganizationInsightsScreenState
                             borderRadius: BorderRadius.circular(12),
                             elevation: 2,
                             isExpanded: true,
-                            icon: Icon(Icons.arrow_drop_down, color: colorScheme.primary),
+                            icon: Icon(Icons.arrow_drop_down,
+                                color: colorScheme.primary),
                             dropdownColor: theme.cardColor,
                           ),
                         ],

@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ebricks/screens/reports/financial_status_report.dart';
 import 'package:ebricks/screens/reports/project_indicator.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
 class ProjectFinancialStatusReportPage extends StatefulWidget {
@@ -39,13 +40,22 @@ class _ProjectFinancialStatusReportPageState
   Future<void> _fetchSiteIds() async {
     try {
       final snapshot = await FirestoreService.getCollection('projects').get();
-      final ids = snapshot.docs
-          .map((doc) => doc.data()['siteId']?.toString())
-          .where((v) => v != null && v.trim().isNotEmpty)
-          .map((v) => v!)
-          .toSet()
-          .toList();
-      ids.sort();
+      final rawIds = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            final rawSiteId = data['siteId']?.toString().trim();
+            final rawSiteName = data['siteName']?.toString().trim() ?? data['projectName']?.toString().trim();
+            return ExpenseService.formatCanonicalSiteId(
+              rawId: doc.id,
+              siteCode: rawSiteId,
+              siteName: rawSiteName,
+            );
+          })
+          .where((v) => v.isNotEmpty)
+          .toSet();
+
+      final validIds = ExpenseService.sanitizeSiteIds(rawIds);
+      final ids = validIds.toList()..sort();
       setState(() {
         siteIds = ids;
         isLoadingSites = false;
@@ -57,14 +67,24 @@ class _ProjectFinancialStatusReportPageState
 
   Future<void> _loadSiteDetails(String siteId) async {
     try {
-      final query = await FirestoreService.getCollection(
-        'projects',
-      ).where('siteId', isEqualTo: siteId).limit(1).get();
-      if (query.docs.isNotEmpty) {
-        final data = query.docs.first.data();
-        siteNameController.text = data['siteId']?.toString() ?? '';
-        projectNameController.text = data['projectName']?.toString() ?? '';
-        ownerNameController.text = data['ownerName']?.toString() ?? '';
+      final keys = await ExpenseService.resolveSiteKeys(siteId);
+      for (final key in keys) {
+        final query = await FirestoreService.getCollection(
+          'projects',
+        ).where('siteId', isEqualTo: key).limit(1).get();
+        if (query.docs.isNotEmpty) {
+          final data = query.docs.first.data();
+          siteNameController.text = siteId;
+          projectNameController.text = data['projectName']?.toString() ?? '';
+          ownerNameController.text = data['ownerName']?.toString() ?? '';
+          return;
+        }
+      }
+
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      siteNameController.text = siteId;
+      if (details.projectName != null && details.projectName!.isNotEmpty) {
+        projectNameController.text = details.projectName!;
       }
     } catch (e) {
       // Handle error quietly

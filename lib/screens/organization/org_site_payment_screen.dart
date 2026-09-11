@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
 class SitePaymentScreen extends StatefulWidget {
@@ -140,15 +141,33 @@ class SitePaymentScreenState extends State<SitePaymentScreen> {
 
       if (!mounted) return;
 
+      final rawSites = snapshot.docs.map<Map<String, String>>((doc) {
+        final data = doc.data();
+        final rawSiteCode = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+        final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? '').toString().trim();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: doc.id,
+          siteCode: rawSiteCode.isNotEmpty ? rawSiteCode : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+        );
+        return {
+          'id': canonicalId,
+          'display': canonicalId,
+        };
+      }).where((s) => s['id']!.isNotEmpty).toList();
+
+      final validIds = ExpenseService.sanitizeSiteIds(rawSites.map((s) => s['id']!));
+      final Map<String, Map<String, String>> uniqueSites = {};
+      for (var s in rawSites) {
+        final id = s['id']!;
+        if (!validIds.contains(id)) continue;
+        uniqueSites.putIfAbsent(id, () => s);
+      }
+      final sortedList = uniqueSites.values.toList()
+        ..sort((a, b) => a['id']!.compareTo(b['id']!));
+
       setState(() {
-        siteList = snapshot.docs.map<Map<String, String>>((doc) {
-          final data = doc.data();
-          final display = (data['siteName'] ?? doc.id).toString();
-          return {
-            'id': doc.id,
-            'display': '${doc.id} - $display',
-          };
-        }).toList();
+        siteList = sortedList;
       });
     } on TimeoutException catch (e) {
       debugPrint('Timeout fetching site IDs: $e');
@@ -218,6 +237,17 @@ class SitePaymentScreenState extends State<SitePaymentScreen> {
       String siteName = '';
       String? foundSupervisorRaw;
       String? foundSupervisorId;
+
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      if (details.supervisor != null && details.supervisor!.isNotEmpty) {
+        foundSupervisorRaw = details.supervisor;
+      }
+      if (details.supervisorId != null && details.supervisorId!.isNotEmpty) {
+        foundSupervisorId = details.supervisorId;
+      }
+      if (details.siteName.isNotEmpty) {
+        siteName = details.siteName;
+      }
 
       // 1. Check Site collection doc
       final siteDoc = await FirestoreService.getCollection('Site')
@@ -888,7 +918,9 @@ class SitePaymentScreenState extends State<SitePaymentScreen> {
       isTablet: isTablet,
       isMobile: isMobile,
       child: DropdownButtonFormField<String>(
-        initialValue: selectedSiteId,
+        initialValue: siteList.any((s) => s['id'] == selectedSiteId)
+            ? selectedSiteId
+            : null,
         isExpanded: true,
         dropdownColor: Colors.white,
         style: const TextStyle(

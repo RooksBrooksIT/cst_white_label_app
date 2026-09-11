@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '/services/firestore_service.dart';
+import '/services/expense_service.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -119,15 +120,35 @@ class _DailySiteExpensesReportPageState
       }).toList();
     }
 
-    final incentiveQuery =
+    String effectiveSiteId = widget.siteId ?? '';
+    if (widget.siteId != null && widget.siteId!.isNotEmpty) {
+      effectiveSiteId =
+          await ExpenseService.resolveCanonicalSiteDocId(widget.siteId!);
+    }
+
+    var incentiveQuery =
         await FirestoreService.getCollection('totalSiteExpensesPerDay')
-            .where('siteId', isEqualTo: widget.siteId)
+            .where('siteId', isEqualTo: effectiveSiteId)
             .where(
               'date',
               isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
             )
             .limit(1)
             .get();
+
+    if (incentiveQuery.docs.isEmpty &&
+        widget.siteId != null &&
+        widget.siteId != effectiveSiteId) {
+      incentiveQuery =
+          await FirestoreService.getCollection('totalSiteExpensesPerDay')
+              .where('siteId', isEqualTo: widget.siteId)
+              .where(
+                'date',
+                isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
+              )
+              .limit(1)
+              .get();
+    }
 
     DocumentSnapshot? filteredIncentiveDoc;
     if (incentiveQuery.docs.isNotEmpty) {

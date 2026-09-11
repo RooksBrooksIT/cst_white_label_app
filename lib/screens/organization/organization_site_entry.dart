@@ -117,25 +117,74 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       };
 
       final snapshot = await FirestoreService.siteSupervisorMap.get();
+      final List<Map<String, String>> rawSites = [];
 
-      siteList = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            final sId = data['site']?.toString() ?? '';
-            return {
-              'siteId': sId,
-              'siteName': siteNames[sId] ?? (data['siteName']?.toString() ?? 'Unnamed Site'),
-              'supervisor': data['supervisor']?.toString() ?? 'Not Available',
-              'supervisorId':
-                  (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ??
-                  'Not Available',
-              'location': data['location']?.toString() ?? 'Not Available',
-              'projectStage':
-                  data['projectStage']?.toString() ?? 'Not Available',
-            };
-          })
-          .where((site) => site['siteId']!.isNotEmpty)
-          .toList();
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final rawSiteCode = (data['siteCode'] ?? data['siteId'] ?? '').toString().trim();
+        final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? '').toString().trim();
+        final sDocId = (data['siteDocId'] ?? '').toString().trim();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: sDocId.isNotEmpty ? sDocId : doc.id,
+          siteCode: rawSiteCode.isNotEmpty ? rawSiteCode : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+        );
+
+        rawSites.add({
+          'siteId': canonicalId,
+          'siteName': siteNames[canonicalId] ?? (data['siteName']?.toString() ?? (rawSiteName.isNotEmpty ? rawSiteName : 'Unnamed Site')),
+          'supervisor': data['supervisor']?.toString() ?? 'Not Available',
+          'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ?? 'Not Available',
+          'location': data['location']?.toString() ?? 'Not Available',
+          'projectStage': data['projectStage']?.toString() ?? 'Not Available',
+        });
+      }
+
+      for (var doc in sitesSnapshot.docs) {
+        final data = doc.data();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: doc.id,
+          siteCode: data['siteCode']?.toString(),
+          siteName: data['siteName']?.toString(),
+        );
+
+        rawSites.add({
+          'siteId': canonicalId,
+          'siteName': data['siteName']?.toString() ?? 'Unnamed Site',
+          'supervisor': data['supervisor']?.toString() ?? 'Not Available',
+          'supervisorId': (data['Supervisor ID'] ?? data['supervisorId'])?.toString() ?? 'Not Available',
+          'location': data['location']?.toString() ?? 'Not Available',
+          'projectStage': data['projectStage']?.toString() ?? 'Not Available',
+        });
+      }
+
+      final validIds = ExpenseService.sanitizeSiteIds(
+        rawSites.map((s) => s['siteId']!).where((id) => id.isNotEmpty),
+      );
+
+      final Map<String, Map<String, String>> uniqueSites = {};
+      for (var s in rawSites) {
+        final id = s['siteId']!;
+        if (!validIds.contains(id)) continue;
+        if (!uniqueSites.containsKey(id)) {
+          uniqueSites[id] = Map.from(s);
+        } else {
+          final existing = uniqueSites[id]!;
+          for (var entry in s.entries) {
+            if ((existing[entry.key] == null ||
+                    existing[entry.key] == 'Not Available' ||
+                    existing[entry.key] == 'Unnamed Site') &&
+                entry.value.isNotEmpty &&
+                entry.value != 'Not Available' &&
+                entry.value != 'Unnamed Site') {
+              existing[entry.key] = entry.value;
+            }
+          }
+        }
+      }
+
+      siteList = uniqueSites.values.toList();
+      siteList.sort((a, b) => (a['siteId'] ?? '').compareTo(b['siteId'] ?? ''));
 
       if (siteList.isNotEmpty) {
         if (selectedSiteId == null || !siteList.any((s) => s['siteId'] == selectedSiteId)) {
@@ -154,7 +203,7 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
     }
   }
 
-  void _onSiteSelected(String siteId) {
+  Future<void> _onSiteSelected(String siteId) async {
     final site = siteList.firstWhere(
       (s) => s['siteId'] == siteId,
       orElse: () => {
@@ -173,6 +222,31 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
       projectStage = site['projectStage'];
       siteCode = siteId;
     });
+
+    if (supervisorName == 'Not Available' ||
+        supervisorName == null ||
+        supervisorName!.isEmpty ||
+        projectStage == 'Not Available' ||
+        projectStage == null ||
+        projectStage!.isEmpty) {
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      if (mounted && selectedSiteId == siteId) {
+        setState(() {
+          if (details['supervisor'] != null && details['supervisor']!.isNotEmpty) {
+            supervisorName = details['supervisor'];
+          }
+          if (details['supervisorId'] != null && details['supervisorId']!.isNotEmpty) {
+            supervisorId = details['supervisorId'];
+          }
+          if (details['location'] != null && details['location']!.isNotEmpty) {
+            siteLocation = details['location'];
+          }
+          if (details['projectStage'] != null && details['projectStage']!.isNotEmpty) {
+            projectStage = details['projectStage'];
+          }
+        });
+      }
+    }
   }
 
   Future<void> _fetchMaterialOptions() async {
@@ -582,6 +656,13 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
     setState(() {
       isSaving = true;
     });
+
+    final canonicalSite =
+        await ExpenseService.resolveCanonicalSiteDocId(siteCode);
+    if (canonicalSite.isNotEmpty) {
+      siteCode = canonicalSite;
+    }
+
     final dateStr = selectedDate != null
         ? DateFormat('ddMMyyyy').format(selectedDate!)
         : DateFormat('ddMMyyyy').format(DateTime.now());

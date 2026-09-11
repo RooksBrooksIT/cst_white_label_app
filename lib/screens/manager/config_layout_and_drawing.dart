@@ -1,4 +1,4 @@
-﻿import 'dart:io' show File;
+import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/app_storage_service.dart';
 import 'package:ebricks/services/subscription_limit_service.dart';
 import 'package:ebricks/screens/organization/pricing_screen.dart';
@@ -228,9 +229,16 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
       final Map<String, Map<String, dynamic>> supervisorMap = {};
       for (var doc in mapSnapshot.docs) {
         final data = doc.data();
-        final sId = data['site']?.toString() ?? doc.id;
-        if (sId.isNotEmpty) {
-          supervisorMap[sId] = data;
+        final rawSiteCode = (data['siteCode'] ?? data['siteId'] ?? '').toString().trim();
+        final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? '').toString().trim();
+        final sDocId = (data['siteDocId'] ?? '').toString().trim();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: sDocId.isNotEmpty ? sDocId : doc.id,
+          siteCode: rawSiteCode.isNotEmpty ? rawSiteCode : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
+        );
+        if (canonicalId.isNotEmpty) {
+          supervisorMap[canonicalId] = data;
         }
       }
 
@@ -241,24 +249,29 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
         final sId = data['siteId']?.toString();
         final pName = data['projectName']?.toString();
         if (sId != null && sId.isNotEmpty && pName != null && pName.isNotEmpty) {
+          final cId = ExpenseService.formatCanonicalSiteId(rawId: sId, siteName: pName);
+          projectNames[cId] = pName;
           projectNames[sId] = pName;
         }
       }
 
-      final Set<String> uniqueSiteIds = {};
-      final List<Map<String, String>> result = [];
+      final List<Map<String, String>> rawList = [];
 
       for (var doc in sitesSnapshot.docs) {
-        final sId = doc.id.trim();
-        if (sId.isNotEmpty && !uniqueSiteIds.contains(sId)) {
-          uniqueSiteIds.add(sId);
-          final mapping = supervisorMap[sId];
-          result.add({
-            'site': sId,
+        final data = doc.data();
+        final canonicalId = ExpenseService.formatCanonicalSiteId(
+          rawId: doc.id,
+          siteCode: data['siteCode']?.toString(),
+          siteName: data['siteName']?.toString(),
+        );
+        if (canonicalId.isNotEmpty) {
+          final mapping = supervisorMap[canonicalId];
+          rawList.add({
+            'site': canonicalId,
             'supervisor': mapping?['supervisor']?.toString() ?? '',
             'projectName': mapping?['projectName']?.toString() ??
-                projectNames[sId] ??
-                doc.data()['siteName']?.toString() ??
+                projectNames[canonicalId] ??
+                data['siteName']?.toString() ??
                 '',
             'projectStage': mapping?['projectStage']?.toString() ?? '',
           });
@@ -268,18 +281,33 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
       // Also supplement with any from siteSupervisorMap
       for (var entry in supervisorMap.entries) {
         final sId = entry.key;
-        if (!uniqueSiteIds.contains(sId)) {
-          uniqueSiteIds.add(sId);
-          final mapping = entry.value;
-          result.add({
-            'site': sId,
-            'supervisor': mapping['supervisor']?.toString() ?? '',
-            'projectName': mapping['projectName']?.toString() ?? projectNames[sId] ?? '',
-            'projectStage': mapping['projectStage']?.toString() ?? '',
-          });
+        final mapping = entry.value;
+        rawList.add({
+          'site': sId,
+          'supervisor': mapping['supervisor']?.toString() ?? '',
+          'projectName': mapping['projectName']?.toString() ?? projectNames[sId] ?? '',
+          'projectStage': mapping['projectStage']?.toString() ?? '',
+        });
+      }
+
+      final validIds = ExpenseService.sanitizeSiteIds(rawList.map((s) => s['site']!));
+      final Map<String, Map<String, String>> uniqueSites = {};
+      for (var s in rawList) {
+        final id = s['site']!;
+        if (!validIds.contains(id)) continue;
+        if (!uniqueSites.containsKey(id)) {
+          uniqueSites[id] = Map.from(s);
+        } else {
+          final existing = uniqueSites[id]!;
+          for (var entry in s.entries) {
+            if ((existing[entry.key] == null || existing[entry.key]!.isEmpty) && entry.value.isNotEmpty) {
+              existing[entry.key] = entry.value;
+            }
+          }
         }
       }
 
+      final result = uniqueSites.values.toList();
       result.sort((a, b) => (a['site'] ?? '').compareTo(b['site'] ?? ''));
       return result;
     } catch (e) {
@@ -316,6 +344,21 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
     _supervisorNameController.text = siteData['supervisor'] ?? '';
     _projectNameController.text = siteData['projectName'] ?? '';
     _projectPhaseController.text = siteData['projectStage'] ?? '';
+
+    if (_supervisorNameController.text.isEmpty || _projectNameController.text.isEmpty) {
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      if (mounted && _selectedSiteId == siteId) {
+        if (_supervisorNameController.text.isEmpty && details.supervisor != null) {
+          _supervisorNameController.text = details.supervisor!;
+        }
+        if (_projectNameController.text.isEmpty && details.projectName != null) {
+          _projectNameController.text = details.projectName!;
+        }
+        if (_projectPhaseController.text.isEmpty && details.projectStage != null) {
+          _projectPhaseController.text = details.projectStage!;
+        }
+      }
+    }
 
     // Fetch site drawing usage and previous drawing configs
     _fetchSiteDrawingUsage(siteId);
@@ -1402,7 +1445,9 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                             )
                           : DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: _selectedSiteId,
+                                value: _allSites.any((s) => s['site'] == _selectedSiteId)
+                                    ? _selectedSiteId
+                                    : null,
                                 isExpanded: true,
                                 hint: const Text(
                                   'Choose site for drawings...',
@@ -1411,11 +1456,10 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                                 icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
                                 items: _allSites.map((s) {
                                   final sId = s['site'] ?? '';
-                                  final pName = s['projectName'] ?? '';
                                   return DropdownMenuItem<String>(
                                     value: sId,
                                     child: Text(
-                                      pName.isNotEmpty ? '$sId - $pName' : sId,
+                                      sId,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 13.5,

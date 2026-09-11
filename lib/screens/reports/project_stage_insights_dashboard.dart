@@ -1,10 +1,11 @@
-﻿import 'package:ebricks/screens/supervisor/projectstage_daily_site_report.dart';
+import 'package:ebricks/screens/supervisor/projectstage_daily_site_report.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/screens/reports/project_stage_expenses_report_page.dart';
 import 'package:ebricks/screens/reports/project_stage_site_summary_report.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import '/widgets/glass_card.dart';
 import '/utils/responsive.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -31,10 +32,18 @@ class SupervisorEntry {
 
   factory SupervisorEntry.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final rawSiteId = (data['siteId'] ?? '').toString();
+    final siteCode = (data['siteCode'] ?? data['SiteCode'])?.toString();
+    final siteName = (data['siteName'] ?? data['projectName'])?.toString();
+    final canonicalSiteId = ExpenseService.formatCanonicalSiteId(
+      rawId: rawSiteId,
+      siteCode: siteCode,
+      siteName: siteName,
+    );
     return SupervisorEntry(
       supervisorId: data['supervisorId'] ?? '',
-      siteId: data['siteId'] ?? '',
-      siteName: data['siteName'],
+      siteId: canonicalSiteId,
+      siteName: siteName,
       date: data['date'] != null
           ? (data['date'] is Timestamp
                 ? (data['date'] as Timestamp).toDate()
@@ -71,15 +80,23 @@ class SiteSupervisorMapEntry {
 
   factory SiteSupervisorMapEntry.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final rawSite = (data['site'] ?? data['siteId'] ?? doc.id).toString();
+    final siteCode = (data['siteCode'] ?? data['SiteCode'])?.toString();
+    final siteName = (data['siteName'] ?? data['projectName'])?.toString();
+    final canonicalSite = ExpenseService.formatCanonicalSiteId(
+      rawId: rawSite,
+      siteCode: siteCode,
+      siteName: siteName,
+    );
     return SiteSupervisorMapEntry(
-      supervisorId: data['Supervisor ID'] ?? '',
-      joinedOn: data['joinedOn'] ?? '',
-      location: data['location'] ?? '',
-      projectName: data['projectName'] ?? '',
-      projectStage: data['projectStage'] ?? '',
-      site: data['site'] ?? '',
-      siteComments: data['siteComments'] ?? '',
-      supervisor: data['supervisor'] ?? '',
+      supervisorId: (data['Supervisor ID'] ?? data['supervisorId'] ?? '').toString(),
+      joinedOn: (data['joinedOn'] ?? '').toString(),
+      location: (data['location'] ?? '').toString(),
+      projectName: (data['projectName'] ?? siteName ?? '').toString(),
+      projectStage: (data['projectStage'] ?? '').toString(),
+      site: canonicalSite,
+      siteComments: (data['siteComments'] ?? '').toString(),
+      supervisor: (data['supervisor'] ?? '').toString(),
     );
   }
 }
@@ -137,14 +154,66 @@ class _ProjectstageInsightsDashboardState
 
   Future<void> _fetchAllSites() async {
     final siteEntries = await fetchAllSiteSupervisorMapEntries();
-    setState(() {
-      allSiteEntries = siteEntries;
-      allSiteIds = siteEntries.map((e) => e.site).toSet().toList();
-      if (allSiteIds.isNotEmpty && selectedSiteId == null) {
-        selectedSiteId = allSiteIds.first;
+    final Set<String> rawIds = {};
+    for (var e in siteEntries) {
+      String s = e.site;
+      if (s.isNotEmpty && !s.contains('_')) {
+        final resolved = await ExpenseService.resolveCanonicalSiteDocId(s);
+        if (resolved.isNotEmpty) s = resolved;
       }
-    });
-    await _fetchProjectStagesForSite(selectedSiteId);
+      if (s.isNotEmpty) rawIds.add(s);
+    }
+
+    try {
+      final siteSnap = await FirestoreService.getCollection('Site').get();
+      for (var doc in siteSnap.docs) {
+        final data = doc.data();
+        final code = data['siteCode']?.toString();
+        final name = (data['siteName'] ?? data['projectName'])?.toString();
+        final canonical = ExpenseService.formatCanonicalSiteId(
+          rawId: doc.id,
+          siteCode: code,
+          siteName: name,
+        );
+        if (canonical.isNotEmpty) rawIds.add(canonical);
+      }
+    } catch (e) {
+      debugPrint("Error fetching Site collection: $e");
+    }
+
+    try {
+      final projSnap = await FirestoreService.getCollection('projects').get();
+      for (var doc in projSnap.docs) {
+        final data = doc.data();
+        final rawSite =
+            (data['siteId'] ?? data['site'] ?? '').toString().trim();
+        final code = data['siteCode']?.toString();
+        final name = (data['siteName'] ?? data['projectName'])?.toString();
+        if (rawSite.isNotEmpty) {
+          final canonical = ExpenseService.formatCanonicalSiteId(
+            rawId: rawSite,
+            siteCode: code,
+            siteName: name,
+          );
+          if (canonical.isNotEmpty) rawIds.add(canonical);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching projects collection: $e");
+    }
+
+    final sanitizedIds = ExpenseService.sanitizeSiteIds(rawIds).toList()..sort();
+    if (mounted) {
+      setState(() {
+        allSiteEntries = siteEntries;
+        allSiteIds = sanitizedIds;
+        if (allSiteIds.isNotEmpty &&
+            (selectedSiteId == null || !allSiteIds.contains(selectedSiteId))) {
+          selectedSiteId = allSiteIds.first;
+        }
+      });
+      await _fetchProjectStagesForSite(selectedSiteId);
+    }
   }
 
   Future<void> _fetchProjectStagesForSite(String? siteId) async {
@@ -164,11 +233,12 @@ class _ProjectstageInsightsDashboardState
         'organizationEntries',
       ];
       Set<String> stageSet = {};
+      final siteKeys = (await ExpenseService.resolveSiteKeys(siteId)).toList();
 
       final futures = collections.map((collection) async {
         final snapshot = await FirestoreService.getCollection(
           collection,
-        ).where('siteId', isEqualTo: siteId).get();
+        ).where('siteId', whereIn: siteKeys).get();
         for (var doc in snapshot.docs) {
           final data = doc.data();
           final stage = data['projectStage'] ?? data['projectField'];
@@ -240,6 +310,7 @@ class _ProjectstageInsightsDashboardState
           : null;
       final start = fromDate;
       final end = toDate;
+      final siteKeys = (await ExpenseService.resolveSiteKeys(siteId)).toList();
 
       debugPrint(
         'ProjectstageInsights: Calculating cost for Site: $siteId, Stage: $stage, Type: $selectedReportType',
@@ -250,23 +321,26 @@ class _ProjectstageInsightsDashboardState
         if (collection == 'siteSupervisorEntries' &&
             selectedReportType == ReportType.dailyExpense &&
             formattedDateDMY != null) {
-          final docId = '${siteId}_$formattedDateDMY';
-          final doc = await FirestoreService.getCollection(
-            collection,
-          ).doc(docId).get();
-          if (doc.exists) {
-            final val = _toNum(doc.data()?['totalAmount']);
-            debugPrint(
-              'ProjectstageInsights: Found Supervisor Entry $docId: $val',
-            );
-            total += val;
+          for (final key in siteKeys) {
+            final docId = '${key}_$formattedDateDMY';
+            final doc = await FirestoreService.getCollection(
+              collection,
+            ).doc(docId).get();
+            if (doc.exists) {
+              final val = _toNum(doc.data()?['totalAmount']);
+              debugPrint(
+                'ProjectstageInsights: Found Supervisor Entry $docId: $val',
+              );
+              total += val;
+              break;
+            }
           }
           continue;
         }
 
         Query<Map<String, dynamic>> query = FirestoreService.getCollection(
           collection,
-        ).where('siteId', isEqualTo: siteId);
+        ).where('siteId', whereIn: siteKeys);
 
         // Apply date filter for other collections in daily mode
         if (selectedReportType == ReportType.dailyExpense &&
@@ -393,7 +467,14 @@ class _ProjectstageInsightsDashboardState
     final entriesForSite = siteSupervisorEntries.isNotEmpty
         ? siteSupervisorEntries
         : _allSupervisorEntriesCached!
-              .where((e) => e.siteId == selectedSiteId)
+              .where((e) {
+                if (e.siteId == null) return false;
+                if (e.siteId == selectedSiteId) return true;
+                final normalized = e.siteId!.toUpperCase().startsWith('PR')
+                    ? 'ST${e.siteId!.substring(2)}'
+                    : e.siteId;
+                return normalized == selectedSiteId;
+              })
               .toList();
 
     if (selectedProjectStage == null) {
@@ -503,7 +584,13 @@ class _ProjectstageInsightsDashboardState
     final currentSupervisorId =
         selectedSupervisorEntry?.supervisorId ??
         allSiteEntries
-            .where((e) => e.site == selectedSiteId)
+            .where((e) {
+              if (e.site == selectedSiteId) return true;
+              final normalized = e.site.toUpperCase().startsWith('PR')
+                  ? 'ST${e.site.substring(2)}'
+                  : e.site;
+              return normalized == selectedSiteId;
+            })
             .firstOrNull
             ?.supervisorId ??
         '';
@@ -661,7 +748,12 @@ class _ProjectstageInsightsDashboardState
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
-                            initialValue: selectedSiteId,
+                            initialValue: (selectedSiteId != null &&
+                                    allSiteIds.contains(selectedSiteId))
+                                ? selectedSiteId
+                                : (allSiteIds.isNotEmpty
+                                    ? allSiteIds.first
+                                    : null),
                             items: allSiteIds.map((siteId) {
                               return DropdownMenuItem<String>(
                                 value: siteId,
@@ -978,8 +1070,12 @@ class _ProjectstageInsightsDashboardState
           selectedDate!.month,
           selectedDate!.day,
         );
-        return (entry.siteId?.trim().toLowerCase() ?? '') ==
-                (selectedSiteId?.trim().toLowerCase() ?? '') &&
+        final eSite = entry.siteId?.trim().toLowerCase() ?? '';
+        final sSite = selectedSiteId?.trim().toLowerCase() ?? '';
+        final matches = eSite == sSite ||
+            (eSite.startsWith('pr') &&
+                eSite.replaceFirst('pr', 'st') == sSite);
+        return matches &&
             (entry.projectStage?.trim() == selectedProjectStage?.trim()) &&
             (entryDate == selectedDateOnly);
       }).toList();
