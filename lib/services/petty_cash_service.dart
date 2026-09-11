@@ -124,9 +124,17 @@ class PettyCashService {
             siteName: sName,
           );
 
+          final pId = (data['projectId'] ?? data['project_id'] ?? data['project'] ?? '').toString().trim();
+          final pName = (data['projectName'] ?? data['project_name'] ?? data['project'] ?? '').toString().trim();
+
           if (canonicalId.isNotEmpty && !seenSiteIds.contains(canonicalId.toLowerCase())) {
             seenSiteIds.add(canonicalId.toLowerCase());
-            assignedSites.add({'siteId': canonicalId, 'siteName': sName});
+            assignedSites.add({
+              'siteId': canonicalId,
+              'siteName': sName,
+              if (pId.isNotEmpty) 'projectId': pId,
+              if (pName.isNotEmpty) 'projectName': pName,
+            });
           }
         }
       }
@@ -139,6 +147,8 @@ class PettyCashService {
           final rawId = (data['siteId'] ?? doc.id).toString().trim();
           final sName = (data['siteName'] ?? data['name'] ?? rawId).toString().trim();
           final sCode = (data['siteCode'] ?? data['SiteCode'])?.toString().trim();
+          final pId = (data['projectId'] ?? data['project_id'] ?? data['project'] ?? '').toString().trim();
+          final pName = (data['projectName'] ?? data['project_name'] ?? data['project'] ?? '').toString().trim();
           final canonicalId = ExpenseService.formatCanonicalSiteId(
             rawId: rawId,
             siteCode: sCode,
@@ -146,7 +156,12 @@ class PettyCashService {
           );
           if (canonicalId.isNotEmpty && !seenSiteIds.contains(canonicalId.toLowerCase())) {
             seenSiteIds.add(canonicalId.toLowerCase());
-            assignedSites.add({'siteId': canonicalId, 'siteName': sName});
+            assignedSites.add({
+              'siteId': canonicalId,
+              'siteName': sName,
+              if (pId.isNotEmpty) 'projectId': pId,
+              if (pName.isNotEmpty) 'projectName': pName,
+            });
           }
         }
       }
@@ -264,7 +279,7 @@ class PettyCashService {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. REQUEST LIFECYCLE: STAGE 1 (SUBMIT)
+  // 3. REQUEST LIFECYCLE: STAGE 1 (SUPERVISOR SUBMIT & MANAGER MANUAL INITIATION)
   // ---------------------------------------------------------------------------
 
   /// Supervisor submits a new Petty Cash Request or Replenishment Request.
@@ -277,13 +292,18 @@ class PettyCashService {
     String? managerId,
     String? managerName,
     bool isReplenishment = false,
-    String? siteId,
-    String? siteName,
+    String? projectId,
+    String? projectName,
+    required String siteId,
+    required String siteName,
     String? linkedSitePaymentId,
     String? linkedSitePaymentTitle,
   }) async {
     if (requestedAmount <= 0) {
       throw Exception('Requested amount must be greater than zero.');
+    }
+    if (siteId.trim().isEmpty) {
+      throw Exception('Site selection is mandatory for petty cash requests.');
     }
 
     final orgId = FirestoreService.currentOrgId;
@@ -350,13 +370,20 @@ class PettyCashService {
       requestId: reqDocId,
       orgId: orgId,
       requestType: requestType,
+      requestSource: 'REQUEST_BASED',
       supervisorId: supervisorId,
       supervisorName: supervisorName,
       managerId: resolvedManagerId.isNotEmpty ? resolvedManagerId : account.managerId,
       managerName: resolvedManagerName.isNotEmpty ? resolvedManagerName : account.managerName,
+      projectId: projectId,
+      projectName: projectName,
+      siteId: siteId,
+      siteName: siteName,
       requestedAmount: requestedAmount,
       approvedAmount: 0.0,
       allocatedAmount: 0.0,
+      totalSpent: 0.0,
+      remainingBalance: 0.0,
       reason: reason,
       remarks: remarks ?? '',
       status: ApprovalWorkflowService.statusPendingManagerReview,
@@ -365,8 +392,6 @@ class PettyCashService {
       currentBalanceAtRequest: account.availableBalance,
       totalAllocatedAtRequest: account.totalAllocated,
       totalUsedAtRequest: account.totalUsed,
-      siteId: siteId,
-      siteName: siteName,
       linkedSitePaymentId: linkedSitePaymentId,
       linkedSitePaymentTitle: linkedSitePaymentTitle,
       approvalHistory: [auditEntry],
@@ -409,7 +434,7 @@ class PettyCashService {
         ? '🔄 Petty Cash Replenishment Request'
         : '💰 New Petty Cash Request';
     final body =
-        '$supervisorName requested $formattedAmt for petty cash. Reason: $reason';
+        '$supervisorName requested $formattedAmt for site $siteName. Reason: $reason';
 
     await NotificationService.notifyManagerAndOrganisation(
       title: title,
@@ -428,7 +453,134 @@ class PettyCashService {
       extraData: {
         'requestedAmount': requestedAmount,
         'requestType': requestType,
+        'requestSource': 'REQUEST_BASED',
         'supervisorId': supervisorId,
+        'siteId': siteId,
+        'siteName': siteName,
+      },
+    );
+
+    return reqDocId;
+  }
+
+  /// Manager manually creates and sends Petty Cash for a Supervisor & Site.
+  /// This allocation requires mandatory Organization approval before funds become active.
+  Future<String> managerCreateManualAllocation({
+    required String managerId,
+    required String managerName,
+    required String supervisorId,
+    required String supervisorName,
+    required String siteId,
+    required String siteName,
+    String? projectId,
+    String? projectName,
+    required double amount,
+    required String reason,
+    String? remarks,
+  }) async {
+    if (amount <= 0) {
+      throw Exception('Petty cash amount must be greater than zero.');
+    }
+    if (siteId.trim().isEmpty) {
+      throw Exception('Site selection is mandatory for petty cash allocation.');
+    }
+    if (supervisorId.trim().isEmpty) {
+      throw Exception('Supervisor selection is mandatory.');
+    }
+
+    final orgId = FirestoreService.currentOrgId;
+
+    final account = await getOrCreateAccount(
+      supervisorId: supervisorId,
+      supervisorName: supervisorName,
+      managerId: managerId,
+      managerName: managerName,
+    );
+
+    final reqDocId =
+        'PCM_${DateTime.now().millisecondsSinceEpoch}_${supervisorId.replaceAll(RegExp(r'\W'), '')}';
+
+    final auditEntry = ApprovalWorkflowService.createAuditEntry(
+      step: '1. Manager Manual Allocation',
+      action: 'Manual Petty Cash Initiated',
+      actorRole: 'Manager',
+      actorName: managerName,
+      actorId: managerId,
+      remarks: reason,
+    );
+
+    final now = DateTime.now();
+    final request = PettyCashRequest(
+      requestId: reqDocId,
+      orgId: orgId,
+      requestType: 'MANUAL_MANAGER',
+      requestSource: 'MANUAL_MANAGER',
+      supervisorId: supervisorId,
+      supervisorName: supervisorName,
+      managerId: managerId,
+      managerName: managerName,
+      projectId: projectId,
+      projectName: projectName,
+      siteId: siteId,
+      siteName: siteName,
+      requestedAmount: amount,
+      approvedAmount: amount,
+      allocatedAmount: amount,
+      totalSpent: 0.0,
+      remainingBalance: 0.0,
+      reason: reason,
+      remarks: remarks ?? '',
+      status: ApprovalWorkflowService.statusPendingOrgApproval,
+      statusDisplay: 'Pending Organization Approval',
+      currentStep: 2,
+      currentBalanceAtRequest: account.availableBalance,
+      totalAllocatedAtRequest: account.totalAllocated,
+      totalUsedAtRequest: account.totalUsed,
+      managerReviewedBy: managerName,
+      managerReviewedAt: now,
+      managerReviewRemarks: reason,
+      approvalHistory: [auditEntry],
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    final requestMap = request.toMap();
+    requestMap['createdAt'] = Timestamp.fromDate(now);
+    requestMap['updatedAt'] = Timestamp.fromDate(now);
+
+    await FirestoreService.pettyCashRequests.doc(reqDocId).set(requestMap);
+
+    await _writeAuditLog(
+      action: 'MANUAL_ALLOCATION_CREATED',
+      entityType: 'REQUEST',
+      entityId: reqDocId,
+      actorId: managerId,
+      actorName: managerName,
+      actorRole: 'Manager',
+      newState: requestMap,
+    );
+
+    // Notify Organization for authorization
+    final formattedAmt = formatCurrency(amount);
+    await NotificationService.notifyOrganisation(
+      title: '🏢 Manual Petty Cash Awaiting Approval',
+      body:
+          'Manager $managerName initiated $formattedAmt manual petty cash for $supervisorName on site $siteName. HQ approval required.',
+      requestType: 'petty_cash',
+      requestId: reqDocId,
+      docId: reqDocId,
+      status: ApprovalWorkflowService.statusPendingOrgApproval,
+      senderRole: 'Manager',
+      senderName: managerName,
+      remarks: reason,
+      requiredAction: 'Action Required: HQ Authorization',
+      extraData: {
+        'requestedAmount': amount,
+        'requestSource': 'MANUAL_MANAGER',
+        'supervisorName': supervisorName,
+        'supervisorId': supervisorId,
+        'siteName': siteName,
+        'siteId': siteId,
       },
     );
 
@@ -508,6 +660,8 @@ class PettyCashService {
         'requestedAmount': req.requestedAmount,
         'supervisorName': req.supervisorName,
         'supervisorId': req.supervisorId,
+        'siteName': req.siteName,
+        'siteId': req.siteId,
       },
     );
   }
@@ -578,11 +732,91 @@ class PettyCashService {
     );
   }
 
+  /// Manager allocates / releases approved funds for a Petty Cash request.
+  Future<void> managerAllocatePettyCash({
+    required String requestId,
+    required String managerName,
+    String? managerId,
+    required double allocationAmount,
+    String? remarks,
+  }) async {
+    if (allocationAmount <= 0) {
+      throw Exception('Allocation amount must be greater than zero.');
+    }
+
+    final docRef = FirestoreService.pettyCashRequests.doc(requestId);
+    final snap = await docRef.get();
+    if (!snap.exists || snap.data() == null) {
+      throw Exception('Request #$requestId not found.');
+    }
+
+    final req = PettyCashRequest.fromMap(requestId, snap.data()!);
+
+    final auditEntry = ApprovalWorkflowService.createAuditEntry(
+      step: '4. Manager Fund Release',
+      action: 'Funds Released by Manager',
+      actorRole: 'Manager',
+      actorName: managerName,
+      actorId: managerId,
+      remarks: 'Released ${formatCurrency(allocationAmount)}. Remarks: ${remarks ?? ''}',
+    );
+
+    final updates = {
+      'status': ApprovalWorkflowService.statusAwaitingConfirmation,
+      'statusDisplay': 'Awaiting Receipt Confirmation',
+      'currentStep': 4,
+      'allocatedAmount': allocationAmount,
+      'allocatedBy': managerName,
+      'allocatedAt': FieldValue.serverTimestamp(),
+      'approvalHistory': FieldValue.arrayUnion([auditEntry]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    await docRef.update(updates);
+
+    await _writeAuditLog(
+      action: 'MANAGER_ALLOCATED',
+      entityType: 'REQUEST',
+      entityId: requestId,
+      actorId: managerId ?? '',
+      actorName: managerName,
+      actorRole: 'Manager',
+      previousState: {'status': req.status},
+      newState: updates,
+    );
+
+    // Notify Supervisor to confirm receipt
+    final formattedAmt = formatCurrency(allocationAmount);
+    await NotificationService.notifySupervisor(
+      supervisorName: req.supervisorName,
+      supervisorId: req.supervisorId,
+      title: '💵 Petty Cash Released – Confirm Receipt',
+      body:
+          'Manager $managerName released $formattedAmt petty cash for site ${req.siteName ?? ""}. Please confirm once you have physically received the cash.',
+      requestType: 'petty_cash',
+      requestId: requestId,
+      docId: requestId,
+      status: ApprovalWorkflowService.statusAwaitingConfirmation,
+      senderRole: 'Manager',
+      senderName: managerName,
+      remarks: remarks,
+      requiredAction: 'Action Required: Confirm Physical Cash Receipt',
+      extraData: {
+        'allocatedAmount': allocationAmount,
+        'supervisorName': req.supervisorName,
+        'supervisorId': req.supervisorId,
+        'siteId': req.siteId,
+        'siteName': req.siteName,
+      },
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // 5. REQUEST LIFECYCLE: STAGE 3 (ORGANIZATION APPROVAL / REJECTION)
   // ---------------------------------------------------------------------------
 
   /// Organization authorizes the request with an approved amount.
+  /// Directly moves to awaiting receipt confirmation by the Supervisor.
   Future<void> orgApproveRequest({
     required String requestId,
     required String orgUserName,
@@ -613,10 +847,13 @@ class PettyCashService {
     );
 
     final updates = {
-      'status': ApprovalWorkflowService.statusPendingManagerClearance,
-      'statusDisplay': 'Pending Manager Allocation',
-      'currentStep': 3,
+      'status': ApprovalWorkflowService.statusAwaitingConfirmation,
+      'statusDisplay': 'Awaiting Receipt Confirmation',
+      'currentStep': 4,
       'approvedAmount': approvedAmount,
+      'allocatedAmount': approvedAmount,
+      'allocatedBy': orgUserName,
+      'allocatedAt': FieldValue.serverTimestamp(),
       'orgApprovedBy': orgUserName,
       'orgApprovalRemarks': remarks,
       'orgApprovedAt': FieldValue.serverTimestamp(),
@@ -637,25 +874,45 @@ class PettyCashService {
       newState: updates,
     );
 
-    // Notify Manager that request is authorized and ready for allocation
+    // Notify Supervisor to confirm receipt
+    final formattedAmt = formatCurrency(approvedAmount);
+    await NotificationService.notifySupervisor(
+      supervisorName: req.supervisorName,
+      supervisorId: req.supervisorId,
+      title: '💵 Petty Cash Approved – Confirm Receipt',
+      body:
+          'HQ approved $formattedAmt petty cash for site ${req.siteName ?? ""}. Please confirm once you have physically received the cash.',
+      requestType: 'petty_cash',
+      requestId: requestId,
+      docId: requestId,
+      status: ApprovalWorkflowService.statusAwaitingConfirmation,
+      senderRole: 'Organization',
+      senderName: orgUserName,
+      remarks: remarks,
+      requiredAction: 'Action Required: Confirm Physical Cash Receipt',
+      extraData: {
+        'approvedAmount': approvedAmount,
+        'allocatedAmount': approvedAmount,
+        'supervisorName': req.supervisorName,
+        'supervisorId': req.supervisorId,
+        'siteId': req.siteId,
+        'siteName': req.siteName,
+      },
+    );
+
+    // Notify Manager
     await NotificationService.notifyManager(
       title: '✅ Petty Cash Authorized by HQ',
       body:
-          'HQ authorized ${formatCurrency(approvedAmount)} for ${req.supervisorName}. Manager clearance required to allocate funds.',
+          'HQ authorized $formattedAmt for ${req.supervisorName} on site ${req.siteName ?? ""}. Awaiting supervisor confirmation.',
       forManagerName: req.managerName,
       requestType: 'petty_cash',
       requestId: requestId,
       docId: requestId,
-      status: ApprovalWorkflowService.statusPendingManagerClearance,
+      status: ApprovalWorkflowService.statusAwaitingConfirmation,
       senderRole: 'Organization',
       senderName: orgUserName,
       remarks: remarks,
-      requiredAction: 'Action Required: Manager Cash Allocation',
-      extraData: {
-        'approvedAmount': approvedAmount,
-        'supervisorName': req.supervisorName,
-        'supervisorId': req.supervisorId,
-      },
     );
   }
 
@@ -743,138 +1000,13 @@ class PettyCashService {
   }
 
   // ---------------------------------------------------------------------------
-  // 6. REQUEST LIFECYCLE: STAGE 4 (MANAGER ALLOCATION - AWAITING RECEIPT)
-  // ---------------------------------------------------------------------------
-
-  /// Manager allocates the approved petty cash amount to the Supervisor.
-  /// The amount is marked as allocated, but is NOT yet added to availableBalance.
-  /// It awaits physical receipt confirmation from the Supervisor.
-  Future<void> managerAllocatePettyCash({
-    required String requestId,
-    required String managerName,
-    String? managerId,
-    required double allocationAmount,
-    String? remarks,
-  }) async {
-    if (allocationAmount <= 0) {
-      throw Exception('Allocation amount must be greater than zero.');
-    }
-
-    final firestore = FirebaseFirestore.instance;
-    final reqRef = FirestoreService.pettyCashRequests.doc(requestId);
-
-    // Variables captured during transaction to trigger outside notifications safely
-    late final String supervisorId;
-    late final String supervisorName;
-    late final bool isReplenishment;
-
-    await firestore.runTransaction((txn) async {
-      final reqSnap = await txn.get(reqRef);
-      if (!reqSnap.exists || reqSnap.data() == null) {
-        throw Exception('Request #$requestId not found.');
-      }
-
-      final reqData = reqSnap.data()!;
-      final currentStatus = reqData['status']?.toString() ?? '';
-      if (currentStatus != ApprovalWorkflowService.statusPendingManagerClearance &&
-          currentStatus != 'org_approved') {
-        throw Exception(
-          'Request cannot be allocated. Current status: $currentStatus. Organization approval is required first.',
-        );
-      }
-
-      final approvedAmount = (reqData['approvedAmount'] is num)
-          ? (reqData['approvedAmount'] as num).toDouble()
-          : (reqData['requestedAmount'] as num).toDouble();
-
-      if (allocationAmount > approvedAmount) {
-        throw Exception(
-          'Allocation amount (${formatCurrency(allocationAmount)}) cannot exceed approved amount (${formatCurrency(approvedAmount)}).',
-        );
-      }
-
-      supervisorId = (reqData['supervisorId'] ?? '').toString();
-      supervisorName = (reqData['supervisorName'] ?? 'Supervisor').toString();
-      isReplenishment = reqData['requestType'] == 'REPLENISHMENT';
-
-      final auditEntry = ApprovalWorkflowService.createAuditEntry(
-        step: '4. Manager Allocation',
-        action: isReplenishment ? 'Replenishment Allocated' : 'Petty Cash Allocated',
-        actorRole: 'Manager',
-        actorName: managerName,
-        actorId: managerId,
-        remarks:
-            'Allocated ${formatCurrency(allocationAmount)} to $supervisorName (Awaiting physical receipt confirmation). Remarks: ${remarks ?? 'Allocated & Awaiting Receipt'}',
-      );
-
-      // 1. Update Request Doc -> status: awaiting_confirmation
-      txn.update(reqRef, {
-        'status': ApprovalWorkflowService.statusAwaitingConfirmation,
-        'statusDisplay': 'Awaiting Receipt Confirmation',
-        'currentStep': 4,
-        'allocatedAmount': allocationAmount,
-        'allocatedBy': managerName,
-        'allocatedAt': FieldValue.serverTimestamp(),
-        'approvalHistory': FieldValue.arrayUnion([auditEntry]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      // 2. Create Audit Log Entry
-      final logRef = FirestoreService.pettyCashAuditLogs.doc();
-      final auditLog = PettyCashAuditLog(
-        logId: logRef.id,
-        action: isReplenishment
-            ? 'REPLENISHMENT_ALLOCATED_AWAITING_RECEIPT'
-            : 'CASH_ALLOCATED_AWAITING_RECEIPT',
-        entityType: 'REQUEST',
-        entityId: requestId,
-        actorId: managerId ?? '',
-        actorName: managerName,
-        actorRole: 'Manager',
-        previousState: {'status': currentStatus},
-        newState: {
-          'status': ApprovalWorkflowService.statusAwaitingConfirmation,
-          'allocatedAmount': allocationAmount,
-          'allocatedBy': managerName,
-        },
-        metadata: {'requestId': requestId, 'supervisorId': supervisorId},
-        timestamp: DateTime.now(),
-      );
-
-      txn.set(logRef, auditLog.toMap());
-    });
-
-    // Notify Supervisor in real time that cash has been allocated and awaits confirmation
-    final formattedAmt = formatCurrency(allocationAmount);
-    await NotificationService.notifySupervisor(
-      supervisorName: supervisorName,
-      supervisorId: supervisorId,
-      title: '💵 Petty Cash Allocated – Confirm Receipt',
-      body:
-          '$formattedAmt has been allocated by Manager $managerName. Please confirm once you have physically received the cash.',
-      requestType: 'petty_cash',
-      requestId: requestId,
-      docId: requestId,
-      status: ApprovalWorkflowService.statusAwaitingConfirmation,
-      senderRole: 'Manager',
-      senderName: managerName,
-      remarks: remarks,
-      requiredAction: 'Action Required: Confirm Physical Cash Receipt',
-      extraData: {
-        'allocatedAmount': allocationAmount,
-        'status': ApprovalWorkflowService.statusAwaitingConfirmation,
-      },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 6b. SUPERVISOR CONFIRMS AMOUNT RECEIVED (BALANCE ACTIVATION)
+  // 6. SUPERVISOR CONFIRMS AMOUNT RECEIVED (BALANCE ACTIVATION)
   // ---------------------------------------------------------------------------
 
   /// Supervisor confirms physical receipt of the allocated petty cash.
   /// This action is atomic and idempotent: repeated clicks cannot double-credit.
-  /// Credits available balance, creates ledger transaction, logs audit entry,
-  /// and notifies the Manager in real time.
+  /// Credits available balance, initializes site allocation balance, creates ledger transaction,
+  /// logs audit entry, and notifies Manager & Org.
   Future<void> supervisorConfirmAmountReceived({
     required String requestId,
     required String supervisorId,
@@ -889,6 +1021,8 @@ class PettyCashService {
     late final String managerId;
     late final String managerName;
     late final String txnId;
+    String? reqSiteId;
+    String? reqSiteName;
     bool alreadyConfirmed = false;
 
     await firestore.runTransaction((txn) async {
@@ -916,10 +1050,10 @@ class PettyCashService {
         );
       }
 
-      allocationAmount = (reqData['allocatedAmount'] is num)
-          ? (reqData['allocatedAmount'] as num).toDouble()
-          : (reqData['approvedAmount'] is num)
-              ? (reqData['approvedAmount'] as num).toDouble()
+      allocationAmount = (reqData['approvedAmount'] is num && (reqData['approvedAmount'] as num) > 0)
+          ? (reqData['approvedAmount'] as num).toDouble()
+          : (reqData['allocatedAmount'] is num && (reqData['allocatedAmount'] as num) > 0)
+              ? (reqData['allocatedAmount'] as num).toDouble()
               : (reqData['requestedAmount'] as num).toDouble();
 
       if (allocationAmount <= 0) {
@@ -929,10 +1063,29 @@ class PettyCashService {
       final isReplenishment = reqData['requestType'] == 'REPLENISHMENT';
       managerId = (reqData['managerId'] ?? '').toString();
       managerName = (reqData['allocatedBy'] ?? reqData['managerName'] ?? 'Manager').toString();
+      reqSiteId = reqData['siteId']?.toString();
+      reqSiteName = reqData['siteName']?.toString();
 
       final cleanSupId = supervisorId.trim().toLowerCase();
       final accountRef = FirestoreService.pettyCashAccounts.doc(cleanSupId);
       final accountSnap = await txn.get(accountRef);
+
+      // Read linked site payment / entry before performing any writes
+      final linkedSitePaymentId = reqData['linkedSitePaymentId']?.toString();
+      DocumentReference<Map<String, dynamic>>? linkedDocRefToUpdate;
+      if (linkedSitePaymentId != null && linkedSitePaymentId.isNotEmpty) {
+        final entryRef = FirestoreService.getCollection('siteSupervisorEntries').doc(linkedSitePaymentId);
+        final entrySnap = await txn.get(entryRef);
+        if (entrySnap.exists) {
+          linkedDocRefToUpdate = entryRef;
+        } else {
+          final paymentRef = FirestoreService.getCollection('siteSupervisorPayments').doc(linkedSitePaymentId);
+          final paymentSnap = await txn.get(paymentRef);
+          if (paymentSnap.exists) {
+            linkedDocRefToUpdate = paymentRef;
+          }
+        }
+      }
 
       double prevAllocated = 0.0;
       double prevUsed = 0.0;
@@ -971,7 +1124,9 @@ class PettyCashService {
         remarks: remarks ?? 'Physically received ${formatCurrency(allocationAmount)} in cash.',
       );
 
-      // 1. Update Request Doc to Received / Active
+      // --- ALL WRITES PERFORMED HERE (AFTER ALL READS COMPLETED) ---
+
+      // 1. Update Request Doc to Received / Active with initialized remainingBalance
       txn.update(reqRef, {
         'status': ApprovalWorkflowService.statusReceived,
         'statusDisplay': 'Received / Active',
@@ -979,11 +1134,13 @@ class PettyCashService {
         'receivedAt': FieldValue.serverTimestamp(),
         'receivedBySupervisorId': supervisorId,
         'receivedBySupervisorName': supervisorName,
+        'remainingBalance': allocationAmount,
+        'totalSpent': 0.0,
         'approvalHistory': FieldValue.arrayUnion([auditEntry]),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Update Account Doc (Now crediting availableBalance and totalAllocated)
+      // 2. Update Account Doc (crediting availableBalance and totalAllocated)
       txn.set(
         accountRef,
         {
@@ -1007,29 +1164,28 @@ class PettyCashService {
       );
 
       // 3. Create Inflow Ledger Transaction
-      final linkedSitePaymentId = reqData['linkedSitePaymentId']?.toString();
-      final reqSiteId = reqData['siteId']?.toString();
-      final reqSiteName = reqData['siteName']?.toString();
-
       final txnRef = FirestoreService.pettyCashTransactions.doc(txnId);
       final transactionRecord = PettyCashTransaction(
         transactionId: txnId,
         idempotencyKey: 'RECV_${requestId}_${allocationAmount.toInt()}',
+        pettyCashId: requestId,
         accountId: cleanSupId,
         orgId: FirestoreService.currentOrgId,
         supervisorId: supervisorId,
         supervisorName: supervisorName,
         managerId: managerId,
         managerName: managerName,
+        projectId: reqData['projectId']?.toString(),
+        projectName: reqData['projectName']?.toString(),
         siteId: reqSiteId,
         siteName: reqSiteName,
         linkedSitePaymentId: linkedSitePaymentId,
-        isSiteExpense: reqSiteId != null && reqSiteId.isNotEmpty,
+        isSiteExpense: reqSiteId != null && reqSiteId!.isNotEmpty,
         transactionType: isReplenishment ? 'REPLENISHMENT' : 'ALLOCATION',
         expenseCategory: isReplenishment ? 'Replenishment' : 'Initial Allocation',
         description: isReplenishment
-            ? 'Petty cash replenishment received and confirmed by $supervisorName'
-            : 'Initial petty cash allocation received and confirmed by $supervisorName',
+            ? 'Petty cash replenishment received and confirmed for site ${reqSiteName ?? ""}'
+            : 'Initial petty cash allocation received and confirmed for site ${reqSiteName ?? ""}',
         amount: allocationAmount,
         previousBalance: prevAvailable,
         newBalance: newAvailableBalance,
@@ -1042,34 +1198,18 @@ class PettyCashService {
 
       txn.set(txnRef, transactionRecord.toMap());
 
-      // Update linked Site Payment status if present
-      if (linkedSitePaymentId != null && linkedSitePaymentId.isNotEmpty) {
-        final entryRef = FirestoreService.getCollection('siteSupervisorEntries').doc(linkedSitePaymentId);
-        final entrySnap = await txn.get(entryRef);
-        if (entrySnap.exists) {
-          txn.update(entryRef, {
-            'fundedViaPettyCash': true,
-            'pettyCashRequestId': requestId,
-            'pettyCashStatus': 'disbursed',
-            'pettyCashConfirmedAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        } else {
-          final paymentRef = FirestoreService.getCollection('siteSupervisorPayments').doc(linkedSitePaymentId);
-          final paymentSnap = await txn.get(paymentRef);
-          if (paymentSnap.exists) {
-            txn.update(paymentRef, {
-              'fundedViaPettyCash': true,
-              'pettyCashRequestId': requestId,
-              'pettyCashStatus': 'disbursed',
-              'pettyCashConfirmedAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-        }
+      // 4. Update linked Site Payment status if present
+      if (linkedDocRefToUpdate != null) {
+        txn.update(linkedDocRefToUpdate, {
+          'fundedViaPettyCash': true,
+          'pettyCashRequestId': requestId,
+          'pettyCashStatus': 'disbursed',
+          'pettyCashConfirmedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       }
 
-      // 4. Create Audit Log Entry
+      // 5. Create Audit Log Entry
       final logRef = FirestoreService.pettyCashAuditLogs.doc();
       final auditLog = PettyCashAuditLog(
         logId: logRef.id,
@@ -1094,6 +1234,8 @@ class PettyCashService {
         metadata: {
           'requestId': requestId,
           'txnId': txnId,
+          'siteId': reqSiteId ?? '',
+          'siteName': reqSiteName ?? '',
           if (linkedSitePaymentId != null) 'linkedSitePaymentId': linkedSitePaymentId,
         },
         timestamp: DateTime.now(),
@@ -1110,7 +1252,7 @@ class PettyCashService {
     await NotificationService.notifyManagerAndOrganisation(
       title: '🤝 Petty Cash Receipt Confirmed',
       body:
-          'Supervisor $supervisorName confirmed receipt of $formattedAmt petty cash. Available balance: $formattedBal.',
+          'Supervisor $supervisorName confirmed receipt of $formattedAmt petty cash for site ${reqSiteName ?? ""}. Available balance: $formattedBal.',
       requestType: 'petty_cash',
       requestId: requestId,
       docId: requestId,
@@ -1127,25 +1269,30 @@ class PettyCashService {
         'newBalance': newAvailableBalance,
         'supervisorId': supervisorId,
         'supervisorName': supervisorName,
+        'siteId': reqSiteId,
+        'siteName': reqSiteName,
         'receivedAt': DateTime.now().toIso8601String(),
       },
     );
   }
 
   // ---------------------------------------------------------------------------
-  // 7. EXPENSE RECORDING: ATOMIC BALANCE DEDUCTION & 10% THRESHOLD MONITOR
+  // 7. EXPENSE RECORDING: SITE-WISE & ATOMIC BALANCE DEDUCTION
   // ---------------------------------------------------------------------------
 
-  /// Records a petty cash expense (Site-wise or Other Expense).
-  /// Fully atomic Firestore transaction with negative balance protection,
-  /// idempotency protection, and 10% low-balance trigger.
+  /// Records a petty cash expense against a specific site and petty cash allocation.
+  /// Deducts from the specific allocation's remainingBalance and the supervisor's overall account.
   Future<PettyCashTransaction> recordExpense({
     required String supervisorId,
     required String supervisorName,
+    String? pettyCashId, // Target parent PettyCashRequest.requestId
     String? managerId,
     String? managerName,
+    String? projectId,
+    String? projectName,
     String? siteId,
     String? siteName,
+    String? vendorName,
     required bool isSiteExpense,
     required String expenseCategory,
     required String description,
@@ -1212,11 +1359,43 @@ class PettyCashService {
           ? (accountData['availableBalance'] as num).toDouble()
           : (currentAllocated - currentUsed);
 
-      // PREVENT NEGATIVE BALANCE: Server-side validation
+      // PREVENT NEGATIVE BALANCE on supervisor account
       if (amount > currentAvailable) {
         throw Exception(
           'Insufficient petty cash balance. Available balance: ${formatCurrency(currentAvailable)}.',
         );
+      }
+
+      // If a specific parent PettyCashRequest ID is provided, check and calculate its allocation balance
+      DocumentReference<Map<String, dynamic>>? targetReqRef;
+      double? newReqSpent;
+      double? newReqRemaining;
+      if (pettyCashId != null && pettyCashId.trim().isNotEmpty) {
+        targetReqRef = FirestoreService.pettyCashRequests.doc(pettyCashId.trim());
+        final reqSnap = await txn.get(targetReqRef);
+        if (reqSnap.exists && reqSnap.data() != null) {
+          final reqData = reqSnap.data()!;
+          final double reqAllocated = (reqData['approvedAmount'] is num && (reqData['approvedAmount'] as num) > 0)
+              ? (reqData['approvedAmount'] as num).toDouble()
+              : (reqData['allocatedAmount'] is num && (reqData['allocatedAmount'] as num) > 0)
+                  ? (reqData['allocatedAmount'] as num).toDouble()
+                  : (reqData['requestedAmount'] as num).toDouble();
+          final double reqSpent = (reqData['totalSpent'] is num)
+              ? (reqData['totalSpent'] as num).toDouble()
+              : 0.0;
+          final double reqRemaining = (reqData['remainingBalance'] is num)
+              ? (reqData['remainingBalance'] as num).toDouble()
+              : (reqAllocated - reqSpent).clamp(0.0, double.infinity);
+
+          if (amount > reqRemaining) {
+            throw Exception(
+              'Insufficient balance in selected allocation #$pettyCashId. Available in allocation: ${formatCurrency(reqRemaining)}.',
+            );
+          }
+
+          newReqSpent = reqSpent + amount;
+          newReqRemaining = (reqRemaining - amount).clamp(0.0, double.infinity);
+        }
       }
 
       final double newBalance = (currentAvailable - amount).clamp(0.0, double.infinity);
@@ -1246,14 +1425,18 @@ class PettyCashService {
       createdTxn = PettyCashTransaction(
         transactionId: txnId,
         idempotencyKey: safeIdempotencyKey,
+        pettyCashId: pettyCashId,
         accountId: cleanSupId,
         orgId: FirestoreService.currentOrgId,
         supervisorId: supervisorId,
         supervisorName: supervisorName,
         managerId: managerId ?? (accountData['managerId'] ?? '').toString(),
         managerName: managerName ?? (accountData['managerName'] ?? '').toString(),
-        siteId: isSiteExpense ? siteId : null,
-        siteName: isSiteExpense ? siteName : null,
+        projectId: projectId,
+        projectName: projectName,
+        siteId: isSiteExpense ? siteId : (siteId ?? ''),
+        siteName: isSiteExpense ? siteName : (siteName ?? ''),
+        vendorName: vendorName,
         isSiteExpense: isSiteExpense,
         transactionType: 'EXPENSE',
         expenseCategory: expenseCategory,
@@ -1269,11 +1452,22 @@ class PettyCashService {
         createdAt: DateTime.now(),
       );
 
-      // 1. Write Transaction doc
+      // --- ALL WRITES PERFORMED HERE (AFTER ALL READS COMPLETED) ---
+
+      // 1. Update target PettyCashRequest doc if present
+      if (targetReqRef != null && newReqSpent != null && newReqRemaining != null) {
+        txn.update(targetReqRef, {
+          'totalSpent': newReqSpent,
+          'remainingBalance': newReqRemaining,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // 2. Write Transaction doc
       final txnRef = FirestoreService.pettyCashTransactions.doc(txnId);
       txn.set(txnRef, createdTxn.toMap());
 
-      // 2. Update Account doc
+      // 3. Update Account doc
       txn.update(accountRef, {
         'totalUsed': newTotalUsed,
         'availableBalance': newBalance,
@@ -1299,8 +1493,10 @@ class PettyCashService {
           'lowBalanceTriggered': alreadyTriggered || shouldNotifyLowBalance,
         },
         metadata: {
+          'pettyCashId': pettyCashId ?? '',
           'isSiteExpense': isSiteExpense,
           'siteId': siteId ?? '',
+          'siteName': siteName ?? '',
           'category': expenseCategory,
         },
         timestamp: DateTime.now(),
@@ -1310,7 +1506,6 @@ class PettyCashService {
 
     // -------------------------------------------------------------------------
     // 10% LOW-BALANCE NOTIFICATION TRIGGER
-    // Dispatched only when the threshold is crossed, exactly once per cycle!
     // -------------------------------------------------------------------------
     if (shouldNotifyLowBalance) {
       final formattedBal = formatCurrency(resultingBalance);
@@ -1351,6 +1546,38 @@ class PettyCashService {
     }
 
     return createdTxn;
+  }
+
+  /// Streams active received/confirmed petty cash allocations for a supervisor.
+  Stream<List<PettyCashRequest>> streamActiveSiteAllocations({
+    required String supervisorId,
+    String? siteId,
+  }) {
+    final cleanSupId = supervisorId.trim().toLowerCase();
+    final filterSiteId = (siteId ?? '').trim().toLowerCase();
+
+    return FirestoreService.pettyCashRequests.snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => PettyCashRequest.fromMap(d.id, d.data()))
+          .where((r) {
+            final matchSup = r.supervisorId.trim().toLowerCase() == cleanSupId;
+            final isConfirmed = r.isReceived && r.effectiveRemainingBalance > 0;
+            if (!matchSup || !isConfirmed) return false;
+            if (filterSiteId.isNotEmpty) {
+              final rSiteId = (r.siteId ?? '').trim().toLowerCase();
+              return rSiteId == filterSiteId || rSiteId.contains(filterSiteId);
+            }
+            return true;
+          })
+          .toList();
+
+      list.sort((a, b) {
+        final tA = a.receivedAt ?? a.orgApprovedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final tB = b.receivedAt ?? b.orgApprovedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return tB.compareTo(tA);
+      });
+      return list;
+    });
   }
 
   // ---------------------------------------------------------------------------

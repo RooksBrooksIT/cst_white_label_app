@@ -1039,36 +1039,48 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Request Type Badge & Requested Amount
+          // Header: Request Type & Source Badges + Requested Amount
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: req.isReplenishment
-                      ? const Color(0xFFF0FDFA)
-                      : const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: req.isReplenishment
-                        ? const Color(0xFF99F6E4)
-                        : const Color(0xFFBFDBFE),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: req.isManualManager
+                          ? const Color(0xFFFAF5FF)
+                          : (req.isReplenishment
+                              ? const Color(0xFFF0FDFA)
+                              : const Color(0xFFEFF6FF)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: req.isManualManager
+                            ? const Color(0xFFE9D5FF)
+                            : (req.isReplenishment
+                                ? const Color(0xFF99F6E4)
+                                : const Color(0xFFBFDBFE)),
+                      ),
+                    ),
+                    child: Text(
+                      req.isManualManager
+                          ? 'MANAGER ALLOCATION'
+                          : (req.isReplenishment ? 'REPLENISHMENT' : 'SUPERVISOR REQUEST'),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: req.isManualManager
+                            ? const Color(0xFF7E22CE)
+                            : (req.isReplenishment
+                                ? const Color(0xFF0F766E)
+                                : const Color(0xFF1D4ED8)),
+                      ),
+                    ),
                   ),
-                ),
-                child: Text(
-                  req.isReplenishment ? 'REPLENISHMENT' : 'INITIAL ALLOCATION',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: req.isReplenishment
-                        ? const Color(0xFF0F766E)
-                        : const Color(0xFF1D4ED8),
-                  ),
-                ),
+                ],
               ),
               Text(
-                PettyCashService.formatCurrency(req.requestedAmount),
+                PettyCashService.formatCurrency(req.requestedAmount > 0 ? req.requestedAmount : req.allocatedAmount),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
@@ -1086,7 +1098,57 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
               color: Color(0xFF334155),
             ),
           ),
-          if (req.isSitePaymentLinked || (req.siteName != null && req.siteName!.isNotEmpty)) ...[
+          // Site & Project Badges
+          if (req.siteName != null || req.siteId != null || req.projectName != null) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (req.siteName != null || req.siteId != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_city_rounded, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${req.siteName ?? req.siteId}',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (req.projectName != null && req.projectName!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.apartment_rounded, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          req.projectName!,
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (req.isSitePaymentLinked) ...[
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1111,6 +1173,30 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (req.isReceived) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Spent: ${PettyCashService.formatCurrency(req.totalSpent)}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF166534)),
+                  ),
+                  Text(
+                    'Balance: ${PettyCashService.formatCurrency(req.effectiveRemainingBalance)}',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
                   ),
                 ],
               ),
@@ -1413,11 +1499,15 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
+  final TextEditingController _vendorController = TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
 
   bool _isSiteExpense = true;
   String? _selectedSiteId;
   String? _selectedSiteName;
+  String? _selectedProjectId;
+  String? _selectedProjectName;
+  String? _selectedPettyCashId;
   String _selectedCategory = 'Office & Site Supplies';
   DateTime _selectedDate = DateTime.now();
   bool _isSubmitting = false;
@@ -1430,15 +1520,18 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
     'Loading & Unloading',
     'Fuel & Utilities',
     'Hardware & Fasteners',
-    'Other Expenses',
+    'Other / Miscellaneous',
   ];
 
   @override
   void initState() {
     super.initState();
     if (widget.assignedSites.isNotEmpty) {
-      _selectedSiteId = widget.assignedSites.first['siteId'];
-      _selectedSiteName = widget.assignedSites.first['siteName'];
+      final first = widget.assignedSites.first;
+      _selectedSiteId = first['siteId'];
+      _selectedSiteName = first['siteName'];
+      _selectedProjectId = first['projectId'];
+      _selectedProjectName = first['projectName'];
     }
   }
 
@@ -1446,6 +1539,7 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
   void dispose() {
     _amountController.dispose();
     _descController.dispose();
+    _vendorController.dispose();
     _remarksController.dispose();
     super.dispose();
   }
@@ -1461,391 +1555,480 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
         final currentAccount = snapshot.data;
         final availableBalance = currentAccount?.availableBalance ?? 0.0;
 
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        return StreamBuilder<List<PettyCashRequest>>(
+          stream: PettyCashService().streamActiveSiteAllocations(
+            supervisorId: widget.supervisorId,
+            siteId: _isSiteExpense ? _selectedSiteId : null,
           ),
-          padding: EdgeInsets.fromLTRB(20, 16, 20, bottomInset + 20),
-          child: SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle pill
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
+          builder: (context, allocSnap) {
+            final activeAllocations = allocSnap.data ?? [];
+            
+            // Auto-select first active allocation if current selection is invalid
+            if (_selectedPettyCashId == null && activeAllocations.isNotEmpty) {
+              _selectedPettyCashId = activeAllocations.first.requestId;
+            } else if (_selectedPettyCashId != null &&
+                !activeAllocations.any((a) => a.requestId == _selectedPettyCashId)) {
+              _selectedPettyCashId = activeAllocations.isNotEmpty ? activeAllocations.first.requestId : null;
+            }
 
-                  // Modal Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            final currentAlloc = activeAllocations.firstWhere(
+              (a) => a.requestId == _selectedPettyCashId,
+              orElse: () => activeAllocations.isNotEmpty ? activeAllocations.first : PettyCashRequest(
+                requestId: '',
+                supervisorId: '',
+                supervisorName: '',
+                requestedAmount: 0,
+                allocatedAmount: 0,
+                reason: '',
+                status: 'pending_manager_review',
+                createdAt: DateTime.now(),
+              ),
+            );
+
+            final maxSpendable = currentAlloc.requestId.isNotEmpty
+                ? currentAlloc.effectiveRemainingBalance
+                : availableBalance;
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, bottomInset + 20),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Record Petty Cash Expense',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF0F172A),
+                      // Handle pill
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 20),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
+                      const SizedBox(height: 14),
 
-                  // Available Balance Indicator Pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Available Balance:',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                      // Modal Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Record Petty Cash Expense',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+
+                      // Balance Indicator Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        Text(
-                          PettyCashService.formatCurrency(availableBalance),
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F172A),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              currentAlloc.requestId.isNotEmpty ? 'Site Allocation Balance:' : 'Overall Available:',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                            ),
+                            Text(
+                              PettyCashService.formatCurrency(maxSpendable),
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (widget.unconfirmedRequests.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFBEB),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFF59E0B)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Awaiting Confirmation',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF92400E),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'You have ${PettyCashService.formatCurrency(widget.unconfirmedRequests.first.allocatedAmount > 0 ? widget.unconfirmedRequests.first.allocatedAmount : widget.unconfirmedRequests.first.requestedAmount)} allocated awaiting physical receipt confirmation.',
+                                      style: const TextStyle(fontSize: 11, color: Color(0xFF78350F), height: 1.3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  if (widget.unconfirmedRequests.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFF59E0B)),
+                      const SizedBox(height: 14),
+
+                      // 1. Toggle: Site Expense vs Other Expense
+                      const Text(
+                        'Expense Type',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 6),
+                      Row(
                         children: [
-                          const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
-                          const SizedBox(width: 8),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Awaiting Confirmation',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF92400E),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'You have ${PettyCashService.formatCurrency(widget.unconfirmedRequests.first.allocatedAmount > 0 ? widget.unconfirmedRequests.first.allocatedAmount : widget.unconfirmedRequests.first.requestedAmount)} allocated by your Manager. This amount is awaiting physical receipt confirmation and cannot be used for expenses until confirmed.',
-                                  style: const TextStyle(fontSize: 11, color: Color(0xFF78350F), height: 1.3),
-                                ),
-                              ],
+                            child: _buildTypeToggle(
+                              title: 'Site Expense',
+                              icon: Icons.location_city_rounded,
+                              isSelected: _isSiteExpense,
+                              onTap: () => setState(() {
+                                _isSiteExpense = true;
+                                if (_selectedCategory == 'Other / Miscellaneous') {
+                                  _selectedCategory = 'Office & Site Supplies';
+                                }
+                              }),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-
-                  // 1. Toggle: Site Expense vs Other Expense
-                  const Text(
-                    'Expense Type',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTypeToggle(
-                          title: 'Site Expense',
-                          icon: Icons.location_city_rounded,
-                          isSelected: _isSiteExpense,
-                          onTap: () => setState(() => _isSiteExpense = true),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildTypeToggle(
-                          title: 'Other Expense',
-                          icon: Icons.miscellaneous_services_rounded,
-                          isSelected: !_isSiteExpense,
-                          onTap: () => setState(() => _isSiteExpense = false),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 2. Site Dropdown (Visible only when Site Expense is chosen)
-                  if (_isSiteExpense) ...[
-                    const Text(
-                      'Assigned Site',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                    ),
-                    const SizedBox(height: 6),
-                    widget.isLoadingSites
-                        ? const LinearProgressIndicator()
-                        : widget.assignedSites.isEmpty
-                            ? Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFFBEB),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFFEF3C7)),
-                                ),
-                                child: const Text(
-                                  'No sites currently assigned. Please select "Other Expense" or contact your manager.',
-                                  style: TextStyle(fontSize: 12, color: Color(0xFFB45309)),
-                                ),
-                              )
-                            : DropdownButtonFormField<String>(
-                                initialValue: _selectedSiteId,
-                                isExpanded: true,
-                                decoration: _buildInputDecoration(hint: 'Select Site', icon: Icons.domain_rounded),
-                                items: widget.assignedSites.map((s) {
-                                  return DropdownMenuItem<String>(
-                                    value: s['siteId'],
-                                    child: Text(
-                                      '${s['siteName']} (${s['siteId']})',
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedSiteId = val;
-                                    final found = widget.assignedSites.firstWhere(
-                                      (s) => s['siteId'] == val,
-                                      orElse: () => {'siteId': val ?? '', 'siteName': val ?? ''},
-                                    );
-                                    _selectedSiteName = found['siteName'];
-                                  });
-                                },
-                                validator: (val) {
-                                  if (_isSiteExpense && (val == null || val.isEmpty)) {
-                                    return 'Please select a site';
-                                  }
-                                  return null;
-                                },
-                              ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  // 3. Expense Category Dropdown
-                  const Text(
-                    'Category',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                  ),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedCategory,
-                    isExpanded: true,
-                    decoration: _buildInputDecoration(hint: 'Select Category', icon: Icons.category_rounded),
-                    items: _categories.map((cat) {
-                      return DropdownMenuItem<String>(
-                        value: cat,
-                        child: Text(cat, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      );
-                    }).toList(),
-                    onChanged: (val) => setState(() => _selectedCategory = val ?? _categories.first),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 4. Description (Required)
-                  const Text(
-                    'Description *',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                  ),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _descController,
-                    decoration: _buildInputDecoration(
-                      hint: 'e.g. Nails, Binding wire, Travel to site',
-                      icon: Icons.description_outlined,
-                    ),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) {
-                        return 'Description is required';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 5. Amount Input & Dynamic Balance Validation
-                  const Text(
-                    'Amount (₹) *',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                  ),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                    ],
-                    decoration: _buildInputDecoration(
-                      hint: '0.00',
-                      icon: Icons.currency_rupee_rounded,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) {
-                        return 'Amount is required';
-                      }
-                      final n = double.tryParse(val.trim());
-                      if (n == null || n <= 0) {
-                        return 'Enter a valid amount greater than 0';
-                      }
-                      if (n > availableBalance) {
-                        return 'Insufficient balance. Available: ${PettyCashService.formatCurrency(availableBalance)}';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  // Dynamic Balance Preview
-                  Builder(builder: (context) {
-                    final enteredAmount = double.tryParse(_amountController.text.trim()) ?? 0.0;
-                    if (enteredAmount > 0) {
-                      final rem = availableBalance - enteredAmount;
-                      final isDeficit = rem < 0;
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          isDeficit
-                              ? '⚠️ Exceeds balance by ${PettyCashService.formatCurrency(-rem)}'
-                              : 'Remaining balance after expense: ${PettyCashService.formatCurrency(rem)}',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: isDeficit ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                          ),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  }),
-                  const SizedBox(height: 14),
-
-                  // 6. Remarks (Optional)
-                  const Text(
-                    'Remarks (Optional)',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                  ),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _remarksController,
-                    decoration: _buildInputDecoration(
-                      hint: 'Optional notes or vendor reference',
-                      icon: Icons.notes_rounded,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 7. Expense Date Picker
-                  const Text(
-                    'Expense Date',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                  ),
-                  const SizedBox(height: 6),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => _selectedDate = picked);
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
                           const SizedBox(width: 10),
-                          Text(
-                            DateFormat('dd MMM yyyy').format(_selectedDate),
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          Expanded(
+                            child: _buildTypeToggle(
+                              title: 'Other Expense',
+                              icon: Icons.miscellaneous_services_rounded,
+                              isSelected: !_isSiteExpense,
+                              onTap: () => setState(() {
+                                _isSiteExpense = false;
+                                _selectedCategory = 'Other / Miscellaneous';
+                              }),
+                            ),
                           ),
-                          const Spacer(),
-                          const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF2563EB))),
                         ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                      const SizedBox(height: 14),
 
-                  // Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: (_isSubmitting || availableBalance <= 0)
-                          ? null
-                          : () => _submitExpense(availableBalance),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: const Color(0xFFE2E8F0),
-                        disabledForegroundColor: const Color(0xFF94A3B8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
+                      // 2. Site Dropdown (Visible when Site Expense is chosen)
+                      if (_isSiteExpense) ...[
+                        const Text(
+                          'Assigned Site *',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                        const SizedBox(height: 6),
+                        widget.isLoadingSites
+                            ? const LinearProgressIndicator()
+                            : widget.assignedSites.isEmpty
+                                ? Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFFBEB),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFFFEF3C7)),
+                                    ),
+                                    child: const Text(
+                                      'No sites currently assigned. Please select "Other Expense" or contact your manager.',
+                                      style: TextStyle(fontSize: 12, color: Color(0xFFB45309)),
+                                    ),
+                                  )
+                                : DropdownButtonFormField<String>(
+                                    initialValue: _selectedSiteId,
+                                    isExpanded: true,
+                                    decoration: _buildInputDecoration(hint: 'Select Site', icon: Icons.domain_rounded),
+                                    items: widget.assignedSites.map((s) {
+                                      return DropdownMenuItem<String>(
+                                        value: s['siteId'],
+                                        child: Text(
+                                          '${s['siteName']} (${s['siteId']})',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _selectedSiteId = val;
+                                        final found = widget.assignedSites.firstWhere(
+                                          (s) => s['siteId'] == val,
+                                          orElse: () => {'siteId': val ?? '', 'siteName': val ?? ''},
+                                        );
+                                        _selectedSiteName = found['siteName'];
+                                        _selectedProjectId = found['projectId'];
+                                        _selectedProjectName = found['projectName'];
+                                        _selectedPettyCashId = null;
+                                      });
+                                    },
+                                    validator: (val) {
+                                      if (_isSiteExpense && (val == null || val.isEmpty)) {
+                                        return 'Please select a site';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                        const SizedBox(height: 14),
+
+                        // Active Allocation Selector (if multiple exist for site)
+                        if (activeAllocations.length > 1) ...[
+                          const Text(
+                            'Select Petty Cash Allocation *',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                          ),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedPettyCashId,
+                            isExpanded: true,
+                            decoration: _buildInputDecoration(hint: 'Select Allocation', icon: Icons.account_balance_rounded),
+                            items: activeAllocations.map((alloc) {
+                              final amt = alloc.allocatedAmount > 0 ? alloc.allocatedAmount : alloc.requestedAmount;
+                              return DropdownMenuItem<String>(
+                                value: alloc.requestId,
+                                child: Text(
+                                  '#${alloc.requestId.length > 6 ? alloc.requestId.substring(0, 6) : alloc.requestId} • Rem: ${PettyCashService.formatCurrency(alloc.effectiveRemainingBalance)} / ${PettyCashService.formatCurrency(amt)}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) => setState(() => _selectedPettyCashId = val),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                      ],
+
+                      // 3. Expense Category Dropdown
+                      const Text(
+                        'Category *',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
                       ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : Text(
-                              availableBalance <= 0
-                                  ? (widget.unconfirmedRequests.isNotEmpty
-                                      ? 'Confirm Cash Received Before Spending'
-                                      : 'Insufficient Balance')
-                                  : 'Save Expense',
-                              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedCategory,
+                        isExpanded: true,
+                        decoration: _buildInputDecoration(hint: 'Select Category', icon: Icons.category_rounded),
+                        items: _categories.map((cat) {
+                          return DropdownMenuItem<String>(
+                            value: cat,
+                            child: Text(cat, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          );
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedCategory = val ?? _categories.first),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 4. Description (Required)
+                      const Text(
+                        'Description *',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _descController,
+                        decoration: _buildInputDecoration(
+                          hint: 'e.g. Nails, Binding wire, Travel to site, Fuel',
+                          icon: Icons.description_outlined,
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Description is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 5. Vendor / Payee Name (Optional/Recommended)
+                      const Text(
+                        'Vendor / Payee Name (Optional)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _vendorController,
+                        decoration: _buildInputDecoration(
+                          hint: 'e.g. Sri Hardware, City Auto Fuel, Local Shop',
+                          icon: Icons.store_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 6. Amount Input & Dynamic Balance Validation
+                      const Text(
+                        'Amount (₹) *',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                        decoration: _buildInputDecoration(
+                          hint: '0.00',
+                          icon: Icons.currency_rupee_rounded,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Amount is required';
+                          }
+                          final n = double.tryParse(val.trim());
+                          if (n == null || n <= 0) {
+                            return 'Enter a valid amount greater than 0';
+                          }
+                          if (n > maxSpendable) {
+                            return 'Exceeds available balance (${PettyCashService.formatCurrency(maxSpendable)})';
+                          }
+                          return null;
+                        },
+                      ),
+
+                      // Dynamic Balance Preview
+                      Builder(builder: (context) {
+                        final enteredAmount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+                        if (enteredAmount > 0) {
+                          final rem = maxSpendable - enteredAmount;
+                          final isDeficit = rem < 0;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              isDeficit
+                                  ? '⚠️ Exceeds allocation balance by ${PettyCashService.formatCurrency(-rem)}'
+                                  : 'Remaining allocation balance: ${PettyCashService.formatCurrency(rem)}',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDeficit ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                              ),
                             ),
-                    ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      }),
+                      const SizedBox(height: 14),
+
+                      // 7. Remarks (Optional)
+                      const Text(
+                        'Remarks (Optional)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _remarksController,
+                        decoration: _buildInputDecoration(
+                          hint: 'Optional notes or reference',
+                          icon: Icons.notes_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 8. Expense Date Picker
+                      const Text(
+                        'Expense Date',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                      ),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setState(() => _selectedDate = picked);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                              const SizedBox(width: 10),
+                              Text(
+                                DateFormat('dd MMM yyyy').format(_selectedDate),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                              ),
+                              const Spacer(),
+                              const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF2563EB))),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Submit Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: (_isSubmitting || maxSpendable <= 0)
+                              ? null
+                              : () => _submitExpense(maxSpendable, currentAlloc.requestId.isNotEmpty ? currentAlloc.requestId : null),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: const Color(0xFFE2E8F0),
+                            disabledForegroundColor: const Color(0xFF94A3B8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
+                          ),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : Text(
+                                  maxSpendable <= 0
+                                      ? (widget.unconfirmedRequests.isNotEmpty
+                                          ? 'Confirm Cash Received Before Spending'
+                                          : 'Insufficient Balance')
+                                      : 'Save Expense',
+                                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -1913,7 +2096,7 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
     );
   }
 
-  Future<void> _submitExpense(double availableBalance) async {
+  Future<void> _submitExpense(double maxSpendable, String? pettyCashId) async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_isSiteExpense && _selectedSiteId == null) {
@@ -1924,7 +2107,7 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
     }
 
     final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
-    if (widget.unconfirmedRequests.isNotEmpty && amount > availableBalance) {
+    if (widget.unconfirmedRequests.isNotEmpty && amount > maxSpendable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -1936,7 +2119,7 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
       return;
     }
 
-    if (amount <= 0 || amount > availableBalance) {
+    if (amount <= 0 || amount > maxSpendable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid amount or exceeds available balance.'), backgroundColor: Color(0xFFEF4444)),
       );
@@ -1958,8 +2141,12 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
         supervisorName: widget.supervisorName,
         managerId: managerId,
         managerName: managerName,
+        pettyCashId: pettyCashId,
+        projectId: _selectedProjectId,
+        projectName: _selectedProjectName,
         siteId: _isSiteExpense ? _selectedSiteId : null,
         siteName: _isSiteExpense ? _selectedSiteName : null,
+        vendorName: _vendorController.text.trim().isNotEmpty ? _vendorController.text.trim() : null,
         isSiteExpense: _isSiteExpense,
         expenseCategory: _selectedCategory,
         description: _descController.text.trim(),
@@ -2015,6 +2202,8 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
 
   String? _selectedSiteId;
   String? _selectedSiteName;
+  String? _selectedProjectId;
+  String? _selectedProjectName;
   List<Map<String, dynamic>> _pendingSitePayments = [];
   bool _isLoadingSitePayments = false;
   String? _selectedSitePaymentId;
@@ -2025,8 +2214,11 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
   void initState() {
     super.initState();
     if (widget.assignedSites.isNotEmpty) {
-      _selectedSiteId = widget.assignedSites.first['siteId'];
-      _selectedSiteName = widget.assignedSites.first['siteName'];
+      final first = widget.assignedSites.first;
+      _selectedSiteId = first['siteId'];
+      _selectedSiteName = first['siteName'];
+      _selectedProjectId = first['projectId'];
+      _selectedProjectName = first['projectName'];
       _fetchPendingSitePayments();
     }
   }
@@ -2071,63 +2263,72 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
             : 'Request Petty Cash Allocation',
         style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900),
       ),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (widget.isReplenishment) ...[
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.isReplenishment) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Current Balance: ${PettyCashService.formatCurrency(currentBal)}',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Allocated: ${PettyCashService.formatCurrency(totalAlloc)}',
+                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Current Balance: ${PettyCashService.formatCurrency(currentBal)}',
-                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        'Allocated: ${PettyCashService.formatCurrency(totalAlloc)}',
-                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
+                  const SizedBox(height: 12),
+                ],
 
-              // Site Selection Dropdown
-              if (widget.assignedSites.isNotEmpty) ...[
+                // Site Selection Dropdown (Mandatory)
                 const Text(
-                  'Associated Site (Optional)',
+                  'Associated Site *',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _selectedSiteId,
                   decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.location_city_rounded, size: 18, color: Color(0xFF64748B)),
-                  ),
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: null,
-                      child: Text('General / Unassigned Site', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.only(left: 10, right: 6),
+                      child: Icon(Icons.location_city_rounded, size: 18, color: Color(0xFF64748B)),
                     ),
-                    ...widget.assignedSites.map((s) {
-                      return DropdownMenuItem<String>(
-                        value: s['siteId'],
-                        child: Text('${s['siteName']} (${s['siteId']})', style: const TextStyle(fontSize: 13)),
-                      );
-                    }),
-                  ],
+                  ),
+                  items: widget.assignedSites.map((s) {
+                    return DropdownMenuItem<String>(
+                      value: s['siteId'],
+                      child: Text(
+                        '${s['siteName']} (${s['siteId']})',
+                        style: const TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
                   onChanged: (val) {
                     setState(() {
                       _selectedSiteId = val;
@@ -2136,169 +2337,187 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
                         orElse: () => {'siteId': '', 'siteName': ''},
                       );
                       _selectedSiteName = found['siteName']?.isNotEmpty == true ? found['siteName'] : null;
+                      _selectedProjectId = found['projectId'];
+                      _selectedProjectName = found['projectName'];
                       _selectedSitePaymentId = null;
                       _selectedSitePaymentTitle = null;
                     });
                     _fetchPendingSitePayments();
                   },
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please select an assigned site';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
-              ],
 
-              // Pending Site Payment Linkage Dropdown
-              if (_isLoadingSitePayments) ...[
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                // Pending Site Payment Linkage Dropdown
+                if (_isLoadingSitePayments) ...[
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-              ] else if (_pendingSitePayments.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFBFDBFE)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(Icons.link_rounded, size: 16, color: Color(0xFF2563EB)),
-                          SizedBox(width: 6),
-                          Text(
-                            'Connect to Pending Site Payment',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF1E40AF),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedSitePaymentId,
-                        decoration: InputDecoration(
-                          hintText: 'Select Site Payment Requisition',
-                          hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        items: [
-                          const DropdownMenuItem<String>(
-                            value: null,
-                            child: Text('None (Standalone Request)', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
-                          ),
-                          ..._pendingSitePayments.map((payment) {
-                            return DropdownMenuItem<String>(
-                              value: payment['id'].toString(),
+                  const SizedBox(height: 12),
+                ] else if (_pendingSitePayments.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.link_rounded, size: 16, color: Color(0xFF2563EB)),
+                            SizedBox(width: 6),
+                            Expanded(
                               child: Text(
-                                payment['title'].toString(),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                'Connect to Pending Site Payment',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1E40AF),
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                          }),
-                        ],
-                        onChanged: (val) {
-                          setState(() {
-                            _selectedSitePaymentId = val;
-                            if (val != null) {
-                              final p = _pendingSitePayments.firstWhere(
-                                (item) => item['id'].toString() == val,
-                                orElse: () => {},
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          initialValue: _selectedSitePaymentId,
+                          decoration: InputDecoration(
+                            hintText: 'Select Site Payment Requisition',
+                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text(
+                                'None (Standalone Request)',
+                                style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            ..._pendingSitePayments.map((payment) {
+                              return DropdownMenuItem<String>(
+                                value: payment['id'].toString(),
+                                child: Text(
+                                  payment['title'].toString(),
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               );
-                              if (p.isNotEmpty) {
-                                _selectedSitePaymentTitle = p['title']?.toString();
-                                if (p['amount'] != null && (p['amount'] as num) > 0) {
-                                  _amountController.text = (p['amount'] as num).toStringAsFixed(0);
+                            }),
+                          ],
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedSitePaymentId = val;
+                              if (val != null) {
+                                final p = _pendingSitePayments.firstWhere(
+                                  (item) => item['id'].toString() == val,
+                                  orElse: () => {},
+                                );
+                                if (p.isNotEmpty) {
+                                  _selectedSitePaymentTitle = p['title']?.toString();
+                                  if (p['amount'] != null && (p['amount'] as num) > 0) {
+                                    _amountController.text = (p['amount'] as num).toStringAsFixed(0);
+                                  }
+                                  _reasonController.text = 'Fund site payment: ${p['title']}';
                                 }
-                                _reasonController.text = 'Fund site payment: ${p['title']}';
+                              } else {
+                                _selectedSitePaymentTitle = null;
                               }
-                            } else {
-                              _selectedSitePaymentTitle = null;
-                            }
-                          });
-                        },
-                      ),
-                    ],
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 12),
+                ],
+
+                const Text(
+                  'Requested Amount (₹) *',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                  ],
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 10000',
+                    prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Amount is required';
+                    final n = double.tryParse(val.trim());
+                    if (n == null || n <= 0) return 'Enter a valid amount > 0';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
+
+                const Text(
+                  'Reason / Justification *',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _reasonController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: widget.isReplenishment
+                        ? 'e.g. Daily site expenses, fuel and urgent hardware supplies'
+                        : 'e.g. Initial operational petty cash for site management',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Reason is required';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                const Text(
+                  'Remarks (Optional)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _remarksController,
+                  decoration: InputDecoration(
+                    hintText: 'Any additional notes for manager',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
               ],
-
-              const Text(
-                'Requested Amount (₹) *',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                ],
-                decoration: InputDecoration(
-                  hintText: 'e.g. 10000',
-                  prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Amount is required';
-                  final n = double.tryParse(val.trim());
-                  if (n == null || n <= 0) return 'Enter a valid amount > 0';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-
-              const Text(
-                'Reason / Justification *',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: _reasonController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: widget.isReplenishment
-                      ? 'e.g. Daily site expenses, fuel and urgent hardware supplies'
-                      : 'e.g. Initial operational petty cash for site management',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.all(12),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Reason is required';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-
-              const Text(
-                'Remarks (Optional)',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: _remarksController,
-                decoration: InputDecoration(
-                  hintText: 'Any additional notes for manager',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.all(12),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -2346,8 +2565,10 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
         managerId: managerId,
         managerName: managerName,
         isReplenishment: widget.isReplenishment,
-        siteId: _selectedSiteId,
-        siteName: _selectedSiteName,
+        projectId: _selectedProjectId,
+        projectName: _selectedProjectName,
+        siteId: _selectedSiteId ?? '',
+        siteName: _selectedSiteName ?? '',
         linkedSitePaymentId: _selectedSitePaymentId,
         linkedSitePaymentTitle: _selectedSitePaymentTitle,
       );

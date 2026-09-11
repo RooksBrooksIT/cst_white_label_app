@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../models/petty_cash_models.dart';
 import '../../services/petty_cash_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/approval_workflow_service.dart';
+import '../../services/firestore_service.dart';
 import '../../utils/app_theme.dart';
 
 class ManagerPettyCashPage extends StatefulWidget {
@@ -100,6 +102,15 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
             Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), text: 'Ledger'),
             Tab(icon: Icon(Icons.analytics_rounded, size: 18), text: 'Reports'),
           ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showManualAllocationDialog(context),
+        backgroundColor: primaryColor,
+        icon: const Icon(Icons.add_card_rounded, color: Colors.white),
+        label: const Text(
+          'Manual Allocation',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(
@@ -415,22 +426,77 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    PettyCashService.formatCurrency(req.requestedAmount),
+                    PettyCashService.formatCurrency(req.requestedAmount > 0 ? req.requestedAmount : req.allocatedAmount),
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                   ),
                   Text(
-                    req.isReplenishment ? 'Replenishment' : 'Initial Request',
+                    req.isManualManager
+                        ? 'Manager Allocation'
+                        : (req.isReplenishment ? 'Replenishment' : 'Supervisor Request'),
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: req.isReplenishment ? const Color(0xFF0F766E) : const Color(0xFF2563EB),
+                      color: req.isManualManager
+                          ? const Color(0xFF7E22CE)
+                          : (req.isReplenishment ? const Color(0xFF0F766E) : const Color(0xFF2563EB)),
                     ),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+
+          // Site & Project Badges
+          if (req.siteName != null || req.siteId != null || req.projectName != null) ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (req.siteName != null || req.siteId != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_city_rounded, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${req.siteName ?? req.siteId}',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (req.projectName != null && req.projectName!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.apartment_rounded, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          req.projectName!,
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
 
           if (req.isSitePaymentLinked || (req.siteName != null && req.siteName!.isNotEmpty)) ...[
             Container(
@@ -601,27 +667,50 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Approved badge & Amount
+          // Header: Approved badge, Source Badge & Amount
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.verified_rounded, size: 13, color: Color(0xFF059669)),
-                    SizedBox(width: 4),
-                    Text(
-                      'HQ AUTHORIZED',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF059669)),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
                     ),
-                  ],
-                ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.verified_rounded, size: 13, color: Color(0xFF059669)),
+                        SizedBox(width: 4),
+                        Text(
+                          'HQ AUTHORIZED',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF059669)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: req.isManualManager ? const Color(0xFFFAF5FF) : const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: req.isManualManager ? const Color(0xFFE9D5FF) : const Color(0xFFBFDBFE),
+                      ),
+                    ),
+                    child: Text(
+                      req.isManualManager ? 'MANUAL' : 'REQUEST',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: req.isManualManager ? const Color(0xFF7E22CE) : const Color(0xFF1D4ED8),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               Text(
                 PettyCashService.formatCurrency(req.approvedAmount > 0 ? req.approvedAmount : req.requestedAmount),
@@ -635,6 +724,56 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
             'Supervisor: ${req.supervisorName} (${req.supervisorId})',
             style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
           ),
+          // Site & Project Badges
+          if (req.siteName != null || req.siteId != null || req.projectName != null) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (req.siteName != null || req.siteId != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_city_rounded, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${req.siteName ?? req.siteId}',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (req.projectName != null && req.projectName!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.apartment_rounded, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          req.projectName!,
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 2),
           Text(
             'Reason: ${req.reason}',
@@ -1429,5 +1568,481 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
         );
       },
     );
+  }
+
+  void _showManualAllocationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _ManagerManualAllocationDialog(
+        currentManagerId: _currentManagerId,
+        currentManagerName: _currentManagerName,
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// MANAGER MANUAL PETTY CASH ALLOCATION MODAL (MANDATORY ORG APPROVAL FLOW)
+// =============================================================================
+
+class _ManagerManualAllocationDialog extends StatefulWidget {
+  final String currentManagerId;
+  final String currentManagerName;
+
+  const _ManagerManualAllocationDialog({
+    required this.currentManagerId,
+    required this.currentManagerName,
+  });
+
+  @override
+  State<_ManagerManualAllocationDialog> createState() =>
+      _ManagerManualAllocationDialogState();
+}
+
+class _ManagerManualAllocationDialogState
+    extends State<_ManagerManualAllocationDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _reasonController = TextEditingController();
+  final TextEditingController _remarksController = TextEditingController();
+
+  bool _isLoading = true;
+  List<Map<String, String>> _supervisors = [];
+  List<Map<String, String>> _allSiteMappings = [];
+
+  String? _selectedSupervisorId;
+  String? _selectedSupervisorName;
+  String? _selectedSiteId;
+  String? _selectedSiteName;
+  String? _selectedProjectId;
+  String? _selectedProjectName;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final Set<String> seenSupIds = {};
+      final List<Map<String, String>> sups = [];
+      final List<Map<String, String>> sites = [];
+
+      final mapSnap = await FirestoreService.siteSupervisorMap.get();
+      for (final doc in mapSnap.docs) {
+        final d = doc.data();
+        final supId = (d['Supervisor ID'] ?? d['supervisorId'] ?? '').toString().trim();
+        final supName = (d['supervisor'] ?? d['supervisorName'] ?? supId).toString().trim();
+        final siteId = (d['siteId'] ?? d['site'] ?? d['site_id'] ?? doc.id).toString().trim();
+        final siteName = (d['siteName'] ?? d['site'] ?? siteId).toString().trim();
+        final projId = (d['projectId'] ?? d['project_id'] ?? d['project'] ?? '').toString().trim();
+        final projName = (d['projectName'] ?? d['project_name'] ?? d['project'] ?? '').toString().trim();
+
+        if (supId.isNotEmpty && !seenSupIds.contains(supId.toLowerCase())) {
+          seenSupIds.add(supId.toLowerCase());
+          sups.add({'supervisorId': supId, 'supervisorName': supName});
+        }
+
+        if (siteId.isNotEmpty) {
+          sites.add({
+            'supervisorId': supId,
+            'supervisorName': supName,
+            'siteId': siteId,
+            'siteName': siteName,
+            'projectId': projId,
+            'projectName': projName,
+          });
+        }
+      }
+
+      // Also fallback fetch from petty cash accounts if supervisor list is empty
+      if (sups.isEmpty) {
+        final accSnap = await FirestoreService.pettyCashAccounts.get();
+        for (final doc in accSnap.docs) {
+          final d = doc.data();
+          final sId = (d['supervisorId'] ?? doc.id).toString().trim();
+          final sName = (d['supervisorName'] ?? sId).toString().trim();
+          if (sId.isNotEmpty && !seenSupIds.contains(sId.toLowerCase())) {
+            seenSupIds.add(sId.toLowerCase());
+            sups.add({'supervisorId': sId, 'supervisorName': sName});
+          }
+        }
+      }
+
+      // Fallback from sites collection
+      if (sites.isEmpty) {
+        final siteSnap = await FirestoreService.sites.get();
+        for (final doc in siteSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? doc.id).toString().trim();
+          final sName = (d['siteName'] ?? d['name'] ?? sId).toString().trim();
+          final pId = (d['projectId'] ?? d['project_id'] ?? '').toString().trim();
+          final pName = (d['projectName'] ?? d['project_name'] ?? '').toString().trim();
+          sites.add({
+            'supervisorId': '',
+            'supervisorName': '',
+            'siteId': sId,
+            'siteName': sName,
+            'projectId': pId,
+            'projectName': pName,
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _supervisors = sups;
+          _allSiteMappings = sites;
+          if (_supervisors.isNotEmpty) {
+            _selectedSupervisorId = _supervisors.first['supervisorId'];
+            _selectedSupervisorName = _supervisors.first['supervisorName'];
+            _updateSitesForSupervisor();
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _updateSitesForSupervisor() {
+    final matching = _allSiteMappings.where(
+      (s) =>
+          s['supervisorId']?.toLowerCase() == _selectedSupervisorId?.toLowerCase() ||
+          (s['supervisorId'] ?? '').isEmpty,
+    ).toList();
+
+    final availableSites = matching.isNotEmpty ? matching : _allSiteMappings;
+    if (availableSites.isNotEmpty) {
+      final first = availableSites.first;
+      _selectedSiteId = first['siteId'];
+      _selectedSiteName = first['siteName'];
+      _selectedProjectId = first['projectId'];
+      _selectedProjectName = first['projectName'];
+    } else {
+      _selectedSiteId = null;
+      _selectedSiteName = null;
+      _selectedProjectId = null;
+      _selectedProjectName = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _reasonController.dispose();
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    final matchingSites = _allSiteMappings.where(
+      (s) =>
+          s['supervisorId']?.toLowerCase() == _selectedSupervisorId?.toLowerCase() ||
+          (s['supervisorId'] ?? '').isEmpty,
+    ).toList();
+    final availableSites = matchingSites.isNotEmpty ? matchingSites : _allSiteMappings;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAF5FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.add_card_rounded, color: Color(0xFF7E22CE), size: 22),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Manual Petty Cash Allocation',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+      content: _isLoading
+          ? const SizedBox(
+              height: 120,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : SizedBox(
+              width: MediaQuery.of(context).size.width,
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Mandatory Org Approval Notice
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF2563EB)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Manual allocations created by Managers are submitted to Organization HQ for mandatory authorization before funds become active.',
+                                style: TextStyle(fontSize: 11, color: Color(0xFF1E40AF), height: 1.3),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 1. Supervisor Selection
+                      const Text(
+                        'Select Supervisor *',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: _selectedSupervisorId,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: const Icon(Icons.person_rounded, size: 18, color: Color(0xFF64748B)),
+                        ),
+                        items: _supervisors.map((s) {
+                          return DropdownMenuItem<String>(
+                            value: s['supervisorId'],
+                            child: Text(
+                              '${s['supervisorName']} (${s['supervisorId']})',
+                              style: const TextStyle(fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedSupervisorId = val;
+                            final found = _supervisors.firstWhere(
+                              (s) => s['supervisorId'] == val,
+                              orElse: () => {'supervisorId': val ?? '', 'supervisorName': val ?? ''},
+                            );
+                            _selectedSupervisorName = found['supervisorName'];
+                            _updateSitesForSupervisor();
+                          });
+                        },
+                        validator: (val) => val == null || val.isEmpty ? 'Supervisor is required' : null,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 2. Site Selection
+                      const Text(
+                        'Select Site *',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: _selectedSiteId,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: const Icon(Icons.location_city_rounded, size: 18, color: Color(0xFF64748B)),
+                        ),
+                        items: availableSites.map((s) {
+                          return DropdownMenuItem<String>(
+                            value: s['siteId'],
+                            child: Text(
+                              '${s['siteName']} (${s['siteId']})',
+                              style: const TextStyle(fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedSiteId = val;
+                            final found = availableSites.firstWhere(
+                              (s) => s['siteId'] == val,
+                              orElse: () => {'siteId': val ?? '', 'siteName': val ?? ''},
+                            );
+                            _selectedSiteName = found['siteName'];
+                            _selectedProjectId = found['projectId'];
+                            _selectedProjectName = found['projectName'];
+                          });
+                        },
+                        validator: (val) => val == null || val.isEmpty ? 'Site is required' : null,
+                      ),
+                      if (_selectedProjectName != null && _selectedProjectName!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Project: $_selectedProjectName',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+
+                      // 3. Amount Input
+                      const Text(
+                        'Allocation Amount (₹) *',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                        decoration: InputDecoration(
+                          hintText: 'e.g. 15000',
+                          prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) return 'Amount is required';
+                          final n = double.tryParse(val.trim());
+                          if (n == null || n <= 0) return 'Enter a valid amount > 0';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 4. Purpose / Reason
+                      const Text(
+                        'Purpose / Reason *',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _reasonController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          hintText: 'e.g. Site mobilization operational petty cash',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) return 'Purpose is required';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 5. Remarks
+                      const Text(
+                        'Remarks (Optional)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _remarksController,
+                        decoration: InputDecoration(
+                          hintText: 'Notes for Organization HQ approval',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                )
+              : const Text('Submit for Org Approval'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedSupervisorId == null || _selectedSiteId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select both a Supervisor and a Site.')),
+      );
+      return;
+    }
+
+    final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+    if (amount <= 0) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      await PettyCashService().managerCreateManualAllocation(
+        supervisorId: _selectedSupervisorId!,
+        supervisorName: _selectedSupervisorName ?? _selectedSupervisorId!,
+        managerId: widget.currentManagerId,
+        managerName: widget.currentManagerName,
+        siteId: _selectedSiteId!,
+        siteName: _selectedSiteName ?? '',
+        projectId: _selectedProjectId,
+        projectName: _selectedProjectName,
+        amount: amount,
+        reason: _reasonController.text.trim(),
+        remarks: _remarksController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Manual allocation of ${PettyCashService.formatCurrency(amount)} created for ${_selectedSupervisorName ?? _selectedSupervisorId} and sent to Organization HQ for mandatory authorization.',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 }

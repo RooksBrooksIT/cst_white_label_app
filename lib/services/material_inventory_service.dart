@@ -790,7 +790,9 @@ class MaterialInventoryService {
             (sName.isNotEmpty && sName == cleanLow) ||
             docId.startsWith('${cleanLow}_') ||
             (cleanLow.contains('_') && sId.isNotEmpty && (cleanLow.startsWith('${sId}_') || cleanLow.endsWith('_$sId'))) ||
-            (sId.contains('_') && cleanLow.isNotEmpty && (sId.startsWith('${cleanLow}_') || sId.endsWith('_$cleanLow')));
+            (sId.contains('_') && cleanLow.isNotEmpty && (sId.startsWith('${cleanLow}_') || sId.endsWith('_$cleanLow'))) ||
+            (cleanLow.startsWith('st') && sId.startsWith('pr') && cleanLow.substring(2) == sId.substring(2)) ||
+            (cleanLow.startsWith('pr') && sId.startsWith('st') && cleanLow.substring(2) == sId.substring(2));
 
         if (isMatch) {
           final item = SiteMaterialPoolItem.fromMap(doc.id, data);
@@ -852,7 +854,7 @@ class MaterialInventoryService {
         double totalAlloc = p.totalAllocatedQty;
         if (legMatch.isNotEmpty) {
           final legCount = (legMatch['availableCount'] as num?)?.toDouble() ?? 0.0;
-          if (legCount > totalAlloc) {
+          if (totalAlloc <= 0 && legCount > 0) {
             totalAlloc = legCount;
           }
         }
@@ -861,7 +863,9 @@ class MaterialInventoryService {
         }
 
         // Available Stock = Total Allocated/Site Stock - Total Consumed/Used Quantity
-        final double remaining = (totalAlloc - totalConsumed).clamp(0.0, double.infinity);
+        final double remaining = (p.remainingQty > 0)
+            ? p.remainingQty
+            : (totalAlloc - totalConsumed).clamp(0.0, double.infinity);
         final double effectiveRate = p.effectiveUnitRate > 0
             ? p.effectiveUnitRate
             : (masterPrices[matKey] ?? 0.0);
@@ -1464,6 +1468,16 @@ class MaterialInventoryService {
         siteCount: newSiteCount,
         displayName: displayName,
       );
+
+      // Sync siteMaterialPool stock for Daily Site Entry integration
+      await _syncSiteMaterialPoolStock(
+        siteId: siteId,
+        materialName: materialName,
+        deltaQty: quantity,
+        siteName: siteName,
+        projectName: projectName,
+        displayName: displayName,
+      );
     } catch (e) {
       debugPrint('MaterialInventoryService.transferCompanyToSite error: $e');
       rethrow;
@@ -1604,6 +1618,24 @@ class MaterialInventoryService {
         siteCount: toNewCount,
         displayName: displayName,
       );
+
+      // Sync siteMaterialPool stock for both sites
+      await _syncSiteMaterialPoolStock(
+        siteId: fromSiteId,
+        materialName: materialName,
+        deltaQty: -quantity,
+        siteName: fromSiteName,
+        projectName: fromProjectName,
+        displayName: displayName,
+      );
+      await _syncSiteMaterialPoolStock(
+        siteId: toSiteId,
+        materialName: materialName,
+        deltaQty: quantity,
+        siteName: toSiteName,
+        projectName: toProjectName,
+        displayName: displayName,
+      );
     } catch (e) {
       debugPrint('MaterialInventoryService.transferSiteToSite error: $e');
       rethrow;
@@ -1720,6 +1752,16 @@ class MaterialInventoryService {
         siteCount: newSiteCount,
         displayName: displayName,
       );
+
+      // Sync siteMaterialPool stock
+      await _syncSiteMaterialPoolStock(
+        siteId: siteId,
+        materialName: materialName,
+        deltaQty: -quantity,
+        siteName: siteName,
+        projectName: projectName,
+        displayName: displayName,
+      );
     } catch (e) {
       debugPrint('MaterialInventoryService.transferSiteToCompany error: $e');
       rethrow;
@@ -1809,6 +1851,16 @@ class MaterialInventoryService {
         materialName: materialName,
         siteCount: quantity,
         displayName: displayName,
+      );
+
+      // Also sync siteMaterialPool
+      await _syncSiteMaterialPoolStock(
+        siteId: siteId,
+        materialName: materialName,
+        deltaQty: quantity,
+        siteName: siteName,
+        displayName: displayName,
+        unit: unit,
       );
     } catch (e) {
       debugPrint('MaterialInventoryService.recordSiteMaterialArrival error: $e');
@@ -2119,5 +2171,91 @@ class MaterialInventoryService {
         debugPrint('Site mirrors sync error: $e');
       }
     });
+  }
+
+  /// Syncs siteMaterialPool stock for seamless integration with Daily Site Entry.
+  static Future<void> _syncSiteMaterialPoolStock({
+    required String siteId,
+    required String materialName,
+    required int deltaQty,
+    String? siteName,
+    String? projectName,
+    String? displayName,
+    String? category,
+    String? subCategory,
+    String? unit,
+  }) async {
+    try {
+      final cleanSiteId = siteId.trim();
+      if (cleanSiteId.isEmpty || deltaQty == 0) return;
+
+      if (!FirestoreService.isReady) {
+        await FirestoreService.initialize();
+      }
+
+      final poolDocId = getSiteMaterialPoolDocId(cleanSiteId, materialName);
+      final poolRef = FirestoreService.siteMaterialPool.doc(poolDocId);
+      final poolSnap = await poolRef.get();
+
+      double totalAllocQty = deltaQty > 0 ? deltaQty.toDouble() : 0.0;
+      double consumedQty = 0.0;
+      double remainingQty = deltaQty.toDouble().clamp(0.0, double.infinity);
+      double unitRate = await fetchConfiguredMaterialUnitRate(materialName);
+
+      String resolvedUnit = unit ?? 'Units';
+      String resolvedCat = category ?? 'General Material';
+      String resolvedSubCat = subCategory ?? '';
+      String resolvedDisp = displayName ?? materialName;
+      String resolvedSiteName = (siteName != null && siteName.isNotEmpty) ? siteName : cleanSiteId;
+      String resolvedProj = projectName ?? '';
+
+      if (poolSnap.exists && poolSnap.data() != null) {
+        final existing = SiteMaterialPoolItem.fromMap(poolDocId, poolSnap.data()!);
+        consumedQty = existing.consumedQty;
+        if (deltaQty > 0) {
+          totalAllocQty = existing.totalAllocatedQty + deltaQty;
+          remainingQty = (totalAllocQty - consumedQty).clamp(0.0, double.infinity);
+        } else {
+          final absDelta = deltaQty.abs();
+          totalAllocQty = (existing.totalAllocatedQty - absDelta).clamp(0.0, double.infinity);
+          remainingQty = (existing.remainingQty - absDelta).clamp(0.0, double.infinity);
+        }
+        if (existing.effectiveUnitRate > 0) unitRate = existing.effectiveUnitRate;
+        if (existing.unit.isNotEmpty && existing.unit != 'Units') resolvedUnit = existing.unit;
+        if (existing.category.isNotEmpty && existing.category != 'General Material') resolvedCat = existing.category;
+        if (existing.subCategory.isNotEmpty) resolvedSubCat = existing.subCategory;
+        if (existing.displayName.isNotEmpty) resolvedDisp = existing.displayName;
+        if (existing.siteName.isNotEmpty) resolvedSiteName = existing.siteName;
+        if (existing.projectName.isNotEmpty) resolvedProj = existing.projectName;
+      }
+
+      final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final poolItem = SiteMaterialPoolItem(
+        docId: poolDocId,
+        siteId: cleanSiteId,
+        siteName: resolvedSiteName,
+        projectName: resolvedProj,
+        materialName: materialName,
+        displayName: resolvedDisp,
+        category: resolvedCat,
+        subCategory: resolvedSubCat,
+        unit: resolvedUnit,
+        totalAllocatedQty: totalAllocQty,
+        totalAllocatedAmount: totalAllocQty * unitRate,
+        consumedQty: consumedQty,
+        consumedAmount: consumedQty * unitRate,
+        remainingQty: remainingQty,
+        remainingAmount: remainingQty * unitRate,
+        effectiveUnitRate: unitRate,
+        lastAllocationDate: deltaQty > 0
+            ? dateStr
+            : (poolSnap.data()?['lastAllocationDate']?.toString() ?? dateStr),
+        updatedAt: FieldValue.serverTimestamp(),
+      );
+
+      await poolRef.set(poolItem.toMap(), SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error syncing site material pool stock for $materialName at $siteId: $e');
+    }
   }
 }

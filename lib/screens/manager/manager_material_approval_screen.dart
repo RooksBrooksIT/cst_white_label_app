@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +7,7 @@ import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/approval_workflow_service.dart';
 import 'package:ebricks/widgets/approval_lifecycle_stepper.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/manager/config_material_information.dart';
 
 class ManagerMaterialApprovalScreen extends StatefulWidget {
   const ManagerMaterialApprovalScreen({super.key});
@@ -1175,7 +1176,7 @@ class _ManagerMaterialApprovalScreenState
       );
     }
 
-    // 3. Manager Final Clearance (Stage 3)
+    // 3. Manager Final Clearance (Stage 3) -> Direct to Materials Movement Flow
     if (stage == ApprovalStage.pendingManagerClearance && isManager) {
       return Container(
         width: double.infinity,
@@ -1193,9 +1194,9 @@ class _ManagerMaterialApprovalScreenState
           ],
         ),
         child: ElevatedButton.icon(
-          icon: const Icon(Icons.verified_rounded, size: 18),
+          icon: const Icon(Icons.local_shipping_rounded, size: 18),
           label: const Text(
-            'Complete Final Clearance & Release to Site',
+            'Approve & Dispatch via Material Movement',
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5),
           ),
           style: ElevatedButton.styleFrom(
@@ -1207,13 +1208,28 @@ class _ManagerMaterialApprovalScreenState
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          onPressed: () => _showFinalClearanceDialog(
-            ctx,
-            docId,
-            supervisorName,
-            materials: data['materials'] as List?,
-            siteId: data['siteId']?.toString(),
-          ),
+          onPressed: () async {
+            Navigator.pop(ctx);
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MaterialInfoScreen(
+                  prefilledSiteId: data['siteId']?.toString(),
+                  prefilledSiteName: data['siteName']?.toString() ?? data['projectName']?.toString(),
+                  prefilledProjectName: data['projectName']?.toString(),
+                  prefilledSupervisorName: supervisorName,
+                  prefilledMaterials: data['materials'] as List?,
+                  linkedRequestId: docId,
+                  linkedMatReqId: (data['matReqId'] ?? docId).toString(),
+                ),
+              ),
+            );
+            if (result == true && mounted) {
+              setState(() {
+                _tabController.animateTo(3); // Switch to Approved tab
+              });
+            }
+          },
         ),
       );
     }
@@ -1548,70 +1564,6 @@ class _ManagerMaterialApprovalScreenState
               );
             },
             child: const Text('Authorize', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showFinalClearanceDialog(
-    BuildContext sheetCtx,
-    String docId,
-    String supName, {
-    List<dynamic>? materials,
-    String? siteId,
-  }) {
-    final remarksController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (dlgCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Complete Final Clearance'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Complete final approval and release the requested materials for immediate dispatch to the site:',
-              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: remarksController,
-              decoration: InputDecoration(
-                hintText: 'e.g. Materials packed and dispatched via vehicle #12.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dlgCtx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-            onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              Navigator.pop(dlgCtx);
-              Navigator.pop(sheetCtx);
-              await ApprovalWorkflowService.managerFinalClearance(
-                collectionName: 'siteMaterialsRequest',
-                docId: docId,
-                managerName: _currentUserName,
-                managerId: _currentUserId,
-                remarks: remarksController.text.trim(),
-                supervisorName: supName,
-                materials: materials,
-                siteId: siteId,
-              );
-              messenger.showSnackBar(
-                const SnackBar(content: Text('Final clearance completed! Supervisor notified.')),
-              );
-            },
-            child: const Text('Release & Approve', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

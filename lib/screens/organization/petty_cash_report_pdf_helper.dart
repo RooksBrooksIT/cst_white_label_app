@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -238,15 +238,15 @@ class PettyCashReportPdfHelper {
                   '#',
                   'APPROVAL DATE',
                   'APPROVED AMOUNT',
+                  'SITE / PROJECT',
                   'SUPERVISOR NAME',
                   'MANAGER NAME',
-                  'RECEIVED CONFIRMATION',
-                  'CONFIRMATION DATE / STATUS',
+                  'CONFIRMATION / STATUS',
                 ],
                 data: List<List<String>>.generate(requests.length, (index) {
                   final req = requests[index];
 
-                  // 1. Approval Date
+                  // 1. Approval Date & Source
                   DateTime? approvalDate = req.orgApprovedAt ?? req.allocatedAt;
                   if (approvalDate == null && req.approvalHistory.isNotEmpty) {
                     for (final h in req.approvalHistory) {
@@ -266,9 +266,13 @@ class PettyCashReportPdfHelper {
                       ? (req.createdAt ?? DateTime.now())
                       : null;
 
-                  final String approvalDateStr = approvalDate != null
+                  final String dateStr = approvalDate != null
                       ? DateFormat('dd/MM/yyyy').format(approvalDate)
                       : (req.status.contains('pending') ? 'Pending' : 'N/A');
+                  final String srcType = req.isManualManager
+                      ? '\n(Manual Alloc)'
+                      : (req.isReplenishment ? '\n(Replenish)' : '\n(Request)');
+                  final String approvalDateStr = '$dateStr$srcType';
 
                   // 2. Approved Amount
                   final double approvedAmt = req.approvedAmount > 0
@@ -276,17 +280,24 @@ class PettyCashReportPdfHelper {
                       : (req.allocatedAmount > 0 ? req.allocatedAmount : req.requestedAmount);
                   final String approvedAmountStr = _formatCurrency(approvedAmt);
 
-                  // 3. Supervisor Name
+                  // 3. Site / Project
+                  final String siteProj = (req.siteName != null && req.siteName!.isNotEmpty)
+                      ? (req.projectName != null && req.projectName!.isNotEmpty
+                          ? '${req.siteName}\n(${req.projectName})'
+                          : req.siteName!)
+                      : (req.siteId != null && req.siteId!.isNotEmpty ? req.siteId! : 'General Site');
+
+                  // 4. Supervisor Name
                   final String supName = req.supervisorName.isNotEmpty
                       ? req.supervisorName
                       : (req.receivedBySupervisorName ?? req.supervisorId);
 
-                  // 4. Manager Name
+                  // 5. Manager Name
                   final String mgrName = req.managerName.isNotEmpty
                       ? req.managerName
                       : (req.managerReviewedBy ?? 'Manager');
 
-                  // 5. Received Confirmation
+                  // 6. Status & Receipt Detail
                   final bool isConfirmed = req.isReceived || req.receivedAt != null || req.status == 'received';
                   final bool isRejected = req.status == 'rejected_by_org' || req.status == 'rejected_by_manager';
                   final bool isAwaiting = req.status == 'awaiting_confirmation' ||
@@ -295,43 +306,24 @@ class PettyCashReportPdfHelper {
 
                   String confirmationText;
                   if (isConfirmed) {
-                    confirmationText = 'YES (CONFIRMED)';
+                    final d = req.receivedAt != null ? DateFormat('dd/MM/yy').format(req.receivedAt!) : 'Received';
+                    confirmationText = 'YES (CONFIRMED)\n$d';
                   } else if (isRejected) {
                     confirmationText = 'REJECTED';
                   } else if (isAwaiting) {
-                    confirmationText = 'AWAITING CONFIRM';
+                    confirmationText = 'AWAITING RECEIPT';
                   } else {
                     confirmationText = 'PENDING APPROVAL';
-                  }
-
-                  // 6. Confirmation Date / Status Detail
-                  String statusDateDetail;
-                  if (req.receivedAt != null) {
-                    statusDateDetail = 'Confirmed on ${DateFormat('dd/MM/yyyy HH:mm').format(req.receivedAt!)}';
-                  } else if (isConfirmed) {
-                    statusDateDetail = 'Received & Added to Balance';
-                  } else if (isRejected) {
-                    statusDateDetail = req.rejectionReason.isNotEmpty
-                        ? 'Declined: ${req.rejectionReason}'
-                        : 'Declined by Org/Mgr';
-                  } else if (isAwaiting) {
-                    statusDateDetail = 'Awaiting Physical Cash Receipt';
-                  } else if (req.status == 'pending_org_approval') {
-                    statusDateDetail = 'Awaiting HQ Org Authorization';
-                  } else {
-                    statusDateDetail = req.statusDisplay.isNotEmpty
-                        ? req.statusDisplay
-                        : 'Pending Review';
                   }
 
                   return [
                     '${index + 1}',
                     approvalDateStr,
                     approvedAmountStr,
+                    siteProj,
                     supName,
                     mgrName,
                     confirmationText,
-                    statusDateDetail,
                   ];
                 }),
                 border: pw.TableBorder.all(
@@ -358,17 +350,17 @@ class PettyCashReportPdfHelper {
                   2: pw.Alignment.centerRight,
                   3: pw.Alignment.centerLeft,
                   4: pw.Alignment.centerLeft,
-                  5: pw.Alignment.center,
-                  6: pw.Alignment.centerLeft,
+                  5: pw.Alignment.centerLeft,
+                  6: pw.Alignment.center,
                 },
                 columnWidths: {
                   0: const pw.FlexColumnWidth(0.5), // #
-                  1: const pw.FlexColumnWidth(1.4), // Approval Date
+                  1: const pw.FlexColumnWidth(1.5), // Approval Date
                   2: const pw.FlexColumnWidth(1.6), // Approved Amount
-                  3: const pw.FlexColumnWidth(1.8), // Supervisor Name
-                  4: const pw.FlexColumnWidth(1.6), // Manager Name
-                  5: const pw.FlexColumnWidth(1.8), // Received Confirmation
-                  6: const pw.FlexColumnWidth(2.6), // Confirmation Date/Status
+                  3: const pw.FlexColumnWidth(2.0), // Site / Project
+                  4: const pw.FlexColumnWidth(1.6), // Supervisor Name
+                  5: const pw.FlexColumnWidth(1.5), // Manager Name
+                  6: const pw.FlexColumnWidth(2.0), // Confirmation / Status
                 },
                 oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey50),
               ),

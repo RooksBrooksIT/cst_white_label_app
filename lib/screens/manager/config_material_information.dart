@@ -6,11 +6,29 @@ import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/material_inventory_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/dialog_utils.dart';
+import 'package:ebricks/services/approval_workflow_service.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MaterialInfoScreen extends StatefulWidget {
-  const MaterialInfoScreen({super.key});
+  final String? prefilledSiteId;
+  final String? prefilledSiteName;
+  final String? prefilledProjectName;
+  final String? prefilledSupervisorName;
+  final List<dynamic>? prefilledMaterials;
+  final String? linkedRequestId;
+  final String? linkedMatReqId;
+
+  const MaterialInfoScreen({
+    super.key,
+    this.prefilledSiteId,
+    this.prefilledSiteName,
+    this.prefilledProjectName,
+    this.prefilledSupervisorName,
+    this.prefilledMaterials,
+    this.linkedRequestId,
+    this.linkedMatReqId,
+  });
 
   @override
   State<MaterialInfoScreen> createState() => _MaterialInfoScreenState();
@@ -334,6 +352,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         setState(() {
           sitesList = result;
           _isLoadingSites = false;
+          _applyPrefilledData();
         });
       }
     } catch (e) {
@@ -344,6 +363,68 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading site data: $e')),
         );
+      }
+    }
+  }
+
+  void _applyPrefilledData() {
+    if (widget.prefilledSiteId != null && widget.prefilledSiteId!.isNotEmpty) {
+      final target = widget.prefilledSiteId!.trim().toLowerCase();
+      final match = sitesList.firstWhere(
+        (s) {
+          final sId = (s['siteId'] ?? '').toString().trim().toLowerCase();
+          final sName = (s['siteName'] ?? '').toString().trim().toLowerCase();
+          return sId == target ||
+              sName == target ||
+              (sId.contains('_') && (sId.startsWith('${target}_') || sId.endsWith('_$target'))) ||
+              (target.contains('_') && (target.startsWith('${sId}_') || target.endsWith('_$sId')));
+        },
+        orElse: () => <String, dynamic>{},
+      );
+
+      if (match.isNotEmpty) {
+        _selectedSiteId = match['siteId'];
+        _projectNameController.text = (widget.prefilledProjectName != null && widget.prefilledProjectName!.isNotEmpty)
+            ? widget.prefilledProjectName!
+            : (match['projectName']?.toString() ?? '');
+        _supervisorNameController.text = (widget.prefilledSupervisorName != null && widget.prefilledSupervisorName!.isNotEmpty)
+            ? widget.prefilledSupervisorName!
+            : (match['supervisorName']?.toString() ?? '');
+      } else {
+        _selectedSiteId = widget.prefilledSiteId;
+        _projectNameController.text = widget.prefilledProjectName ?? '';
+        _supervisorNameController.text = widget.prefilledSupervisorName ?? '';
+        if (!sitesList.any((s) => s['siteId'] == widget.prefilledSiteId)) {
+          sitesList.insert(0, {
+            'siteId': widget.prefilledSiteId,
+            'siteName': widget.prefilledSiteName ?? widget.prefilledSiteId,
+            'projectName': widget.prefilledProjectName ?? '',
+            'supervisorName': widget.prefilledSupervisorName ?? '',
+          });
+        }
+      }
+    }
+
+    if (widget.prefilledMaterials != null && widget.prefilledMaterials!.isNotEmpty && materialsToTransfer.isEmpty) {
+      for (final m in widget.prefilledMaterials!) {
+        if (m is Map) {
+          final matMap = Map<String, dynamic>.from(m);
+          final matName = (matMap['materialName'] ?? matMap['material'] ?? matMap['displayName'] ?? '').toString().trim();
+          final rawQty = matMap['materialQty'] ?? matMap['quantity'] ?? matMap['neededCount'] ?? 0;
+          final int qty = (rawQty is num) ? rawQty.toInt() : (int.tryParse(rawQty.toString()) ?? 0);
+          final unit = (matMap['materialUnit'] ?? matMap['unit'] ?? 'Units').toString().trim();
+
+          if (matName.isNotEmpty && qty > 0) {
+            if (!materialsToTransfer.any((existing) => existing['materialName'].toString().toLowerCase().trim() == matName.toLowerCase())) {
+              materialsToTransfer.add({
+                'materialName': matName,
+                'displayName': matName,
+                'neededCount': qty,
+                'unit': unit,
+              });
+            }
+          }
+        }
       }
     }
   }
@@ -384,6 +465,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         setState(() {
           materialsList = list;
           _isLoadingMaterials = false;
+          _applyPrefilledData();
           if (_selectedMaterialName != null) {
             final match = list.firstWhere(
               (m) =>
@@ -894,14 +976,43 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
         );
       }
 
+      if (widget.linkedRequestId != null && widget.linkedRequestId!.isNotEmpty) {
+        try {
+          await ApprovalWorkflowService.managerFinalClearance(
+            collectionName: 'siteMaterialsRequest',
+            docId: widget.linkedRequestId!,
+            managerName: _managerNameController.text.trim().isNotEmpty
+                ? _managerNameController.text.trim()
+                : _loggedInManagerName,
+            remarks: 'Fulfilled & dispatched via Material Movement.',
+            supervisorName: _supervisorNameController.text.trim(),
+            siteId: _selectedSiteId,
+            materials: materialsToTransfer,
+            additionalUpdates: {
+              'isStockTransferred': true,
+              'dispatchedViaMaterialMovement': true,
+            },
+          );
+        } catch (approvalErr) {
+          debugPrint('Error completing linked approval: $approvalErr');
+        }
+      }
+
       if (mounted) {
         setState(() => _isProcessing = false);
+        final successMsg = (widget.linkedMatReqId != null && widget.linkedMatReqId!.isNotEmpty)
+            ? 'Materials moved successfully & Request #${widget.linkedMatReqId} approved and released to site!'
+            : 'Materials transferred to site successfully!';
         await DialogUtils.showSuccessDialog(
           context,
-          message: 'Materials transferred to site successfully!',
+          message: successMsg,
         );
         _clearAll();
-        await _loadMaterialData();
+        if (widget.linkedRequestId != null && widget.linkedRequestId!.isNotEmpty) {
+          if (mounted) Navigator.pop(context, true);
+        } else {
+          await _loadMaterialData();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1110,6 +1221,83 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (widget.linkedMatReqId != null && widget.linkedMatReqId!.isNotEmpty) ...[
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  const Color(0xFF10B981).withValues(alpha: 0.12),
+                                  const Color(0xFF059669).withValues(alpha: 0.05),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.inventory_2_rounded,
+                                    color: Color(0xFF059669),
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Fulfilling Request #${widget.linkedMatReqId}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 13.5,
+                                              color: Color(0xFF065F46),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF059669),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'PRE-FILLED',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w900,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Review approved items & transfer to dispatch to site.',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (_transferMode == 0) ...[
                           // ── CTS: Company To Site UI ──────────────────────
                           _buildCardContainer(

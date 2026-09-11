@@ -363,24 +363,48 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Request Type & Requested Amount
+          // Header: Request Type, Source Badge & Requested Amount
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
-                ),
-                child: Text(
-                  req.isReplenishment ? 'REPLENISHMENT' : 'INITIAL REQUEST',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF1D4ED8)),
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: req.isManualManager
+                          ? const Color(0xFFFAF5FF)
+                          : (req.isReplenishment
+                              ? const Color(0xFFF0FDFA)
+                              : const Color(0xFFEFF6FF)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: req.isManualManager
+                            ? const Color(0xFFE9D5FF)
+                            : (req.isReplenishment
+                                ? const Color(0xFF99F6E4)
+                                : const Color(0xFFBFDBFE)),
+                      ),
+                    ),
+                    child: Text(
+                      req.isManualManager
+                          ? 'MANAGER ALLOCATION'
+                          : (req.isReplenishment ? 'REPLENISHMENT' : 'SUPERVISOR REQUEST'),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: req.isManualManager
+                            ? const Color(0xFF7E22CE)
+                            : (req.isReplenishment
+                                ? const Color(0xFF0F766E)
+                                : const Color(0xFF1D4ED8)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               Text(
-                PettyCashService.formatCurrency(req.requestedAmount),
+                PettyCashService.formatCurrency(req.requestedAmount > 0 ? req.requestedAmount : req.allocatedAmount),
                 style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
               ),
             ],
@@ -392,9 +416,61 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
             style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
           ),
           Text(
-            'Forwarded by Manager: ${req.managerName}',
+            req.isManualManager
+                ? 'Initiated by Manager: ${req.managerName}'
+                : 'Forwarded by Manager: ${req.managerName}',
             style: const TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600),
           ),
+          // Site & Project Badges
+          if (req.siteName != null || req.siteId != null || req.projectName != null) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (req.siteName != null || req.siteId != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_city_rounded, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${req.siteName ?? req.siteId}',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (req.projectName != null && req.projectName!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.apartment_rounded, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          req.projectName!,
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 4),
           Text(
             'Reason: ${req.reason}',

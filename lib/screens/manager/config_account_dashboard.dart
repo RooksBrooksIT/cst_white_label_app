@@ -12,6 +12,7 @@ import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
 
 import 'package:ebricks/screens/common/contact_support_screen.dart';
+import 'package:ebricks/screens/common/landing_page.dart';
 import 'package:ebricks/screens/manager/config_layout_and_drawing.dart';
 import 'package:ebricks/screens/manager/config_material_information.dart';
 import 'package:ebricks/screens/manager/config_materialavailability.dart';
@@ -64,7 +65,10 @@ class ConfigAccountDashboard extends StatefulWidget {
 }
 
 class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String _managerName = 'Manager';
+  String _managerPhone = '';
+  String _managerEmail = '';
   String _managerDesignation = 'Manager';
   UserRole _currentUserRole = UserRole.none;
   final ScrollController _scrollController = ScrollController();
@@ -426,41 +430,113 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
 
     if (_currentUserRole == UserRole.manager) {
       final data = auth.userData;
-      String name =
-          (data['FullName'] ??
-                  data['fullName'] ??
-                  data['UserName'] ??
-                  data['username'] ??
-                  'Manager')
-              .toString();
+      String name = (data['FullName'] ??
+              data['fullName'] ??
+              data['UserName'] ??
+              data['username'] ??
+              data['Name'] ??
+              data['name'] ??
+              'Manager')
+          .toString();
       String desig = (data['Designation'] ?? data['designation'] ?? '')
+          .toString();
+      String phone = (data['ContactNo'] ??
+              data['contactNo'] ??
+              data['MobileNumber'] ??
+              data['mobileNumber'] ??
+              data['PhoneNumber'] ??
+              data['phoneNumber'] ??
+              data['phone'] ??
+              data['Phone'] ??
+              data['Mobile'] ??
+              data['mobile'] ??
+              '')
+          .toString();
+      String email = (data['Email'] ??
+              data['email'] ??
+              data['EmailAddress'] ??
+              data['emailAddress'] ??
+              '')
           .toString();
 
       if (mounted) {
         setState(() {
           _managerName = name;
           if (desig.isNotEmpty) _managerDesignation = desig;
+          _managerPhone = phone;
+          _managerEmail = email;
         });
       }
 
-      // If designation or full name wasn't cached in userData, fetch from Firestore
+      // If phone, email, designation or full name wasn't cached in userData, fetch from Firestore
       try {
         final username = (data['username'] ?? data['UserName'] ?? '')
             .toString()
             .trim();
         if (username.isNotEmpty) {
           // 1. Try 'manager' collection
-          final managerQuery = await FirestoreService.getCollection(
+          var managerQuery = await FirestoreService.getCollection(
             'manager',
           ).where('UserName', isEqualTo: username).limit(1).get();
+
+          if (managerQuery.docs.isEmpty) {
+            managerQuery = await FirestoreService.getCollection(
+              'manager',
+            ).where('username', isEqualTo: username).limit(1).get();
+          }
+
+          if (managerQuery.docs.isEmpty) {
+            // Also try direct document get by username
+            final docSnap = await FirestoreService.getCollection('manager')
+                .doc(username)
+                .get();
+            if (docSnap.exists && docSnap.data() != null) {
+              final docData = docSnap.data()!;
+              final fetchedFullName =
+                  (docData['FullName'] ?? docData['fullName'] ?? docData['Name'] ?? docData['name'] ?? '')
+                      .toString()
+                      .trim();
+              final fetchedDesig =
+                  (docData['Designation'] ?? docData['designation'] ?? '')
+                      .toString()
+                      .trim();
+              final fetchedPhone =
+                  (docData['ContactNo'] ?? docData['contactNo'] ?? docData['MobileNumber'] ?? docData['mobileNumber'] ?? docData['PhoneNumber'] ?? docData['phoneNumber'] ?? docData['Phone'] ?? docData['phone'] ?? docData['Mobile'] ?? docData['mobile'] ?? '')
+                      .toString()
+                      .trim();
+              final fetchedEmail =
+                  (docData['Email'] ?? docData['email'] ?? docData['EmailAddress'] ?? docData['emailAddress'] ?? '')
+                      .toString()
+                      .trim();
+
+              if (mounted) {
+                setState(() {
+                  if (fetchedFullName.isNotEmpty) _managerName = fetchedFullName;
+                  if (fetchedDesig.isNotEmpty) _managerDesignation = fetchedDesig;
+                  if (fetchedPhone.isNotEmpty) _managerPhone = fetchedPhone;
+                  if (fetchedEmail.isNotEmpty) _managerEmail = fetchedEmail;
+                });
+              }
+              return;
+            }
+          }
+
           if (managerQuery.docs.isNotEmpty) {
             final docData = managerQuery.docs.first.data();
             final fetchedFullName =
-                (docData['FullName'] ?? docData['fullName'] ?? '')
+                (docData['FullName'] ?? docData['fullName'] ?? docData['Name'] ?? docData['name'] ?? '')
                     .toString()
                     .trim();
             final fetchedDesig =
                 (docData['Designation'] ?? docData['designation'] ?? '')
+                    .toString()
+                    .trim();
+            final fetchedPhone =
+                (docData['ContactNo'] ?? docData['contactNo'] ?? docData['MobileNumber'] ?? docData['mobileNumber'] ?? docData['PhoneNumber'] ?? docData['phoneNumber'] ?? docData['Phone'] ?? docData['phone'] ?? docData['Mobile'] ?? docData['mobile'] ?? '')
+                    .toString()
+                    .trim();
+            final fetchedEmail =
+                (docData['Email'] ?? docData['email'] ?? docData['EmailAddress'] ?? docData['emailAddress'] ?? '')
                     .toString()
                     .trim();
 
@@ -468,6 +544,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               setState(() {
                 if (fetchedFullName.isNotEmpty) _managerName = fetchedFullName;
                 if (fetchedDesig.isNotEmpty) _managerDesignation = fetchedDesig;
+                if (fetchedPhone.isNotEmpty) _managerPhone = fetchedPhone;
+                if (fetchedEmail.isNotEmpty) _managerEmail = fetchedEmail;
               });
             }
             return;
@@ -481,11 +559,19 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           if (configQuery.docs.isNotEmpty) {
             final docData = configQuery.docs.first.data();
             final fetchedFullName =
-                (docData['FullName'] ?? docData['fullName'] ?? '')
+                (docData['FullName'] ?? docData['fullName'] ?? docData['Name'] ?? docData['name'] ?? '')
                     .toString()
                     .trim();
             final fetchedDesig =
                 (docData['Designation'] ?? docData['designation'] ?? '')
+                    .toString()
+                    .trim();
+            final fetchedPhone =
+                (docData['ContactNo'] ?? docData['contactNo'] ?? docData['MobileNumber'] ?? docData['mobileNumber'] ?? docData['PhoneNumber'] ?? docData['phoneNumber'] ?? docData['Phone'] ?? docData['phone'] ?? docData['Mobile'] ?? docData['mobile'] ?? '')
+                    .toString()
+                    .trim();
+            final fetchedEmail =
+                (docData['Email'] ?? docData['email'] ?? docData['EmailAddress'] ?? docData['emailAddress'] ?? '')
                     .toString()
                     .trim();
 
@@ -493,6 +579,8 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               setState(() {
                 if (fetchedFullName.isNotEmpty) _managerName = fetchedFullName;
                 if (fetchedDesig.isNotEmpty) _managerDesignation = fetchedDesig;
+                if (fetchedPhone.isNotEmpty) _managerPhone = fetchedPhone;
+                if (fetchedEmail.isNotEmpty) _managerEmail = fetchedEmail;
               });
             }
           }
@@ -554,8 +642,10 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 }
               },
               child: Scaffold(
+                key: _scaffoldKey,
                 backgroundColor: Colors.transparent,
                 extendBody: true,
+                endDrawer: _buildManagerEndDrawer(context),
                 floatingActionButtonLocation:
                     FloatingActionButtonLocation.endFloat,
                 floatingActionButton: _currentIndex == 0
@@ -935,13 +1025,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          const OrgMenuScreen(standalone: true),
-                    ),
-                  );
+                  _scaffoldKey.currentState?.openEndDrawer();
                 },
                 child: Container(
                   width: 44,
@@ -2649,13 +2733,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                     onTap: () => setState(() => _currentIndex = 3),
                   ),
                   _buildNavItem(
-                    icon: _currentIndex == 4
-                        ? Icons.grid_view_rounded
-                        : Icons.menu_rounded,
+                    icon: Icons.menu_rounded,
                     label: 'More',
                     primaryColor: primaryColor,
-                    isSelected: _currentIndex == 4,
-                    onTap: () => setState(() => _currentIndex = 4),
+                    isSelected: false,
+                    onTap: () {
+                      _scaffoldKey.currentState?.openEndDrawer();
+                    },
                   ),
                 ],
               ),
@@ -2720,6 +2804,422 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // -------------------- 5. DEDICATED MANAGER END DRAWER --------------------
+
+  Widget _buildManagerEndDrawer(BuildContext context) {
+    return ValueListenableBuilder<Color>(
+      valueListenable: AppTheme.primaryColor,
+      builder: (context, primaryColor, _) {
+        final darkAccent = AppTheme.getDarkAccent(primaryColor);
+        final screenWidth = MediaQuery.of(context).size.width;
+        final drawerWidth = (screenWidth * 0.85).clamp(280.0, 360.0);
+
+        return Drawer(
+          width: drawerWidth,
+          backgroundColor: const Color(0xFFF8FAFC),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.horizontal(left: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // 1. Premium Header Banner
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  MediaQuery.of(context).padding.top + 20,
+                  16,
+                  24,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryColor, darkAccent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(28),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withValues(alpha: 0.28),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top Row: Role Pill + Close Button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified_user_rounded,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                'Manager Profile',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          tooltip: 'Close',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Avatar + Name + Role Designation
+                    Row(
+                      children: [
+                        Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              width: 2.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              _managerName.isNotEmpty
+                                  ? _managerName[0].toUpperCase()
+                                  : 'M',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                color: primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _managerName.isNotEmpty ? _managerName : 'Manager',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: -0.3,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _managerDesignation.isNotEmpty
+                                    ? _managerDesignation
+                                    : 'Manager',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // 2. Profile Details Content (Manager Name, Phone, Email only)
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      child: Text(
+                        'ACCOUNT INFORMATION',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF94A3B8),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Manager Name Card
+                    _buildDrawerInfoCard(
+                      icon: Icons.person_rounded,
+                      iconColor: const Color(0xFF3B82F6),
+                      label: 'Manager Name',
+                      value: _managerName.isNotEmpty ? _managerName : 'Manager',
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Phone Number Card
+                    _buildDrawerInfoCard(
+                      icon: Icons.phone_rounded,
+                      iconColor: const Color(0xFF10B981),
+                      label: 'Phone Number',
+                      value: _managerPhone.isNotEmpty
+                          ? _managerPhone
+                          : 'Not Provided',
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Email Address Card
+                    _buildDrawerInfoCard(
+                      icon: Icons.mail_rounded,
+                      iconColor: const Color(0xFF8B5CF6),
+                      label: 'Email Address',
+                      value: _managerEmail.isNotEmpty
+                          ? _managerEmail
+                          : 'Not Provided',
+                    ),
+                  ],
+                ),
+              ),
+
+              // 3. Bottom Logout Button
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  0,
+                  16,
+                  MediaQuery.of(context).padding.bottom + 16,
+                ),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.18),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _showLogoutDialog(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.logout_rounded, size: 20, color: Colors.white),
+                        SizedBox(width: 10),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDrawerInfoCard({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 24),
+            SizedBox(width: 10),
+            Text(
+              'Confirm Logout',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to log out of the Manager Dashboard?',
+          style: TextStyle(fontSize: 14.5, color: Color(0xFF475569)),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final rootNav = Navigator.of(dialogContext, rootNavigator: true);
+              await AuthService().logout();
+              rootNav.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LandingPage()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'Yes, Log Out',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3513,7 +4013,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: theme.cardColor,
           shape: RoundedRectangleBorder(
@@ -3546,7 +4046,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(
                 'Cancel',
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
@@ -3554,14 +4054,12 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             ),
             ElevatedButton(
               onPressed: () async {
+                final rootNav = Navigator.of(dialogContext, rootNavigator: true);
                 await AuthService().logout();
-                if (context.mounted) {
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/landing',
-                    (route) => false,
-                  );
-                }
+                rootNav.pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LandingPage()),
+                  (route) => false,
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
@@ -57,10 +57,169 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       final cleanSupId = widget.supervisorId.trim().toLowerCase();
       final cleanSupName = widget.supervisorName.trim().toLowerCase();
 
-      final Map<String, Map<String, dynamic>> consolidatedSites = {};
+      // -----------------------------------------------------------------------
+      // 1. Build a registry from the primary 'Site' collection for canonical resolution
+      // -----------------------------------------------------------------------
+      final Map<String, Map<String, dynamic>> siteRegistry = {};
+      try {
+        final siteSnap = await FirestoreService.getCollection('Site').get();
+        for (final doc in siteSnap.docs) {
+          final data = doc.data();
+          final docId = doc.id.trim();
+          final rawSiteId = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+          final rawSiteName = (data['siteName'] ?? data['name'] ?? '').toString().trim();
+          final projName = (data['projectName'] ?? data['project'] ?? '').toString().trim();
+          final supName = (data['assignedSupervisor'] ??
+                  data['supervisor'] ??
+                  data['supervisorName'] ??
+                  '')
+              .toString()
+              .trim();
+          final supId = (data['supervisorId'] ?? data['Supervisor ID'] ?? '')
+              .toString()
+              .trim();
+
+          String cleanSiteId = rawSiteId;
+          if (cleanSiteId.isEmpty && (docId.startsWith('ST') || docId.startsWith('PR'))) {
+            cleanSiteId = docId.contains('_') ? docId.split('_').first : docId;
+          }
+          if (cleanSiteId.isEmpty && rawSiteId.contains('_')) {
+            cleanSiteId = rawSiteId.split('_').first;
+          }
+          if (cleanSiteId.toUpperCase().startsWith('PR')) {
+            cleanSiteId = 'ST${cleanSiteId.substring(2)}';
+          }
+
+          String cleanSiteName = rawSiteName;
+          if (cleanSiteName.isEmpty && docId.contains('_')) {
+            cleanSiteName = docId.split('_').skip(1).join(' ');
+          } else if (cleanSiteName.isEmpty && rawSiteId.contains('_')) {
+            cleanSiteName = rawSiteId.split('_').skip(1).join(' ');
+          } else if (cleanSiteName.isEmpty) {
+            cleanSiteName = docId;
+          }
+
+          final siteInfo = {
+            'docId': docId,
+            'siteId': cleanSiteId.isNotEmpty ? cleanSiteId : docId,
+            'siteName': cleanSiteName,
+            'projectName': projName,
+            'supervisor': supName,
+            'supervisorId': supId,
+            'data': data,
+          };
+
+          if (cleanSiteId.isNotEmpty) {
+            siteRegistry[cleanSiteId.toLowerCase()] = siteInfo;
+            siteRegistry[cleanSiteId.toUpperCase()] = siteInfo;
+          }
+          if (cleanSiteName.isNotEmpty) {
+            siteRegistry[cleanSiteName.toLowerCase()] = siteInfo;
+          }
+          if (docId.isNotEmpty) {
+            siteRegistry[docId.toLowerCase()] = siteInfo;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error building site registry: $e');
+      }
+
+      // Deduplicated map keyed by unique Site ID (e.g. 'ST001')
+      final Map<String, Map<String, dynamic>> uniqueSitesBySiteId = {};
+
+      void addOrMergeSite({
+        required String rawSiteId,
+        required String rawSiteName,
+        String? rawDocId,
+        String? projectName,
+        String? supervisor,
+      }) {
+        String resolvedSiteId = rawSiteId.trim();
+        String resolvedSiteName = rawSiteName.trim();
+        String projName = (projectName ?? '').trim();
+        String sup = (supervisor ?? widget.supervisorName).trim();
+
+        // Resolve against siteRegistry
+        final reg = siteRegistry[resolvedSiteId.toLowerCase()] ??
+            siteRegistry[resolvedSiteName.toLowerCase()] ??
+            (rawDocId != null ? siteRegistry[rawDocId.toLowerCase()] : null);
+
+        if (reg != null) {
+          if (resolvedSiteId.isEmpty || (!resolvedSiteId.startsWith('ST') && !resolvedSiteId.startsWith('PR'))) {
+            resolvedSiteId = reg['siteId']?.toString() ?? resolvedSiteId;
+          }
+          if (resolvedSiteName.isEmpty || resolvedSiteName.toLowerCase() == resolvedSiteId.toLowerCase()) {
+            resolvedSiteName = reg['siteName']?.toString() ?? resolvedSiteName;
+          }
+          if (projName.isEmpty) {
+            projName = reg['projectName']?.toString() ?? '';
+          }
+        }
+
+        // If siteId contains underscore (e.g. ST001_AbineshHouse)
+        if (resolvedSiteId.contains('_')) {
+          final parts = resolvedSiteId.split('_');
+          if (parts[0].startsWith('ST') || parts[0].startsWith('PR')) {
+            if (resolvedSiteName.isEmpty || resolvedSiteName == resolvedSiteId) {
+              resolvedSiteName = parts.skip(1).join(' ');
+            }
+            resolvedSiteId = parts[0];
+          }
+        }
+
+        if (resolvedSiteId.toUpperCase().startsWith('PR')) {
+          resolvedSiteId = 'ST${resolvedSiteId.substring(2)}';
+        }
+
+        if (resolvedSiteName.isEmpty) {
+          resolvedSiteName = resolvedSiteId;
+        }
+
+        final uniqueKey = (resolvedSiteId.isNotEmpty ? resolvedSiteId : resolvedSiteName).toUpperCase();
+        if (uniqueKey.isEmpty) return;
+
+        if (uniqueSitesBySiteId.containsKey(uniqueKey)) {
+          final existing = uniqueSitesBySiteId[uniqueKey]!;
+          if ((existing['siteName'] == null || existing['siteName'] == existing['siteId']) &&
+              resolvedSiteName.isNotEmpty) {
+            existing['siteName'] = resolvedSiteName;
+          }
+          if ((existing['projectName'] == null || existing['projectName'].toString().isEmpty) &&
+              projName.isNotEmpty) {
+            existing['projectName'] = projName;
+          }
+        } else {
+          // Check if an entry with the exact same site name already exists
+          final existingByName = uniqueSitesBySiteId.values.firstWhere(
+            (s) => (s['siteName']?.toString().toLowerCase() == resolvedSiteName.toLowerCase() &&
+                resolvedSiteName.length > 2),
+            orElse: () => {},
+          );
+
+          if (existingByName.isNotEmpty) {
+            if (resolvedSiteId.startsWith('ST') &&
+                !(existingByName['siteId']?.toString().startsWith('ST') ?? false)) {
+              uniqueSitesBySiteId.remove(existingByName['id']);
+              existingByName['id'] = resolvedSiteId;
+              existingByName['siteId'] = resolvedSiteId;
+              if (projName.isNotEmpty) existingByName['projectName'] = projName;
+              uniqueSitesBySiteId[resolvedSiteId.toUpperCase()] = existingByName;
+            }
+            return;
+          }
+
+          uniqueSitesBySiteId[uniqueKey] = {
+            'id': resolvedSiteId.isNotEmpty ? resolvedSiteId : uniqueKey,
+            'siteId': resolvedSiteId.isNotEmpty ? resolvedSiteId : uniqueKey,
+            'siteName': resolvedSiteName,
+            'projectName': projName,
+            'supervisor': sup,
+          };
+        }
+      }
 
       // -----------------------------------------------------------------------
-      // 1. Fetch from siteSupervisorMap
+      // 2. Fetch from siteSupervisorMap
       // -----------------------------------------------------------------------
       try {
         final mapSnap = await FirestoreService.siteSupervisorMap.get();
@@ -88,25 +247,18 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
               cleanSupId.isEmpty;
 
           if (isMatched) {
-            final rawSiteId = (data['siteId'] ?? data['site'] ?? data['site_id'] ?? doc.id)
-                .toString()
-                .trim();
-            final rawSiteName = (data['siteName'] ?? data['site'] ?? data['projectName'] ?? rawSiteId)
-                .toString()
-                .trim();
+            final rawSiteId = (data['siteId'] ?? data['siteCode'] ?? data['site_id'] ?? '').toString().trim();
+            final rawSiteName = (data['siteName'] ?? data['name'] ?? '').toString().trim();
+            final rawSite = (data['site'] ?? data['siteDocId'] ?? doc.id).toString().trim();
             final projName = (data['projectName'] ?? data['project'] ?? '').toString().trim();
 
-            if (rawSiteId.isNotEmpty || rawSiteName.isNotEmpty) {
-              final key = rawSiteId.isNotEmpty ? rawSiteId : rawSiteName;
-              consolidatedSites[key] = {
-                'id': key,
-                'siteId': rawSiteId.isNotEmpty ? rawSiteId : key,
-                'siteName': rawSiteName.isNotEmpty ? rawSiteName : key,
-                'site': rawSiteName.isNotEmpty ? rawSiteName : key,
-                'projectName': projName,
-                'supervisor': (data['supervisor'] ?? widget.supervisorName).toString(),
-              };
-            }
+            addOrMergeSite(
+              rawSiteId: rawSiteId.isNotEmpty ? rawSiteId : rawSite,
+              rawSiteName: rawSiteName.isNotEmpty ? rawSiteName : rawSite,
+              rawDocId: doc.id,
+              projectName: projName,
+              supervisor: (data['supervisor'] ?? widget.supervisorName).toString(),
+            );
           }
         }
       } catch (e) {
@@ -114,54 +266,28 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       }
 
       // -----------------------------------------------------------------------
-      // 2. Fetch from Site collection
+      // 3. Match from Site registry for assigned supervisor
       // -----------------------------------------------------------------------
-      try {
-        final siteSnap = await FirestoreService.getCollection('Site').get();
-        for (final doc in siteSnap.docs) {
-          final data = doc.data();
-          final docId = doc.id.trim();
-          final sId = (data['siteId'] ?? docId).toString().trim();
-          final sName = (data['siteName'] ?? data['name'] ?? docId).toString().trim();
-          final sSupName = (data['assignedSupervisor'] ??
-                  data['supervisor'] ??
-                  data['supervisorName'] ??
-                  '')
-              .toString()
-              .trim()
-              .toLowerCase();
-          final sSupId = (data['supervisorId'] ?? '').toString().trim().toLowerCase();
+      for (final regEntry in siteRegistry.values) {
+        final supName = (regEntry['supervisor'] ?? '').toString().trim().toLowerCase();
+        final supId = (regEntry['supervisorId'] ?? '').toString().trim().toLowerCase();
+        final isAssigned = (cleanSupId.isNotEmpty && supId == cleanSupId) ||
+            (cleanSupName.isNotEmpty && supName == cleanSupName) ||
+            (cleanSupName.isNotEmpty && supName.contains(cleanSupName));
 
-          final bool isAssigned = (cleanSupId.isNotEmpty && sSupId == cleanSupId) ||
-              (cleanSupName.isNotEmpty && sSupName == cleanSupName) ||
-              (cleanSupName.isNotEmpty && sSupName.contains(cleanSupName)) ||
-              consolidatedSites.containsKey(docId) ||
-              consolidatedSites.containsKey(sId) ||
-              consolidatedSites.containsKey(sName);
-
-          if (isAssigned) {
-            final key = docId.isNotEmpty ? docId : (sId.isNotEmpty ? sId : sName);
-            final existing = consolidatedSites[key] ??
-                consolidatedSites[sId] ??
-                consolidatedSites[sName] ??
-                {};
-
-            consolidatedSites[key] = {
-              'id': key,
-              'siteId': sId.isNotEmpty ? sId : key,
-              'siteName': sName.isNotEmpty ? sName : (existing['siteName'] ?? key),
-              'site': sName.isNotEmpty ? sName : (existing['site'] ?? key),
-              'projectName': data['projectName'] ?? existing['projectName'] ?? '',
-              'supervisor': data['supervisor'] ?? existing['supervisor'] ?? widget.supervisorName,
-            };
-          }
+        if (isAssigned) {
+          addOrMergeSite(
+            rawSiteId: regEntry['siteId']?.toString() ?? '',
+            rawSiteName: regEntry['siteName']?.toString() ?? '',
+            rawDocId: regEntry['docId']?.toString(),
+            projectName: regEntry['projectName']?.toString(),
+            supervisor: regEntry['supervisor']?.toString(),
+          );
         }
-      } catch (e) {
-        debugPrint('Error loading Site collection: $e');
       }
 
       // -----------------------------------------------------------------------
-      // 3. Fetch from workerSiteMapping & workerSiteMap
+      // 4. Fetch from workerSiteMapping
       // -----------------------------------------------------------------------
       try {
         final mapSnap = await FirestoreService.getCollection('workerSiteMapping').get();
@@ -173,17 +299,16 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
 
           if (isMatched) {
             final rawSite = (data['site'] ?? doc.id).toString().trim();
+            final rawSiteId = (data['siteId'] ?? '').toString().trim();
             final projName = (data['projectName'] ?? '').toString().trim();
-            if (rawSite.isNotEmpty && !consolidatedSites.containsKey(rawSite)) {
-              consolidatedSites[rawSite] = {
-                'id': rawSite,
-                'siteId': rawSite,
-                'siteName': rawSite,
-                'site': rawSite,
-                'projectName': projName,
-                'supervisor': data['supervisor'] ?? widget.supervisorName,
-              };
-            }
+
+            addOrMergeSite(
+              rawSiteId: rawSiteId.isNotEmpty ? rawSiteId : rawSite,
+              rawSiteName: rawSite,
+              rawDocId: doc.id,
+              projectName: projName,
+              supervisor: data['supervisor'] ?? widget.supervisorName,
+            );
           }
         }
       } catch (e) {
@@ -191,69 +316,33 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       }
 
       // -----------------------------------------------------------------------
-      // 4. Broad Fallback: If no sites matched the supervisor, load all active sites
+      // 5. Broad Fallback: If no sites matched the supervisor, load all active sites
       // -----------------------------------------------------------------------
-      if (consolidatedSites.isEmpty) {
-        try {
-          final siteSnap = await FirestoreService.getCollection('Site').get();
-          for (final doc in siteSnap.docs) {
-            final data = doc.data();
-            final docId = doc.id.trim();
-            final sId = (data['siteId'] ?? docId).toString().trim();
-            final sName = (data['siteName'] ?? data['name'] ?? docId).toString().trim();
-            final key = docId.isNotEmpty ? docId : (sId.isNotEmpty ? sId : sName);
-            consolidatedSites[key] = {
-              'id': key,
-              'siteId': sId.isNotEmpty ? sId : key,
-              'siteName': sName.isNotEmpty ? sName : key,
-              'site': sName.isNotEmpty ? sName : key,
-              'projectName': data['projectName'] ?? '',
-              'supervisor': data['supervisor'] ?? widget.supervisorName,
-            };
-          }
-        } catch (e) {
-          debugPrint('Error in fallback site loading: $e');
-        }
-
-        // If Site collection was also empty, check all siteSupervisorMap docs
-        if (consolidatedSites.isEmpty) {
-          try {
-            final mapSnap = await FirestoreService.siteSupervisorMap.get();
-            for (final doc in mapSnap.docs) {
-              final data = doc.data();
-              final rawSiteId = (data['siteId'] ?? data['site'] ?? doc.id).toString().trim();
-              final rawSiteName = (data['siteName'] ?? data['site'] ?? rawSiteId).toString().trim();
-              final key = rawSiteId.isNotEmpty ? rawSiteId : rawSiteName;
-              if (key.isNotEmpty) {
-                consolidatedSites[key] = {
-                  'id': key,
-                  'siteId': rawSiteId.isNotEmpty ? rawSiteId : key,
-                  'siteName': rawSiteName.isNotEmpty ? rawSiteName : key,
-                  'site': rawSiteName.isNotEmpty ? rawSiteName : key,
-                  'projectName': data['projectName'] ?? '',
-                  'supervisor': data['supervisor'] ?? widget.supervisorName,
-                };
-              }
-            }
-          } catch (e) {
-            debugPrint('Error in fallback siteSupervisorMap loading: $e');
-          }
+      if (uniqueSitesBySiteId.isEmpty) {
+        for (final regEntry in siteRegistry.values) {
+          addOrMergeSite(
+            rawSiteId: regEntry['siteId']?.toString() ?? '',
+            rawSiteName: regEntry['siteName']?.toString() ?? '',
+            rawDocId: regEntry['docId']?.toString(),
+            projectName: regEntry['projectName']?.toString(),
+            supervisor: regEntry['supervisor']?.toString(),
+          );
         }
       }
 
-      // Convert to clean list
-      final List<Map<String, dynamic>> finalSites = consolidatedSites.values.map((s) {
+      // Convert to clean list of unique sites
+      final List<Map<String, dynamic>> finalSites = uniqueSitesBySiteId.values.map((s) {
         final sId = s['siteId']?.toString() ?? '';
         final sName = s['siteName']?.toString() ?? '';
         String displayLabel;
-        if (sId.isNotEmpty && sName.isNotEmpty && sId != sName) {
+        if (sId.isNotEmpty && sName.isNotEmpty && sId.toLowerCase() != sName.toLowerCase()) {
           displayLabel = '$sName ($sId)';
         } else {
           displayLabel = sName.isNotEmpty ? sName : sId;
         }
 
         return {
-          'id': s['id'],
+          'id': sId.isNotEmpty ? sId : sName,
           'siteId': sId,
           'siteName': sName.isNotEmpty ? sName : sId,
           'site': sName.isNotEmpty ? sName : sId,

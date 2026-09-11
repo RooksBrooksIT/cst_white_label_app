@@ -496,8 +496,7 @@ class ApprovalWorkflowService {
     final reqRef = FirestoreService.getCollection(collectionName).doc(docId);
     final reqSnap = await reqRef.get();
     final reqData = reqSnap.data() ?? {};
-
-    final isAlreadyTransferred = (reqData['isStockTransferred'] == true);
+    final isAlreadyTransferred = (reqData['isStockTransferred'] == true) || (additionalUpdates?['isStockTransferred'] == true);
     final rawMaterials = materials ?? (reqData['materials'] as List?);
     final targetSiteId = (siteId != null && siteId.isNotEmpty)
         ? siteId

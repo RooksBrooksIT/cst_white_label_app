@@ -117,14 +117,21 @@ class PettyCashAccount {
 class PettyCashRequest {
   final String requestId;
   final String orgId;
-  final String requestType; // 'INITIAL_ALLOCATION' or 'REPLENISHMENT'
+  final String requestType; // 'INITIAL_ALLOCATION', 'REPLENISHMENT', or 'MANUAL_MANAGER'
+  final String requestSource; // 'REQUEST_BASED' or 'MANUAL_MANAGER'
   final String supervisorId;
   final String supervisorName;
   final String managerId;
   final String managerName;
+  final String? projectId;
+  final String? projectName;
+  final String? siteId;
+  final String? siteName;
   final double requestedAmount;
   final double approvedAmount;
   final double allocatedAmount;
+  final double totalSpent;
+  final double remainingBalance;
   final String reason;
   final String remarks;
   final String status;
@@ -146,8 +153,6 @@ class PettyCashRequest {
   final DateTime? receivedAt;
   final String? receivedBySupervisorId;
   final String? receivedBySupervisorName;
-  final String? siteId;
-  final String? siteName;
   final String? linkedSitePaymentId;
   final String? linkedSitePaymentTitle;
   final List<Map<String, dynamic>> approvalHistory;
@@ -156,19 +161,26 @@ class PettyCashRequest {
 
   const PettyCashRequest({
     required this.requestId,
-    required this.orgId,
-    required this.requestType,
+    this.orgId = '',
+    this.requestType = 'INITIAL_REQUEST',
+    this.requestSource = 'REQUEST_BASED',
     required this.supervisorId,
     required this.supervisorName,
     this.managerId = '',
     this.managerName = '',
+    this.projectId,
+    this.projectName,
+    this.siteId,
+    this.siteName,
     required this.requestedAmount,
     this.approvedAmount = 0.0,
     this.allocatedAmount = 0.0,
+    this.totalSpent = 0.0,
+    this.remainingBalance = 0.0,
     required this.reason,
     this.remarks = '',
     required this.status,
-    required this.statusDisplay,
+    this.statusDisplay = 'Pending',
     this.currentStep = 1,
     this.currentBalanceAtRequest = 0.0,
     this.totalAllocatedAtRequest = 0.0,
@@ -186,8 +198,6 @@ class PettyCashRequest {
     this.receivedAt,
     this.receivedBySupervisorId,
     this.receivedBySupervisorName,
-    this.siteId,
-    this.siteName,
     this.linkedSitePaymentId,
     this.linkedSitePaymentTitle,
     this.approvalHistory = const [],
@@ -196,6 +206,11 @@ class PettyCashRequest {
   });
 
   bool get isReplenishment => requestType == 'REPLENISHMENT';
+  bool get isManualManager =>
+      requestSource == 'MANUAL_MANAGER' ||
+      requestType == 'MANUAL_MANAGER' ||
+      requestType == 'MANUAL_ALLOCATION';
+  bool get isRequestBased => !isManualManager;
   bool get isAwaitingConfirmation =>
       status == 'awaiting_confirmation' || status == 'awaiting_receipt_confirmation';
   bool get isReceived =>
@@ -203,24 +218,61 @@ class PettyCashRequest {
   bool get isSitePaymentLinked =>
       linkedSitePaymentId != null && linkedSitePaymentId!.isNotEmpty;
 
+  /// Effective active remaining balance for this specific site allocation
+  double get effectiveRemainingBalance {
+    if (!isReceived) return 0.0;
+    if (remainingBalance > 0 || totalSpent > 0) return remainingBalance;
+    final alloc = approvedAmount > 0
+        ? approvedAmount
+        : (allocatedAmount > 0 ? allocatedAmount : requestedAmount);
+    return (alloc - totalSpent).clamp(0.0, double.infinity);
+  }
+
   factory PettyCashRequest.fromMap(String id, Map<String, dynamic> data) {
+    final reqType = (data['requestType'] ?? 'INITIAL_ALLOCATION').toString();
+    final reqSrc = (data['requestSource'] ??
+            (reqType == 'MANUAL_MANAGER' || reqType == 'MANUAL_ALLOCATION'
+                ? 'MANUAL_MANAGER'
+                : 'REQUEST_BASED'))
+        .toString();
+
+    final reqAmt = (data['requestedAmount'] is num)
+        ? (data['requestedAmount'] as num).toDouble()
+        : double.tryParse(data['requestedAmount']?.toString() ?? '') ?? 0.0;
+    final appAmt = (data['approvedAmount'] is num)
+        ? (data['approvedAmount'] as num).toDouble()
+        : double.tryParse(data['approvedAmount']?.toString() ?? '') ?? 0.0;
+    final allocAmt = (data['allocatedAmount'] is num)
+        ? (data['allocatedAmount'] as num).toDouble()
+        : double.tryParse(data['allocatedAmount']?.toString() ?? '') ?? 0.0;
+
+    final spent = (data['totalSpent'] is num)
+        ? (data['totalSpent'] as num).toDouble()
+        : double.tryParse(data['totalSpent']?.toString() ?? '') ?? 0.0;
+
+    final effectiveAlloc = appAmt > 0 ? appAmt : (allocAmt > 0 ? allocAmt : reqAmt);
+    final rawRem = (data['remainingBalance'] is num)
+        ? (data['remainingBalance'] as num).toDouble()
+        : (effectiveAlloc - spent).clamp(0.0, double.infinity);
+
     return PettyCashRequest(
       requestId: id,
       orgId: (data['orgId'] ?? '').toString(),
-      requestType: (data['requestType'] ?? 'INITIAL_ALLOCATION').toString(),
+      requestType: reqType,
+      requestSource: reqSrc,
       supervisorId: (data['supervisorId'] ?? '').toString(),
       supervisorName: (data['supervisorName'] ?? 'Supervisor').toString(),
       managerId: (data['managerId'] ?? '').toString(),
       managerName: (data['managerName'] ?? '').toString(),
-      requestedAmount: (data['requestedAmount'] is num)
-          ? (data['requestedAmount'] as num).toDouble()
-          : double.tryParse(data['requestedAmount']?.toString() ?? '') ?? 0.0,
-      approvedAmount: (data['approvedAmount'] is num)
-          ? (data['approvedAmount'] as num).toDouble()
-          : double.tryParse(data['approvedAmount']?.toString() ?? '') ?? 0.0,
-      allocatedAmount: (data['allocatedAmount'] is num)
-          ? (data['allocatedAmount'] as num).toDouble()
-          : double.tryParse(data['allocatedAmount']?.toString() ?? '') ?? 0.0,
+      projectId: data['projectId']?.toString(),
+      projectName: data['projectName']?.toString(),
+      siteId: data['siteId']?.toString(),
+      siteName: data['siteName']?.toString(),
+      requestedAmount: reqAmt,
+      approvedAmount: appAmt,
+      allocatedAmount: allocAmt,
+      totalSpent: spent,
+      remainingBalance: rawRem,
       reason: (data['reason'] ?? '').toString(),
       remarks: (data['remarks'] ?? '').toString(),
       status: (data['status'] ?? 'pending_manager_review').toString(),
@@ -250,8 +302,6 @@ class PettyCashRequest {
       receivedAt: _parseDateTime(data['receivedAt']),
       receivedBySupervisorId: data['receivedBySupervisorId']?.toString(),
       receivedBySupervisorName: data['receivedBySupervisorName']?.toString(),
-      siteId: data['siteId']?.toString(),
-      siteName: data['siteName']?.toString(),
       linkedSitePaymentId: data['linkedSitePaymentId']?.toString(),
       linkedSitePaymentTitle: data['linkedSitePaymentTitle']?.toString(),
       approvalHistory: (data['approvalHistory'] is List)
@@ -271,13 +321,20 @@ class PettyCashRequest {
       'requestId': requestId,
       'orgId': orgId,
       'requestType': requestType,
+      'requestSource': requestSource,
       'supervisorId': supervisorId,
       'supervisorName': supervisorName,
       'managerId': managerId,
       'managerName': managerName,
+      if (projectId != null) 'projectId': projectId,
+      if (projectName != null) 'projectName': projectName,
+      if (siteId != null) 'siteId': siteId,
+      if (siteName != null) 'siteName': siteName,
       'requestedAmount': requestedAmount,
       'approvedAmount': approvedAmount,
       'allocatedAmount': allocatedAmount,
+      'totalSpent': totalSpent,
+      'remainingBalance': remainingBalance,
       'reason': reason,
       'remarks': remarks,
       'status': status,
@@ -303,8 +360,6 @@ class PettyCashRequest {
         'receivedBySupervisorId': receivedBySupervisorId,
       if (receivedBySupervisorName != null)
         'receivedBySupervisorName': receivedBySupervisorName,
-      if (siteId != null) 'siteId': siteId,
-      if (siteName != null) 'siteName': siteName,
       if (linkedSitePaymentId != null)
         'linkedSitePaymentId': linkedSitePaymentId,
       if (linkedSitePaymentTitle != null)
@@ -322,14 +377,18 @@ class PettyCashRequest {
 class PettyCashTransaction {
   final String transactionId;
   final String idempotencyKey;
+  final String? pettyCashId; // Parent PettyCashRequest.requestId
   final String accountId;
   final String orgId;
   final String supervisorId;
   final String supervisorName;
   final String managerId;
   final String managerName;
+  final String? projectId;
+  final String? projectName;
   final String? siteId;
   final String? siteName;
+  final String? vendorName;
   final String? linkedSitePaymentId;
   final bool isSiteExpense;
   final String transactionType; // 'ALLOCATION', 'EXPENSE', 'REPLENISHMENT', 'ADJUSTMENT', 'REVERSAL'
@@ -348,14 +407,18 @@ class PettyCashTransaction {
   const PettyCashTransaction({
     required this.transactionId,
     required this.idempotencyKey,
+    this.pettyCashId,
     required this.accountId,
     required this.orgId,
     required this.supervisorId,
     required this.supervisorName,
     this.managerId = '',
     this.managerName = '',
+    this.projectId,
+    this.projectName,
     this.siteId,
     this.siteName,
+    this.vendorName,
     this.linkedSitePaymentId,
     this.isSiteExpense = false,
     required this.transactionType,
@@ -375,21 +438,28 @@ class PettyCashTransaction {
   bool get isExpense => transactionType == 'EXPENSE';
   bool get isAllocation =>
       transactionType == 'ALLOCATION' || transactionType == 'REPLENISHMENT';
+  bool get isOtherExpense =>
+      expenseCategory.toLowerCase() == 'other' ||
+      expenseCategory.toLowerCase() == 'miscellaneous';
 
   factory PettyCashTransaction.fromMap(String id, Map<String, dynamic> data) {
     return PettyCashTransaction(
       transactionId: id,
       idempotencyKey: (data['idempotencyKey'] ?? id).toString(),
+      pettyCashId: (data['pettyCashId'] ?? data['requestId'])?.toString(),
       accountId: (data['accountId'] ?? '').toString(),
       orgId: (data['orgId'] ?? '').toString(),
       supervisorId: (data['supervisorId'] ?? '').toString(),
       supervisorName: (data['supervisorName'] ?? 'Supervisor').toString(),
       managerId: (data['managerId'] ?? '').toString(),
       managerName: (data['managerName'] ?? '').toString(),
+      projectId: data['projectId']?.toString(),
+      projectName: data['projectName']?.toString(),
       siteId: data['siteId']?.toString(),
       siteName: data['siteName']?.toString(),
+      vendorName: (data['vendorName'] ?? data['vendor'] ?? data['payee'])?.toString(),
       linkedSitePaymentId: data['linkedSitePaymentId']?.toString(),
-      isSiteExpense: data['isSiteExpense'] == true,
+      isSiteExpense: data['isSiteExpense'] == true || (data['siteId']?.toString().isNotEmpty == true),
       transactionType: (data['transactionType'] ?? 'EXPENSE').toString(),
       expenseCategory: (data['expenseCategory'] ?? 'Other').toString(),
       description: (data['description'] ?? '').toString(),
@@ -415,14 +485,18 @@ class PettyCashTransaction {
     return {
       'transactionId': transactionId,
       'idempotencyKey': idempotencyKey,
+      if (pettyCashId != null) 'pettyCashId': pettyCashId,
       'accountId': accountId,
       'orgId': orgId,
       'supervisorId': supervisorId,
       'supervisorName': supervisorName,
       'managerId': managerId,
       'managerName': managerName,
+      if (projectId != null) 'projectId': projectId,
+      if (projectName != null) 'projectName': projectName,
       'siteId': siteId ?? '',
       'siteName': siteName ?? '',
+      if (vendorName != null) 'vendorName': vendorName,
       if (linkedSitePaymentId != null)
         'linkedSitePaymentId': linkedSitePaymentId,
       'isSiteExpense': isSiteExpense,
