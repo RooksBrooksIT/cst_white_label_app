@@ -28,6 +28,12 @@ class PayUParams {
   final bool isSandbox;
   final String? pg;
   final String? bankcode;
+  final String? udf1;
+  final String? udf2;
+  final String? udf3;
+  final String? udf4;
+  final String? udf5;
+  final String? appId;
 
   PayUParams({
     this.merchantId,
@@ -44,7 +50,16 @@ class PayUParams {
     bool? isSandbox,
     this.pg,
     this.bankcode,
+    this.udf1,
+    this.udf2,
+    this.udf3,
+    String? udf4,
+    String? udf5,
+    String? appId,
   })  : isSandbox = isSandbox ?? !PayUService.isProduction,
+        udf4 = udf4 ?? 'ebricks',
+        udf5 = udf5 ?? 'ebricks_subscription',
+        appId = appId ?? 'ebricks',
         surl = surl ??
             dotenv.env['PAYU_SURL'] ??
             defaultSuccessUrl,
@@ -149,9 +164,14 @@ class PayUService {
     final String sanitizedFirstName = sanitizeName(params.firstName);
     final String sanitizedProductInfo = sanitizeProductInfo(params.productInfo);
     final String sanitizedEmail = sanitizeEmail(params.email);
+    final String udf1 = params.udf1 ?? '';
+    final String udf2 = params.udf2 ?? '';
+    final String udf3 = params.udf3 ?? '';
+    final String udf4 = params.udf4 ?? 'ebricks';
+    final String udf5 = params.udf5 ?? 'ebricks_subscription';
 
     final hashSequence =
-        '${params.merchantKey}|${params.txnid}|$amountStr|$sanitizedProductInfo|$sanitizedFirstName|$sanitizedEmail|||||||||||${params.merchantSalt}';
+        '${params.merchantKey}|${params.txnid}|$amountStr|$sanitizedProductInfo|$sanitizedFirstName|$sanitizedEmail|$udf1|$udf2|$udf3|$udf4|$udf5||||||${params.merchantSalt}';
 
     final bytes = utf8.encode(hashSequence);
     final digest = sha512.convert(bytes);
@@ -264,6 +284,11 @@ class PayUService {
       'furl': params.furl,
       'hash': hash,
       'service_provider': 'payu_paisa',
+      'udf1': params.udf1 ?? '',
+      'udf2': params.udf2 ?? '',
+      'udf3': params.udf3 ?? '',
+      'udf4': params.udf4 ?? 'ebricks',
+      'udf5': params.udf5 ?? 'ebricks_subscription',
     };
 
     if (params.pg != null) map['pg'] = params.pg!;
@@ -349,6 +374,13 @@ class PayUService {
       'phone': params.phone,
       'merchantKey': params.merchantKey,
       'environment': params.isSandbox ? 'sandbox' : 'production',
+      'udf1': params.udf1 ?? '',
+      'udf2': params.udf2 ?? '',
+      'udf3': params.udf3 ?? '',
+      'udf4': params.udf4 ?? 'ebricks',
+      'udf5': params.udf5 ?? 'ebricks_subscription',
+      'appId': params.appId ?? 'ebricks',
+      'application': 'ebricks',
       if (params.pg != null) 'pg': params.pg,
       if (params.bankcode != null) 'bankcode': params.bankcode,
     };
@@ -456,6 +488,8 @@ class PayUService {
     String? payerName,
     String? txnid,
     String? paymentMethod,
+    bool? isTrial,
+    bool? isUpgrade,
   }) async {
     final Map<String, dynamic> invoicePayload = {
       'orgId': orgId,
@@ -466,6 +500,8 @@ class PayUService {
       'payerName': payerName,
       'txnid': txnid ?? 'INV_${DateTime.now().millisecondsSinceEpoch}',
       'paymentMethod': paymentMethod ?? (amount == 0 ? 'Free Trial Activation' : 'Direct'),
+      if (isTrial != null) 'isTrial': isTrial,
+      if (isUpgrade != null) 'isUpgrade': isUpgrade,
     };
 
     debugPrint('\n=================== SEND PLAN INVOICE REQUEST ===================');

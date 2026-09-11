@@ -1274,6 +1274,13 @@ class PettyCashService {
         'receivedAt': DateTime.now().toIso8601String(),
       },
     );
+
+    // Trigger immediate Site Financial Details & Project synchronization
+    if (reqSiteId != null && reqSiteId!.trim().isNotEmpty) {
+      ExpenseService.recalcTotalsAndSyncProject(reqSiteId!.trim()).catchError((e) {
+        debugPrint('Error syncing site financial details on petty cash receipt: $e');
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1545,6 +1552,16 @@ class PettyCashService {
       );
     }
 
+    // Trigger immediate Site Financial Details & Project synchronization
+    final effectiveSite = (siteId != null && siteId.trim().isNotEmpty)
+        ? siteId.trim()
+        : (createdTxn.siteId != null ? createdTxn.siteId!.trim() : '');
+    if (effectiveSite.isNotEmpty) {
+      ExpenseService.recalcTotalsAndSyncProject(effectiveSite).catchError((e) {
+        debugPrint('Error syncing site financial details on petty cash expense: $e');
+      });
+    }
+
     return createdTxn;
   }
 
@@ -1717,4 +1734,245 @@ class PettyCashService {
         .map((snap) =>
             snap.docs.map((d) => PettyCashAuditLog.fromMap(d.id, d.data())).toList());
   }
+
+  // ---------------------------------------------------------------------------
+  // 10. SITE-WISE EXPENSE TRACKING & AGGREGATION ENGINE
+  // ---------------------------------------------------------------------------
+
+  /// Calculates site-wise petty cash summaries across requests and transactions with filtering.
+  List<SitePettyCashSummary> calculateSiteWiseSummaries({
+    required List<PettyCashRequest> requests,
+    required List<PettyCashTransaction> transactions,
+    DateTime? fromDate,
+    DateTime? toDate,
+    String? siteFilter,
+    String? supervisorFilter,
+    String? projectFilter,
+    String? categoryFilter,
+  }) {
+    final Map<String, List<PettyCashRequest>> siteRequestsMap = {};
+    final Map<String, List<PettyCashTransaction>> siteTransactionsMap = {};
+    final Map<String, String> siteNameMap = {};
+    final Map<String, String> siteProjectMap = {};
+    final Map<String, String> siteSupervisorIdMap = {};
+    final Map<String, String> siteSupervisorNameMap = {};
+    final Map<String, String> siteManagerIdMap = {};
+    final Map<String, String> siteManagerNameMap = {};
+
+    final cleanSiteFilter = (siteFilter ?? '').trim().toLowerCase();
+    final cleanSupFilter = (supervisorFilter ?? '').trim().toLowerCase();
+    final cleanProjFilter = (projectFilter ?? '').trim().toLowerCase();
+    final cleanCatFilter = (categoryFilter ?? '').trim().toLowerCase();
+
+    // 1. Group Requests by Site
+    for (final req in requests) {
+      final rawSite = (req.siteId ?? '').trim();
+      if (rawSite.isEmpty) continue;
+      final siteKey = ExpenseService.formatCanonicalSiteId(
+        rawId: rawSite,
+        siteName: req.siteName,
+      );
+
+      // Apply site filter
+      if (cleanSiteFilter.isNotEmpty &&
+          siteKey.toLowerCase() != cleanSiteFilter &&
+          (req.siteName ?? '').toLowerCase() != cleanSiteFilter &&
+          !siteKey.toLowerCase().contains(cleanSiteFilter)) {
+        continue;
+      }
+
+      // Apply supervisor filter
+      if (cleanSupFilter.isNotEmpty &&
+          req.supervisorId.toLowerCase() != cleanSupFilter &&
+          req.supervisorName.toLowerCase() != cleanSupFilter &&
+          !req.supervisorName.toLowerCase().contains(cleanSupFilter)) {
+        continue;
+      }
+
+      // Apply project filter
+      if (cleanProjFilter.isNotEmpty &&
+          (req.projectId ?? '').toLowerCase() != cleanProjFilter &&
+          (req.projectName ?? '').toLowerCase() != cleanProjFilter &&
+          !(req.projectName ?? '').toLowerCase().contains(cleanProjFilter)) {
+        continue;
+      }
+
+      siteRequestsMap.putIfAbsent(siteKey, () => []).add(req);
+      if (req.siteName != null && req.siteName!.isNotEmpty) {
+        siteNameMap[siteKey] = req.siteName!;
+      }
+      if (req.projectName != null && req.projectName!.isNotEmpty) {
+        siteProjectMap[siteKey] = req.projectName!;
+      }
+      if (req.supervisorId.isNotEmpty) {
+        siteSupervisorIdMap[siteKey] = req.supervisorId;
+        siteSupervisorNameMap[siteKey] = req.supervisorName;
+      }
+      if (req.managerName.isNotEmpty) {
+        siteManagerIdMap[siteKey] = req.managerId;
+        siteManagerNameMap[siteKey] = req.managerName;
+      }
+    }
+
+    // 2. Group Transactions by Site
+    for (final t in transactions) {
+      final rawSite = (t.siteId ?? '').trim();
+      if (rawSite.isEmpty) continue;
+      final siteKey = ExpenseService.formatCanonicalSiteId(
+        rawId: rawSite,
+        siteName: t.siteName,
+      );
+
+      // Apply site filter
+      if (cleanSiteFilter.isNotEmpty &&
+          siteKey.toLowerCase() != cleanSiteFilter &&
+          (t.siteName ?? '').toLowerCase() != cleanSiteFilter &&
+          !siteKey.toLowerCase().contains(cleanSiteFilter)) {
+        continue;
+      }
+
+      // Apply supervisor filter
+      if (cleanSupFilter.isNotEmpty &&
+          t.supervisorId.toLowerCase() != cleanSupFilter &&
+          t.supervisorName.toLowerCase() != cleanSupFilter &&
+          !t.supervisorName.toLowerCase().contains(cleanSupFilter)) {
+        continue;
+      }
+
+      // Apply project filter
+      if (cleanProjFilter.isNotEmpty &&
+          (t.projectId ?? '').toLowerCase() != cleanProjFilter &&
+          (t.projectName ?? '').toLowerCase() != cleanProjFilter &&
+          !(t.projectName ?? '').toLowerCase().contains(cleanProjFilter)) {
+        continue;
+      }
+
+      // Apply category filter
+      if (cleanCatFilter.isNotEmpty &&
+          cleanCatFilter != 'all' &&
+          t.expenseCategory.toLowerCase() != cleanCatFilter &&
+          !t.expenseCategory.toLowerCase().contains(cleanCatFilter)) {
+        continue;
+      }
+
+      // Apply date range filter
+      if (fromDate != null) {
+        final startOfFromDate = DateTime(fromDate.year, fromDate.month, fromDate.day);
+        if (t.transactionDate.isBefore(startOfFromDate)) continue;
+      }
+      if (toDate != null) {
+        final endOfToDate = DateTime(toDate.year, toDate.month, toDate.day, 23, 59, 59);
+        if (t.transactionDate.isAfter(endOfToDate)) continue;
+      }
+
+      siteTransactionsMap.putIfAbsent(siteKey, () => []).add(t);
+      if (t.siteName != null && t.siteName!.isNotEmpty && !siteNameMap.containsKey(siteKey)) {
+        siteNameMap[siteKey] = t.siteName!;
+      }
+      if (t.projectName != null && t.projectName!.isNotEmpty && !siteProjectMap.containsKey(siteKey)) {
+        siteProjectMap[siteKey] = t.projectName!;
+      }
+      if (t.supervisorId.isNotEmpty && !siteSupervisorIdMap.containsKey(siteKey)) {
+        siteSupervisorIdMap[siteKey] = t.supervisorId;
+        siteSupervisorNameMap[siteKey] = t.supervisorName;
+      }
+      if (t.managerName.isNotEmpty && !siteManagerNameMap.containsKey(siteKey)) {
+        siteManagerIdMap[siteKey] = t.managerId;
+        siteManagerNameMap[siteKey] = t.managerName;
+      }
+    }
+
+    final Set<String> allSiteKeys = {
+      ...siteRequestsMap.keys,
+      ...siteTransactionsMap.keys,
+    };
+
+    final List<SitePettyCashSummary> summaries = [];
+
+    for (final siteKey in allSiteKeys) {
+      final siteReqs = siteRequestsMap[siteKey] ?? [];
+      final siteTxns = siteTransactionsMap[siteKey] ?? [];
+
+      // Calculate total allocated / received from confirmed requests
+      double totalReceived = 0.0;
+      for (final r in siteReqs) {
+        if (r.isReceived) {
+          final alloc = r.approvedAmount > 0
+              ? r.approvedAmount
+              : (r.allocatedAmount > 0 ? r.allocatedAmount : r.requestedAmount);
+          totalReceived += alloc;
+        }
+      }
+
+      // Calculate total expenses & other expenses from transactions
+      double totalExpenses = 0.0;
+      double otherExpenses = 0.0;
+      DateTime? lastActivity;
+
+      for (final t in siteTxns) {
+        if (t.isExpense) {
+          totalExpenses += t.amount;
+          if (t.isOtherExpense) {
+            otherExpenses += t.amount;
+          }
+        }
+        if (lastActivity == null || t.transactionDate.isAfter(lastActivity)) {
+          lastActivity = t.transactionDate;
+        }
+      }
+
+      // If transactions are empty but request has spent, use request totalSpent
+      if (totalExpenses == 0 && siteReqs.isNotEmpty) {
+        for (final r in siteReqs) {
+          if (r.totalSpent > 0) {
+            totalExpenses += r.totalSpent;
+          }
+        }
+      }
+
+      final remaining = (totalReceived - totalExpenses).clamp(0.0, double.infinity);
+
+      String status = 'Active';
+      if (totalReceived <= 0) {
+        status = siteReqs.isNotEmpty ? 'Pending Receipt' : 'No Allocation';
+      } else if (remaining <= 0) {
+        status = 'Fully Utilized';
+      } else if (remaining <= (totalReceived * 0.1)) {
+        status = 'Low Balance';
+      }
+
+      final siteDisplayName = siteNameMap[siteKey] ?? siteKey;
+      final projDisplayName = siteProjectMap[siteKey];
+      final supId = siteSupervisorIdMap[siteKey] ?? (siteReqs.isNotEmpty ? siteReqs.first.supervisorId : '');
+      final supName = siteSupervisorNameMap[siteKey] ?? (siteReqs.isNotEmpty ? siteReqs.first.supervisorName : 'Supervisor');
+      final mgrId = siteManagerIdMap[siteKey] ?? (siteReqs.isNotEmpty ? siteReqs.first.managerId : '');
+      final mgrName = siteManagerNameMap[siteKey] ?? (siteReqs.isNotEmpty ? siteReqs.first.managerName : 'Manager');
+
+      summaries.add(SitePettyCashSummary(
+        siteId: siteKey,
+        siteName: siteDisplayName,
+        projectId: projDisplayName != null ? siteKey : null,
+        projectName: projDisplayName,
+        supervisorId: supId,
+        supervisorName: supName,
+        managerId: mgrId,
+        managerName: mgrName,
+        totalReceived: totalReceived,
+        totalExpenses: totalExpenses,
+        otherExpenses: otherExpenses,
+        remainingBalance: remaining,
+        transactionCount: siteTxns.where((t) => t.isExpense).length,
+        allocationCount: siteReqs.where((r) => r.isReceived).length,
+        lastActivityAt: lastActivity ?? (siteReqs.isNotEmpty ? siteReqs.first.receivedAt : null),
+        status: status,
+        allocations: siteReqs,
+        transactions: siteTxns,
+      ));
+    }
+
+    // Sort by remaining balance descending or site name
+    summaries.sort((a, b) => b.totalReceived.compareTo(a.totalReceived));
+    return summaries;
+  }
 }
+

@@ -314,9 +314,11 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     Color primaryColor,
     Color darkAccent,
   ) {
+    final isSmall = Responsive.isSmallMobile(context);
     return AppBar(
       elevation: 0,
       backgroundColor: Colors.transparent,
+      systemOverlayStyle: SystemUiOverlayStyle.light,
       flexibleSpace: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -344,10 +346,10 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
         ),
         onPressed: () => Navigator.pop(context),
       ),
-      title: const Text(
+      title: Text(
         'Financial Overview',
         style: TextStyle(
-          fontSize: 18,
+          fontSize: isSmall ? 16 : 18,
           fontWeight: FontWeight.w900,
           color: Colors.white,
           letterSpacing: -0.3,
@@ -454,6 +456,8 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
       filteredList.sort((a, b) => (a['siteName'] ?? '').toString().compareTo((b['siteName'] ?? '').toString()));
     }
 
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return CustomScrollView(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(
@@ -463,8 +467,9 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
         // 1. Top Financial Overview Hero Card
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 14),
+            padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 12),
             child: _buildFinancialOverviewCard(
+              context: context,
               totalIncome: totalIncome,
               totalExpenses: totalExpenses,
               netProfit: netProfit,
@@ -480,7 +485,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
         // 2. Search & Filter Bar
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
+            padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -501,7 +506,13 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                   child: TextField(
                     controller: _searchController,
                     onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                    ),
                     decoration: InputDecoration(
+                      isDense: true,
                       hintText: 'Search site, project, or client...',
                       hintStyle: const TextStyle(
                         fontSize: 13,
@@ -524,13 +535,13 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                           : null,
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
+                        horizontal: 14,
+                        vertical: 12,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
                 // Status Filter Chips
                 SingleChildScrollView(
@@ -546,13 +557,17 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                           selected: isSelected,
                           selectedColor: primaryColor,
                           backgroundColor: Colors.white,
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           labelStyle: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                             color: isSelected ? Colors.white : const Color(0xFF475569),
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(16),
                             side: BorderSide(
                               color: isSelected ? primaryColor : const Color(0xFFE2E8F0),
                             ),
@@ -580,34 +595,49 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        borderRadius: BorderRadius.circular(2),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: primaryColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Sites Financial Breakdown',
-                      style: TextStyle(
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.3,
+                      const SizedBox(width: 8),
+                      const Flexible(
+                        child: Text(
+                          'Sites Financial Breakdown',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                Text(
-                  '${filteredList.length} ${filteredList.length == 1 ? 'Site' : 'Sites'}',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF64748B),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Text(
+                    '${filteredList.length} ${filteredList.length == 1 ? 'Site' : 'Sites'}',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ],
@@ -619,22 +649,39 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
         if (filteredList.isEmpty)
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 40),
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 24),
               child: Container(
-                padding: const EdgeInsets.all(28),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.account_balance_wallet_outlined,
-                      size: 52,
-                      color: Colors.grey.shade400,
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 38,
+                        color: Colors.grey.shade400,
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     const Text(
                       'No sites found',
                       style: TextStyle(
@@ -643,7 +690,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                         color: Color(0xFF1E293B),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     const Text(
                       'Try adjusting your search query or status filter.',
                       style: TextStyle(
@@ -652,6 +699,31 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
+                    if (_searchQuery.isNotEmpty || _selectedStatusTab != 'All') ...[
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: primaryColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
+                          ),
+                        ),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                            _selectedStatusTab = 'All';
+                          });
+                        },
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text(
+                          'Reset Filters',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -659,7 +731,12 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
           )
         else
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 100),
+            padding: EdgeInsets.fromLTRB(
+              hPad,
+              0,
+              hPad,
+              kBottomNavigationBarHeight + bottomInset + 24,
+            ),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
@@ -683,6 +760,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
 
   // -------------------- TOP FINANCIAL OVERVIEW CARD --------------------
   Widget _buildFinancialOverviewCard({
+    required BuildContext context,
     required double totalIncome,
     required double totalExpenses,
     required double netProfit,
@@ -692,8 +770,11 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     required Color primaryColor,
     required Color darkAccent,
   }) {
+    final isSmall = Responsive.isSmallMobile(context);
+    final cardPadding = isSmall ? 14.0 : 18.0;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(cardPadding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -703,7 +784,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
             color: darkAccent.withValues(alpha: 0.35),
@@ -721,45 +802,38 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
         children: [
           // Row 1: Header Title & Live Badge
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: Colors.white,
+                  size: 15,
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.account_balance_wallet_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Total Organization Finance',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white70,
-                          letterSpacing: 0.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Total Organization Finance',
+                  style: TextStyle(
+                    fontSize: isSmall ? 12 : 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    letterSpacing: 0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 8,
-                  vertical: 3,
+                  vertical: 3.5,
                 ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF10B981).withValues(alpha: 0.2),
@@ -768,19 +842,22 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                     color: const Color(0xFF10B981).withValues(alpha: 0.4),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.fiber_manual_record_rounded,
-                      size: 8,
-                      color: Color(0xFF10B981),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                    SizedBox(width: 4),
-                    Text(
+                    const SizedBox(width: 4),
+                    const Text(
                       'Live Backend Data',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF10B981),
                       ),
@@ -790,7 +867,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: isSmall ? 12 : 16),
 
           // Row 2: Total Income & Total Expenses Big KPIs
           Row(
@@ -798,96 +875,132 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
               // Total Income
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmall ? 10 : 12,
+                    vertical: isSmall ? 10 : 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.35),
                     ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.arrow_downward_rounded,
-                            size: 14,
-                            color: Color(0xFF10B981),
+                          Container(
+                            padding: const EdgeInsets.all(2.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_downward_rounded,
+                              size: 11,
+                              color: Color(0xFF10B981),
+                            ),
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Total Income',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white70,
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              'Total Income',
+                              style: TextStyle(
+                                fontSize: isSmall ? 10.5 : 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white70,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        '₹ ${_formatCurrency(totalIncome)}',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF10B981),
-                          letterSpacing: -0.4,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '₹ ${_formatCurrency(totalIncome)}',
+                          style: TextStyle(
+                            fontSize: isSmall ? 15 : 17,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFF10B981),
+                            letterSpacing: -0.4,
+                          ),
+                          maxLines: 1,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: isSmall ? 8 : 10),
 
               // Total Expenses
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmall ? 10 : 12,
+                    vertical: isSmall ? 10 : 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: const Color(0xFFEF4444).withValues(alpha: 0.3),
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.35),
                     ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.arrow_upward_rounded,
-                            size: 14,
-                            color: Color(0xFFEF4444),
+                          Container(
+                            padding: const EdgeInsets.all(2.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_upward_rounded,
+                              size: 11,
+                              color: Color(0xFFEF4444),
+                            ),
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Total Expenses',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white70,
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              'Total Expenses',
+                              style: TextStyle(
+                                fontSize: isSmall ? 10.5 : 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white70,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        '₹ ${_formatCurrency(totalExpenses)}',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFFEF4444),
-                          letterSpacing: -0.4,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '₹ ${_formatCurrency(totalExpenses)}',
+                          style: TextStyle(
+                            fontSize: isSmall ? 15 : 17,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFFEF4444),
+                            letterSpacing: -0.4,
+                          ),
+                          maxLines: 1,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -895,45 +1008,56 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: isSmall ? 10 : 12),
 
           // Row 3: Site Counts Row (Live, Completed, Planning)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmall ? 8 : 12,
+              vertical: isSmall ? 8 : 10,
+            ),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildCountIndicator(
-                  label: 'Live Sites',
-                  count: liveSitesCount < 10 ? '0$liveSitesCount' : '$liveSitesCount',
-                  color: const Color(0xFF38BDF8),
-                  icon: Icons.domain_rounded,
+                Expanded(
+                  child: _buildCountIndicator(
+                    label: 'Live Sites',
+                    count: liveSitesCount < 10 ? '0$liveSitesCount' : '$liveSitesCount',
+                    color: const Color(0xFF38BDF8),
+                    icon: Icons.domain_rounded,
+                    isSmall: isSmall,
+                  ),
                 ),
                 Container(
                   width: 1,
-                  height: 24,
+                  height: 22,
                   color: Colors.white.withValues(alpha: 0.15),
                 ),
-                _buildCountIndicator(
-                  label: 'Completed',
-                  count: completedSitesCount < 10 ? '0$completedSitesCount' : '$completedSitesCount',
-                  color: const Color(0xFF34D399),
-                  icon: Icons.check_circle_rounded,
+                Expanded(
+                  child: _buildCountIndicator(
+                    label: 'Completed',
+                    count: completedSitesCount < 10 ? '0$completedSitesCount' : '$completedSitesCount',
+                    color: const Color(0xFF34D399),
+                    icon: Icons.check_circle_rounded,
+                    isSmall: isSmall,
+                  ),
                 ),
                 Container(
                   width: 1,
-                  height: 24,
+                  height: 22,
                   color: Colors.white.withValues(alpha: 0.15),
                 ),
-                _buildCountIndicator(
-                  label: 'Planning',
-                  count: planningSitesCount < 10 ? '0$planningSitesCount' : '$planningSitesCount',
-                  color: const Color(0xFFA78BFA),
-                  icon: Icons.architecture_rounded,
+                Expanded(
+                  child: _buildCountIndicator(
+                    label: 'Planning',
+                    count: planningSitesCount < 10 ? '0$planningSitesCount' : '$planningSitesCount',
+                    color: const Color(0xFFA78BFA),
+                    icon: Icons.architecture_rounded,
+                    isSmall: isSmall,
+                  ),
                 ),
               ],
             ),
@@ -948,34 +1072,45 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     required String count,
     required Color color,
     required IconData icon,
+    required bool isSmall,
   }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              count,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: color,
-              ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: Colors.white70,
-              ),
+            Icon(icon, size: isSmall ? 13 : 15, color: color),
+            const SizedBox(width: 5),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  count,
+                  style: TextStyle(
+                    fontSize: isSmall ? 13 : 14,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    height: 1.1,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: isSmall ? 9 : 10,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.75),
+                    height: 1.1,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-      ],
+      ),
     );
   }
 
@@ -985,6 +1120,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     Map<String, dynamic> site,
     Color primaryColor,
   ) {
+    final isSmall = Responsive.isSmallMobile(context);
     final siteId = (site['siteId'] ?? '').toString();
     final siteName = (site['siteName'] ?? siteId).toString();
     final projectName = (site['projectName'] ?? siteName).toString();
@@ -1037,13 +1173,12 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isSmall ? 12 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Top Row: Site / Project Name & Status Badge
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
@@ -1052,29 +1187,37 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                siteName,
-                                style: const TextStyle(
-                                  fontSize: 16.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0F172A),
-                                  letterSpacing: -0.3,
+                              Flexible(
+                                child: Text(
+                                  siteName,
+                                  style: TextStyle(
+                                    fontSize: isSmall ? 14.5 : 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF0F172A),
+                                    letterSpacing: -0.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               if (projectName.isNotEmpty && projectName != siteName) ...[
                                 const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: primaryColor.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    projectName,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: primaryColor,
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: primaryColor.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      projectName,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: primaryColor,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ),
@@ -1084,20 +1227,23 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                           const SizedBox(height: 3),
                           Text(
                             '$category • $subCategory ${ownerName.isNotEmpty ? '• Owner: $ownerName${ownerPhone.isNotEmpty ? ' ($ownerPhone)' : ''}' : ''}',
-                            style: const TextStyle(
-                              fontSize: 11.5,
+                            style: TextStyle(
+                              fontSize: isSmall ? 10.5 : 11.5,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
+                              color: const Color(0xFF64748B),
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
@@ -1106,7 +1252,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                           child: Text(
                             status,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: isSmall ? 10 : 11,
                               fontWeight: FontWeight.w800,
                               color: statusColor,
                             ),
@@ -1115,7 +1261,7 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                         const SizedBox(width: 4),
                         const Icon(
                           Icons.arrow_forward_ios_rounded,
-                          size: 14,
+                          size: 13,
                           color: Color(0xFF94A3B8),
                         ),
                       ],
@@ -1132,27 +1278,34 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                         label: 'Budget',
                         amount: '₹ ${_formatCurrency(budget)}',
                         color: const Color(0xFF0284C7),
+                        isSmall: isSmall,
                       ),
                     ),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: _buildMetricItem(
                         label: 'Income',
                         amount: '₹ ${_formatCurrency(income)}',
                         color: const Color(0xFF10B981),
+                        isSmall: isSmall,
                       ),
                     ),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: _buildMetricItem(
                         label: 'Expenses',
                         amount: '₹ ${_formatCurrency(expenses)}',
                         color: const Color(0xFFEF4444),
+                        isSmall: isSmall,
                       ),
                     ),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: _buildMetricItem(
                         label: 'Balance',
                         amount: '₹ ${_formatCurrency(balance)}',
                         color: const Color(0xFF8B5CF6),
+                        isSmall: isSmall,
                       ),
                     ),
                   ],
@@ -1180,10 +1333,10 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
                     const SizedBox(width: 8),
                     Text(
                       '$usagePercent% spent',
-                      style: const TextStyle(
-                        fontSize: 10.5,
+                      style: TextStyle(
+                        fontSize: isSmall ? 9.5 : 10.5,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF64748B),
+                        color: const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -1200,29 +1353,35 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     required String label,
     required String amount,
     required Color color,
+    required bool isSmall,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF64748B),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          amount,
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-            color: color,
-            letterSpacing: -0.2,
+            fontSize: isSmall ? 9.5 : 10.5,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF64748B),
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            amount,
+            style: TextStyle(
+              fontSize: isSmall ? 11 : 12,
+              fontWeight: FontWeight.w900,
+              color: color,
+              letterSpacing: -0.2,
+            ),
+            maxLines: 1,
+          ),
         ),
       ],
     );

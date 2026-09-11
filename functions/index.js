@@ -86,8 +86,13 @@ function computeRequestHash(params, salt) {
   const firstName = sanitizeName(params.firstName);
   const productInfo = sanitizeProductInfo(params.productInfo);
   const email = sanitizeEmail(params.email);
+  const udf1 = params.udf1 || "";
+  const udf2 = params.udf2 || "";
+  const udf3 = params.udf3 || "";
+  const udf4 = params.udf4 || "ebricks";
+  const udf5 = params.udf5 || "ebricks_subscription";
 
-  const hashSequence = `${params.merchantKey}|${params.txnid}|${amountStr}|${productInfo}|${firstName}|${email}|||||||||||${salt}`;
+  const hashSequence = `${params.merchantKey}|${params.txnid}|${amountStr}|${productInfo}|${firstName}|${email}|${udf1}|${udf2}|${udf3}|${udf4}|${udf5}||||||${salt}`;
 
   logger.info("PayU Cloud Function Hash Sequence:", hashSequence);
   
@@ -130,11 +135,14 @@ function computeResponseHash(params, salt, fallbackKey = "") {
 exports.generatePayUHash = functions.region("us-central1").https.onCall(async (data, context) => {
   try {
     const payload = data || {};
-    const { txnid, amount, productInfo, firstName, email, phone, pg, bankcode } = payload;
+    const { txnid, amount, productInfo, firstName, email, phone, pg, bankcode, udf1, udf2, udf3, udf4, udf5 } = payload;
 
     if (!txnid || !amount) {
       throw new HttpsError("invalid-argument", "Missing required parameters: txnid and amount");
     }
+
+    const effectiveUdf4 = udf4 || "ebricks";
+    const effectiveUdf5 = udf5 || "ebricks_subscription";
 
     const config = getPayUConfig(payload);
     const params = {
@@ -144,6 +152,11 @@ exports.generatePayUHash = functions.region("us-central1").https.onCall(async (d
       productInfo,
       firstName,
       email,
+      udf1: udf1 || "",
+      udf2: udf2 || "",
+      udf3: udf3 || "",
+      udf4: effectiveUdf4,
+      udf5: effectiveUdf5,
     };
 
     const hash = computeRequestHash(params, config.merchantSalt);
@@ -160,6 +173,11 @@ exports.generatePayUHash = functions.region("us-central1").https.onCall(async (d
       furl: process.env.PAYU_FURL || "https://api.payu.in/public/#/failure",
       hash,
       service_provider: "payu_paisa",
+      udf1: udf1 || "",
+      udf2: udf2 || "",
+      udf3: udf3 || "",
+      udf4: effectiveUdf4,
+      udf5: effectiveUdf5,
     };
 
     // Add optional UPI Intent payment parameters
@@ -310,7 +328,7 @@ exports.verifySubscription = functions.region("us-central1").https.onCall(async 
 
     // Ensure we have the user's registered email - check Firestore admin & root org doc if missing from request
     let effectiveEmail = (subscriptionUpdate.payerEmail || "").trim();
-    let orgName = "eBricks Organization Workspace";
+    let orgName = "eBricks Workspace";
     let effectiveCustomerName = subscriptionUpdate.payerName || "Customer";
 
     try {
@@ -348,6 +366,9 @@ exports.verifySubscription = functions.region("us-central1").https.onCall(async 
     let emailResult = null;
     if (isSubscriptionActive && effectiveEmail) {
       try {
+        const isFreeTrial = (planDetails?.planName || "").toLowerCase().includes("free trial") || subscriptionUpdate.paymentAmount === 0;
+        const isUpgrade = Boolean(payload.isUpgrade || (txnid && String(txnid).startsWith("UPG")));
+
         emailResult = await emailService.sendSubscriptionInvoice({
           orgId,
           txnid,
@@ -361,11 +382,13 @@ exports.verifySubscription = functions.region("us-central1").https.onCall(async 
           paymentMethod: subscriptionUpdate.paymentMethod,
           startDate: now,
           endDate,
+          isTrial: isFreeTrial,
+          isUpgrade,
         }, db);
         
-        logger.info(`Invoice email dispatch result for txnid ${txnid}:`, emailResult);
+        logger.info(`[eBricks verifySubscription] Invoice email dispatch result for txnid ${txnid}:`, emailResult);
       } catch (emailErr) {
-        logger.warn(`Invoice email dispatch error for txnid ${txnid}:`, emailErr.message || emailErr);
+        logger.warn(`[eBricks verifySubscription] Invoice email dispatch error for txnid ${txnid}:`, emailErr.message || emailErr);
         // Important: Email failure must NOT rollback the active subscription
       }
     }
@@ -473,14 +496,54 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
       const config = getPayUConfig();
       const { txnid, status, amount, email, firstname, productinfo, mihexpressid } = payload;
       const mihpayid = mihexpressid || payload.mihpayid || payload.payuMoneyId || "";
-      const isSuccess = (status || "").toLowerCase() === "success";
+      const rawStatus = (status || "").toLowerCase();
+      let isSuccess = rawStatus === "success";
+
+      // Check if this request is a browser HTTP redirect (surl / furl hitting payuWebhook)
+      const isBrowserRedirect = (req.headers["accept"] && req.headers["accept"].includes("text/html")) ||
+          req.headers["sec-fetch-dest"] === "document" ||
+          (req.headers["user-agent"] && req.headers["user-agent"].includes("Mozilla")) ||
+          (payload && (payload.mihpayid || payload.payuMoneyId || payload.unmappedstatus || payload.status));
+
+      // -------------------------------------------------------------
+      // 1. RESPONSE SIGNATURE HASH VERIFICATION
+      // -------------------------------------------------------------
+      if (payload.hash) {
+        const computedHash = computeResponseHash(payload, config.merchantSalt, config.merchantKey);
+        if (computedHash !== payload.hash.toLowerCase()) {
+          logger.warn(`[eBricks PayU Webhook] Hash signature mismatch for txnid ${txnid}: computed=${computedHash}, received=${payload.hash}`);
+          // If hash mismatch, invalidate success status
+          isSuccess = false;
+        }
+      }
 
       const db = admin.firestore();
 
       if (txnid) {
-        // Record webhook audit log in Firestore
+        const orgIdFromUdf = (payload.udf1 || "").trim();
+
+        // -------------------------------------------------------------
+        // 2. IDEMPOTENCY CHECK
+        // Prevent duplicate processing on repeated PayU webhook deliveries
+        // -------------------------------------------------------------
+        const existingLogDoc = await db.collection("payment_logs").doc(txnid).get().catch(() => null);
+        if (existingLogDoc && existingLogDoc.exists) {
+          const logData = existingLogDoc.data() || {};
+          if (logData.processedByApp === true && logData.status === "success" && isSuccess) {
+            logger.info(`[eBricks PayU Webhook] Transaction ${txnid} already processed. Skipping duplicate execution.`);
+            if (isBrowserRedirect) {
+              res.set("Content-Type", "text/html");
+              return res.status(200).send(renderBridgeHtml(payload));
+            }
+            return res.status(200).json({ status: "success", message: "Transaction already processed", txnid });
+          }
+        }
+
+        // Record verified eBricks webhook audit log in Firestore
         await db.collection("payment_logs").doc(txnid).set({
           txnid,
+          app: "eBricks",
+          processedByApp: true,
           status: status || "UNKNOWN",
           amount: parseFloat(amount || 0),
           email: email || "",
@@ -491,10 +554,9 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
           rawData: payload,
         }, { merge: true }).catch((err) => logger.warn("Log write warning:", err));
 
-        // 1. If udf1 carries the orgId, update organisation and subscription document directly
-        const orgId = (payload.udf1 || "").trim();
-        if (orgId) {
-          const orgRef = db.collection("organisation").doc(orgId);
+        // 3. If udf1 carries the orgId, update organisation and subscription document directly
+        if (orgIdFromUdf && orgIdFromUdf !== "onboarding_temp") {
+          const orgRef = db.collection("organisation").doc(orgIdFromUdf);
           await orgRef.set({
             isSubscriptionActive: isSuccess,
             paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
@@ -513,7 +575,7 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
           }, { merge: true }).catch(() => {});
         }
 
-        // 2. Query top-level organisation collection by paymentTxnId
+        // 4. Query top-level organisation collection by paymentTxnId
         const orgQuery = await db.collection("organisation")
           .where("paymentTxnId", "==", txnid)
           .get()
@@ -543,7 +605,7 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
           }
         }
 
-        // 3. Send invoice email on successful webhook (idempotency prevents duplicate sends)
+        // 5. Send invoice email on successful webhook (idempotent in emailService)
         if (isSuccess) {
           try {
             let payerEmail = email;
@@ -551,8 +613,8 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
             let orgName = "eBricks Workspace";
             let planName = productinfo || "Silver";
 
-            if (orgId) {
-              const orgDoc = await db.collection("organisation").doc(orgId).get();
+            if (orgIdFromUdf && orgIdFromUdf !== "onboarding_temp") {
+              const orgDoc = await db.collection("organisation").doc(orgIdFromUdf).get();
               if (orgDoc.exists) {
                 const oData = orgDoc.data() || {};
                 orgName = oData.org_name || oData.name || orgName;
@@ -561,8 +623,11 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
             }
 
             if (payerEmail) {
+              const isFreeTrial = (planName || "").toLowerCase().includes("trial") || parseFloat(amount || 0) === 0;
+              const isUpgrade = (planName || "").toLowerCase().includes("upgrade") || String(txnid).startsWith("UPG");
+
               await emailService.sendSubscriptionInvoice({
-                orgId: orgId || "",
+                orgId: orgIdFromUdf || "",
                 txnid,
                 payerEmail,
                 payerName,
@@ -574,6 +639,8 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
                 paymentMethod: payload.mode || "PayU",
                 startDate: new Date(),
                 endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                isTrial: isFreeTrial,
+                isUpgrade,
               }, db);
             }
           } catch (emailErr) {
@@ -581,12 +648,6 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
           }
         }
       }
-
-      // Check if this request is a browser HTTP redirect (surl / furl hitting payuWebhook)
-      const isBrowserRedirect = (req.headers["accept"] && req.headers["accept"].includes("text/html")) ||
-          req.headers["sec-fetch-dest"] === "document" ||
-          (req.headers["user-agent"] && req.headers["user-agent"].includes("Mozilla")) ||
-          (payload && (payload.mihpayid || payload.payuMoneyId || payload.unmappedstatus || payload.status));
 
       if (isBrowserRedirect) {
         res.set("Content-Type", "text/html");
@@ -620,6 +681,7 @@ exports.payuResponse = functions.region("us-central1").https.onRequest((req, res
         const db = admin.firestore();
         db.collection("payment_logs").doc(txnid).set({
           txnid,
+          app: "eBricks",
           status,
           amount: parseFloat(rawData.amount || 0),
           email: rawData.email || "",
@@ -668,6 +730,10 @@ exports.resendSubscriptionInvoice = functions.region("us-central1").https.onCall
       throw new HttpsError("invalid-argument", "No valid recipient email associated with this invoice");
     }
 
+    const numAmount = parseFloat(invoiceData.amount || 0);
+    const isFreeTrial = (invoiceData.planName || "").toLowerCase().includes("free trial") || (numAmount === 0 && (String(invoiceData.paymentMethod || "").toLowerCase().includes("trial") || String(invoiceData.invoiceType || "").toLowerCase().includes("trial") || String(invoiceData.planType || "").toLowerCase().includes("trial")));
+    const isPlanUpgrade = String(invoiceData.paymentMethod).toLowerCase().includes("upgrade") || (txnid && String(txnid).startsWith("UPG"));
+
     const html = emailService.renderInvoiceHtml({
       customerName: invoiceData.payerName || "Customer",
       orgName: invoiceData.orgName || "eBricks Workspace",
@@ -681,9 +747,19 @@ exports.resendSubscriptionInvoice = functions.region("us-central1").https.onCall
       paymentDate: invoiceData.paymentDate || new Date().toLocaleDateString("en-IN"),
       startDate: invoiceData.startDate || "Today",
       endDate: invoiceData.endDate || "30 Days",
+      isTrial: isFreeTrial,
+      isUpgrade: isPlanUpgrade,
     });
 
-    const subject = `Payment Receipt & Invoice for ${invoiceData.orgName || "eBricks Workspace"}`;
+    let subject = "";
+    if (isFreeTrial) {
+      subject = `Welcome to eBricks - Free Trial Subscription Invoice for ${invoiceData.orgName || "eBricks Workspace"}`;
+    } else if (isPlanUpgrade) {
+      subject = `eBricks Subscription Plan Update Invoice - ${invoiceData.orgName || "eBricks Workspace"} (${invoiceData.planName || "Plan"})`;
+    } else {
+      subject = `eBricks Subscription Invoice & Payment Receipt - ${invoiceData.orgName || "eBricks Workspace"} (${invoiceData.planName || "Plan"})`;
+    }
+
     const result = await emailService.sendEmail({
       to: targetEmail,
       subject,
@@ -729,6 +805,8 @@ exports.sendNewSubscriptionInvoice = functions.region("us-central1").https.onCal
       payerName,
       paymentMethod = "Free Trial Activation",
       payuMoneyId = "Complimentary Access",
+      isTrial,
+      isUpgrade,
     } = payload;
 
     if (!orgId) {
@@ -739,7 +817,7 @@ exports.sendNewSubscriptionInvoice = functions.region("us-central1").https.onCal
     const orgRef = db.collection("organisation").doc(orgId);
 
     let effectiveEmail = (payerEmail || "").trim();
-    let orgName = "eBricks Organization Workspace";
+    let orgName = "eBricks Workspace";
     let effectiveCustomerName = payerName || "Customer";
 
     try {
@@ -780,6 +858,10 @@ exports.sendNewSubscriptionInvoice = functions.region("us-central1").https.onCal
 
     const endDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
+    const numAmount = parseFloat(amount || 0);
+    const isFreeTrial = isTrial !== undefined ? isTrial : (planName.toLowerCase().includes("free trial") || numAmount === 0);
+    const isPlanUpgrade = isUpgrade !== undefined ? isUpgrade : (String(paymentMethod).toLowerCase().includes("upgrade") || String(txnid).startsWith("UPG"));
+
     const result = await emailService.sendSubscriptionInvoice({
       orgId,
       txnid,
@@ -788,11 +870,13 @@ exports.sendNewSubscriptionInvoice = functions.region("us-central1").https.onCal
       orgName,
       planName,
       planType,
-      amount: parseFloat(amount || 0),
+      amount: numAmount,
       payuMoneyId,
       paymentMethod,
       startDate: now,
       endDate,
+      isTrial: isFreeTrial,
+      isUpgrade: isPlanUpgrade,
     }, db);
 
     return {

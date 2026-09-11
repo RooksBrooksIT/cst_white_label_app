@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/firestore_service.dart';
-import 'package:ebricks/screens/organization/org_site_payment_menu_page.dart';
 import 'package:ebricks/screens/organization/org_supervisor_in_site_page.dart';
 import 'package:ebricks/screens/organization/organization_expenses.dart';
 import 'package:ebricks/screens/organization/org_approvals_menu_page.dart';
@@ -1038,7 +1037,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     return InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
-        _navigateToSitePaymentMenu(context);
+        _navigateToSitesList(context);
       },
       borderRadius: BorderRadius.circular(22),
       child: Container(
@@ -1970,19 +1969,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 onTap: () => _navigateToOrganizationExpenses(context),
               ),
 
-              // 2. Site Payment
-              _buildConstructionActionCard(
-                title: 'Site Payment',
-                subtitle: 'Entry & reports',
-                icon: Icons.payments_rounded,
-                accentColor: const Color(0xFF2563EB),
-                onTap: () => _navigateToSitePaymentMenu(context),
-              ),
-
-              // 3. Approvals
+              // 2. Approvals
               _buildConstructionActionCard(
                 title: 'Approvals',
-                subtitle: 'Materials, tools & payments',
+                subtitle: 'Materials, tools & petty cash',
                 icon: Icons.fact_check_rounded,
                 accentColor: const Color(0xFFD97706),
                 onTap: () => Navigator.push(
@@ -1993,7 +1983,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ),
               ),
 
-              // 4. Supervisor in Site
+              // 3. Supervisor in Site
               _buildConstructionActionCard(
                 title: 'Supervisor in Site',
                 subtitle: 'Staff & site allocations',
@@ -2007,7 +1997,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ),
               ),
 
-              // 5. Materials & Tools Inventory
+              // 4. Materials & Tools Inventory
               _buildConstructionActionCard(
                 title: 'Materials & Tools Inventory',
                 subtitle: 'Stock levels & equipment',
@@ -2021,7 +2011,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ),
               ),
 
-              // 6. Manager Config
+              // 5. Manager Config
               _buildConstructionActionCard(
                 title: 'Manager Config',
                 subtitle: 'Roles & permissions',
@@ -2035,7 +2025,7 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                 ),
               ),
 
-              // 7. Petty Cash Hub
+              // 6. Petty Cash Hub
               _buildConstructionActionCard(
                 title: 'Petty Cash Hub',
                 subtitle: 'Allocations & master ledger',
@@ -2048,38 +2038,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ),
                 ),
               ),
-
-              // 8. Static Emoji Card
-              _buildStaticEmojiCard(),
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildStaticEmojiCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 14,
-            spreadRadius: 0,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: const Center(
-        child: Text(
-          '🏗️',
-          style: TextStyle(
-            fontSize: 42,
-          ),
-        ),
       ),
     );
   }
@@ -2222,10 +2183,6 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     );
   }
 
-  void _navigateToSitePaymentMenu(BuildContext context) => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => const OrgSitePaymentMenuPage()),
-  );
 
   void _navigateToOrganizationExpenses(BuildContext context) => Navigator.push(
     context,

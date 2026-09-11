@@ -1,0 +1,337 @@
+================================================================================
+           CST WHITE-LABEL APP: INVOICE AND BILL FLOW ANALYSIS REPORT
+================================================================================
+Project: CST White-Label Construction Management Platform (eBricks)
+Generated: September 11, 2026
+Version: 1.0.0
+Author: DeepMind Antigravity Pair-Programming Agent
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. Executive Architecture Overview
+2. Domain 1: SaaS Subscription Invoicing & Tax Receipts Flow
+   2.1 Client Initiation & PayU Checkout
+   2.2 Backend Webhook Verification & Application Isolation Guard
+   2.3 HTML Invoice Rendering & SMTP Email Dispatch
+   2.4 Idempotency & Resend Workflows
+3. Domain 2: Site Construction Expense Bills & Vendor Receipts Flow
+   3.1 Supervisor Petty Cash & Daily Expense Bills
+   3.2 Manager Site Expense Bills
+   3.3 Organisation HQ Bulk Bills
+   3.4 Media & Receipt Storage Architecture
+4. Domain 3: Financial Aggregation & Reconciliation Engine
+   4.1 ExpenseService Logic & Formulas
+   4.2 Canonical Document Storage (totalSiteExpensesPerDay)
+   4.3 Multi-Level Sync (Site & Project Budgets)
+5. Domain 4: PDF Export & Invoicing Reports
+6. Firestore Schema & Storage Hierarchy
+7. Architectural Flow Diagrams
+
+================================================================================
+1. EXECUTIVE ARCHITECTURE OVERVIEW
+================================================================================
+
+The CST White-Label application features two distinct invoice and billing systems
+operating in parallel:
+
+A. SaaS Platform Subscription Invoicing:
+   - Manages recurring organisation license fees (Free Trial, Silver, Gold, Platinum).
+   - Direct gateway integration via PayU (S2S Webhooks, hosted checkout, UPI intent).
+   - Generates automated, branded tax invoices/receipts delivered to customer emails
+     via Cloud Functions and Gmail SMTP.
+
+B. Operational Construction Expense Bills & Vendor Receipts:
+   - Tracks ground-level operational disbursements across construction sites.
+   - Captures physical bill/voucher photos, supplier invoice numbers, vendor names,
+     and category breakdowns (Materials, Fuel, Food, Transportation, Machinery).
+   - Reconciles across 3 management tiers (Supervisor, Manager, Organisation HQ).
+   - Real-time aggregation calculates Total Site Expenses, Remaining Budget, and
+     Petty Cash Balances.
+
+================================================================================
+2. DOMAIN 1: SAAS SUBSCRIPTION INVOICING & TAX RECEIPTS FLOW
+================================================================================
+
+2.1 Client Initiation & PayU Checkout:
+--------------------------------------------------------------------------------
+1. Entry Points:
+   - PricingScreen (lib/screens/organization/pricing_screen.dart)
+   - PayUCheckoutScreen (lib/screens/organization/payu_checkout_screen.dart)
+
+2. Payload Construction (PayUService.dart):
+   - PayUParams object generated with:
+     * txnid: CST transaction ID (e.g. TXN-1726048123000)
+     * amount: Plan price in INR (e.g. 2999.00)
+     * productInfo: "<OrgName> <PlanName> Plan (<PlanType>)"
+     * firstName: Customer Name or Organization Name
+     * email: Billing contact email
+     * phone: 10-digit sanitized phone
+     * udf1: Organization ID / Name
+     * udf4: "cst_whitelabel" (App signature)
+     * udf5: "cst_subscription" (Subscription signature)
+     * appId: "cst"
+     * surl / furl: Webhook callback URL
+   - SHA-512 Hash Sequence:
+     sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||salt)
+
+2.2 Backend Webhook Verification & Application Isolation Guard:
+--------------------------------------------------------------------------------
+1. Cloud Functions Endpoints (functions/index.js):
+   - payuWebhook: Handles server-to-server POST webhooks and browser redirect callbacks.
+   - verifySubscription: Callable function for direct client validation.
+   - payuResponse: Handles WebView navigation status redirects.
+
+2. Application Origin Guard (checkTransactionOrigin):
+   - Inspects udf1..udf5, appId, application, productinfo, and txnid.
+   - Strictly ignores and rejects IMS Mobile App transactions:
+     * Drops udf5 == "ims_subscription", udf5.startsWith("ims_"), appId == "ims".
+     * Acknowledges PayU server with HTTP 200 { status: "ignored" }.
+     * Performs ZERO writes to CST Firestore and sends ZERO CST emails.
+   - Validates CST signature for genuine transactions (udf5 == "cst_subscription").
+
+3. Cryptographic Verification:
+   - Computes SHA-512 response hash using production merchant salt:
+     sha512(salt|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
+   - Requires valid status == "success" and confirmed mihpayid / payuMoneyId.
+
+4. Database Sync:
+   - Updates organisation/{orgId} (isSubscriptionActive, paymentStatus, payuMoneyId).
+   - Updates organisation/{orgId}/data/subscription with full plan configuration.
+   - Writes immutable audit log to payment_logs/{txnid} with app: "CST".
+
+2.3 HTML Invoice Rendering & SMTP Email Dispatch:
+--------------------------------------------------------------------------------
+1. Dispatch Engine (functions/emailService.js -> sendSubscriptionInvoice):
+   - Invoked automatically upon verified payment success.
+   - Recipient email validated and masked in logs for security.
+
+2. Rendered Invoice Components (renderInvoiceHtml):
+   - Brand Header: eBricks Workspace branding with status badge.
+   - Invoice Number: Formatted as INV-<timestamp> or INV-<last6Txn>.
+   - Summary Box: Total Amount Paid (₹ formatted) / 100% Free Trial notice.
+   - Itemized Table:
+     * Customer & Organisation Name
+     * Plan Type & Billing Frequency (Monthly, 6 Months, Yearly)
+     * Payment Method (UPI, Card, NetBanking)
+     * Transaction ID & PayU Money ID
+     * Payment Date & Active Validity Period (Start Date to End Date)
+   - Support Contact: Dedicated billing support details (support@rookstechnologies.com).
+
+3. Delivery:
+   - Dispatched via Nodemailer over STARTTLS (port 587) / SSL (port 465) using Gmail SMTP.
+
+2.4 Idempotency & Resend Workflows:
+--------------------------------------------------------------------------------
+1. Idempotency Check:
+   - Before email transmission, checks Firestore collection invoices/{txnid}.
+   - If emailStatus == "SENT", skips duplicate email dispatch.
+   - Saves record with emailMessageId, emailSentAt, and full invoice metadata.
+
+2. Manual Resend Capability:
+   - Callable Cloud Function resendSubscriptionInvoice(txnid, emailOverride).
+   - Allows administrative re-dispatch to updated or corrected email addresses.
+
+================================================================================
+3. DOMAIN 2: SITE CONSTRUCTION EXPENSE BILLS & VENDOR RECEIPTS FLOW
+================================================================================
+
+3.1 Supervisor Petty Cash & Daily Expense Bills:
+--------------------------------------------------------------------------------
+1. Collection Sources:
+   - pettyCashTransactions: Vendor disbursements funded via supervisor petty cash.
+   - siteSupervisorEntries: Daily operational expenses (labour, food, fuel, transport).
+
+2. Captured Fields:
+   - billNo: Vendor invoice / cash memo number.
+   - billVendor: Merchant / supplier business name.
+   - billAmount / totalAmount: Monetary value in INR.
+   - billImageUrl / billProof: Firebase Storage URL for physical receipt photo.
+   - category: Materials, Transport, Equipment Hire, Fuel, Food, General.
+   - isPettyCash: Boolean flag preventing double-counting against supervisor entries.
+
+3.2 Manager Site Expense Bills:
+--------------------------------------------------------------------------------
+1. Collection Source: managerExpenses
+2. Schema & Structure:
+   - Contains an embedded bills array of structured objects:
+     bills: [
+       {
+         "billNo": "INV-8492",
+         "billVendor": "Shree Ram Cement Traders",
+         "billAmount": 45000.00,
+         "billDate": "2026-09-10",
+         "billImage": "https://firebasestorage.../bill_8492.jpg",
+         "billType": "Materials"
+       }, ...
+     ]
+
+3.3 Organisation HQ Bulk Bills:
+--------------------------------------------------------------------------------
+1. Collection Source: organizationExpenses / organizationEntries
+2. Usage:
+   - High-value procurement (structural steel, RMC bulk orders, crane rental).
+   - Stores itemized bills array matching manager schema.
+
+3.4 Media & Receipt Storage Architecture:
+--------------------------------------------------------------------------------
+- Handled by AppStorageService.uploadExpenseBill (lib/services/app_storage_service.dart).
+- Storage Path Template:
+  organisation/{orgId}/expenses/{siteId}_{dateFormatted}/bill_{billNo}_{timestamp}.jpg
+- Security & Multi-Tenancy: Scoped strictly under tenant orgId, preventing cross-tenant leakage.
+
+================================================================================
+4. DOMAIN 3: FINANCIAL AGGREGATION & RECONCILIATION ENGINE
+================================================================================
+
+The reconciliation logic in ExpenseService (lib/services/expense_service.dart) runs
+whenever any supervisor, petty cash, manager, or organisation expense is recorded.
+
+4.1 ExpenseService Logic & Formulas:
+--------------------------------------------------------------------------------
+1. Bill Array Aggregation:
+   - Iterates through bills array across managerExpenses and organizationExpenses:
+     BillsTotal = Sum(bill['billAmount'] ?? bill['amount'])
+
+2. Petty Cash Site Aggregation:
+   - Sums confirmed pettyCashRequests for the site -> TotalPettyCashReceived
+   - Sums pettyCashTransactions for the site -> TotalPettyCashSpent
+   - Computes: RemainingPettyCash = TotalPettyCashReceived - TotalPettyCashSpent
+
+3. Master Total Site Expense Formula:
+   TotalSiteExpense = SupervisorDailyEntries (excluding petty cash)
+                    + PettyCashSpent
+                    + ManagerBillsTotal
+                    + OrganizationBillsTotal
+                    + ContractorPayments
+                    + IncentivePayments
+
+4.2 Canonical Document Storage:
+--------------------------------------------------------------------------------
+- Document: totalSiteExpensesPerDay/{canonicalSiteId}
+- Fields Stored:
+  * totalSupervisorExpense: Daily site labour & food entries
+  * totalManagerExpense: Manager bill totals
+  * totalOrgExpense: Org HQ bill totals
+  * totalPettyCashExpense: Petty cash vendor disbursements
+  * totalPettyCashReceived: Confirmed petty cash allocations
+  * remainingPettyCash: Current available petty cash balance
+  * totalContractorExpense: Payouts to subcontractors
+  * totalSiteExpense: Comprehensive site outflow sum
+  * canonicalSiteId, siteCode, siteName, lastUpdated
+
+4.3 Multi-Level Sync:
+--------------------------------------------------------------------------------
+- Automatically syncs amountSpent and amountBalance to:
+  1. Site/{siteDocId} (Site-level financial allocation)
+  2. projects/{projectDocId} (Project-level financial allocation)
+
+================================================================================
+5. DOMAIN 4: PDF EXPORT & INVOICING REPORTS
+================================================================================
+
+1. Project Stage PDF Helper (lib/utils/project_stage_pdf_helper.dart):
+   - Generates tabular breakdown of Manager Bills: [Vendor | Bill No | Amount]
+   - Generates tabular breakdown of Organization Bills: [Vendor | Bill No | Amount]
+
+2. Financial Status Report (lib/screens/reports/financial_status_report.dart):
+   - Outputs comprehensive site financial statement.
+   - Includes Site Petty Cash summary table (Received, Spent, Balance).
+   - Embeds contractor invoices, manager bills, and supervisor claims.
+
+3. Site Expenses Report (lib/screens/reports/site_expenses_report_page.dart):
+   - Detailed audit export listing every individual bill, photo attachment link,
+     voucher number, and expense category.
+
+================================================================================
+6. FIRESTORE SCHEMA & STORAGE HIERARCHY
+================================================================================
+
+firestore/
+├── organisation/{orgId}/
+│   │
+│   ├── data/
+│   │   ├── admin                          <-- Workspace Admin Credentials
+│   │   └── subscription                   <-- Active SaaS Plan, PayU Txn & Expiry
+│   │
+│   ├── Site/{siteId}                      <-- Budget, amountSpent & amountBalance
+│   ├── projects/{projectId}               <-- Project Level Budget & Spent Sync
+│   │
+│   ├── managerExpenses/{docId}            <-- Manager Bills Array
+│   │   └── bills: [{ billNo, billVendor, billAmount, billImage }]
+│   │
+│   ├── organizationExpenses/{docId}       <-- Org HQ Bulk Bills Array
+│   │   └── bills: [{ billNo, billVendor, billAmount, billImage }]
+│   │
+│   ├── pettyCashRequests/{reqId}          <-- Petty Cash Top-up & Site Allocation
+│   ├── pettyCashTransactions/{txnId}      <-- Supervisor Petty Cash Bills & Receipts
+│   ├── siteSupervisorEntries/{entryId}    <-- Daily Labour, Food & Travel Vouchers
+│   │
+│   └── totalSiteExpensesPerDay/{siteId}   <-- Canonical Reconciled Ledger
+│
+├── invoices/{txnid}                       <-- SaaS Tax Invoices (Idempotency Audit)
+└── payment_logs/{txnid}                   <-- PayU S2S Webhook Transaction Audit
+
+Storage Bucket:
+└── organisation/{orgId}/expenses/{siteId}_{date}/bill_{billNo}_{timestamp}.jpg
+
+================================================================================
+7. ARCHITECTURAL FLOW DIAGRAMS
+================================================================================
+
+A. SaaS SUBSCRIPTION INVOICE FLOW:
+----------------------------------
+[PricingScreen]
+      │
+      ▼
+[PayUService.buildPostDataAsync] ── (Stamped with udf4: cst_whitelabel, udf5: cst_subscription)
+      │
+      ▼
+[PayU Payment Gateway]
+      │
+      ▼ (Webhook Notification)
+[payuWebhook Cloud Function]
+      │
+      ├── [Origin Guard: checkTransactionOrigin]
+      │         ├── (isIms == true) ──► Log & Return HTTP 200 (Drop / No Write)
+      │         └── (isCst == true) ──► Continue
+      │
+      ├── [Signature Hash Verification]
+      ├── [Idempotency Check in invoices/{txnid}]
+      │
+      ▼
+[Update Firestore: organisation & subscription]
+      │
+      ▼
+[emailService.sendSubscriptionInvoice]
+      │
+      ▼ (Gmail SMTP / Nodemailer)
+[Customer Receives Branded HTML Tax Invoice]
+
+
+B. SITE CONSTRUCTION BILL FLOW:
+-------------------------------
+[Supervisor / Manager / Org HQ]
+      │
+      ├── (Takes Photo) ──► [Firebase Storage: organisation/{orgId}/expenses/...]
+      │
+      └── (Logs Bill)   ──► [Firestore: pettyCashTransactions / managerExpenses / orgExpenses]
+                                 │
+                                 ▼
+                    [ExpenseService Aggregator]
+                                 │
+                    ┌────────────┴────────────┐
+                    ▼                         ▼
+         [Reconcile Bills &       [Update totalSiteExpensesPerDay]
+          Deduplicate Petty Cash]             │
+                                              ▼
+                                   [Sync amountSpent to
+                                    Site & projects Collections]
+                                              │
+                                              ▼
+                                   [SiteFinancialDetailsPage &
+                                    PDF Breakdown Statements]
+
+================================================================================
+                                END OF REPORT
+================================================================================

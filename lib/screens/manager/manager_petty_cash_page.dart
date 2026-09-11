@@ -24,6 +24,16 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
   String _searchQuery = '';
   String _reportPeriod = 'This Month';
 
+  // Site-Wise Filter States
+  String _siteSearchQuery = '';
+  String _selectedSiteFilter = 'All';
+  String _selectedProjectFilter = 'All';
+  String _selectedSupervisorFilter = 'All';
+  String _selectedCategoryFilter = 'All';
+  String _selectedTimeframe = 'All Time'; // 'All Time', 'Today', 'This Month', 'Custom'
+  DateTime? _siteFromDate;
+  DateTime? _siteToDate;
+
   Color get primaryColor => Theme.of(context).colorScheme.primary;
 
   String get _currentManagerName {
@@ -40,9 +50,9 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 5,
+      length: 6,
       vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 4),
+      initialIndex: widget.initialTabIndex.clamp(0, 5),
     );
   }
 
@@ -98,6 +108,7 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
           tabs: const [
             Tab(icon: Icon(Icons.rate_review_rounded, size: 18), text: 'Reviews'),
             Tab(icon: Icon(Icons.payments_rounded, size: 18), text: 'Allocations'),
+            Tab(icon: Icon(Icons.location_city_rounded, size: 18), text: 'Site-Wise'),
             Tab(icon: Icon(Icons.supervisor_account_rounded, size: 18), text: 'Supervisors'),
             Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), text: 'Ledger'),
             Tab(icon: Icon(Icons.analytics_rounded, size: 18), text: 'Reports'),
@@ -126,6 +137,7 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
                 children: [
                   _buildReviewsTab(),
                   _buildAllocationsTab(),
+                  _buildSiteWiseTab(),
                   _buildSupervisorsTab(),
                   _buildLedgerTab(),
                   _buildReportsTab(),
@@ -835,6 +847,733 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
           ),
         ],
       ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. TAB 2: SITE-WISE PETTY CASH TRACKING & BALANCES
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSiteWiseTab() {
+    return StreamBuilder<List<PettyCashRequest>>(
+      stream: _pettyCashService.streamAllRequests(),
+      builder: (context, reqSnap) {
+        return StreamBuilder<List<PettyCashTransaction>>(
+          stream: _pettyCashService.streamAllTransactions(),
+          builder: (context, txnSnap) {
+            if (reqSnap.connectionState == ConnectionState.waiting ||
+                txnSnap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final allRequests = reqSnap.data ?? [];
+            final allTransactions = txnSnap.data ?? [];
+
+            // Compute Date Range from Timeframe
+            DateTime? filterFromDate = _siteFromDate;
+            DateTime? filterToDate = _siteToDate;
+
+            final now = DateTime.now();
+            if (_selectedTimeframe == 'Today') {
+              filterFromDate = DateTime(now.year, now.month, now.day);
+              filterToDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+            } else if (_selectedTimeframe == 'This Month') {
+              filterFromDate = DateTime(now.year, now.month, 1);
+              filterToDate = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+            } else if (_selectedTimeframe == 'All Time') {
+              filterFromDate = null;
+              filterToDate = null;
+            }
+
+            // Extract dynamic filter lists
+            final Set<String> siteNames = {'All'};
+            final Set<String> projectNames = {'All'};
+            final Set<String> supervisorNames = {'All'};
+            final Set<String> categories = {
+              'All',
+              'Office & Site Supplies',
+              'Transport & Travel',
+              'Loading & Unloading',
+              'Refreshments & Meals',
+              'Hardware & Fasteners',
+              'Fuel & Utilities',
+              'Emergency Repairs',
+              'Other / Miscellaneous',
+            };
+
+            for (final r in allRequests) {
+              if (r.siteName != null && r.siteName!.isNotEmpty) {
+                siteNames.add(r.siteName!);
+              } else if (r.siteId != null && r.siteId!.isNotEmpty) {
+                siteNames.add(r.siteId!);
+              }
+              if (r.projectName != null && r.projectName!.isNotEmpty) {
+                projectNames.add(r.projectName!);
+              }
+              if (r.supervisorName.isNotEmpty) {
+                supervisorNames.add(r.supervisorName);
+              }
+            }
+
+            for (final t in allTransactions) {
+              if (t.siteName != null && t.siteName!.isNotEmpty) {
+                siteNames.add(t.siteName!);
+              } else if (t.siteId != null && t.siteId!.isNotEmpty) {
+                siteNames.add(t.siteId!);
+              }
+              if (t.projectName != null && t.projectName!.isNotEmpty) {
+                projectNames.add(t.projectName!);
+              }
+              if (t.supervisorName.isNotEmpty) {
+                supervisorNames.add(t.supervisorName);
+              }
+              if (t.expenseCategory.isNotEmpty) {
+                categories.add(t.expenseCategory);
+              }
+            }
+
+            // Calculate Site Summaries
+            final siteSummaries = _pettyCashService.calculateSiteWiseSummaries(
+              requests: allRequests,
+              transactions: allTransactions,
+              fromDate: filterFromDate,
+              toDate: filterToDate,
+              siteFilter: _selectedSiteFilter != 'All' ? _selectedSiteFilter : null,
+              supervisorFilter: _selectedSupervisorFilter != 'All' ? _selectedSupervisorFilter : null,
+              projectFilter: _selectedProjectFilter != 'All' ? _selectedProjectFilter : null,
+              categoryFilter: _selectedCategoryFilter != 'All' ? _selectedCategoryFilter : null,
+            );
+
+            // Filter by search query
+            final filteredSummaries = siteSummaries.where((s) {
+              if (_siteSearchQuery.isNotEmpty) {
+                final q = _siteSearchQuery.toLowerCase();
+                final matchSite = s.siteName.toLowerCase().contains(q) || s.siteId.toLowerCase().contains(q);
+                final matchProj = (s.projectName ?? '').toLowerCase().contains(q);
+                final matchSup = s.supervisorName.toLowerCase().contains(q);
+                if (!matchSite && !matchProj && !matchSup) return false;
+              }
+              return true;
+            }).toList();
+
+            // Compute Filtered Aggregate Totals
+            double filteredTotalReceived = 0.0;
+            double filteredTotalExpenses = 0.0;
+            double filteredOtherExpenses = 0.0;
+            double filteredRemainingBalance = 0.0;
+
+            for (final s in filteredSummaries) {
+              filteredTotalReceived += s.totalReceived;
+              filteredTotalExpenses += s.totalExpenses;
+              filteredOtherExpenses += s.otherExpenses;
+              filteredRemainingBalance += s.remainingBalance;
+            }
+
+            return Column(
+              children: [
+                // Top Filter Controls & Search Bar
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Search Bar
+                      TextField(
+                        onChanged: (val) => setState(() => _siteSearchQuery = val.trim()),
+                        decoration: InputDecoration(
+                          hintText: 'Search site, project, or supervisor...',
+                          hintStyle: const TextStyle(fontSize: 12.5),
+                          prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Filter Pills Row
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          children: [
+                            // Timeframe Filter
+                            _buildFilterDropdown<String>(
+                              label: 'Period',
+                              value: _selectedTimeframe,
+                              items: const ['All Time', 'Today', 'This Month', 'Custom'],
+                              onChanged: (val) async {
+                                if (val == 'Custom') {
+                                  final picked = await showDateRangePicker(
+                                    context: context,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2030),
+                                    initialDateRange: _siteFromDate != null && _siteToDate != null
+                                        ? DateTimeRange(start: _siteFromDate!, end: _siteToDate!)
+                                        : DateTimeRange(start: DateTime.now().subtract(const Duration(days: 30)), end: DateTime.now()),
+                                  );
+                                  if (picked != null) {
+                                    setState(() {
+                                      _selectedTimeframe = 'Custom';
+                                      _siteFromDate = picked.start;
+                                      _siteToDate = picked.end;
+                                    });
+                                  }
+                                } else {
+                                  setState(() => _selectedTimeframe = val ?? 'All Time');
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Site Filter
+                            _buildFilterDropdown<String>(
+                              label: 'Site',
+                              value: _selectedSiteFilter,
+                              items: siteNames.toList()..sort(),
+                              onChanged: (val) => setState(() => _selectedSiteFilter = val ?? 'All'),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Project Filter
+                            _buildFilterDropdown<String>(
+                              label: 'Project',
+                              value: _selectedProjectFilter,
+                              items: projectNames.toList()..sort(),
+                              onChanged: (val) => setState(() => _selectedProjectFilter = val ?? 'All'),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Supervisor Filter
+                            _buildFilterDropdown<String>(
+                              label: 'Supervisor',
+                              value: _selectedSupervisorFilter,
+                              items: supervisorNames.toList()..sort(),
+                              onChanged: (val) => setState(() => _selectedSupervisorFilter = val ?? 'All'),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Category Filter
+                            _buildFilterDropdown<String>(
+                              label: 'Category',
+                              value: _selectedCategoryFilter,
+                              items: categories.toList()..sort(),
+                              onChanged: (val) => setState(() => _selectedCategoryFilter = val ?? 'All'),
+                            ),
+                            if (_selectedTimeframe == 'Custom' && _siteFromDate != null && _siteToDate != null) ...[
+                              const SizedBox(width: 8),
+                              Chip(
+                                label: Text(
+                                  '${DateFormat('dd MMM').format(_siteFromDate!)} - ${DateFormat('dd MMM').format(_siteToDate!)}',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                ),
+                                onDeleted: () => setState(() => _selectedTimeframe = 'All Time'),
+                                deleteIcon: const Icon(Icons.close_rounded, size: 14),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Aggregated KPI Strip
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: const Color(0xFFF1F5F9),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildInlineKpi('Sites', '${filteredSummaries.length} active'),
+                      _buildInlineKpi('Received', PettyCashService.formatCurrency(filteredTotalReceived), color: const Color(0xFF2563EB)),
+                      _buildInlineKpi('Spent', PettyCashService.formatCurrency(filteredTotalExpenses), color: const Color(0xFFE11D48)),
+                      _buildInlineKpi('Other Exp', PettyCashService.formatCurrency(filteredOtherExpenses), color: const Color(0xFF7C3AED)),
+                      _buildInlineKpi('Balance', PettyCashService.formatCurrency(filteredRemainingBalance), color: const Color(0xFF059669)),
+                    ],
+                  ),
+                ),
+
+                // Site Cards List
+                Expanded(
+                  child: filteredSummaries.isEmpty
+                      ? _buildEmptyState(
+                          icon: Icons.location_city_outlined,
+                          title: 'No sites match the filters',
+                          subtitle: 'Try adjusting your site, supervisor, date, or category filters.',
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+                          itemCount: filteredSummaries.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final site = filteredSummaries[index];
+                            return _buildSitePettyCashCard(site);
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterDropdown<T>({
+    required String label,
+    required T value,
+    required List<T> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: items.contains(value) ? value : items.first,
+          isDense: true,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+          icon: const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF64748B)),
+          items: items.map((item) {
+            return DropdownMenuItem<T>(
+              value: item,
+              child: Text(
+                '$label: $item',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInlineKpi(String label, String value, {Color? color}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 1),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w900,
+            color: color ?? const Color(0xFF0F172A),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSitePettyCashCard(SitePettyCashSummary s) {
+    Color statusBg = const Color(0xFFECFDF5);
+    Color statusColor = const Color(0xFF059669);
+
+    if (s.status == 'Low Balance') {
+      statusBg = const Color(0xFFFEF2F2);
+      statusColor = const Color(0xFFEF4444);
+    } else if (s.status == 'Fully Utilized') {
+      statusBg = const Color(0xFFF1F5F9);
+      statusColor = const Color(0xFF475569);
+    } else if (s.status == 'Pending Receipt') {
+      statusBg = const Color(0xFFFFFBEB);
+      statusColor = const Color(0xFFD97706);
+    }
+
+    final double progress = s.totalReceived > 0
+        ? (s.totalExpenses / s.totalReceived).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: s.isLowBalance ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
+          width: s.isLowBalance ? 1.5 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Site Name, Project, & Status Pill
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.location_city_rounded, color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.siteName,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (s.projectName != null && s.projectName!.isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        'Project: ${s.projectName}',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(Icons.person_outline_rounded, size: 13, color: Color(0xFF94A3B8)),
+                        const SizedBox(width: 4),
+                        Text(
+                          s.supervisorName,
+                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569), fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  s.status.toUpperCase(),
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: statusColor, letterSpacing: 0.2),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Balance Breakdown Grid
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSiteBalanceMetric('Received Amount', PettyCashService.formatCurrency(s.totalReceived), const Color(0xFF2563EB)),
+                    _buildSiteBalanceMetric('Total Spent', PettyCashService.formatCurrency(s.totalExpenses), const Color(0xFFE11D48)),
+                    _buildSiteBalanceMetric('Other Expenses', PettyCashService.formatCurrency(s.otherExpenses), const Color(0xFF7C3AED)),
+                    _buildSiteBalanceMetric(
+                      'Remaining',
+                      PettyCashService.formatCurrency(s.remainingBalance),
+                      s.isLowBalance ? const Color(0xFFEF4444) : const Color(0xFF059669),
+                      isHighlight: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Utilization Progress Bar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Budget Utilization', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                        Text('${(progress * 100).toStringAsFixed(1)}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 6,
+                        backgroundColor: const Color(0xFFE2E8F0),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          progress > 0.9 ? const Color(0xFFEF4444) : (progress > 0.7 ? const Color(0xFFF59E0B) : const Color(0xFF10B981)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Bottom Action: Inspect Site Ledger
+          InkWell(
+            onTap: () => _openSiteLedgerModal(s),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.receipt_long_rounded, size: 15, color: primaryColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Inspect Site Ledger (${s.transactionCount} expenses)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: primaryColor),
+                      ),
+                    ],
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: primaryColor),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSiteBalanceMetric(String label, String value, Color color, {bool isHighlight = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isHighlight ? 13.5 : 12,
+            fontWeight: isHighlight ? FontWeight.w900 : FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openSiteLedgerModal(SitePettyCashSummary s) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.82,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle Pill
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Title Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.siteName,
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Supervisor: ${s.supervisorName} • ${s.transactions.length} total entries',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 22),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Mini Summary Strip inside modal
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSiteBalanceMetric('Received', PettyCashService.formatCurrency(s.totalReceived), const Color(0xFF2563EB)),
+                    _buildSiteBalanceMetric('Spent', PettyCashService.formatCurrency(s.totalExpenses), const Color(0xFFE11D48)),
+                    _buildSiteBalanceMetric('Other', PettyCashService.formatCurrency(s.otherExpenses), const Color(0xFF7C3AED)),
+                    _buildSiteBalanceMetric('Remaining', PettyCashService.formatCurrency(s.remainingBalance), const Color(0xFF059669), isHighlight: true),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              const Text(
+                'SITE TRANSACTION & EXPENSE LEDGER',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 8),
+
+              // Ledger Transactions List
+              Expanded(
+                child: s.transactions.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No expenses recorded yet against this site allocation.',
+                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: s.transactions.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, idx) {
+                          final t = s.transactions[idx];
+                          final isExp = t.isExpense;
+                          final dateStr = DateFormat('dd MMM yyyy • hh:mm a').format(t.transactionDate);
+
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: t.isOtherExpense
+                                            ? const Color(0xFFFAF5FF)
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: t.isOtherExpense ? const Color(0xFFE9D5FF) : const Color(0xFFCBD5E1),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        t.expenseCategory,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: t.isOtherExpense ? const Color(0xFF7E22CE) : const Color(0xFF334155),
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${isExp ? '-' : '+'}${PettyCashService.formatCurrency(t.amount)}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                        color: isExp ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  t.description,
+                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                ),
+                                if (t.vendorName != null && t.vendorName!.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Payee/Vendor: ${t.vendorName}',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(dateStr, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                                    Text(
+                                      'Bal: ${PettyCashService.formatCurrency(t.previousBalance)} → ${PettyCashService.formatCurrency(t.newBalance)}',
+                                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

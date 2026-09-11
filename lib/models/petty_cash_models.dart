@@ -598,3 +598,53 @@ DateTime? _parseDateTime(dynamic value) {
   }
   return null;
 }
+
+/// Represents a site-wise aggregate summary of petty cash allocations, expenses, and remaining balances.
+class SitePettyCashSummary {
+  final String siteId;
+  final String siteName;
+  final String? projectId;
+  final String? projectName;
+  final String supervisorId;
+  final String supervisorName;
+  final String managerId;
+  final String managerName;
+  final double totalReceived; // Sum of confirmed received/approved allocations for this site
+  final double totalExpenses; // Sum of all expenses for this site
+  final double otherExpenses; // Sum of Other/Miscellaneous expenses for this site
+  final double remainingBalance; // totalReceived - totalExpenses
+  final int transactionCount;
+  final int allocationCount;
+  final DateTime? lastActivityAt;
+  final String status; // 'Active', 'Low Balance', 'Depleted', 'Pending Receipt'
+  final List<PettyCashRequest> allocations;
+  final List<PettyCashTransaction> transactions;
+
+  const SitePettyCashSummary({
+    required this.siteId,
+    required this.siteName,
+    this.projectId,
+    this.projectName,
+    required this.supervisorId,
+    required this.supervisorName,
+    this.managerId = '',
+    this.managerName = '',
+    required this.totalReceived,
+    required this.totalExpenses,
+    required this.otherExpenses,
+    required this.remainingBalance,
+    this.transactionCount = 0,
+    this.allocationCount = 0,
+    this.lastActivityAt,
+    required this.status,
+    this.allocations = const [],
+    this.transactions = const [],
+  });
+
+  double get utilizationPercent =>
+      totalReceived > 0 ? ((totalExpenses / totalReceived) * 100.0).clamp(0.0, 100.0) : 0.0;
+
+  bool get isLowBalance =>
+      totalReceived > 0 && remainingBalance <= (totalReceived * 0.1);
+}
+

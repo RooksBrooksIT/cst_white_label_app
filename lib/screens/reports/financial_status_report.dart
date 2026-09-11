@@ -324,6 +324,16 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     final budgetRemaining = budget - spent;
     final usage = budget > 0 ? (spent / budget * 100).clamp(0, 100) : 0;
 
+    final pcReceived = _parseNum(
+      projectData?['totalPettyCashReceived'] ?? projectData?['pettyCashReceived'],
+    );
+    final pcSpent = _parseNum(
+      projectData?['totalPettyCashExpense'] ?? projectData?['pettyCashExpense'] ?? projectData?['pettyCashSpent'],
+    );
+    final pcBalance = _parseNum(
+      projectData?['remainingPettyCash'] ?? (pcReceived - pcSpent),
+    );
+
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,6 +376,35 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
             budgetRemaining >= 0 ? Colors.teal : Colors.deepOrange,
             Icons.savings_outlined,
           ),
+          if (pcReceived > 0 || pcSpent > 0) ...[
+            const Divider(height: 24),
+            Text(
+              'Site Petty Cash Flow',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildFinanceTile(
+              'Petty Cash Received for Site',
+              '₹ $pcReceived',
+              Colors.teal,
+              Icons.account_balance_wallet_outlined,
+            ),
+            _buildFinanceTile(
+              'Petty Cash Expenses Spent',
+              '₹ $pcSpent',
+              Colors.deepOrange,
+              Icons.shopping_bag_outlined,
+            ),
+            _buildFinanceTile(
+              'Remaining Petty Cash for Site',
+              '₹ $pcBalance',
+              pcBalance >= 0 ? Colors.green : Colors.red,
+              Icons.savings_outlined,
+            ),
+          ],
           const SizedBox(height: 24),
           Text(
             'Budget Utilization (${usage.toStringAsFixed(1)}%)',
@@ -491,6 +530,16 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
     final customerCashBalance = received - spent;
     final budgetRemaining = budget - spent;
 
+    final pcReceived = _parseNum(
+      projectData?['totalPettyCashReceived'] ?? projectData?['pettyCashReceived'],
+    );
+    final pcSpent = _parseNum(
+      projectData?['totalPettyCashExpense'] ?? projectData?['pettyCashExpense'] ?? projectData?['pettyCashSpent'],
+    );
+    final pcBalance = _parseNum(
+      projectData?['remainingPettyCash'] ?? (pcReceived - pcSpent),
+    );
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -571,6 +620,11 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
               ['Total Expenses Spent', '₹${spent.toStringAsFixed(2)}'],
               ['Balance from Customer Received', '₹${customerCashBalance.toStringAsFixed(2)}'],
               ['Budget Remaining', '₹${budgetRemaining.toStringAsFixed(2)}'],
+              if (pcReceived > 0 || pcSpent > 0) ...[
+                ['Site Petty Cash Received', '₹${pcReceived.toStringAsFixed(2)}'],
+                ['Site Petty Cash Spent', '₹${pcSpent.toStringAsFixed(2)}'],
+                ['Site Remaining Petty Cash', '₹${pcBalance.toStringAsFixed(2)}'],
+              ],
             ],
             headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold,

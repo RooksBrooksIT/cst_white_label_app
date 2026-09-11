@@ -1,10 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
 import 'package:ebricks/screens/manager/manager_material_approval_screen.dart';
 import 'package:ebricks/screens/manager/manager_approval_screen.dart';
-import 'package:ebricks/screens/organization/org_site_payment_screen.dart';
 import 'package:ebricks/screens/organization/org_petty_cash_page.dart';
 
 class OrgApprovalsMenuPage extends StatelessWidget {
@@ -44,21 +43,6 @@ class OrgApprovalsMenuPage extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const ManagerApprovalScreen(),
-                ),
-              );
-            },
-          ),
-          _MenuItemData(
-            title: 'Site Payment Approvals',
-            subtitle: 'Authorize contractor payments, worker wages & site expenses',
-            icon: Icons.payments_rounded,
-            accentColor: const Color(0xFF2563EB),
-            badgeText: 'Finance',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SitePaymentScreen(),
                 ),
               );
             },

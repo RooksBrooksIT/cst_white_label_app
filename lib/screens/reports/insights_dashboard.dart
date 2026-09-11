@@ -1,7 +1,8 @@
-﻿import 'package:ebricks/screens/reports/project_stage_insights_dashboard.dart';
+import 'package:ebricks/screens/reports/project_stage_insights_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:ebricks/screens/manager/contractor_report_page.dart';
 import 'package:ebricks/screens/organization/organization_insights_screen.dart';
+import 'package:ebricks/screens/reports/organization_petty_cash_insights_screen.dart';
 import 'package:ebricks/screens/reports/project_financial_status_report_page.dart';
 import 'package:ebricks/screens/reports/site_status_report.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -161,6 +162,21 @@ class InsightsDashboard extends StatelessWidget {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => ContractorReportPage()),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSectionCard(
+                    context,
+                    icon: Icons.monetization_on_rounded,
+                    title: 'Petty Cash Expenses Insights',
+                    description:
+                        'Track site-wise petty cash received, expenses, other expenses, and remaining balances.',
+                    primaryColor: primaryColor,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OrganizationPettyCashInsightsScreen(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 32),

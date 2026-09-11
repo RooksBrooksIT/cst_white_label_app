@@ -39,7 +39,7 @@ function getEmailConfig() {
   const secure = process.env.EMAIL_SECURE === "true" || port === 465;
   const user = (process.env.EMAIL_USER || "support@rookstechnologies.com").trim();
   const password = (process.env.EMAIL_PASSWORD || "").trim();
-  const from = (process.env.EMAIL_FROM || `Rooks & Brooks Support <${user}>`).trim();
+  const from = (process.env.EMAIL_FROM || `eBricks Support <${user}>`).trim();
   const mockMode = process.env.EMAIL_MOCK_MODE === "true";
 
   return {
@@ -277,7 +277,7 @@ function renderTestEmailHtml({ to, timestamp, environment }) {
       </div>
     </div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} Rooks &amp; Brooks Technologies. All rights reserved.
+      &copy; ${new Date().getFullYear()} eBricks. All rights reserved.
     </div>
   </div>
 </body>
@@ -301,14 +301,36 @@ function renderInvoiceHtml(data) {
     paymentDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
     startDate = "Today",
     endDate = "30 Days",
+    isTrial = false,
+    isUpgrade = false,
   } = data;
 
   const numAmount = parseFloat(amount || 0);
-  const isFreeTrial = planName.toLowerCase().includes("free trial") || numAmount === 0;
+  const isFreeTrial = isTrial || planName.toLowerCase().includes("free trial") || (numAmount === 0 && (String(paymentMethod).toLowerCase().includes("trial") || String(planType).toLowerCase().includes("trial")));
+  const isPlanUpgrade = isUpgrade || String(paymentMethod).toLowerCase().includes("upgrade") || (txnid && String(txnid).startsWith("UPG"));
   const formattedAmount = numAmount.toFixed(2);
-  const badgeText = isFreeTrial ? "✓ TRIAL ACTIVATED" : "✓ PAYMENT SUCCESSFUL";
-  const amountSubtitle = isFreeTrial ? '<span style="font-size: 13px; color: #10b981; font-weight: 700; margin-left: 8px;">(100% Free Trial)</span>' : "";
-  const effectivePaymentMethod = isFreeTrial && (paymentMethod === "UPI" || paymentMethod === "None") ? "Free Trial Activation" : paymentMethod;
+
+  let badgeText = "✓ PAYMENT SUCCESSFUL";
+  let amountLabel = "Total Amount Paid";
+  let amountSubtitle = "";
+  let greetingText = "";
+
+  if (isFreeTrial) {
+    badgeText = "✓ FREE TRIAL ACTIVATED";
+    amountLabel = "Subscription Amount";
+    amountSubtitle = '<span style="font-size: 13px; color: #10b981; font-weight: 700; margin-left: 8px;">(100% Free Trial)</span>';
+    greetingText = `Welcome to <strong>eBricks</strong>! Your <strong>Free Trial</strong> subscription for <strong>${orgName}</strong> has been activated successfully.`;
+  } else if (isPlanUpgrade) {
+    badgeText = numAmount > 0 ? "✓ PLAN UPGRADED &amp; PAID" : "✓ PLAN UPDATED";
+    amountLabel = numAmount > 0 ? "Amount Paid for Upgrade" : "Subscription Amount";
+    greetingText = `Your <strong>eBricks</strong> subscription for <strong>${orgName}</strong> has been successfully updated to the <strong>${planName}</strong> plan.`;
+  } else {
+    badgeText = "✓ PAYMENT SUCCESSFUL";
+    amountLabel = "Total Amount Paid";
+    greetingText = `Thank you for your payment. Your <strong>eBricks</strong> subscription for <strong>${orgName}</strong> is now verified and active.`;
+  }
+
+  const effectivePaymentMethod = isFreeTrial && (paymentMethod === "UPI" || paymentMethod === "None" || paymentMethod === "Direct") ? "Free Trial Activation" : paymentMethod;
   const effectivePayuId = isFreeTrial && (payuMoneyId === "Confirmed by PayU" || !payuMoneyId) ? "Complimentary Trial Access" : payuMoneyId;
 
   return `<!DOCTYPE html>
@@ -316,13 +338,13 @@ function renderInvoiceHtml(data) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Subscription Invoice - ${invoiceNo}</title>
+  <title>eBricks Subscription Invoice - ${invoiceNo}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0d1b2a; margin: 0; padding: 24px; color: #f8fafc; }
     .container { max-width: 580px; margin: 0 auto; background: #1b2a47; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.45); }
     .header { background: linear-gradient(135deg, #0f172a, #1e3a8a); padding: 32px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); }
     .brand-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .brand-title { font-size: 20px; font-weight: 900; color: #ffffff; letter-spacing: -0.5px; }
+    .brand-title { font-size: 22px; font-weight: 900; color: #ffffff; letter-spacing: -0.5px; }
     .receipt-tag { background: rgba(16,185,129,0.18); border: 1px solid #10b981; color: #10b981; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 12px; letter-spacing: 0.5px; }
     .amount-box { background: rgba(255,255,255,0.04); border-radius: 14px; padding: 18px 22px; margin-top: 10px; }
     .amount-label { font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
@@ -345,11 +367,11 @@ function renderInvoiceHtml(data) {
   <div class="container">
     <div class="header">
       <div class="brand-row">
-        <div class="brand-title">eBricks Workspace</div>
+        <div class="brand-title">eBricks</div>
         <span class="receipt-tag">${badgeText}</span>
       </div>
       <div class="amount-box">
-        <div class="amount-label">${isFreeTrial ? "Subscription Amount" : "Total Amount Paid"}</div>
+        <div class="amount-label">${amountLabel}</div>
         <div class="amount-val">₹ ${formattedAmount} ${amountSubtitle}</div>
       </div>
     </div>
@@ -357,17 +379,18 @@ function renderInvoiceHtml(data) {
     <div class="content">
       <p style="font-size: 14px; color: #e2e8f0; margin: 0 0 20px; line-height: 1.5;">
         Dear <strong>${customerName}</strong>,<br>
-        ${isFreeTrial 
-          ? `Welcome to <strong>eBricks</strong>! Your <strong>Free Trial</strong> subscription for <strong>${orgName}</strong> has been activated successfully.`
-          : `Thank you for your payment. Your subscription for <strong>${orgName}</strong> is now verified and active.`
-        }
+        ${greetingText}
       </p>
 
-      <div class="section-title">Invoice &amp; Subscription Details</div>
+      <div class="section-title">eBricks Invoice &amp; Subscription Details</div>
       <table class="table-details">
         <tr>
           <td class="table-label">Invoice Number</td>
           <td class="table-val">${invoiceNo}</td>
+        </tr>
+        <tr>
+          <td class="table-label">Application</td>
+          <td class="table-val"><strong>eBricks</strong></td>
         </tr>
         <tr>
           <td class="table-label">Plan &amp; Cadence</td>
@@ -408,9 +431,9 @@ function renderInvoiceHtml(data) {
     </div>
 
     <div class="footer">
-      Need help or have questions regarding your invoice?<br>
+      Need help or have questions regarding your eBricks invoice?<br>
       Contact support at <a href="mailto:support@rookstechnologies.com">support@rookstechnologies.com</a><br><br>
-      &copy; ${new Date().getFullYear()} Rooks &amp; Brooks Technologies. All rights reserved.
+      &copy; ${new Date().getFullYear()} eBricks. All rights reserved.
     </div>
   </div>
 </body>
@@ -433,6 +456,8 @@ function renderInvoiceHtml(data) {
  * @param {string} [params.paymentMethod] - Payment mode (UPI, Card, etc.)
  * @param {Date} [params.startDate] - Subscription start date
  * @param {Date} [params.endDate] - Subscription end date
+ * @param {boolean} [params.isTrial] - Explicit Free Trial flag
+ * @param {boolean} [params.isUpgrade] - Explicit Plan Upgrade flag
  * @param {FirebaseFirestore.Firestore} db - Firestore admin instance
  */
 async function sendSubscriptionInvoice(params, db) {
@@ -441,7 +466,7 @@ async function sendSubscriptionInvoice(params, db) {
     txnid = `TXN-${Date.now()}`,
     payerEmail,
     payerName = "Customer",
-    orgName = "Organization Workspace",
+    orgName = "eBricks Workspace",
     planName = "Silver",
     planType = "Monthly",
     amount = 0,
@@ -449,6 +474,8 @@ async function sendSubscriptionInvoice(params, db) {
     paymentMethod = "UPI",
     startDate = new Date(),
     endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    isTrial = false,
+    isUpgrade = false,
   } = params;
 
   if (!payerEmail || !isValidEmail(payerEmail)) {
@@ -493,7 +520,9 @@ async function sendSubscriptionInvoice(params, db) {
     minute: "2-digit",
   });
 
-  const isFreeTrial = planName.toLowerCase().includes("free trial") || parseFloat(amount || 0) === 0;
+  const numAmount = parseFloat(amount || 0);
+  const isFreeTrial = isTrial || planName.toLowerCase().includes("free trial") || (numAmount === 0 && (String(paymentMethod).toLowerCase().includes("trial") || String(planType).toLowerCase().includes("trial")));
+  const isPlanUpgrade = isUpgrade || String(paymentMethod).toLowerCase().includes("upgrade") || (txnid && String(txnid).startsWith("UPG"));
 
   const html = renderInvoiceHtml({
     customerName: payerName,
@@ -508,11 +537,18 @@ async function sendSubscriptionInvoice(params, db) {
     paymentDate: formattedPaymentDate,
     startDate: formattedStartDate,
     endDate: formattedEndDate,
+    isTrial: isFreeTrial,
+    isUpgrade: isPlanUpgrade,
   });
 
-  const subject = isFreeTrial
-    ? `Welcome to eBricks & Subscription Invoice for ${orgName || "eBricks Workspace"}`
-    : `Payment Receipt & Invoice for ${orgName || "eBricks Workspace"} (${planName} Plan)`;
+  let subject = "";
+  if (isFreeTrial) {
+    subject = `Welcome to eBricks - Free Trial Subscription Invoice for ${orgName || "eBricks Workspace"}`;
+  } else if (isPlanUpgrade) {
+    subject = `eBricks Subscription Plan Update Invoice - ${orgName || "eBricks Workspace"} (${planName})`;
+  } else {
+    subject = `eBricks Subscription Invoice & Payment Receipt - ${orgName || "eBricks Workspace"} (${planName})`;
+  }
 
   // 2. Dispatch Email
   const result = await sendEmail({
@@ -527,6 +563,7 @@ async function sendSubscriptionInvoice(params, db) {
       const invoiceRecord = {
         txnid,
         orgId: orgId || "",
+        app: "eBricks",
         invoiceNo,
         payerEmail,
         payerName,
@@ -536,6 +573,8 @@ async function sendSubscriptionInvoice(params, db) {
         amount: parseFloat(amount || 0),
         payuMoneyId,
         paymentMethod,
+        isTrial: isFreeTrial,
+        isUpgrade: isPlanUpgrade,
         emailStatus: result.success ? "SENT" : "FAILED",
         emailMessageId: result.messageId || null,
         emailError: result.error || null,
@@ -589,7 +628,7 @@ function renderExpiryReminderHtml(data) {
     .container { max-width: 580px; margin: 0 auto; background: #1b2a47; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.45); }
     .header { background: linear-gradient(135deg, #1e293b, #b45309); padding: 32px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); }
     .brand-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-    .brand-title { font-size: 20px; font-weight: 900; color: #ffffff; letter-spacing: -0.5px; }
+    .brand-title { font-size: 22px; font-weight: 900; color: #ffffff; letter-spacing: -0.5px; }
     .badge { background: rgba(245,158,11,0.2); border: 1px solid #f59e0b; color: #fbbf24; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 12px; letter-spacing: 0.5px; }
     .hero-title { font-size: 24px; font-weight: 900; color: #ffffff; margin: 0 0 6px; }
     .hero-subtitle { font-size: 14px; color: #fde68a; margin: 0; }
@@ -615,7 +654,7 @@ function renderExpiryReminderHtml(data) {
   <div class="container">
     <div class="header">
       <div class="brand-row">
-        <div class="brand-title">eBricks Workspace</div>
+        <div class="brand-title">eBricks</div>
         <span class="badge">⚠️ EXPIRING SOON</span>
       </div>
       <div class="hero-title">${daysText.toUpperCase()} REMAINING</div>
@@ -666,7 +705,7 @@ function renderExpiryReminderHtml(data) {
     <div class="footer">
       Questions about your renewal or need billing support?<br>
       Contact us at <a href="mailto:${supportEmail}">${supportEmail}</a><br><br>
-      &copy; ${new Date().getFullYear()} Rooks &amp; Brooks Technologies. All rights reserved.
+      &copy; ${new Date().getFullYear()} eBricks. All rights reserved.
     </div>
   </div>
 </body>

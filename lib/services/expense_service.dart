@@ -210,13 +210,15 @@ class ExpenseService {
       final canonicalDocId = details.canonicalDocId;
       final siteKeys = details.allKeys;
 
-      // Compute totals from all 5 expense categories concurrently in parallel
+      // Compute totals from all expense categories + Petty Cash concurrently in parallel
       final results = await Future.wait([
         _sumSupervisorExpenses(canonicalDocId, siteKeys),
         _sumManagerExpenses(canonicalDocId, siteKeys),
         _sumOrganizationExpenses(canonicalDocId, siteKeys),
         _sumContractorExpenses(canonicalDocId, siteKeys),
         _sumIncentiveExpenses(canonicalDocId, siteKeys),
+        _sumPettyCashExpenses(canonicalDocId, siteKeys),
+        _sumPettyCashReceived(canonicalDocId, siteKeys),
       ]);
 
       final supervisorTotal = results[0];
@@ -224,12 +226,15 @@ class ExpenseService {
       final organizationTotal = results[2];
       final contractorTotal = results[3];
       final incentiveTotal = results[4];
+      final pettyCashExpenseTotal = results[5];
+      final pettyCashReceivedTotal = results[6];
 
       final double totalAllExpenses = supervisorTotal +
           managerTotal +
           organizationTotal +
           contractorTotal +
-          incentiveTotal;
+          incentiveTotal +
+          pettyCashExpenseTotal;
 
       final firestore = FirebaseFirestore.instance;
       final DocumentReference<Map<String, dynamic>>? projectRef =
@@ -281,7 +286,11 @@ class ExpenseService {
           'siteId': canonicalDocId,
           'siteCode': details.siteCode,
           'siteName': details.siteName,
-          'totalSiteExpense': supervisorTotal,
+          'totalSiteExpense': supervisorTotal + pettyCashExpenseTotal,
+          'totalSupervisorExpense': supervisorTotal,
+          'totalPettyCashExpense': pettyCashExpenseTotal,
+          'totalPettyCashReceived': pettyCashReceivedTotal,
+          'remainingPettyCash': (pettyCashReceivedTotal - pettyCashExpenseTotal),
           'totalMgrExpense': managerTotal,
           'totalOrgExpense': organizationTotal,
           'totalContractorExpense': contractorTotal,
@@ -348,7 +357,7 @@ class ExpenseService {
       await batch.commit();
 
       print(
-        "✅ Synced totals for site $canonicalDocId (requested: $siteId) — Supervisor: $supervisorTotal, Manager: $managerTotal, Organization: $organizationTotal, Contractor: $contractorTotal, Incentive: $incentiveTotal, Total: $totalAllExpenses",
+        "✅ Synced totals for site $canonicalDocId (requested: $siteId) — Supervisor: $supervisorTotal, Petty Cash Spent: $pettyCashExpenseTotal (Rec: $pettyCashReceivedTotal), Manager: $managerTotal, Organization: $organizationTotal, Contractor: $contractorTotal, Incentive: $incentiveTotal, Total: $totalAllExpenses",
       );
     } catch (e) {
       print(
@@ -817,11 +826,13 @@ class ExpenseService {
       } catch (_) {}
 
       for (final data in matchedDocs.values) {
-        // Skip manager or org entries recorded in supervisor collection
+        // Skip manager or org entries recorded in supervisor collection, and any petty cash flagged entries
         if (data['isManagerEntry'] == true ||
             data['createdBy'] == 'manager' ||
             data['isOrgEntry'] == true ||
-            data['createdBy'] == 'manager_org') {
+            data['createdBy'] == 'manager_org' ||
+            data['isPettyCash'] == true ||
+            data['isPettyCashExpense'] == true) {
           continue;
         }
         final amount = _parseExpenseAmount(data['totalAmount'] ?? data['amount'], data);
@@ -1130,6 +1141,120 @@ class ExpenseService {
       }
     } catch (e) {
       print("❌ Error summing incentive expenses for siteId=$siteId: $e");
+    }
+    return total;
+  }
+
+  // Sum petty cash expenses spent for the site
+  static Future<double> _sumPettyCashExpenses(String siteId, [Set<String>? preResolvedSiteKeys]) async {
+    double total = 0.0;
+    try {
+      final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
+      final Map<String, Map<String, dynamic>> matchedDocs = {};
+
+      for (final key in siteKeys) {
+        final snap1 = await FirestoreService.pettyCashTransactions
+            .where('siteId', isEqualTo: key)
+            .get();
+        for (final doc in snap1.docs) {
+          matchedDocs[doc.id] = doc.data();
+        }
+
+        final snap2 = await FirestoreService.pettyCashTransactions
+            .where('siteName', isEqualTo: key)
+            .get();
+        for (final doc in snap2.docs) {
+          matchedDocs[doc.id] = doc.data();
+        }
+      }
+
+      // Ingest all petty cash transactions to match site identifiers
+      try {
+        final allTxnsSnap = await FirestoreService.pettyCashTransactions.get();
+        for (final doc in allTxnsSnap.docs) {
+          final data = doc.data();
+          final sId = (data['siteId'] ?? '').toString().trim();
+          final sName = (data['siteName'] ?? '').toString().trim();
+          for (final key in siteKeys) {
+            if (sId == key ||
+                sName == key ||
+                (sId.isNotEmpty && sId.toLowerCase() == key.toLowerCase()) ||
+                (sName.isNotEmpty && sName.toLowerCase() == key.toLowerCase()) ||
+                doc.id.startsWith('${key}_')) {
+              matchedDocs[doc.id] = data;
+            }
+          }
+        }
+      } catch (_) {}
+
+      for (final data in matchedDocs.values) {
+        final txnType = (data['transactionType'] ?? 'EXPENSE').toString().toUpperCase();
+        if (txnType == 'EXPENSE') {
+          final amount = _parseExpenseAmount(data['amount'], data);
+          total += amount;
+        }
+      }
+    } catch (e) {
+      print("❌ Error summing petty cash expenses for siteId=$siteId: $e");
+    }
+    return total;
+  }
+
+  // Sum confirmed petty cash allocated/received for the site
+  static Future<double> _sumPettyCashReceived(String siteId, [Set<String>? preResolvedSiteKeys]) async {
+    double total = 0.0;
+    try {
+      final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
+      final Map<String, Map<String, dynamic>> matchedDocs = {};
+
+      for (final key in siteKeys) {
+        final snap1 = await FirestoreService.pettyCashRequests
+            .where('siteId', isEqualTo: key)
+            .get();
+        for (final doc in snap1.docs) {
+          matchedDocs[doc.id] = doc.data();
+        }
+
+        final snap2 = await FirestoreService.pettyCashRequests
+            .where('siteName', isEqualTo: key)
+            .get();
+        for (final doc in snap2.docs) {
+          matchedDocs[doc.id] = doc.data();
+        }
+      }
+
+      try {
+        final allReqSnap = await FirestoreService.pettyCashRequests.get();
+        for (final doc in allReqSnap.docs) {
+          final data = doc.data();
+          final sId = (data['siteId'] ?? '').toString().trim();
+          final sName = (data['siteName'] ?? '').toString().trim();
+          for (final key in siteKeys) {
+            if (sId == key ||
+                sName == key ||
+                (sId.isNotEmpty && sId.toLowerCase() == key.toLowerCase()) ||
+                (sName.isNotEmpty && sName.toLowerCase() == key.toLowerCase())) {
+              matchedDocs[doc.id] = data;
+            }
+          }
+        }
+      } catch (_) {}
+
+      for (final data in matchedDocs.values) {
+        final isReceived = data['isReceived'] == true ||
+            data['receivedAt'] != null ||
+            data['status'] == 'received';
+        if (isReceived) {
+          final double approvedAmt = (data['approvedAmount'] is num && (data['approvedAmount'] as num) > 0)
+              ? (data['approvedAmount'] as num).toDouble()
+              : ((data['allocatedAmount'] is num && (data['allocatedAmount'] as num) > 0)
+                  ? (data['allocatedAmount'] as num).toDouble()
+                  : ((data['requestedAmount'] is num) ? (data['requestedAmount'] as num).toDouble() : 0.0));
+          total += approvedAmt;
+        }
+      }
+    } catch (e) {
+      print("❌ Error summing petty cash received for siteId=$siteId: $e");
     }
     return total;
   }

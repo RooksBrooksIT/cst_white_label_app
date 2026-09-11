@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -371,6 +371,10 @@ class _PricingScreenState extends State<PricingScreen> {
         email: widget.email.isEmpty ? 'customer@example.com' : widget.email,
         phone: widget.phone.isEmpty ? '9999999999' : widget.phone,
         isSandbox: !PayUService.isProduction,
+        udf1: widget.orgName.isEmpty ? 'onboarding_temp' : widget.orgName,
+        udf4: 'ebricks',
+        udf5: 'ebricks_subscription',
+        appId: 'ebricks',
       );
 
       final result = await Navigator.push<PayUResult>(
@@ -643,6 +647,8 @@ class _PricingScreenState extends State<PricingScreen> {
               paymentMethod: _selectedPlan == 'Free Trial'
                   ? 'Free Trial Activation'
                   : 'Direct Subscription',
+              isTrial: _selectedPlan == 'Free Trial',
+              isUpgrade: true,
             );
           } catch (e) {
             debugPrint('Direct plan invoice dispatch note: $e');
@@ -727,6 +733,10 @@ class _PricingScreenState extends State<PricingScreen> {
         email: widget.email.isEmpty ? 'customer@example.com' : widget.email,
         phone: widget.phone.isEmpty ? '9999999999' : widget.phone,
         isSandbox: !PayUService.isProduction,
+        udf1: widget.orgName.isEmpty ? 'onboarding_temp' : widget.orgName,
+        udf4: 'ebricks',
+        udf5: 'ebricks_subscription',
+        appId: 'ebricks',
       );
 
       final result = await Navigator.push<PayUResult>(
@@ -1070,6 +1080,8 @@ class _PricingScreenState extends State<PricingScreen> {
             paymentMethod: _selectedPlan == 'Free Trial'
                 ? 'Free Trial Activation'
                 : 'Direct Subscription',
+            isTrial: _selectedPlan == 'Free Trial',
+            isUpgrade: false,
           );
         } catch (backendError) {
           debugPrint('Free Trial invoice dispatch note: $backendError');
