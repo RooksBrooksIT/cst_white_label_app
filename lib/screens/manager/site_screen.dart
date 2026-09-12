@@ -2057,6 +2057,53 @@ class _SiteScreenState extends State<SiteScreen>
             ),
             child: Scaffold(
               backgroundColor: Colors.transparent,
+              appBar: widget.hideAppBar
+                  ? null
+                  : AppBar(
+                      iconTheme: const IconThemeData(color: Colors.white),
+                      automaticallyImplyLeading: false,
+                      title: const Text(
+                        'Project & Site Setup',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      centerTitle: true,
+                      elevation: 0,
+                      backgroundColor: Colors.transparent,
+                      flexibleSpace: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              darkAccent,
+                              Color.alphaBlend(
+                                primaryColor.withValues(alpha: 0.35),
+                                darkAccent,
+                              ),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                      ),
+                      leading: (widget.showBackButton ||
+                              widget.onBack != null ||
+                              Navigator.canPop(context))
+                          ? IconButton(
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                                  color: Colors.white, size: 18),
+                              onPressed: () {
+                                if (widget.onBack != null) {
+                                  widget.onBack!();
+                                } else if (Navigator.canPop(context)) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                            )
+                          : null,
+                    ),
               body: SafeArea(
                 bottom: false,
                 child: Center(
@@ -2067,105 +2114,6 @@ class _SiteScreenState extends State<SiteScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (!widget.hideAppBar) ...[
-                          // Top Header
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                            child: Row(
-                              children: [
-                                if ((widget.showBackButton &&
-                                        Navigator.canPop(context)) ||
-                                    widget.onBack != null)
-                                  InkWell(
-                                    onTap: () {
-                                      HapticFeedback.lightImpact();
-                                      if (widget.onBack != null) {
-                                        widget.onBack!();
-                                      } else if (Navigator.canPop(context)) {
-                                        Navigator.pop(context);
-                                      }
-                                    },
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Container(
-                                      width: 38,
-                                      height: 38,
-                                      margin: const EdgeInsets.only(right: 12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.white,
-                                          width: 1.2,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFF0F172A)
-                                                .withValues(alpha: 0.05),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.arrow_back_ios_new_rounded,
-                                        size: 16,
-                                        color: Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                  ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Text(
-                                            'Project & Site Setup',
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.w900,
-                                              color: Color(0xFF0F172A),
-                                              letterSpacing: -0.5,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: primaryColor.withValues(alpha: 0.12),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              'Setup',
-                                              style: TextStyle(
-                                                fontSize: 10.5,
-                                                fontWeight: FontWeight.w800,
-                                                color: primaryColor,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      const Text(
-                                        'Configure parameters, location & budget',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF64748B),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Segmented Pill Switcher Tabs
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -2295,8 +2243,6 @@ class _SiteScreenState extends State<SiteScreen>
                               ),
                             ),
                           ),
-                        ],
-
                         Expanded(
                           child: TabBarView(
                             controller: _tabController,

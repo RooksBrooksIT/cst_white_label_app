@@ -159,6 +159,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         const Color(0xFF06B6D4),
       ),
       DashboardItem(
+        'Manager Daily Site Entry',
+        Icons.edit_note_rounded,
+        const Color(0xFFEA580C),
+        'Log daily site progress and expenses',
+        const Color(0xFFEA580C),
+      ),
+      DashboardItem(
         'Manager Expenses',
         Icons.account_balance_wallet_rounded,
         const Color(0xFF2563EB),
@@ -241,13 +248,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       ),
     ],
     "Supervisor & Site Operations": [
-      DashboardItem(
-        'Manager Daily Site Entry',
-        Icons.edit_note_rounded,
-        const Color(0xFFEA580C),
-        'Log daily site progress and expenses',
-        const Color(0xFFEA580C),
-      ),
       DashboardItem(
         'Site-Supervisor Map',
         Icons.map_rounded,
@@ -670,18 +670,18 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                       )
                     : null,
                 bottomNavigationBar: _buildBottomNavigationBar(context),
-                body: SafeArea(
-                  bottom: false,
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxWidth: Responsive.maxContentWidth,
-                      ),
-                      child: IndexedStack(
-                        index: _currentIndex,
-                        children: [
-                          LayoutBuilder(
+                body: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: Responsive.maxContentWidth,
+                    ),
+                    child: IndexedStack(
+                      index: _currentIndex,
+                      children: [
+                        SafeArea(
+                          bottom: false,
+                          child: LayoutBuilder(
                             builder: (context, constraints) {
                               return CustomScrollView(
                                 controller: _scrollController,
@@ -720,24 +720,24 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                               );
                             },
                           ),
-                          ManagerSitesListPage(
-                            initialFilter: 'All',
-                            showBackButton: true,
-                            onBack: () => setState(() => _currentIndex = 0),
-                          ),
-                          SiteScreen(
-                            hideAppBar: false,
-                            showBackButton: true,
-                            onBack: () => setState(() => _currentIndex = 0),
-                          ),
-                          ManagerApprovalsCenterPage(
-                            hideAppBar: false,
-                            showBackButton: true,
-                            onBack: () => setState(() => _currentIndex = 0),
-                          ),
-                          _buildMoreTab(context),
-                        ],
-                      ),
+                        ),
+                        ManagerSitesListPage(
+                          initialFilter: 'All',
+                          showBackButton: true,
+                          onBack: () => setState(() => _currentIndex = 0),
+                        ),
+                        SiteScreen(
+                          hideAppBar: false,
+                          showBackButton: true,
+                          onBack: () => setState(() => _currentIndex = 0),
+                        ),
+                        ManagerApprovalsCenterPage(
+                          hideAppBar: false,
+                          showBackButton: true,
+                          onBack: () => setState(() => _currentIndex = 0),
+                        ),
+                        _buildMoreTab(context),
+                      ],
                     ),
                   ),
                 ),
@@ -3400,376 +3400,391 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
       },
     ];
 
-    return ListView(
-      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 115),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        // Executive Profile Hero Card
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withValues(alpha: 0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 5),
-              ),
-              BoxShadow(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          primaryColor,
-                          AppTheme.getDarkAccent(primaryColor),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryColor.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        _managerName.isNotEmpty
-                            ? _managerName.substring(0, 1).toUpperCase()
-                            : 'M',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                _managerName,
-                                style: const TextStyle(
-                                  fontSize: 16.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0F172A),
-                                  letterSpacing: -0.3,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(
-                                  0xFF10B981,
-                                ).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'Active',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF10B981),
-                                ),
-                              ),
-                            ),
+    return SafeArea(
+      bottom: false,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 115),
+        physics: const BouncingScrollPhysics(),
+        children: [
+          // Executive Profile Hero Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 5),
+                ),
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            primaryColor,
+                            AppTheme.getDarkAccent(primaryColor),
                           ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          _managerDesignation,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: primaryColor.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          _managerName.isNotEmpty
+                              ? _managerName.characters.first.toUpperCase()
+                              : 'M',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _managerName,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                    letterSpacing: -0.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF10B981,
+                                  ).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Active',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _managerDesignation,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.showLogout)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.logout_rounded,
+                          color: Color(0xFFEF4444),
+                          size: 20,
+                        ),
+                        tooltip: 'Logout',
+                        onPressed: () => _showLogoutConfirmation(context),
+                      ),
+                  ],
+                ),
+                if (_managerEmail.isNotEmpty || _managerPhone.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        if (_managerEmail.isNotEmpty)
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.email_outlined,
+                                  size: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _managerEmail,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (_managerEmail.isNotEmpty &&
+                            _managerPhone.isNotEmpty)
+                          Container(
+                            height: 12,
+                            width: 1,
+                            color: Colors.grey.shade300,
+                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                        if (_managerPhone.isNotEmpty)
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _managerPhone,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
-                  if (widget.showLogout)
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _showLogoutConfirmation(context);
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFFEF4444,
-                            ).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.logout_rounded,
-                            color: Color(0xFFEF4444),
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
-              ),
-              const SizedBox(height: 14),
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Categorized Setting Sections
+          ...sections.map((section) {
+            final title = section['title'] as String;
+            final tag = section['tag'] as String;
+            final items = section['items'] as List<Map<String, dynamic>>;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF10B981),
-                          shape: BoxShape.circle,
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Operations Hub',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey.shade700,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Text(
+                          tag,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  Text(
-                    'Workspace Desk',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: primaryColor,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Bento Sections
-        ...sections.map((section) {
-          final items = section['items'] as List<Map<String, dynamic>>;
-          final title = section['title'] as String;
-          final tag = section['tag'] as String;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 4, right: 4, bottom: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Text(
-                        tag,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
-              ),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isTwoCol = constraints.maxWidth >= 340;
-                  final itemWidth = isTwoCol
-                      ? (constraints.maxWidth - 12) / 2
-                      : constraints.maxWidth;
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isTwoCol = constraints.maxWidth >= 340;
+                    final itemWidth = isTwoCol
+                        ? (constraints.maxWidth - 12) / 2
+                        : constraints.maxWidth;
 
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: items.map((item) {
-                      final color = item['color'] as Color;
-                      final action = item['action'] as VoidCallback?;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: items.map((item) {
+                        final color = item['color'] as Color;
+                        final action = item['action'] as VoidCallback?;
 
-                      return SizedBox(
-                        width: itemWidth,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: Colors.white, width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: color.withValues(alpha: 0.07),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
+                        return SizedBox(
+                          width: itemWidth,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                                width: 1.2,
                               ),
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF0F172A,
-                                ).withValues(alpha: 0.02),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(18),
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                action?.call();
-                              },
-                              borderRadius: BorderRadius.circular(18),
-                              splashColor: color.withValues(alpha: 0.1),
-                              highlightColor: color.withValues(alpha: 0.05),
-                              child: Padding(
-                                padding: const EdgeInsets.all(13),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                color.withValues(alpha: 0.18),
-                                                color.withValues(alpha: 0.08),
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                            border: Border.all(
-                                              color: color.withValues(
-                                                alpha: 0.2,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF0F172A,
+                                  ).withValues(alpha: 0.03),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              child: InkWell(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  if (action != null) action();
+                                },
+                                borderRadius: BorderRadius.circular(16),
+                                splashColor: color.withValues(alpha: 0.1),
+                                highlightColor: color.withValues(alpha: 0.05),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(13),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  color.withValues(alpha: 0.18),
+                                                  color.withValues(alpha: 0.08),
+                                                ],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
                                               ),
-                                              width: 1,
+                                              borderRadius: BorderRadius.circular(
+                                                12,
+                                              ),
+                                              border: Border.all(
+                                                color: color.withValues(
+                                                  alpha: 0.2,
+                                                ),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              item['icon'] as IconData,
+                                              color: color,
+                                              size: 20,
                                             ),
                                           ),
-                                          child: Icon(
-                                            item['icon'] as IconData,
-                                            color: color,
-                                            size: 20,
+                                          Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF1F5F9),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.arrow_forward_ios_rounded,
+                                              size: 10,
+                                              color: Color(0xFF94A3B8),
+                                            ),
                                           ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF8FAFC),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            Icons.arrow_forward_rounded,
-                                            size: 13,
-                                            color: color,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      item['title'] as String,
-                                      style: const TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w900,
-                                        color: Color(0xFF0F172A),
-                                        letterSpacing: -0.2,
+                                        ],
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      item['subtitle'] as String,
-                                      style: const TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF64748B),
-                                        height: 1.25,
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        item['title'] as String,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F172A),
+                                          letterSpacing: -0.2,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        item['subtitle'] as String,
+                                        style: const TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF64748B),
+                                          height: 1.25,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
-          );
-        }),
-      ],
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+              ],
+            );
+          }),
+        ],
+      ),
     );
   }
 
@@ -4306,34 +4321,6 @@ class ConsoleCategoryDetailsPage extends StatefulWidget {
 
 class _ConsoleCategoryDetailsPageState
     extends State<ConsoleCategoryDetailsPage> {
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
-  String _searchQuery = '';
-  bool _isSearchExpanded = false;
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.dispose();
-    super.dispose();
-  }
-
-  void _toggleSearch() {
-    HapticFeedback.lightImpact();
-    setState(() {
-      _isSearchExpanded = !_isSearchExpanded;
-      if (!_isSearchExpanded) {
-        _searchController.clear();
-        _searchQuery = '';
-      }
-    });
-    if (_isSearchExpanded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _searchFocusNode.requestFocus();
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final hPad = Responsive.horizontalPadding(context);
@@ -4349,17 +4336,10 @@ class _ConsoleCategoryDetailsPageState
     final String subtitle = meta["subtitle"] as String;
     final IconData categoryIcon = meta["icon"] as IconData;
 
-    final rawQuery = _searchQuery.trim().toLowerCase();
-    final filteredItems =
-        (rawQuery.isEmpty
-              ? List<DashboardItem>.from(widget.items)
-              : widget.items.where((item) {
-                  return item.title.toLowerCase().contains(rawQuery) ||
-                      item.subtitle.toLowerCase().contains(rawQuery);
-                }).toList())
-          ..sort(
-            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-          );
+    final filteredItems = List<DashboardItem>.from(widget.items)
+      ..sort(
+        (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+      );
 
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
@@ -4382,72 +4362,16 @@ class _ConsoleCategoryDetailsPageState
             backgroundColor: Colors.transparent,
             appBar: AppBar(
               iconTheme: const IconThemeData(color: Colors.white),
-              title: _isSearchExpanded
-                  ? Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        autofocus: true,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        cursorColor: Colors.white,
-                        decoration: InputDecoration(
-                          hintText: 'Search in ${widget.sectionTitle}...',
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.65),
-                            fontSize: 13,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search_rounded,
-                            color: Colors.white70,
-                            size: 18,
-                          ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(
-                                    Icons.cancel_rounded,
-                                    color: Colors.white70,
-                                    size: 16,
-                                  ),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : null,
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 10,
-                          ),
-                        ),
-                        onChanged: (val) {
-                          setState(() {
-                            _searchQuery = val;
-                          });
-                        },
-                      ),
-                    )
-                  : Text(
-                      widget.sectionTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 17,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-              centerTitle: !_isSearchExpanded,
+              title: Text(
+                widget.sectionTitle,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 17,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              centerTitle: true,
               elevation: 0,
               flexibleSpace: Container(
                 decoration: BoxDecoration(
@@ -4470,41 +4394,8 @@ class _ConsoleCategoryDetailsPageState
                   color: Colors.white,
                   size: 18,
                 ),
-                onPressed: () {
-                  if (_isSearchExpanded) {
-                    setState(() {
-                      _isSearchExpanded = false;
-                      _searchController.clear();
-                      _searchQuery = '';
-                    });
-                  } else {
-                    Navigator.pop(context);
-                  }
-                },
+                onPressed: () => Navigator.pop(context),
               ),
-              actions: [
-                if (!_isSearchExpanded)
-                  IconButton(
-                    icon: const Icon(
-                      Icons.search_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                    tooltip: 'Search options',
-                    onPressed: _toggleSearch,
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                    tooltip: 'Close search',
-                    onPressed: _toggleSearch,
-                  ),
-                const SizedBox(width: 4),
-              ],
             ),
             body: LayoutBuilder(
               builder: (context, constraints) {
@@ -4648,28 +4539,19 @@ class _ConsoleCategoryDetailsPageState
                                     ],
                                   ),
                                   child: Icon(
-                                    Icons.search_off_rounded,
+                                    Icons.inbox_rounded,
                                     size: 40,
                                     color: Colors.grey.shade400,
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                Text(
-                                  'No options found matching "$_searchQuery"',
+                                const Text(
+                                  'No options available',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.w700,
                                     color: Color(0xFF334155),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Try searching with different keywords.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    color: Color(0xFF94A3B8),
                                   ),
                                 ),
                               ],

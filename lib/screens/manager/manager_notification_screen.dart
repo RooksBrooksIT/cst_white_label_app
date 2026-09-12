@@ -56,7 +56,7 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
             letterSpacing: -0.3,
           ),
         ),
-        centerTitle: false,
+        centerTitle: true,
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(

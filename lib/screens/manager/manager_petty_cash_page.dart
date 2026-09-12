@@ -96,6 +96,10 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
             ),
           ),
         ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,

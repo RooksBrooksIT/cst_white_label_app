@@ -1,0 +1,360 @@
+================================================================================
+           CST / EBRICKS WHITE-LABEL APP - COMPREHENSIVE WORKFLOW ANALYSIS
+================================================================================
+Document Type   : Full Architecture, Role Hierarchy & End-to-End Workflow Analysis
+Application     : CST White Label Construction ERP / Enterprise Management System
+Framework       : Flutter (Cross-Platform Mobile, Tablet & Desktop Support)
+Backend & Cloud : Firebase Authentication, Cloud Firestore, Cloud Storage, Cloud Functions, FCM
+Payments Engine : PayU Gateway Integration
+Generated Date  : 2026-09-12
+================================================================================
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. EXECUTIVE OVERVIEW & ARCHITECTURAL FOUNDATION
+2. USER ROLES, ACCESS CONTROL & PERMISSION HIERARCHY
+3. AUTHENTICATION, ONBOARDING & SETUP WORKFLOWS
+4. ORGANIZATION MODULE (MASTER HUB) WORKFLOWS
+5. MANAGER MODULE (OPERATIONAL CONTROL) WORKFLOWS
+6. SUPERVISOR MODULE (FIELD EXECUTION) WORKFLOWS
+7. CUSTOMER / CLIENT MODULE WORKFLOWS
+8. REPORTS, PDF GENERATION & ANALYTICS ENGINE
+9. CORE END-TO-END BUSINESS WORKFLOWS & DATA LIFECYCLES
+10. CROSS-CUTTING SERVICES (NOTIFICATIONS, OFFLINE SYNC, THEME ENGINE, PAYMENTS)
+--------------------------------------------------------------------------------
+
+================================================================================
+1. EXECUTIVE OVERVIEW & ARCHITECTURAL FOUNDATION
+================================================================================
+
+1.1 Purpose & Domain
+The CST White Label Application (internally known as E-Bricks) is an enterprise-grade
+Construction Resource Planning (ERP) and Site Management Software. It bridges corporate
+organizations, field operations managers, site supervisors, subcontractors, workers,
+and clients into a single unified real-time ecosystem.
+
+1.2 Key Architectural Components:
+- Presentation Layer: Responsive Flutter UI adapting gracefully across mobile, tablet,
+  and desktop form factors with custom HSL/Color-blend dynamic gradient design tokens.
+- State Management: ValueNotifier/ValueListenableBuilder, Streams (Firestore snapshot listeners),
+  StatefulWidgets, and decoupled business logic services.
+- Data Layer: Cloud Firestore multi-tenant NoSQL structure organized under corporate
+  tenant spaces, site sub-collections, master registers, and global transaction ledgers.
+- White-Label Customization Engine: Dynamic company branding (`AppTheme`), adaptive primary
+  color palettes, dynamic app icons/logos, company name injection, and splash/portal branding.
+- Connectivity & Offline Resilience: `ConnectivityWrapper`, `OfflineSyncService`, and cached
+  storage mechanisms ensuring seamless offline site data entry and automated sync on reconnect.
+- Cloud Push Notifications: Integrated Firebase Cloud Messaging (FCM) via `NotificationService`
+  and dynamic deep-link router `NotificationRouter`.
+
+================================================================================
+2. USER ROLES, ACCESS CONTROL & PERMISSION HIERARCHY
+================================================================================
+
+The system enforces strict role-based access control (RBAC) across 4 primary user roles
+and secondary contractor/worker profiles:
+
+1. ORGANIZATION ADMIN (Super Admin / Corporate Owner)
+   - Scope: Complete enterprise-wide governance across all company sites, financial ledgers,
+     budgets, master inventories, subscription plans, and white-label branding.
+   - Key Capabilities: Add/remove managers and supervisors, approve high-value material and
+     financial requests, manage corporate subscriptions via PayU, configure master rate cards.
+
+2. PROJECT / OPERATIONS MANAGER (Field Operations Controller)
+   - Scope: Day-to-day oversight of multiple allocated construction sites, project stages,
+     approvals, material allocations, machinery tracking, and labour deployment.
+   - Key Capabilities: Create and configure new sites/projects, approve supervisor material
+     and tool requests, verify daily site logs, manage contractor bills, approve petty cash.
+
+3. SITE SUPERVISOR (Frontline Field Executioner)
+   - Scope: Direct on-site management of designated construction sites.
+   - Key Capabilities: Submit daily site reports (DSR), request materials and machinery,
+     mark labour attendance, record on-site petty cash expenses, log contractor progress.
+
+4. CLIENT / CUSTOMER (Project Stakeholder & Beneficiary)
+   - Scope: Read-only transparent window into their specific project(s).
+   - Key Capabilities: View live site completion percentage, milestone photos, financial
+     payment status, stage timeline progress, and summary reports.
+
+5. CONTRACTORS, LABOURERS & DRIVERS (Subcontractor Entities)
+   - Scope: Managed resources tracked for daily attendance, piece-rate wages, task allocation,
+     vehicle trip logs, tool transfers, and settlement payouts.
+
+================================================================================
+3. AUTHENTICATION, ONBOARDING & SETUP WORKFLOWS
+================================================================================
+
+3.1 Cold Start & Splash Sequence:
+1. `SplashScreen` loads app configuration, initializes Firebase options, local cache, and
+   FCM token handlers.
+2. `AppTheme.initialize()` fetches the active organization's dynamic branding (colors, logo, app name).
+3. If an authenticated session exists in `AuthService`, the user is routed directly to their
+   designated portal (`OrganizationDashboard`, `ConfigAccountDashboard`, `SupervisorDashboard`,
+   or `CustomerDashboard`).
+4. If unauthenticated, the user is navigated to `/landing` (`LandingPage`).
+
+3.2 Role-Based Login & Onboarding Routes:
+- `/landing` (Landing Page): Introduces the platform, features, and direct entrance routes.
+- `/authSelection` (`MainDashboard`): Role selector allowing users to choose their portal:
+  * Organization Login (`/orgLogin` -> `Organisation_LoginPage`)
+  * Manager Login (`/managerLogin` -> `ConfigLoginPage`)
+  * Supervisor Login (`/supervisorLogin` -> `SupervisorLoginPage`)
+  * Customer Login (`/customerLogin` -> `CustomerLoginPage`)
+- `/orgRegistration` (`OrganisationLandingPage` & `OrganisationRegistrationPage`):
+  * Organization sign-up workflow capturing company name, email, phone, business address,
+    registration certificate, and initial admin credentials.
+- `/pricing` (`PricingScreen`) & `/payuCheckout` (`PayuCheckoutScreen`):
+  * Subscription selection (Starter, Professional, Enterprise tiers) with automated PayU payment
+    gateway checkout and webhook verification.
+- `/joinByReferral` (`JoinByReferralPage`):
+  * Staff onboarding where managers, supervisors, and staff join an organization using an
+    invite code/referral token.
+- `/resetPassword` (`ResetPasswordScreen` & `OrgResetPasswordScreen`):
+  * Self-service password recovery via Firebase Auth password reset emails.
+
+================================================================================
+4. ORGANIZATION MODULE (MASTER HUB) WORKFLOWS
+================================================================================
+
+Primary Screens: `OrganizationDashboard`, `OrgMenuScreen`, `OrgFinancePage`, `OrgSitesListPage`,
+`OrgApprovalsMenuPage`, `OrgPettyCashPage`, `OrgInformationScreen`, `BrandingEditScreen`.
+
+Workflow Details:
+4.1 Executive Dashboard (`OrganizationDashboard`):
+- Displays company-wide metrics: Total live sites, active workforce headcount, pending approvals,
+  monthly capital burn rate, and aggregated site progress.
+- Bottom navigation with shortcuts to Sites, Finance, Approvals, and Master Menu.
+
+4.2 Organization Master Menu & Team Management (`OrgMenuScreen`, `OrgInformationScreen`):
+- Organization Profile: View company details, registration ID, contact credentials.
+- Staff & User Management: List all registered Managers, Supervisors, and Customers with search,
+  filtering, phone, email, and role assignment.
+- Password & Credential Administration: Reset staff access tokens and permissions.
+
+4.3 Enterprise Financial Management (`OrgFinancePage`, `SiteFinancialDetailsPage`):
+- Overall cashflow charts, planned vs. actual project expenditures, site-by-site budget comparisons.
+- Deep-dive site financial statements, vendor payments ledger, and contractor billing summaries.
+
+4.4 Multi-Level Approvals Hub (`OrgApprovalsMenuPage`):
+- Tier-2 approval desk for major material purchase orders exceeding manager clearance thresholds.
+- Emergency fund releases, site budget revisions, and structural milestone approvals.
+
+4.5 Central Petty Cash & Corporate Vault (`OrgPettyCashPage`, `OrganizationPettyCashInsightsScreen`):
+- Top-level corporate cash disbursement to site manager wallets.
+- Multi-site petty cash consumption analytics, voucher audits, and receipt verification.
+
+4.6 White-Label Branding Center (`BrandingScreen`, `BrandingEditScreen`):
+- Change primary brand theme colors dynamically across all staff devices in real-time.
+- Upload custom enterprise logo, login banners, and watermarks for generated PDF reports.
+
+4.7 Subscription & Quota Hub (`OrgSubscriptionPage`):
+- Live tracking of active site limits, supervisor seat counts, and cloud storage quotas.
+- Plan renewals and upgrades via PayU payment gateway integration.
+
+================================================================================
+5. MANAGER MODULE (OPERATIONAL CONTROL) WORKFLOWS
+================================================================================
+
+Primary Screens: `ConfigAccountDashboard`, `ManagerSitesListPage`, `SiteScreen`,
+`ProjectSetupWizard`, `ManagerApprovalsCenterPage`, `ManagerExpenses`, `ManagerPettyCashPage`,
+`ConfigMaterials`, `ToolsMasterPage`, `LabourScreen`, `ConfigLayoutAndDrawing`.
+
+Workflow Details:
+5.1 Executive Management Console (`ConfigAccountDashboard`):
+- Real-time KPIs overview carousel: Live sites count, pending requests, daily labour deployed,
+  monthly expenses summary.
+- Comprehensive Categorized Bento Modules:
+  * Operations & Sites
+  * Approvals & Authorizations
+  * Material & Inventory Control
+  * Tools & Equipment Logistics
+  * Workforce, Subcontractors & Fleet
+  * Drawing & Layout Blueprints
+  * Financials, Invoices & Reports
+
+5.2 Site Lifecycle & Project Setup (`ManagerSitesListPage`, `SiteScreen`, `ProjectSetupWizard`):
+- Site Setup Wizard (`ProjectSetupWizard`):
+  * Step 1: Site Details (Site name, GPS coordinates, category, start/end dates, planned budget).
+  * Step 2: Milestone & Stage Definition (Foundation, Plinth, Superstructure, Finishing, Handover).
+  * Step 3: Supervisor & Team Allocation (Assigning lead and assistant site supervisors).
+- Sites Workspace (`ManagerSitesListPage`):
+  * Filter sites by status tabs: "All", "Live", "In Progress", "Planning", "Completed", "On Hold".
+  * Fast search, sorting (Budget, Name, Progress), and direct site entry launcher.
+
+5.3 Operational Approvals Desk (`ManagerApprovalsCenterPage`):
+- 4 Core Approval Modules:
+  1. Material Approvals (`ManagerMaterialApprovalScreen`): Authorize supervisor material indented quantities.
+  2. Supervisor Approvals (`ManagerApprovalScreen`): Authorize stage clearances and DSR entries.
+  3. Site Payments & Subcontractor Invoices (`ManagerSitePaymentApprovalPage`): Verify contractor billings.
+  4. Tool Approvals (`ManagerToolsApprovalScreen`): Authorize heavy machinery and tool requisitions.
+
+5.4 Material & Warehouse Inventory Engine (`ConfigMaterials`, `ConfigMatSubCat`, `ConfigMaterialAvailability`):
+- Master category & sub-category item registers (Cement, Steel, Aggregates, Electrical, Plumbing).
+- Real-time stock availability tracking per site and central storage yard.
+- Material transfer workflows between sites (`MaterialTransferService`).
+
+5.5 Tools & Equipment Logistics (`ToolsMasterPage`, `ToolsInventoryDetails`, `ToolsMovementPage`):
+- Master machinery register (Mixers, Scaffolding, Generators, Drills, Vibrators).
+- Tool movement logging: Tracks which tool is at which site, who received it, condition on dispatch.
+
+5.6 Workforce, Labour & Fleet Management (`LabourScreen`, `WorkersConfigPage`, `VehicleDetailsPage`):
+- Subcontractor contracts & daily wage labour directories.
+- Worker-to-site allocation matrices (`WorkersSiteMappingPage`).
+- Fleet & Driver directory (`VehicleDriverConfigPage`, `VehicleInventoryPage`) with fuel and maintenance logs.
+
+5.7 Blueprints & Engineering Drawings (`ConfigLayoutAndDrawing`):
+- Architectural, Structural, Electrical, and Plumbing CAD/PDF drawing repository.
+- Version-controlled document distribution ensuring supervisors always access approved blueprints.
+
+================================================================================
+6. SUPERVISOR MODULE (FIELD EXECUTION) WORKFLOWS
+================================================================================
+
+Primary Screens: `SupervisorDashboard`, `SiteEntryPage`, `MaterialRequestForm`,
+`SupervisorMaterialInformation`, `ToolsAtSitePage`, `SupervisorWorkerAttPage`,
+`SupervisorPettyCashPage`, `SiteContractorEntryPage`.
+
+Workflow Details:
+6.1 Supervisor Home & Shift Setup (`SupervisorDashboard`):
+- Displays assigned site(s), current stage target, quick actions for daily logging, and alert feeds.
+
+6.2 Daily Site Report (DSR) & Progress Entry (`SiteEntryPage`, `ProjectstageDailySiteReport`):
+- Log daily progress percentage per stage.
+- Upload high-resolution geotagged site photos of work completed.
+- Record weather conditions, obstacles, safety incidents, and milestone remarks.
+
+6.3 Material Requisitions & Goods Received Notes (GRN) (`MaterialRequestForm`, `MaterialAtSiteEntryPage`):
+- Raise indent requests for required construction materials with urgency level and required-by date.
+- Goods Receipt Verification: Mark received materials on site against approved quantities,
+  attaching supplier delivery challans/invoices.
+
+6.4 Tool & Machinery Handover (`ToolsAtSitePage`, `SupervisorToolMovement`):
+- Acknowledge receipt of equipment transferred from central warehouse or another site.
+- Report broken, damaged, or maintenance-required tools.
+
+6.5 Labour Attendance & Contractor Measurements (`SupervisorWorkerAttPage`, `SiteContractorEntryPage`):
+- Daily muster roll attendance marking (Masons, Carpenters, Helpers, Electricians).
+- Record completed work quantities against contractor bill of quantities (BOQ) (e.g. sq ft plastering).
+
+6.6 Field Petty Cash Expenses (`SupervisorPettyCashPage`):
+- Record urgent spot purchases (nails, emergency transport, water tanker, local tea/refreshments).
+- Take photos of paper receipts/cash bills; auto-submits to Manager approval queue.
+
+================================================================================
+7. CUSTOMER / CLIENT MODULE WORKFLOWS
+================================================================================
+
+Primary Screens: `CustomerDashboard`, `CustomerProjectDetails`, `CustomerSiteStatusReport`,
+`CustomerProjectFinancialStatusreport`, `CustomerWorkersSummary`.
+
+Workflow Details:
+7.1 Client Portal Dashboard (`CustomerDashboard`):
+- Overview of customer's commissioned project(s), current active construction stage, and progress bar.
+
+7.2 Live Project Tracking (`CustomerProjectDetails`, `CustomerSiteStatusReport`):
+- Milestone timeline displaying completed vs. ongoing stages.
+- View verified site inspection photographs and progress updates submitted by the engineering team.
+
+7.3 Financial Transparency (`CustomerProjectFinancialStatusreport`):
+- Summary of total project contract value, installments paid, upcoming payment schedule milestones,
+  and payment receipt acknowledgments.
+
+7.4 Workforce Activity Insight (`CustomerWorkersSummary`, `CustomerWorkerDetails`):
+- High-level insight into daily worker deployment and activity on their project site.
+
+================================================================================
+8. REPORTS, PDF GENERATION & ANALYTICS ENGINE
+================================================================================
+
+Primary Screens: `site_status_report_page.dart`, `site_summary_page.dart`, `daily_site_report.dart`,
+`financial_status_report.dart`, `incentive_calculation.dart`, `project_stage_insights_dashboard.dart`.
+
+8.1 Real-Time Reports Portfolio:
+- Planning Site Report (`site_status_report_page.dart`):
+  * Comprehensive table of planning stage projects with responsive pagination, multi-parameter search,
+    stage filters, and on-demand PDF report generation.
+- Site Summary Report (`site_summary_page.dart`):
+  * Executive 360-degree overview of a site combining progress, material consumption, labour costs,
+    and financial variance.
+- Financial Status Report (`financial_status_report.dart`):
+  * Detailed cost vs. budget analytics, stage expense breakdowns, and contractor payout summaries.
+- Daily Site Report (DSR) Generator (`daily_site_report.dart`):
+  * Formal daily log export capturing labour attendance, tasks executed, materials utilized, and photos.
+- Worker Incentive & Payroll Calculation (`incentive_calculation.dart`, `incentive_calculation_sheet.dart`):
+  * Automated calculation of overtime, productivity bonuses, and weekly/monthly wage sheets.
+- Machinery & Fleet Reports (`tools_inventory_report.dart`, `vehicle_inventory_pdf.dart`):
+  * Utilization hours, breakdown logs, and site distribution sheets.
+
+8.2 PDF Document Generation Architecture:
+- Uses Flutter `pdf` and `printing` libraries.
+- Features standardized corporate headers, company logo watermark, timestamp, page numbering,
+  clean tabular layouts, and auto-pagination.
+- One-click PDF generation, print preview (`pdf_preview_page.dart`), and device sharing integration.
+
+================================================================================
+9. CORE END-TO-END BUSINESS WORKFLOWS & DATA LIFECYCLES
+================================================================================
+
+9.1 End-to-End Material Request Lifecycle:
+[Supervisor Indent]
+   |--> Supervisor identifies material shortage on site.
+   |--> Submits Material Request via `MaterialRequestForm` (item, qty, unit, urgency).
+[Manager Review]
+   |--> Notification pushed to Manager's Approval Desk.
+   |--> Manager checks central warehouse inventory via `MaterialInventoryService`.
+   |--> If available: Dispatches from warehouse or initiates site-to-site transfer.
+   |--> If purchase needed: Approves request and forwards to Organization for procurement.
+[Organization Clearance]
+   |--> Org Admin authorizes procurement purchase order.
+[Dispatch & Delivery]
+   |--> Vendor/Yard dispatches material with delivery challan.
+[Site Receipt & Stock Update]
+   |--> Supervisor verifies shipment at site, uploads challan photo, logs GRN in `MaterialAtSiteEntryPage`.
+   |--> Firestore automatically increments active on-site inventory ledger.
+
+9.2 End-to-End Petty Cash Allocation & Expense Lifecycle:
+[Fund Allocation]
+   |--> Org Admin disburses initial petty cash pool to Manager via `OrgPettyCashPage`.
+   |--> Manager allocates micro-wallets to designated Site Supervisors via `ManagerPettyCashPage`.
+[Field Expense]
+   |--> Supervisor incurs emergency site expense and logs entry in `SupervisorPettyCashPage`.
+   |--> Captures receipt photo, vendor name, amount, expense category, and site ID.
+[Manager Audit & Approval]
+   |--> Manager inspects expense entry, verifies receipt clarity, and approves/rejects voucher.
+[Settlement & Top-Up]
+   |--> Approved vouchers reconcile the supervisor's wallet balance.
+   |--> Low balance triggers automated top-up request to the Manager/Organization vault.
+
+9.3 End-to-End Project Creation to Handover Lifecycle:
+1. Setup: Org or Manager creates project via `ProjectSetupWizard` (GPS, budget, stages, supervisors).
+2. Preparation: Drawings/Blueprints uploaded to `ConfigLayoutAndDrawing`; tools and initial stock mapped.
+3. Execution: Daily site reports (DSR), worker attendance, material intake, and petty cash logs recorded daily.
+4. Monitoring: Managers and Org Admins track milestones, approve stage completions, and monitor financial burn.
+5. Reporting: Ongoing PDF reports generated for internal review and customer updates.
+6. Handover: Final inspection completed, defect liability list resolved, and site marked "Completed".
+
+================================================================================
+10. CROSS-CUTTING PLATFORM SERVICES
+================================================================================
+
+10.1 Cloud Notifications (`NotificationService`, `NotificationRouter`, `NotificationModel`):
+- Handles FCM device registration, foreground heads-up banners, background wakeups, and notification center.
+- Deep links users straight to the relevant approval request, site status page, or chat thread on tap.
+
+10.2 Offline Synchronization (`OfflineSyncService`):
+- Intercepts network calls when device is offline in remote construction locations.
+- Queues Firestore mutations locally in encrypted local storage.
+- Automatically flushes and syncs queued data upon network restoration without data loss.
+
+10.3 Dynamic White-Label Engine (`AppTheme`):
+- Live `ValueListenable` system that updates primary, dark accent, and gradient background colors instantly
+  when branding settings change in Firestore.
+- Computes harmonious color schemes (HSL mathematical tone adaptation) to maintain consistent visual appeal.
+
+10.4 Payment Gateway Engine (`PayuService`, `PayuCheckoutScreen`):
+- Secure server-verified hash generation for PayU checkout.
+- Handles success/failure callbacks, subscription limit activations, and billing transaction histories.
+
+================================================================================
+END OF DOCUMENT
+================================================================================

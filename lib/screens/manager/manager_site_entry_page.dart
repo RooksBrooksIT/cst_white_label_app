@@ -983,16 +983,6 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                 icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
                 onPressed: () => Navigator.pop(context),
               ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: IconButton(
-                    icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                    onPressed: _refreshData,
-                    tooltip: 'Refresh',
-                  ),
-                ),
-              ],
             ),
       body: SafeArea(
         child: SingleChildScrollView(

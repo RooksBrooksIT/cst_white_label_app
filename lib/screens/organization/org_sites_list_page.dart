@@ -36,9 +36,14 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
     'On Hold',
   ];
 
+  final Map<String, GlobalKey> _tabKeys = {};
+
   @override
   void initState() {
     super.initState();
+    for (final tab in _statusTabs) {
+      _tabKeys[tab] = GlobalKey();
+    }
     _selectedStatus = widget.initialFilter;
     if (!_statusTabs.any((t) => t.toLowerCase() == _selectedStatus.toLowerCase())) {
       _selectedStatus = 'All';
@@ -48,6 +53,27 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
         orElse: () => 'All',
       );
     }
+    if (_selectedStatus != 'All') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _ensureTabVisible(_selectedStatus);
+      });
+    }
+  }
+
+  void _ensureTabVisible(String status) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final key = _tabKeys[status];
+      final tabContext = key?.currentContext;
+      if (tabContext == null) return;
+
+      Scrollable.ensureVisible(
+        tabContext,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    });
   }
 
   @override
@@ -482,11 +508,14 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                       children: [
                                         // Dynamic Status Tabs with Live Counters
                                         SingleChildScrollView(
+                                          controller: _scrollController,
+                                          key: const PageStorageKey<String>('org_sites_status_tabs_scroll'),
                                           scrollDirection: Axis.horizontal,
                                           physics: const BouncingScrollPhysics(),
                                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                           child: Row(
                                             children: _statusTabs.map((status) {
+                                              final key = _tabKeys[status];
                                               final isSelected = _selectedStatus.toLowerCase() == status.toLowerCase();
                                               final tabCount = _getCountForTab(
                                                 status,
@@ -499,11 +528,13 @@ class _OrgSitesListPageState extends State<OrgSitesListPage> {
                                               );
 
                                               return Padding(
+                                                key: key,
                                                 padding: const EdgeInsets.only(right: 8),
                                                 child: InkWell(
                                                   onTap: () {
                                                     HapticFeedback.lightImpact();
                                                     setState(() => _selectedStatus = status);
+                                                    _ensureTabVisible(status);
                                                   },
                                                   borderRadius: BorderRadius.circular(14),
                                                   child: AnimatedContainer(

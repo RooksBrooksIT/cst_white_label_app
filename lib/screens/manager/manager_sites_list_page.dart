@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
@@ -39,9 +39,14 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
     'On Hold',
   ];
 
+  final Map<String, GlobalKey> _tabKeys = {};
+
   @override
   void initState() {
     super.initState();
+    for (final tab in _statusTabs) {
+      _tabKeys[tab] = GlobalKey();
+    }
     _selectedStatus = widget.initialFilter;
     if (!_statusTabs.any((t) => t.toLowerCase() == _selectedStatus.toLowerCase())) {
       _selectedStatus = 'All';
@@ -53,6 +58,27 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
       );
       _selectedStatus = match;
     }
+    if (_selectedStatus != 'All') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _ensureTabVisible(_selectedStatus);
+      });
+    }
+  }
+
+  void _ensureTabVisible(String status) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final key = _tabKeys[status];
+      final tabContext = key?.currentContext;
+      if (tabContext == null) return;
+
+      Scrollable.ensureVisible(
+        tabContext,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    });
   }
 
   @override
@@ -197,6 +223,72 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
           ),
           child: Scaffold(
             backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              iconTheme: const IconThemeData(color: Colors.white),
+              automaticallyImplyLeading: false,
+              title: const Text(
+                'Sites & Projects',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              centerTitle: true,
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      darkAccent,
+                      Color.alphaBlend(
+                        primaryColor.withValues(alpha: 0.35),
+                        darkAccent,
+                      ),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+              leading: (widget.showBackButton ||
+                      widget.onBack != null ||
+                      Navigator.canPop(context))
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white, size: 18),
+                      onPressed: () {
+                        if (widget.onBack != null) {
+                          widget.onBack!();
+                        } else if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+                      },
+                    )
+                  : null,
+              actions: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  tooltip: 'Add Site',
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProjectSetupWizard(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 4),
+              ],
+            ),
             body: SafeArea(
               bottom: false,
               child: Center(
@@ -207,138 +299,7 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. Top Header
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Row(
-                          children: [
-                            if ((widget.showBackButton &&
-                                    Navigator.canPop(context)) ||
-                                widget.onBack != null)
-                              InkWell(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  if (widget.onBack != null) {
-                                    widget.onBack!();
-                                  } else if (Navigator.canPop(context)) {
-                                    Navigator.pop(context);
-                                  }
-                                },
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  width: 38,
-                                  height: 38,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 1.2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF0F172A)
-                                            .withValues(alpha: 0.05),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    size: 16,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
-                                  Text(
-                                    'Sites & Projects',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF0F172A),
-                                      letterSpacing: -0.5,
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Manage live sites & track project stages',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            InkWell(
-                              onTap: () {
-                                HapticFeedback.mediumImpact();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const ProjectSetupWizard(),
-                                  ),
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(14),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 13,
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [primaryColor, darkAccent],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                    width: 1.2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: primaryColor.withValues(alpha: 0.35),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.add_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Add Site',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
+                      const SizedBox(height: 8),
                       // 2. Search Bar and Filter Option Row
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -585,11 +546,14 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                                           children: [
                                             // Dynamic Status Tabs with Live Counters
                                             SingleChildScrollView(
+                                              controller: _scrollController,
+                                              key: const PageStorageKey<String>('manager_sites_status_tabs_scroll'),
                                               scrollDirection: Axis.horizontal,
                                               physics: const BouncingScrollPhysics(),
                                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                               child: Row(
                                                 children: _statusTabs.map((status) {
+                                                  final key = _tabKeys[status];
                                                   final isSelected = _selectedStatus.toLowerCase() == status.toLowerCase();
                                                   final tabCount = _getCountForTab(
                                                     status,
@@ -602,11 +566,13 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                                                   );
 
                                                   return Padding(
+                                                    key: key,
                                                     padding: const EdgeInsets.only(right: 8),
                                                     child: InkWell(
                                                       onTap: () {
                                                         HapticFeedback.lightImpact();
                                                         setState(() => _selectedStatus = status);
+                                                        _ensureTabVisible(status);
                                                       },
                                                       borderRadius: BorderRadius.circular(14),
                                                       child: AnimatedContainer(
