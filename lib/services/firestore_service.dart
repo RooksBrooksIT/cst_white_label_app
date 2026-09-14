@@ -350,6 +350,46 @@ class FirestoreService {
   static CollectionReference<Map<String, dynamic>>
   get pettyCashAuditLogs => getCollection('pettyCashAuditLogs');
 
+  // Universal Tools & Equipment Collections
+  static CollectionReference<Map<String, dynamic>> get tools =>
+      getCollection('tools');
+  static CollectionReference<Map<String, dynamic>> get toolsAtCompany =>
+      getCollection('toolsAtCompany');
+  static CollectionReference<Map<String, dynamic>> get toolsAtSite =>
+      getCollection('toolsAtSite');
+  static CollectionReference<Map<String, dynamic>> get toolsInventory =>
+      getCollection('toolsInventory');
+  static CollectionReference<Map<String, dynamic>> get toolsMovement =>
+      getCollection('toolsMovement');
+  static CollectionReference<Map<String, dynamic>> get toolsReturn =>
+      getCollection('toolsReturn');
+  static CollectionReference<Map<String, dynamic>> get siteToolsRequest =>
+      getCollection('siteToolsRequest');
+
+  // Universal Workers & Attendance Collections
+  static CollectionReference<Map<String, dynamic>> get workerSiteMapping =>
+      getCollection('workerSiteMapping');
+  static CollectionReference<Map<String, dynamic>> get workerSiteMap =>
+      getCollection('workerSiteMap');
+  static CollectionReference<Map<String, dynamic>> get workersAttendance =>
+      getCollection('workersAttendance');
+  static CollectionReference<Map<String, dynamic>> get workersConfig =>
+      getCollection('workersConfig');
+
+  // Universal Vehicles & Drivers Collections
+  static CollectionReference<Map<String, dynamic>> get drivers =>
+      getCollection('drivers');
+  static CollectionReference<Map<String, dynamic>> get vehicleDetails =>
+      getCollection('vehicleDetails');
+  static CollectionReference<Map<String, dynamic>> get vehicleMovements =>
+      getCollection('vehicleMovements');
+  static CollectionReference<Map<String, dynamic>> get vehicleAssignments =>
+      getCollection('vehicle_assignments');
+
+  // Usage & Subscription Metrics Collections
+  static CollectionReference<Map<String, dynamic>> get siteDrawingsUsage =>
+      getCollection('siteDrawingsUsage');
+
   /// Generates a unique 6-digit alphanumeric referral code.
   static Future<String> generateUniqueReferralCode() async {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
