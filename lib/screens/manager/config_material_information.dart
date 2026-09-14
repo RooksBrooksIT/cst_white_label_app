@@ -300,18 +300,35 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       final List<Map<String, dynamic>> rawList = [];
       for (var doc in sitesSnapshot.docs) {
         final sData = doc.data();
+        final rawSiteCode = (sData['siteCode'] ?? sData['siteId'] ?? '').toString().trim();
+        final rawSiteName = (sData['siteName'] ?? sData['name'] ?? sData['projectName'] ?? '').toString().trim();
         final canonicalId = ExpenseService.formatCanonicalSiteId(
           rawId: doc.id,
-          siteCode: sData['siteCode']?.toString(),
-          siteName: sData['siteName']?.toString(),
+          siteCode: rawSiteCode.isNotEmpty ? rawSiteCode : null,
+          siteName: rawSiteName.isNotEmpty ? rawSiteName : null,
         );
-        final siteName = sData['siteName']?.toString() ?? canonicalId;
+
+        String siteCode = rawSiteCode;
+        if (siteCode.isEmpty) {
+          siteCode = doc.id.contains('_') ? doc.id.split('_').first : doc.id;
+        } else if (siteCode.contains('_')) {
+          siteCode = siteCode.split('_').first;
+        }
+
+        String siteName = rawSiteName;
+        if (siteName.isEmpty && doc.id.contains('_')) {
+          siteName = doc.id.substring(doc.id.indexOf('_') + 1);
+        } else if (siteName.contains('_') && siteName.startsWith('${siteCode}_')) {
+          siteName = siteName.substring(siteCode.length + 1);
+        }
+
         final mapping = supervisorMap[canonicalId] ?? supervisorMap[doc.id] ?? supervisorMap[siteName];
 
         rawList.add({
-          'siteId': canonicalId,
-          'siteName': siteName,
-          'projectName': mapping?['projectName'] ?? sData['projectName'] ?? '',
+          'siteId': canonicalId.isNotEmpty ? canonicalId : doc.id,
+          'siteCode': siteCode,
+          'siteName': siteName.isNotEmpty ? siteName : (canonicalId.isNotEmpty ? canonicalId : doc.id),
+          'projectName': mapping?['projectName'] ?? sData['projectName'] ?? siteName,
           'supervisorName': mapping?['supervisorName'] ?? mapping?['supervisor'] ?? sData['supervisorName'] ?? '',
         });
       }
@@ -319,9 +336,15 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
       for (var entry in supervisorMap.entries) {
         final sId = entry.key;
         final mapping = entry.value;
+        final rawCode = (mapping['siteCode'] ?? mapping['siteId'] ?? '').toString().trim();
+        final rawName = (mapping['siteName'] ?? mapping['projectName'] ?? '').toString().trim();
+        final sCode = rawCode.isNotEmpty ? (rawCode.contains('_') ? rawCode.split('_').first : rawCode) : (sId.contains('_') ? sId.split('_').first : sId);
+        final sName = rawName.isNotEmpty ? (rawName.startsWith('${sCode}_') ? rawName.substring(sCode.length + 1) : rawName) : (sId.contains('_') ? sId.substring(sId.indexOf('_') + 1) : sId);
+
         rawList.add({
           'siteId': sId,
-          'siteName': mapping['siteName']?.toString() ?? sId,
+          'siteCode': sCode,
+          'siteName': sName,
           'projectName': mapping['projectName']?.toString() ?? '',
           'supervisorName': mapping['supervisorName'] ?? mapping['supervisor'] ?? '',
         });
@@ -1994,10 +2017,35 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
                     ),
                   ),
                   items: sitesList.map((site) {
+                    final siteIdVal = (site['siteId'] ?? '').toString().trim();
+                    String siteCode = (site['siteCode'] ?? '').toString().trim();
+                    String siteName = (site['siteName'] ?? '').toString().trim();
+
+                    if (siteCode.isEmpty && siteIdVal.isNotEmpty) {
+                      siteCode = siteIdVal.contains('_') ? siteIdVal.split('_').first : siteIdVal;
+                    } else if (siteCode.contains('_')) {
+                      siteCode = siteCode.split('_').first;
+                    }
+
+                    if (siteName.isEmpty && siteIdVal.contains('_')) {
+                      siteName = siteIdVal.substring(siteIdVal.indexOf('_') + 1);
+                    } else if (siteName.contains('_') && siteName.startsWith('${siteCode}_')) {
+                      siteName = siteName.substring(siteCode.length + 1);
+                    }
+
+                    final String displayText;
+                    if (siteCode.isNotEmpty && siteName.isNotEmpty && siteCode.toLowerCase() != siteName.toLowerCase()) {
+                      displayText = '$siteCode — $siteName';
+                    } else if (siteName.isNotEmpty) {
+                      displayText = siteName;
+                    } else {
+                      displayText = siteCode.isNotEmpty ? siteCode : siteIdVal;
+                    }
+
                     return DropdownMenuItem<String>(
                       value: site['siteId'],
                       child: Text(
-                        site['siteId'] ?? '',
+                        displayText,
                         overflow: TextOverflow.ellipsis,
                       ),
                     );

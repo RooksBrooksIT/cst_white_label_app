@@ -76,6 +76,7 @@ class _SiteScreenState extends State<SiteScreen>
   String? _selectedProjectId;
   bool _isLoadingSiteData = false;
   bool _isUpdating = false;
+  final List<Map<String, dynamic>> _pendingPayments = [];
 
   final TextEditingController _updateSiteNameController = TextEditingController();
   final TextEditingController _updateLocationController = TextEditingController();
@@ -308,118 +309,99 @@ class _SiteScreenState extends State<SiteScreen>
   }
 
   Future<void> _loadSiteForUpdate(String docId) async {
+    _pendingPayments.clear();
     setState(() {
       _selectedSiteDocId = docId;
       _isLoadingSiteData = true;
     });
 
     try {
-      final siteDoc = await FirestoreService.getCollection('Site').doc(docId).get();
-      if (!siteDoc.exists) {
+      final projectsCol = FirestoreService.getCollection('projects');
+      DocumentSnapshot<Map<String, dynamic>>? siteDoc =
+          await projectsCol.doc(docId).get();
+
+      if (!siteDoc.exists || siteDoc.data() == null) {
+        final fallback = await FirestoreService.findLinkedProjectDoc(
+          siteDocId: docId,
+        );
+        if (fallback != null && fallback.exists) {
+          siteDoc = fallback;
+        }
+      }
+
+      if (!siteDoc.exists || siteDoc.data() == null) {
         setState(() => _isLoadingSiteData = false);
         return;
       }
 
-      final siteData = siteDoc.data() ?? {};
-      _selectedSiteId = (siteData['siteId'] as String?) ?? docId;
-      _selectedSiteName = (siteData['siteName'] as String?) ?? '';
+      final siteData = siteDoc.data()!;
+      _selectedSiteDocId = siteDoc.id;
+      _selectedSiteId = (siteData['siteId'] as String?) ?? siteDoc.id;
+      _selectedSiteName =
+          (siteData['siteName'] ?? siteData['projectName'] as String?) ?? '';
+      _selectedProjectId = (siteData['projectId'] as String?) ?? siteDoc.id;
 
       _updateSiteNameController.text = _selectedSiteName ?? '';
-      _updateLocationController.text = (siteData['location'] as String?) ?? '';
+      _updateLocationController.text =
+          (siteData['location'] ?? siteData['siteLocation'] as String?) ?? '';
       _updateLatitudeController.text = siteData['latitude']?.toString() ?? '';
       _updateLongitudeController.text = siteData['longitude']?.toString() ?? '';
+
       _updateProjectCategory = (siteData['projectCategory'] as String?) ?? '';
       if (_updateProjectCategory != null && _updateProjectCategory!.isEmpty) {
         _updateProjectCategory = null;
       }
-      _updateStatus = (siteData['status'] as String?) ?? '';
-      if (_updateStatus != null && _updateStatus!.isEmpty) {
-        _updateStatus = null;
-      }
 
-      _updateStartDate = _parseDate(siteData['startDate']);
-      _updateEndDate = _parseDate(siteData['endDate']);
+      final rawStatus = (siteData['status'] ?? siteData['currentStatus'] as String?)?.toString().trim();
+      _updateStatus = (rawStatus != null && rawStatus.isNotEmpty) ? rawStatus : null;
+      _updateProjectStatus = _updateStatus;
+
+      _updateStartDate = _parseDate(siteData['startDate'] ?? siteData['plannedStartDate']);
+      _updateEndDate = _parseDate(siteData['endDate'] ?? siteData['plannedEndDate']);
       _updateActualStartDate = _parseDate(siteData['actualStartDate'] ?? siteData['actualStateDate']);
       _updateActualEndDate = _parseDate(siteData['actualEndDate']);
 
       _updateIsContractWork = siteData['isContractWork'] == true;
-      _updateContractorNameController.text = (siteData['contractorName'] as String?) ?? '';
-      _updateContractorBudgetController.text = siteData['contractorBudget']?.toString() ?? '';
+      _updateContractorNameController.text =
+          (siteData['contractorName'] as String?) ?? '';
+      _updateContractorBudgetController.text =
+          siteData['contractorBudget']?.toString() ?? '';
       _updateContractStartDate = _parseDate(siteData['contractStartDate']);
       _updateContractEndDate = _parseDate(siteData['contractEndDate']);
 
-      // Also look for linked project document
-      _selectedProjectId = null;
-      final projectQuery = await FirestoreService.getCollection('projects')
-          .where('siteId', isEqualTo: docId)
-          .limit(1)
-          .get();
+      _updateProjectNameController.text =
+          (siteData['projectName'] as String?) ?? _selectedSiteName ?? '';
+      _updateOwnerNameController.text =
+          (siteData['ownerName'] as String?) ?? '';
+      _updateOwnerPhoneController.text =
+          (siteData['ownerPhoneNumber'] as String?) ?? '';
+      _updateProjectBudgetController.text =
+          siteData['projectBudget']?.toString() ?? '';
+      _updateAmountPaidController.text =
+          siteData['amountPaid']?.toString() ?? siteData['amountReceived']?.toString() ?? '';
 
-      Map<String, dynamic> projData = {};
-      if (projectQuery.docs.isNotEmpty) {
-        _selectedProjectId = projectQuery.docs.first.id;
-        projData = projectQuery.docs.first.data();
-      } else {
-        // Try matching by siteId string
-        final altQuery = await FirestoreService.getCollection('projects')
-            .where('siteId', isEqualTo: _selectedSiteId)
-            .limit(1)
-            .get();
-        if (altQuery.docs.isNotEmpty) {
-          _selectedProjectId = altQuery.docs.first.id;
-          projData = altQuery.docs.first.data();
-        }
-      }
-
-      if (projData.isNotEmpty) {
-        _updateProjectNameController.text =
-            (projData['projectName'] as String?) ?? _selectedSiteName ?? '';
-        _updateOwnerNameController.text = (projData['ownerName'] as String?) ?? '';
-        _updateOwnerPhoneController.text = (projData['ownerPhoneNumber'] as String?) ?? '';
-        _updateProjectBudgetController.text = projData['projectBudget']?.toString() ?? '';
-        _updateAmountPaidController.text = projData['amountPaid']?.toString() ?? '';
-        _updateProjectSubCategory = (projData['projectSubCategory'] as String?) ?? '';
-        if (_updateProjectSubCategory != null && _updateProjectSubCategory!.isEmpty) {
-          _updateProjectSubCategory = null;
-        }
-        _updateProjectStage = (projData['projectStage'] as String?) ?? '';
-        if (_updateProjectStage != null && _updateProjectStage!.isEmpty) {
-          _updateProjectStage = null;
-        }
-        _updateProjectContract = (projData['projectContract'] as String?) ?? '';
-        if (_updateProjectContract != null && _updateProjectContract!.isEmpty) {
-          _updateProjectContract = null;
-        }
-        _updateProjectStatus = (projData['currentStatus'] ?? projData['status']) as String?;
-
-        _updateActualStartDate ??=
-            _parseDate(projData['actualStateDate'] ?? projData['actualStartDate']);
-        _updateActualEndDate ??= _parseDate(projData['actualEndDate']);
-        if (!_updateIsContractWork && projData['isContractWork'] == true) {
-          _updateIsContractWork = true;
-          _updateContractorNameController.text = (projData['contractorName'] as String?) ?? '';
-          _updateContractorBudgetController.text =
-              projData['contractorBudget']?.toString() ?? '';
-          _updateContractStartDate = _parseDate(projData['contractStartDate']);
-          _updateContractEndDate = _parseDate(projData['contractEndDate']);
-        }
-      } else {
-        _updateProjectNameController.text = _selectedSiteName ?? '';
-        _updateOwnerNameController.clear();
-        _updateOwnerPhoneController.clear();
-        _updateProjectBudgetController.clear();
-        _updateAmountPaidController.clear();
+      _updateProjectSubCategory = (siteData['projectSubCategory'] as String?) ?? '';
+      if (_updateProjectSubCategory != null && _updateProjectSubCategory!.isEmpty) {
         _updateProjectSubCategory = null;
-        _updateProjectStage = null;
-        _updateProjectContract = null;
-        _updateProjectStatus = null;
       }
 
-      // Fetch expenses & compute balance
+      _updateProjectStage = (siteData['projectStage'] as String?) ?? '';
+      if (_updateProjectStage != null && _updateProjectStage!.isEmpty) {
+        _updateProjectStage = null;
+      }
+
+      _updateProjectContract = (siteData['projectContract'] as String?) ?? '';
+      if (_updateProjectContract != null && _updateProjectContract!.isEmpty) {
+        _updateProjectContract = null;
+      }
+
+      // Fetch expenses & payments in parallel for fastest performance
       final double currentBudget =
           double.tryParse(_updateProjectBudgetController.text.trim()) ?? 0.0;
-      await _fetchAndSetUpdateExpensesAndBalance(docId, _selectedSiteId, currentBudget);
-      await _loadReceivedPaymentsForSite(docId, _selectedProjectId);
+      await Future.wait([
+        _fetchAndSetUpdateExpensesAndBalance(docId, _selectedSiteId, currentBudget),
+        _loadReceivedPaymentsForSite(docId, _selectedProjectId),
+      ]);
     } catch (e) {
       debugPrint('Error loading site for update: $e');
     } finally {
@@ -946,7 +928,7 @@ class _SiteScreenState extends State<SiteScreen>
                               ),
                               elevation: 2,
                             ),
-                            onPressed: () async {
+                            onPressed: () {
                               if (!formKey.currentState!.validate()) return;
                               final double enteredNewAmount =
                                   double.tryParse(
@@ -958,13 +940,41 @@ class _SiteScreenState extends State<SiteScreen>
                               if (enteredNewAmount <= 0) return;
 
                               Navigator.pop(ctx);
-                              await _saveNewReceivedPayment(
-                                amount: enteredNewAmount,
-                                updatedTotal: updatedTotal,
-                                date: paymentDate,
-                                mode: 'Cash',
-                                referenceNo: '',
-                                remarks: '',
+
+                              // Track locally without writing to backend immediately
+                              final entryId =
+                                  'PAY_${DateTime.now().millisecondsSinceEpoch}';
+                              final paymentEntry = {
+                                'paymentId': entryId,
+                                'projectId': _selectedProjectId,
+                                'siteId': _selectedSiteDocId,
+                                'siteName': _selectedSiteName,
+                                'amount': enteredNewAmount,
+                                'date': Timestamp.fromDate(paymentDate),
+                                'paymentMode': 'Cash',
+                                'referenceNo': '',
+                                'remarks': '',
+                              };
+                              _pendingPayments.add(paymentEntry);
+
+                              setState(() {
+                                _updateAmountPaidController.text =
+                                    updatedTotal.toStringAsFixed(2);
+                              });
+                              _recalcUpdateBalance();
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Amount recorded locally. Click "UPDATE SITE" to save changes to backend.',
+                                  ),
+                                  backgroundColor: const Color(0xFF0F172A),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
                               );
                             },
                           ),
@@ -979,133 +989,6 @@ class _SiteScreenState extends State<SiteScreen>
         );
       },
     );
-  }
-
-  Future<void> _saveNewReceivedPayment({
-    required double amount,
-    double? updatedTotal,
-    required DateTime date,
-    String mode = 'Cash',
-    String referenceNo = '',
-    String remarks = '',
-  }) async {
-    try {
-      final entryId = 'PAY_${DateTime.now().millisecondsSinceEpoch}';
-      final paymentEntry = {
-        'paymentId': entryId,
-        'projectId': _selectedProjectId,
-        'siteId': _selectedSiteDocId,
-        'siteName': _selectedSiteName,
-        'amount': amount,
-        'date': Timestamp.fromDate(date),
-        'paymentMode': mode,
-        'referenceNo': referenceNo,
-        'remarks': remarks,
-        'createdAt': Timestamp.now(),
-      };
-
-      // 1. Add to projectPayments collection
-      await FirestoreService.getCollection(
-        'projectPayments',
-      ).doc(entryId).set({
-        ...paymentEntry,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // 2. Fetch all payments for this site to calculate cumulative total
-      final allPaymentsSnapshot = await FirestoreService.getCollection(
-        'projectPayments',
-      ).where('siteId', isEqualTo: _selectedSiteDocId).get();
-
-      double cumulativeAmountReceived = 0.0;
-      final List<Map<String, dynamic>> updatedList = [];
-
-      for (final doc in allPaymentsSnapshot.docs) {
-        final data = doc.data();
-        final a = (data['amount'] as num?)?.toDouble() ?? 0.0;
-        cumulativeAmountReceived += a;
-        updatedList.add(data);
-      }
-
-      if (allPaymentsSnapshot.docs.isEmpty) {
-        final currentPaid =
-            double.tryParse(_updateAmountPaidController.text.replaceAll(',', '')) ?? 0.0;
-        cumulativeAmountReceived = currentPaid + amount;
-      }
-
-      // If updatedTotal was explicitly computed, ensure cumulative total is at least updatedTotal
-      if (updatedTotal != null && updatedTotal > cumulativeAmountReceived) {
-        cumulativeAmountReceived = updatedTotal;
-      }
-
-      // 3. Update project document & Site document
-      final double spent =
-          double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
-      final double customerCashBalance = cumulativeAmountReceived - spent;
-
-      if (_selectedProjectId != null && _selectedProjectId!.isNotEmpty) {
-        try {
-          await FirestoreService.getCollection('projects')
-              .doc(_selectedProjectId)
-              .set({
-            'amountPaid': cumulativeAmountReceived,
-            'amountReceived': cumulativeAmountReceived,
-            'amountBalance': customerCashBalance,
-            'receivedPayments': FieldValue.arrayUnion([paymentEntry]),
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } catch (projErr) {
-          debugPrint('Error updating projects doc: $projErr');
-        }
-      }
-
-      if (_selectedSiteDocId != null) {
-        try {
-          await FirestoreService.getCollection('Site')
-              .doc(_selectedSiteDocId)
-              .set({
-            'amountPaid': cumulativeAmountReceived,
-            'amountReceived': cumulativeAmountReceived,
-            'amountBalance': customerCashBalance,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } catch (siteErr) {
-          debugPrint('Error updating Site doc: $siteErr');
-        }
-      }
-
-      // Sync across central ExpenseService
-      final syncSiteId = _selectedSiteDocId ?? _selectedProjectId ?? '';
-      if (syncSiteId.isNotEmpty) {
-        await ExpenseService.recalcTotalsAndSyncProject(syncSiteId);
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _updateAmountPaidController.text =
-            cumulativeAmountReceived.toStringAsFixed(2);
-        _updateBalanceAmountController.text = customerCashBalance.toStringAsFixed(2);
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '₹${amount.toStringAsFixed(2)} added! Total Amount Received: ₹${cumulativeAmountReceived.toStringAsFixed(2)}',
-          ),
-          backgroundColor: const Color(0xFF059669),
-        ),
-      );
-    } catch (e) {
-      debugPrint('Error in _saveNewReceivedPayment: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error adding payment: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   void _showPaymentHistoryModal(BuildContext context) {
@@ -1308,6 +1191,114 @@ class _SiteScreenState extends State<SiteScreen>
     );
   }
 
+  Future<void> _confirmAndUpdateSite() async {
+    if (_selectedSiteDocId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a site to update.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (!(_updateFormKey.currentState?.validate() ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill out all required fields.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.help_outline_rounded,
+                color: primaryColor,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Confirm Update',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to save the modified changes to the backend for this site and project?',
+          style: TextStyle(
+            fontSize: 13.5,
+            color: Color(0xFF475569),
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text(
+              'No / Cancel',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              elevation: 2,
+            ),
+            child: const Text(
+              'Yes / Confirm',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _updateSiteAndProject();
+    }
+  }
+
   Future<void> _updateSiteAndProject() async {
     if (_selectedSiteDocId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1334,78 +1325,135 @@ class _SiteScreenState extends State<SiteScreen>
     try {
       final siteName = _updateSiteNameController.text.trim();
       final location = _updateLocationController.text.trim();
+      final latitude = _updateLatitudeController.text.trim().isNotEmpty
+          ? double.tryParse(_updateLatitudeController.text.trim())
+          : null;
+      final longitude = _updateLongitudeController.text.trim().isNotEmpty
+          ? double.tryParse(_updateLongitudeController.text.trim())
+          : null;
       final projectName = _updateProjectNameController.text.trim().isEmpty
           ? siteName
           : _updateProjectNameController.text.trim();
 
-      // 1. Update Site document (Only editable fields allowed: Site Status, Actual Start/End Date)
-      final siteUpdateData = {
-        'status': _updateStatus,
+      final double budget = double.tryParse(
+              _updateProjectBudgetController.text.replaceAll(',', '').trim()) ??
+          0.0;
+      final double amountPaid = double.tryParse(
+              _updateAmountPaidController.text.replaceAll(',', '').trim()) ??
+          0.0;
+      final double amountSpent = double.tryParse(
+              _updateAmountSpentController.text.replaceAll(',', '').trim()) ??
+          0.0;
+      final double amountBalance = amountPaid - amountSpent;
+
+      final selectedStatus = _updateStatus ?? _updateProjectStatus ?? 'Planning';
+
+      // 1. Prepare unified update payload
+      final updateData = <String, dynamic>{
+        'status': selectedStatus,
+        'currentStatus': selectedStatus,
+        'siteName': siteName,
+        'projectName': projectName,
+        'location': location,
+        'siteLocation': location,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (_updateProjectCategory != null && _updateProjectCategory!.isNotEmpty)
+          'projectCategory': _updateProjectCategory,
+        if (_updateProjectSubCategory != null && _updateProjectSubCategory!.isNotEmpty)
+          'projectSubCategory': _updateProjectSubCategory,
+        if (_updateProjectStage != null && _updateProjectStage!.isNotEmpty)
+          'projectStage': _updateProjectStage,
+        if (_updateProjectContract != null && _updateProjectContract!.isNotEmpty)
+          'projectContract': _updateProjectContract,
         'actualStartDate': _updateActualStartDate != null
             ? Timestamp.fromDate(_updateActualStartDate!)
             : null,
-        'actualEndDate': _updateActualEndDate != null
-            ? Timestamp.fromDate(_updateActualEndDate!)
-            : null,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
-      await FirestoreService.getCollection('Site')
-          .doc(_selectedSiteDocId)
-          .update(siteUpdateData);
-
-      // 2. Update linked project document (Only editable fields allowed: Project Stage, Site Status, Amount Received, Actual Start/End Date)
-      final double amountPaid =
-          double.tryParse(_updateAmountPaidController.text.replaceAll(',', '')) ?? 0.0;
-      final double amountSpent =
-          double.tryParse(_updateAmountSpentController.text.replaceAll(',', '')) ?? 0.0;
-      final double amountBalance = amountPaid - amountSpent;
-
-      final projectUpdateData = {
-        'amountPaid': amountPaid,
-        'amountReceived': amountPaid,
-        'amountBalance': amountBalance,
-        'projectStage': _updateProjectStage ?? '',
-        'currentStatus': _updateProjectStatus ?? _updateStatus,
-        'status': _updateProjectStatus ?? _updateStatus,
         'actualStateDate': _updateActualStartDate != null
             ? Timestamp.fromDate(_updateActualStartDate!)
             : null,
         'actualEndDate': _updateActualEndDate != null
             ? Timestamp.fromDate(_updateActualEndDate!)
             : null,
+        'amountPaid': amountPaid,
+        'amountReceived': amountPaid,
+        'amountSpent': amountSpent,
+        'amountSpend': amountSpent,
+        'amountBalance': amountBalance,
+        'receivedPayments': amountPaid,
+        'projectBudget': budget,
+        'ownerName': _updateOwnerNameController.text.trim(),
+        'ownerPhoneNumber': _updateOwnerPhoneController.text.trim(),
+        'isContractWork': _updateIsContractWork,
+        'contractorName': _updateIsContractWork
+            ? _updateContractorNameController.text.trim()
+            : null,
+        'contractorBudget': _updateIsContractWork
+            ? (double.tryParse(_updateContractorBudgetController.text.replaceAll(',', '').trim()) ?? 0.0)
+            : null,
+        'contractStartDate': _updateIsContractWork && _updateContractStartDate != null
+            ? Timestamp.fromDate(_updateContractStartDate!)
+            : null,
+        'contractEndDate': _updateIsContractWork && _updateContractEndDate != null
+            ? Timestamp.fromDate(_updateContractEndDate!)
+            : null,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      if (_selectedProjectId != null) {
-        await FirestoreService.getCollection('projects')
-            .doc(_selectedProjectId)
-            .update(projectUpdateData);
-      } else {
-        // Query by siteId
-        final query = await FirestoreService.getCollection('projects')
-            .where('siteId', isEqualTo: _selectedSiteDocId)
-            .get();
-        for (final doc in query.docs) {
-          await doc.reference.update(projectUpdateData);
+      // 2. Perform fast atomic batch commit
+      final batch = FirebaseFirestore.instance.batch();
+      final projectsCol = FirestoreService.getCollection('projects');
+
+      // Commit any pending payment records in the same batch
+      if (_pendingPayments.isNotEmpty) {
+        final payCol = FirestoreService.getCollection('projectPayments');
+        for (final payment in _pendingPayments) {
+          final pId = payment['paymentId'] as String;
+          batch.set(payCol.doc(pId), {
+            ...payment,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
         }
+        _pendingPayments.clear();
       }
 
-      // Real-time Notification to Organization
+      final targetDocIds = <String>{
+        if (_selectedSiteDocId != null && _selectedSiteDocId!.isNotEmpty) _selectedSiteDocId!,
+        if (_selectedProjectId != null && _selectedProjectId!.isNotEmpty) _selectedProjectId!,
+      };
+
+      for (final targetId in targetDocIds) {
+        batch.set(projectsCol.doc(targetId), updateData, SetOptions(merge: true));
+      }
+
+      await batch.commit();
+
+      // 3. Immediately update local state
+      _updateStatus = selectedStatus;
+      _updateProjectStatus = selectedStatus;
+
+      // 4. Dispatch background tasks without blocking UI response
+      final syncSiteId = _selectedSiteDocId ?? _selectedProjectId ?? '';
+      if (syncSiteId.isNotEmpty) {
+        unawaited(ExpenseService.recalcTotalsAndSyncProject(syncSiteId));
+      }
+
       try {
         final ud = AuthService().userData;
         final currentManager = (ud['FullName'] ?? ud['fullName'] ?? ud['username'] ?? 'Manager').toString();
-
-        await NotificationService.notifySiteCreatedOrUpdated(
+        unawaited(NotificationService.notifySiteCreatedOrUpdated(
           siteId: _selectedSiteId ?? _selectedSiteDocId!,
           siteName: siteName,
           location: location,
           projectName: projectName,
           managerName: currentManager,
           isCreated: false,
-        );
-      } catch (notifErr) {
-        debugPrint('Notification error on update: $notifErr');
+        ));
+      } catch (_) {}
+
+      // Refresh page data from backend to guarantee visual fidelity
+      if (_selectedSiteDocId != null) {
+        await _loadSiteForUpdate(_selectedSiteDocId!);
       }
 
       if (mounted) {
@@ -1818,8 +1866,9 @@ class _SiteScreenState extends State<SiteScreen>
           'amountPaid': amountPaid,
           'amountReceived': amountPaid,
           'amountSpent': amountSpent,
+          'amountSpend': amountSpent,
           'amountBalance': balance,
-          'receivedPayments': initialPaymentEntry != null ? [initialPaymentEntry] : [],
+          'receivedPayments': amountPaid,
           'projectBudget': budget,
           'projectCategory': _projectCategory ?? '',
           'projectSubCategory': _projectSubCategory ?? '',
@@ -1880,11 +1929,15 @@ class _SiteScreenState extends State<SiteScreen>
         await FirestoreService.getCollection('Site')
             .doc(createdSiteDocId)
             .set({
+          'projectId': nextPrDocId,
           'amountPaid': amountPaid,
           'amountReceived': amountPaid,
           'amountSpent': 0.0,
+          'amountSpend': 0.0,
           'amountBalance': balance,
+          'receivedPayments': amountPaid,
           'projectBudget': budget,
+          'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
         // Sync central ExpenseService
@@ -3613,7 +3666,7 @@ class _SiteScreenState extends State<SiteScreen>
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: _isUpdating ? null : _updateSiteAndProject,
+                        onTap: _isUpdating ? null : _confirmAndUpdateSite,
                         borderRadius: BorderRadius.circular(16),
                         child: Center(
                           child: _isUpdating

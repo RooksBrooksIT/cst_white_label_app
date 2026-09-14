@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 
 class WorkerMappingPage extends StatefulWidget {
-  const WorkerMappingPage({super.key});
+  final String? initialSiteId;
+  const WorkerMappingPage({super.key, this.initialSiteId});
 
   @override
   State<WorkerMappingPage> createState() => _WorkerMappingPageState();
@@ -30,6 +34,13 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   List<Map<String, dynamic>> _sites = [];
   List<Map<String, dynamic>> _workers = [];
 
+  // Worker availability tracking (workerId/workerName -> {siteId, siteName, supervisor})
+  Map<String, Map<String, String>> _workerAssignedSites = {};
+
+  // Subscriptions for real-time sync
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _allMappingsSubscription;
+  StreamSubscription<dynamic>? _currentSiteMappingSubscription;
+
   // Loading states
   bool _isLoadingSites = false;
   bool _isLoadingWorkers = false;
@@ -40,28 +51,142 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
   @override
   void initState() {
     super.initState();
+    _initAllMappingsListener();
     _loadSites();
     _loadWorkers();
+  }
+
+  @override
+  void dispose() {
+    _allMappingsSubscription?.cancel();
+    _currentSiteMappingSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// Real-time stream of all worker mappings to know worker availability across all sites
+  void _initAllMappingsListener() {
+    _allMappingsSubscription = FirestoreService.getCollection('workerSiteMapping')
+        .snapshots()
+        .listen((snapshot) {
+      final Map<String, Map<String, String>> newAssigned = {};
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final sId = doc.id;
+        final sName = (data['siteName'] ?? data['site'] ?? sId).toString();
+        final sSup = (data['supervisor'] ?? '').toString();
+        final workersList = data['workers'] as List<dynamic>? ?? [];
+
+        for (final w in workersList) {
+          if (w is Map) {
+            final wId = (w['workerId'] ?? w['id'] ?? '').toString().trim().toLowerCase();
+            final wName = (w['workerName'] ?? w['name'] ?? '').toString().trim().toLowerCase();
+            final info = {
+              'siteId': sId,
+              'siteName': sName,
+              'supervisor': sSup,
+            };
+            if (wId.isNotEmpty) newAssigned[wId] = info;
+            if (wName.isNotEmpty) newAssigned[wName] = info;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _workerAssignedSites = newAssigned;
+        });
+      }
+    }, onError: (e) {
+      debugPrint('Error listening to all workerSiteMapping: $e');
+    });
+  }
+
+  Map<String, String>? _getAssignedInfoForWorker(String? id, String? name) {
+    final cleanId = (id ?? '').trim().toLowerCase();
+    final cleanName = (name ?? '').trim().toLowerCase();
+    if (cleanId.isNotEmpty && _workerAssignedSites.containsKey(cleanId)) {
+      return _workerAssignedSites[cleanId];
+    }
+    if (cleanName.isNotEmpty && _workerAssignedSites.containsKey(cleanName)) {
+      return _workerAssignedSites[cleanName];
+    }
+    return null;
   }
 
   Future<void> _loadSites() async {
     setState(() => _isLoadingSites = true);
 
     try {
-      final siteSnapshot = await FirestoreService.getCollection('Site').get();
-      if (!mounted) return;
-
-      setState(() {
-        _sites = siteSnapshot.docs.map((doc) {
+      // 1. Try 'projects' collection first (single source of truth)
+      List<Map<String, dynamic>> loadedSites = [];
+      try {
+        final projectSnap = await FirestoreService.getCollection('projects').get();
+        for (final doc in projectSnap.docs) {
           final data = doc.data();
-          return {
+          final sId = (data['siteId'] ?? data['id'] ?? doc.id).toString().trim();
+          final sName = (data['siteName'] ?? data['projectName'] ?? doc.id).toString().trim();
+          final supervisor = (data['assignedSupervisor'] ?? data['supervisor'] ?? data['supervisorName'] ?? '').toString().trim();
+          if (sId.isNotEmpty || sName.isNotEmpty) {
+            loadedSites.add({
+              'id': sId.isNotEmpty ? sId : sName,
+              'site': sId.isNotEmpty ? sId : sName,
+              'siteId': sId,
+              'siteName': sName.isNotEmpty ? sName : sId,
+              'supervisor': supervisor,
+              'projectName': sName,
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading from projects: $e');
+      }
+
+      // 2. Fallback to 'Site' collection if projects was empty
+      if (loadedSites.isEmpty) {
+        final siteSnapshot = await FirestoreService.getCollection('Site').get();
+        for (final doc in siteSnapshot.docs) {
+          final data = doc.data();
+          final sId = (data['siteId'] ?? doc.id).toString().trim();
+          final sName = (data['siteName'] ?? doc.id).toString().trim();
+          loadedSites.add({
             'id': doc.id,
             'site': doc.id,
-            'siteName': data['siteName'] ?? doc.id,
-          };
-        }).toList();
+            'siteId': sId.isNotEmpty ? sId : doc.id,
+            'siteName': sName,
+            'supervisor': (data['assignedSupervisor'] ?? data['supervisor'] ?? '').toString(),
+            'projectName': sName,
+          });
+        }
+      }
+
+      // Deduplicate by site ID / name
+      final Map<String, Map<String, dynamic>> dedup = {};
+      for (final s in loadedSites) {
+        final key = (s['site'] ?? s['id']).toString();
+        dedup[key] = s;
+      }
+
+      final finalList = dedup.values.toList();
+      finalList.sort((a, b) => (a['siteName'] ?? '').toString().toLowerCase().compareTo((b['siteName'] ?? '').toString().toLowerCase()));
+
+      if (!mounted) return;
+      setState(() {
+        _sites = finalList;
         _isLoadingSites = false;
       });
+
+      // Handle initial site selection if provided
+      if (widget.initialSiteId != null && _selectedSite == null) {
+        final matched = _sites.firstWhere(
+          (s) => s['id'] == widget.initialSiteId || s['site'] == widget.initialSiteId || s['siteId'] == widget.initialSiteId,
+          orElse: () => {},
+        );
+        if (matched.isNotEmpty) {
+          _onSiteSelected(matched['site'] as String?);
+        } else if (_sites.isNotEmpty) {
+          _onSiteSelected(_sites.first['site'] as String?);
+        }
+      }
     } catch (e) {
       debugPrint('Error loading sites: $e');
       if (mounted) {
@@ -103,7 +228,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
           workersMap[id] = {
             'id': id,
             'name': cleanName,
-            'designation': designation,
+            'designation': designation.isNotEmpty ? designation : 'General Worker',
             'salary': salary,
             'phoneNumber': phone,
           };
@@ -147,12 +272,29 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     if (site != null) {
       _loadSiteDetails(site);
-      _loadExistingWorkersForSite(site);
+      _listenToSiteWorkerMapping(site);
     }
   }
 
   Future<void> _loadSiteDetails(String siteId) async {
     try {
+      // 1. Check local _sites list first
+      final matched = _sites.firstWhere(
+        (s) => s['site'] == siteId || s['id'] == siteId || s['siteId'] == siteId,
+        orElse: () => {},
+      );
+
+      if (matched.isNotEmpty && (matched['supervisor']?.toString().isNotEmpty ?? false)) {
+        if (mounted) {
+          setState(() {
+            _selectedSupervisor = matched['supervisor'] ?? 'Not available';
+            _selectedProjectName = matched['siteName'] ?? matched['projectName'] ?? siteId;
+          });
+        }
+        return;
+      }
+
+      // 2. Query siteSupervisorMap
       final mapSnapshot = await FirestoreService.getCollection(
         'siteSupervisorMap',
       ).where('site', isEqualTo: siteId).limit(1).get();
@@ -163,62 +305,105 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         final data = mapSnapshot.docs.first.data();
         setState(() {
           _selectedSupervisor = data['supervisor'] ?? 'Not available';
-          _selectedProjectName = data['projectName'] ?? 'Not available';
+          _selectedProjectName = data['projectName'] ?? matched['siteName'] ?? siteId;
         });
       } else {
-        final siteDoc = await FirestoreService.getCollection(
-          'Site',
-        ).doc(siteId).get();
-        if (!mounted) return;
-        setState(() {
-          _selectedSupervisor = 'Not available';
-          if (siteDoc.exists) {
-            final data = siteDoc.data()!;
-            _selectedProjectName = data['siteName'] ?? 'Not available';
-          } else {
-            _selectedProjectName = 'Not available';
-          }
-        });
+        final projDoc = await FirestoreService.getCollection('projects').doc(siteId).get();
+        if (projDoc.exists && mounted) {
+          final data = projDoc.data()!;
+          setState(() {
+            _selectedSupervisor = data['assignedSupervisor'] ?? data['supervisor'] ?? 'Not available';
+            _selectedProjectName = data['siteName'] ?? data['projectName'] ?? siteId;
+          });
+        } else {
+          final siteDoc = await FirestoreService.getCollection('Site').doc(siteId).get();
+          if (!mounted) return;
+          setState(() {
+            _selectedSupervisor = siteDoc.exists ? (siteDoc.data()?['assignedSupervisor'] ?? 'Not available') : 'Not available';
+            _selectedProjectName = siteDoc.exists ? (siteDoc.data()?['siteName'] ?? siteId) : siteId;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error fetching site details: $e');
     }
   }
 
-  Future<void> _loadExistingWorkersForSite(String siteId) async {
-    try {
-      var existingDoc = await FirestoreService.getCollection(
-        'workerSiteMapping',
-      ).doc(siteId).get();
+  void _listenToSiteWorkerMapping(String siteId) {
+    _currentSiteMappingSubscription?.cancel();
 
-      if (!existingDoc.exists) {
-        existingDoc = await FirestoreService.getCollection(
-          'workerSiteMap',
-        ).doc(siteId).get();
+    final cleanSiteId = siteId.trim().toLowerCase();
+    final cleanSiteName = (_selectedProjectName ?? '').trim().toLowerCase();
+    final combinedKey = '${cleanSiteId}_${cleanSiteName}'.trim().toLowerCase();
+
+    final Set<String> candidateKeys = {
+      cleanSiteId,
+      if (cleanSiteName.isNotEmpty) cleanSiteName,
+      if (cleanSiteId.isNotEmpty && cleanSiteName.isNotEmpty) combinedKey,
+    };
+
+    bool matchesSite(String? val) {
+      if (val == null) return false;
+      final clean = val.trim().toLowerCase();
+      if (clean.isEmpty) return false;
+      if (candidateKeys.contains(clean)) return true;
+      for (final key in candidateKeys) {
+        if (clean == key || clean.contains(key) || key.contains(clean)) return true;
       }
-
-      if (!mounted) return;
-
-      if (existingDoc.exists && existingDoc.data() != null) {
-        final data = existingDoc.data()!;
-        final workersList = data['workers'] as List<dynamic>? ?? [];
-
-        setState(() {
-          _selectedWorkersList = workersList.map((w) {
-            final workerMap = Map<String, dynamic>.from(w as Map);
-            return {
-              'workerId': (workerMap['workerId'] ?? workerMap['id'] ?? '').toString(),
-              'workerName': (workerMap['workerName'] ?? workerMap['name'] ?? '').toString(),
-              'workerDesignation': (workerMap['workerDesignation'] ?? workerMap['designation'] ?? '').toString(),
-              'workerSalary': (workerMap['workerSalary'] ?? workerMap['salary'] ?? '').toString(),
-              'workerPhone': (workerMap['workerPhone'] ?? workerMap['phoneNumber'] ?? workerMap['phone'] ?? '').toString(),
-            };
-          }).toList();
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading existing workers mapping: $e');
+      return false;
     }
+
+    _currentSiteMappingSubscription = FirestoreService.getCollection('workerSiteMapping')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final Map<String, Map<String, dynamic>> dedup = {};
+
+      for (final doc in snapshot.docs) {
+        final docId = doc.id.trim().toLowerCase();
+        final data = doc.data();
+        final dSiteId = (data['siteId'] ?? '').toString();
+        final dSite = (data['site'] ?? '').toString();
+        final dSiteName = (data['siteName'] ?? '').toString();
+        final dProjectName = (data['projectName'] ?? '').toString();
+
+        final isMatch = candidateKeys.contains(docId) ||
+            matchesSite(docId) ||
+            matchesSite(dSiteId) ||
+            matchesSite(dSite) ||
+            matchesSite(dSiteName) ||
+            matchesSite(dProjectName);
+
+        if (isMatch) {
+          final workersList = (data['workers'] ?? data['mappedWorkers']) as List<dynamic>? ?? [];
+          for (final w in workersList) {
+            if (w is Map) {
+              final workerMap = Map<String, dynamic>.from(w);
+              final name = (workerMap['workerName'] ?? workerMap['name'] ?? '').toString().trim();
+              if (name.isNotEmpty) {
+                final key = name.toLowerCase();
+                dedup[key] = {
+                  'workerId': (workerMap['workerId'] ?? workerMap['id'] ?? '').toString(),
+                  'workerName': name,
+                  'workerDesignation': (workerMap['workerDesignation'] ?? workerMap['designation'] ?? 'Worker').toString(),
+                  'workerSalary': (workerMap['workerSalary'] ?? workerMap['salary'] ?? '0').toString(),
+                  'workerPhone': (workerMap['workerPhone'] ?? workerMap['phoneNumber'] ?? workerMap['phone'] ?? '').toString(),
+                  'siteId': (workerMap['siteId'] ?? siteId).toString(),
+                  'assignmentStatus': (workerMap['assignmentStatus'] ?? 'Active').toString(),
+                  'mappingDate': (workerMap['mappingDate'] ?? DateFormat('dd/MM/yyyy').format(DateTime.now())).toString(),
+                };
+              }
+            }
+          }
+        }
+      }
+
+      setState(() {
+        _selectedWorkersList = dedup.values.toList();
+      });
+    }, onError: (e) {
+      debugPrint('Error listening to workerSiteMapping for $siteId: $e');
+    });
   }
 
   void _onWorkerSelected(String? workerId) {
@@ -268,20 +453,40 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     if (isAlreadyAdded) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Worker "$_selectedWorkerName" is already in the list'),
+          content: Text('Worker "$_selectedWorkerName" is already mapped to this site'),
           backgroundColor: Colors.orangeAccent,
         ),
       );
       return;
     }
 
+    final assignedInfo = _getAssignedInfoForWorker(_selectedWorkerId, _selectedWorkerName);
+    final isAssignedElsewhere = assignedInfo != null &&
+        assignedInfo['siteId'] != null &&
+        assignedInfo['siteId'] != _selectedSite;
+
+    if (isAssignedElsewhere) {
+      final prevSiteName = assignedInfo['siteName'] ?? assignedInfo['siteId'] ?? 'another site';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reassigning "$_selectedWorkerName" from $prevSiteName to $_selectedSite.'),
+          backgroundColor: Colors.blueGrey,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
     setState(() {
       _selectedWorkersList.add({
         'workerId': _selectedWorkerId,
         'workerName': _selectedWorkerName,
-        'workerDesignation': _selectedWorkerDesignation ?? '',
-        'workerSalary': _selectedWorkerSalary ?? '',
+        'workerDesignation': _selectedWorkerDesignation ?? 'General Worker',
+        'workerSalary': _selectedWorkerSalary ?? '0',
         'workerPhone': _selectedWorkerPhone ?? '',
+        'siteId': _selectedSite ?? '',
+        'siteName': _selectedProjectName ?? _selectedSite ?? '',
+        'assignmentStatus': 'Active',
+        'mappingDate': DateFormat('dd/MM/yyyy').format(DateTime.now()),
       });
 
       _selectedWorkerId = null;
@@ -310,32 +515,89 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     setState(() => _isSubmitting = true);
 
     try {
+      final String siteId = _selectedSite!;
+      final String siteName = _selectedProjectName ?? siteId;
+      final String supervisor = _selectedSupervisor ?? 'Not available';
+
+      final cleanSiteId = siteId.trim();
+      final cleanSiteName = siteName.trim();
+      final combinedKey = '${cleanSiteId}_${cleanSiteName}';
+
       final docData = {
-        'site': _selectedSite,
-        'supervisor': _selectedSupervisor ?? 'Not available',
-        'projectName': _selectedProjectName ?? 'Not available',
+        'site': cleanSiteId,
+        'siteId': cleanSiteId,
+        'siteName': cleanSiteName,
+        'supervisor': supervisor,
+        'projectName': cleanSiteName,
         'totalWorkersMapped': _selectedWorkersList.length,
         'workers': _selectedWorkersList,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      await Future.wait([
-        FirestoreService.getCollection('workerSiteMapping')
-            .doc(_selectedSite)
-            .set(docData, SetOptions(merge: true)),
-        FirestoreService.getCollection('workerSiteMap')
-            .doc(_selectedSite)
-            .set(docData, SetOptions(merge: true)),
-      ]);
+      // 1. Commit mapping to both workerSiteMapping and legacy workerSiteMap across all canonical keys
+      final batch = FirebaseFirestore.instance.batch();
+
+      final Set<String> targetDocKeys = {
+        cleanSiteId,
+        if (cleanSiteName.isNotEmpty) cleanSiteName,
+        if (cleanSiteId.isNotEmpty && cleanSiteName.isNotEmpty) combinedKey,
+      };
+
+      for (final key in targetDocKeys) {
+        final ref1 = FirestoreService.getCollection('workerSiteMapping').doc(key);
+        final ref2 = FirestoreService.getCollection('workerSiteMap').doc(key);
+        batch.set(ref1, docData, SetOptions(merge: true));
+        batch.set(ref2, docData, SetOptions(merge: true));
+      }
+
+      // 2. If workers were transferred from other sites, clean them up from previous site mapping
+      final Set<String> addedWorkerIds = _selectedWorkersList
+          .map((w) => (w['workerId'] ?? '').toString().toLowerCase())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final Set<String> addedWorkerNames = _selectedWorkersList
+          .map((w) => (w['workerName'] ?? '').toString().toLowerCase())
+          .where((name) => name.isNotEmpty)
+          .toSet();
+
+      final otherSiteSnapshots = await FirestoreService.getCollection('workerSiteMapping').get();
+      for (final otherDoc in otherSiteSnapshots.docs) {
+        if (targetDocKeys.contains(otherDoc.id.trim())) continue;
+        final data = otherDoc.data();
+        final rawList = data['workers'] as List<dynamic>? ?? [];
+        bool modified = false;
+
+        final updatedList = rawList.where((w) {
+          if (w is! Map) return true;
+          final wid = (w['workerId'] ?? w['id'] ?? '').toString().toLowerCase();
+          final wname = (w['workerName'] ?? w['name'] ?? '').toString().toLowerCase();
+          if ((wid.isNotEmpty && addedWorkerIds.contains(wid)) ||
+              (wname.isNotEmpty && addedWorkerNames.contains(wname))) {
+            modified = true;
+            return false; // Remove transferred worker
+          }
+          return true;
+        }).toList();
+
+        if (modified) {
+          batch.update(otherDoc.reference, {
+            'workers': updatedList,
+            'totalWorkersMapped': updatedList.length,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      await batch.commit();
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Successfully mapped ${_selectedWorkersList.length} workers to site $_selectedSite!',
+            'Successfully mapped ${_selectedWorkersList.length} workers to site $siteName ($siteId)!',
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: const Color(0xFF10B981),
         ),
       );
     } catch (e) {
@@ -411,8 +673,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                     primaryColor: primaryColor,
                     children: [
                       _buildSiteDropdown(primaryColor),
-                      if (_selectedSupervisor != null ||
-                          _selectedProjectName != null) ...[
+                      if (_selectedSupervisor != null || _selectedProjectName != null) ...[
                         const SizedBox(height: 14),
                         Row(
                           children: [
@@ -475,8 +736,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                           ),
                         ],
                       ),
-                      if (_selectedWorkerDesignation != null ||
-                          _selectedWorkerSalary != null) ...[
+                      if (_selectedWorkerDesignation != null || _selectedWorkerSalary != null) ...[
                         const SizedBox(height: 14),
                         Row(
                           children: [
@@ -624,9 +884,10 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                     ),
                   ]
                 : _sites.map<DropdownMenuItem<String>>((site) {
-                    final displayName = site['siteName'] != site['site']
-                        ? '${site['site']} (${site['siteName']})'
-                        : site['site'] ?? '';
+                    final displayName = SiteDisplayHelper.formatSiteDisplay(
+                      siteId: site['siteId'] ?? site['site'],
+                      siteName: site['siteName'] ?? site['projectName'],
+                    );
                     return DropdownMenuItem<String>(
                       value: site['site'] as String?,
                       child: Text(
@@ -710,7 +971,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
             ),
             style: const TextStyle(
               color: Color(0xFF0A183D),
-              fontSize: 14.5,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
             items: _isLoadingWorkers
@@ -721,14 +982,49 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                     ),
                   ]
                 : availableWorkers.map<DropdownMenuItem<String>>((worker) {
+                    final String id = worker['id']?.toString() ?? '';
                     final String name = worker['name']?.toString().trim() ?? '';
                     final String des = worker['designation']?.toString().trim() ?? '';
                     final String displayName = des.isNotEmpty ? '$name ($des)' : name;
+
+                    final assignedInfo = _getAssignedInfoForWorker(id, name);
+                    final isAssignedElsewhere = assignedInfo != null &&
+                        assignedInfo['siteId'] != null &&
+                        assignedInfo['siteId'] != _selectedSite;
+
+                    final assignedSiteLabel = assignedInfo?['siteName'] ?? assignedInfo?['siteId'] ?? '';
+
                     return DropdownMenuItem<String>(
                       value: worker['id'] as String?,
-                      child: Text(
-                        displayName,
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              displayName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13.5),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isAssignedElsewhere ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isAssignedElsewhere ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0),
+                              ),
+                            ),
+                            child: Text(
+                              isAssignedElsewhere ? 'Mapped: $assignedSiteLabel' : 'Available',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isAssignedElsewhere ? const Color(0xFFD97706) : const Color(0xFF059669),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }).toList(),
@@ -749,7 +1045,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: primaryColor),
+          Icon(icon, size: 16, color: const Color(0xFF64748B)),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -758,7 +1054,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                 Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF64748B),
                   ),
@@ -770,7 +1066,6 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF0A183D),
                   ),
-                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

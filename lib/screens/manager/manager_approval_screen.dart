@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/approval_workflow_service.dart';
 import 'package:ebricks/widgets/approval_lifecycle_stepper.dart';
+import 'package:ebricks/screens/manager/workers_site_mapping_page.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
 class ManagerApprovalScreen extends StatefulWidget {
@@ -927,31 +928,64 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen>
     }
 
     if (stage == ApprovalStage.approved) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFBBF7D0)),
-        ),
-        child: const Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
-              SizedBox(width: 6),
-              Text(
-                'Workforce Allocation is fully Approved & Active',
-                style: TextStyle(
-                  color: Color(0xFF15803D),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12.5,
-                ),
+      final siteId = (data['siteId'] ?? data['site'] ?? '').toString();
+      return Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: const Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Workforce Allocation is fully Approved & Active',
+                    style: TextStyle(
+                      color: Color(0xFF15803D),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          if (isManager) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                label: const Text(
+                  'Map / Assign Approved Workers to Site',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WorkerMappingPage(initialSiteId: siteId.isNotEmpty ? siteId : null),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
       );
     }
 

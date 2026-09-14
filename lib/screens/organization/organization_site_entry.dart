@@ -4,6 +4,7 @@ import '/services/firestore_service.dart';
 import '/services/expense_service.dart';
 import 'package:intl/intl.dart';
 import '/utils/app_theme.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 
 class OrganizationSiteEntry extends StatefulWidget {
   final String userName;
@@ -943,7 +944,10 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
                                     (site) => DropdownMenuItem(
                                       value: site['siteId'],
                                       child: Text(
-                                        site['siteId'] ?? '',
+                                        SiteDisplayHelper.formatSiteDisplay(
+                                          siteId: site['siteId'],
+                                          siteName: site['siteName'],
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: 13.5,

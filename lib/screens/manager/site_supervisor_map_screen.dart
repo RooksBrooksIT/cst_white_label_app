@@ -6,6 +6,7 @@ import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 
 class SiteSupervisorMapScreen extends StatefulWidget {
   const SiteSupervisorMapScreen({super.key});
@@ -222,14 +223,57 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         final comments =
             (mapping?['siteComments'] ?? mapping?['comments'] ?? '').toString();
 
-        String label;
-        if (rawSiteId.isNotEmpty &&
-            rawSiteName.isNotEmpty &&
-            rawSiteId != rawSiteName) {
-          label = '$rawSiteId - $rawSiteName';
-        } else {
-          label = rawSiteName.isNotEmpty ? rawSiteName : rawSiteId;
+        final label = SiteDisplayHelper.formatSiteDisplay(
+          siteId: rawSiteId,
+          siteName: rawSiteName,
+        );
+
+        final uniqueKey = rawSiteId.isNotEmpty
+            ? rawSiteId
+            : (rawSiteName.isNotEmpty ? rawSiteName : docId);
+        if (seenKeys.add(uniqueKey)) {
+          consolidated.add({
+            'key': uniqueKey,
+            'docId': docId,
+            'siteId': rawSiteId,
+            'siteName': rawSiteName,
+            'displayLabel': label,
+            'projectName': projectNameVal,
+            'projectStage': stageVal,
+            'location': locVal,
+            'startDate': sDate,
+            'endDate': eDate,
+            'joinedDate': jDate,
+            'supervisorId': supId,
+            'supervisorName': supName,
+            'siteComments': comments,
+            'rawMapping': mapping,
+          });
         }
+      }
+
+      // Also include sites from projects collection
+      for (var entry in projectMap.entries) {
+        final pData = entry.value;
+        final docId = entry.key;
+        final rawSiteId = (pData['siteId'] ?? pData['id'] ?? docId).toString().trim();
+        final rawSiteName = (pData['siteName'] ?? pData['projectName'] ?? rawSiteId).toString().trim();
+
+        final mapping = mappingMap[rawSiteId] ?? mappingMap[rawSiteName] ?? mappingMap[docId];
+        final projectNameVal = (mapping?['projectName'] ?? pData['projectName'] ?? rawSiteName).toString();
+        final stageVal = (mapping?['projectStage'] ?? mapping?['stage'] ?? pData['projectStage'] ?? pData['stage'] ?? '').toString();
+        final locVal = (mapping?['location'] ?? mapping?['address'] ?? pData['location'] ?? pData['address'] ?? '').toString();
+        final sDate = _parseDate(mapping?['startDate'] ?? pData['startDate'] ?? pData['actualStartDate']);
+        final eDate = _parseDate(mapping?['endDate'] ?? pData['endDate'] ?? pData['actualEndDate']);
+        final jDate = _parseDate(mapping?['Joined On'] ?? mapping?['joinedDate']);
+        final supId = (mapping?['Supervisor ID'] ?? mapping?['supervisorId'] ?? pData['supervisorId'] ?? '').toString();
+        final supName = (mapping?['supervisor'] ?? mapping?['supervisorName'] ?? pData['assignedSupervisor'] ?? pData['supervisor'] ?? '').toString();
+        final comments = (mapping?['siteComments'] ?? mapping?['comments'] ?? '').toString();
+
+        final label = SiteDisplayHelper.formatSiteDisplay(
+          siteId: rawSiteId,
+          siteName: rawSiteName,
+        );
 
         final uniqueKey = rawSiteId.isNotEmpty
             ? rawSiteId
@@ -294,12 +338,10 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           final comments =
               (mData['siteComments'] ?? mData['comments'] ?? '').toString();
 
-          String label;
-          if (sId.isNotEmpty && sName.isNotEmpty && sId != sName) {
-            label = '$sId - $sName';
-          } else {
-            label = sName.isNotEmpty ? sName : sId;
-          }
+          final label = SiteDisplayHelper.formatSiteDisplay(
+            siteId: sId,
+            siteName: sName,
+          );
 
           consolidated.add({
             'key': uniqueKey,
@@ -320,6 +362,11 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
           });
         }
       }
+
+      consolidated.sort((a, b) =>
+          (a['displayLabel'] as String).toLowerCase().compareTo(
+                (b['displayLabel'] as String).toLowerCase(),
+              ));
 
       if (!mounted) return;
       setState(() {
@@ -1501,16 +1548,15 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                     final entry = paginatedEntries[index];
                     final data = entry.value;
 
-                    final siteName = data['siteName'] ??
+                    final siteName = (data['siteName'] ??
                         data['site'] ??
                         data['siteId'] ??
-                        entry.key;
-                    final siteIdVal = data['siteId'] ?? data['site'] ?? '';
-                    final displaySite = (siteIdVal.isNotEmpty &&
-                            siteName.isNotEmpty &&
-                            siteIdVal != siteName)
-                        ? '$siteIdVal - $siteName'
-                        : (siteName.isNotEmpty ? siteName : siteIdVal);
+                        entry.key).toString();
+                    final siteIdVal = (data['siteId'] ?? data['site'] ?? '').toString();
+                    final displaySite = SiteDisplayHelper.formatSiteDisplay(
+                      siteId: siteIdVal,
+                      siteName: siteName,
+                    );
 
                     final supervisorName = data['supervisor'] ??
                         data['supervisorName'] ??

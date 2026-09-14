@@ -79,6 +79,10 @@ class FirestoreService {
     debugPrint(
       'FirestoreService: Initialized with OrgPath: $_cachedDynamicPath',
     );
+    // Automatically trigger migration in background when org path is ready
+    if (_cachedDynamicPath != null && _cachedDynamicPath!.isNotEmpty) {
+      Future.microtask(() => migrateSitesIntoProjects());
+    }
   }
 
   /// Explicitly sets the organization path, bypassing SharedPreferences.
@@ -89,29 +93,36 @@ class FirestoreService {
     SharedPreferences.getInstance().then((prefs) {
       prefs.setString('org_dynamic_path', path);
     });
+    // Trigger migration for the newly set organization
+    Future.microtask(() => migrateSitesIntoProjects());
   }
 
   /// Gets a collection that is nested under the organization's data root.
   /// Resulting Path: /organisation/{OrgID}/data/{collectionName}
+  /// Note: 'Site' and 'sites' are automatically redirected to 'projects' as the single source of truth.
   /// This method is synchronous to support UI StreamBuilders.
   static CollectionReference<Map<String, dynamic>> getCollection(
     String collectionName,
   ) {
+    final effectiveCollection = (collectionName == 'Site' || collectionName == 'sites')
+        ? 'projects'
+        : collectionName;
+
     final orgId = _getOrgIdFromPath();
 
     debugPrint(
-      'FirestoreService: Accessing collection "$collectionName" for OrgID: $orgId',
+      'FirestoreService: Accessing collection "$effectiveCollection" (requested: "$collectionName") for OrgID: $orgId',
     );
 
     if (orgId == 'uninitialized') {
       // Fallback if not initialized or logged out
-      return FirebaseFirestore.instance.collection(collectionName);
+      return FirebaseFirestore.instance.collection(effectiveCollection);
     }
 
     return FirebaseFirestore.instance
         .collection('organisation')
         .doc(orgId)
-        .collection(collectionName);
+        .collection(effectiveCollection);
   }
 
   /// Internal helper to extract OrgID robustly from cached path
@@ -790,5 +801,354 @@ class FirestoreService {
     } catch (_) {}
 
     return orgId;
+  }
+
+  /// Resolves the exact linked project document reference for a given Site,
+  /// accounting for various naming conventions, legacy composite IDs (e.g. ST001_AbineshHouse),
+  /// site code, site name, and projectId mappings.
+  static Future<DocumentSnapshot<Map<String, dynamic>>?> findLinkedProjectDoc({
+    required String siteDocId,
+    String? siteCode,
+    String? siteName,
+    String? projectId,
+  }) async {
+    try {
+      final projectsCol = getCollection('projects');
+
+      // 1. Direct projectId match
+      if (projectId != null && projectId.trim().isNotEmpty) {
+        final directProj = await projectsCol.doc(projectId.trim()).get();
+        if (directProj.exists && directProj.data() != null) {
+          return directProj;
+        }
+        final qProjId = await projectsCol.where('projectId', isEqualTo: projectId.trim()).limit(1).get();
+        if (qProjId.docs.isNotEmpty) return qProjId.docs.first;
+      }
+
+      // 2. Direct siteDocId match
+      if (siteDocId.trim().isNotEmpty) {
+        final directSiteDoc = await projectsCol.doc(siteDocId.trim()).get();
+        if (directSiteDoc.exists && directSiteDoc.data() != null) {
+          return directSiteDoc;
+        }
+
+        final qSiteDocId = await projectsCol
+            .where('siteId', isEqualTo: siteDocId.trim())
+            .limit(1)
+            .get();
+        if (qSiteDocId.docs.isNotEmpty) {
+          return qSiteDocId.docs.first;
+        }
+      }
+
+      // 3. Check siteCode match (e.g., 'ST001')
+      if (siteCode != null && siteCode.trim().isNotEmpty) {
+        final qSiteCode = await projectsCol
+            .where('siteId', isEqualTo: siteCode.trim())
+            .limit(1)
+            .get();
+        if (qSiteCode.docs.isNotEmpty) {
+          return qSiteCode.docs.first;
+        }
+      }
+
+      // 4. Check composite key formats (e.g., 'ST001_AbineshHouse')
+      final candidateCodes = <String>{
+        if (siteCode != null && siteCode.trim().isNotEmpty) siteCode.trim(),
+        if (siteDocId.trim().isNotEmpty) siteDocId.trim(),
+      };
+      final candidateNames = <String>{
+        if (siteName != null && siteName.trim().isNotEmpty) siteName.trim(),
+      };
+
+      for (final code in candidateCodes) {
+        for (final name in candidateNames) {
+          final sanitizedName = name.replaceAll(' ', '');
+          final comp1 = '${code}_$sanitizedName';
+          final comp2 = '${code}_$name';
+
+          final q1 = await projectsCol.where('siteId', isEqualTo: comp1).limit(1).get();
+          if (q1.docs.isNotEmpty) return q1.docs.first;
+
+          final q2 = await projectsCol.where('siteId', isEqualTo: comp2).limit(1).get();
+          if (q2.docs.isNotEmpty) return q2.docs.first;
+
+          final d1 = await projectsCol.doc(comp1).get();
+          if (d1.exists && d1.data() != null) return d1;
+
+          final d2 = await projectsCol.doc(comp2).get();
+          if (d2.exists && d2.data() != null) return d2;
+        }
+      }
+
+      // 5. Check siteName & projectName equality
+      if (siteName != null && siteName.trim().isNotEmpty) {
+        final qSiteName = await projectsCol
+            .where('siteName', isEqualTo: siteName.trim())
+            .limit(1)
+            .get();
+        if (qSiteName.docs.isNotEmpty) {
+          return qSiteName.docs.first;
+        }
+
+        final qProjName = await projectsCol
+            .where('projectName', isEqualTo: siteName.trim())
+            .limit(1)
+            .get();
+        if (qProjName.docs.isNotEmpty) {
+          return qProjName.docs.first;
+        }
+      }
+
+      // 6. Broad scan fallback across all projects to catch prefix / substring matches
+      final allProjects = await projectsCol.get();
+      for (final doc in allProjects.docs) {
+        final data = doc.data();
+        final pSiteId = (data['siteId'] ?? '').toString().trim();
+        final pSiteName = (data['siteName'] ?? '').toString().trim();
+        final pProjName = (data['projectName'] ?? '').toString().trim();
+
+        for (final code in candidateCodes) {
+          if (pSiteId.startsWith('${code}_') ||
+              pSiteId.startsWith(code) ||
+              pSiteId == code ||
+              doc.id.startsWith('${code}_') ||
+              doc.id == code) {
+            return doc;
+          }
+        }
+
+        if (siteName != null && siteName.trim().isNotEmpty) {
+          if (pSiteName.toLowerCase() == siteName.trim().toLowerCase() ||
+              pProjName.toLowerCase() == siteName.trim().toLowerCase()) {
+            return doc;
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Error finding linked project for site $siteDocId: $e');
+      return null;
+    }
+  }
+
+  /// Resolves the linked Site/Project document reference for a given identifier
+  static Future<DocumentSnapshot<Map<String, dynamic>>?> findLinkedSiteDoc({
+    required String projectDocId,
+    String? siteId,
+    String? siteName,
+  }) async {
+    return findLinkedProjectDoc(
+      siteDocId: siteId ?? projectDocId,
+      siteCode: siteId,
+      siteName: siteName,
+      projectId: projectDocId,
+    );
+  }
+
+  /// Safely and atomically updates a Project/Site document in the single unified projects collection.
+  static Future<void> syncSiteAndProject({
+    required String siteDocId,
+    String? siteCode,
+    String? siteName,
+    String? projectId,
+    required Map<String, dynamic> siteUpdates,
+    Map<String, dynamic>? projectExtraUpdates,
+  }) async {
+    final projectsCol = getCollection('projects');
+
+    // 1. Locate the existing Project document
+    final linkedProjectSnap = await findLinkedProjectDoc(
+      siteDocId: siteDocId,
+      siteCode: siteCode,
+      siteName: siteName,
+      projectId: projectId,
+    );
+
+    final targetDocRef = linkedProjectSnap != null
+        ? linkedProjectSnap.reference
+        : projectsCol.doc(projectId ?? siteDocId);
+
+    // 2. Prepare combined updates
+    final combinedUpdates = <String, dynamic>{
+      'siteId': siteDocId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (siteCode != null && siteCode.isNotEmpty) {
+      combinedUpdates['siteCode'] = siteCode;
+    }
+    if (siteName != null && siteName.isNotEmpty) {
+      combinedUpdates['siteName'] = siteName;
+    }
+
+    // Apply siteUpdates
+    combinedUpdates.addAll(siteUpdates);
+
+    // Map any aliases
+    if (siteUpdates.containsKey('status') && !combinedUpdates.containsKey('currentStatus')) {
+      combinedUpdates['currentStatus'] = siteUpdates['status'];
+    }
+    if (siteUpdates.containsKey('currentStatus') && !combinedUpdates.containsKey('status')) {
+      combinedUpdates['status'] = siteUpdates['currentStatus'];
+    }
+    if (siteUpdates.containsKey('amountPaid')) {
+      combinedUpdates['amountReceived'] = siteUpdates['amountPaid'];
+      combinedUpdates['receivedPayments'] = siteUpdates['amountPaid'];
+    }
+    if (siteUpdates.containsKey('amountSpent')) {
+      combinedUpdates['amountSpend'] = siteUpdates['amountSpent'];
+    }
+    if (siteUpdates.containsKey('actualStartDate')) {
+      combinedUpdates['actualStateDate'] = siteUpdates['actualStartDate'];
+    }
+    if (siteUpdates.containsKey('startDate') && !combinedUpdates.containsKey('plannedStartDate')) {
+      combinedUpdates['plannedStartDate'] = siteUpdates['startDate'];
+    }
+    if (siteUpdates.containsKey('endDate') && !combinedUpdates.containsKey('plannedEndDate')) {
+      combinedUpdates['plannedEndDate'] = siteUpdates['endDate'];
+    }
+
+    if (projectExtraUpdates != null) {
+      combinedUpdates.addAll(projectExtraUpdates);
+    }
+
+    await targetDocRef.set(combinedUpdates, SetOptions(merge: true));
+  }
+
+  /// Migrates legacy raw 'Site' documents into the unified 'projects' collection.
+  /// Runs safely and idempotently without overwriting valid data.
+  static Future<void> migrateSitesIntoProjects() async {
+    try {
+      final orgId = _getOrgIdFromPath();
+      if (orgId == 'uninitialized') return;
+
+      // Access raw 'Site' subcollection directly (bypassing getCollection redirection)
+      final rawSiteCol = FirebaseFirestore.instance
+          .collection('organisation')
+          .doc(orgId)
+          .collection('Site');
+
+      final siteSnap = await rawSiteCol.get();
+      if (siteSnap.docs.isEmpty) {
+        debugPrint('FirestoreService: No legacy Site documents found to migrate for org: $orgId');
+        return;
+      }
+
+      final projectsCol = getCollection('projects');
+      final existingProjectsSnap = await projectsCol.get();
+      final existingProjectDocs = existingProjectsSnap.docs;
+
+      debugPrint('FirestoreService: Migrating ${siteSnap.docs.length} legacy Site documents into projects...');
+
+      for (final siteDoc in siteSnap.docs) {
+        final sData = siteDoc.data();
+        final sDocId = siteDoc.id;
+        final sSiteId = (sData['siteId'] ?? sDocId).toString().trim();
+        final sSiteName = (sData['siteName'] ?? sData['name'] ?? '').toString().trim();
+        final sProjId = (sData['projectId'] ?? '').toString().trim();
+
+        // Search for matching project document
+        QueryDocumentSnapshot<Map<String, dynamic>>? matchedProj;
+        for (final pDoc in existingProjectDocs) {
+          final pData = pDoc.data();
+          final pSiteId = (pData['siteId'] ?? '').toString().trim();
+          final pProjIdField = (pData['projectId'] ?? '').toString().trim();
+          final pName = (pData['projectName'] ?? pData['siteName'] ?? '').toString().trim();
+
+          if (pDoc.id == sDocId ||
+              pDoc.id == sProjId ||
+              (sProjId.isNotEmpty && (pDoc.id == sProjId || pProjIdField == sProjId)) ||
+              (sSiteId.isNotEmpty && (pDoc.id == sSiteId || pSiteId == sSiteId || pSiteId.startsWith('${sSiteId}_'))) ||
+              (sSiteName.isNotEmpty && pName.toLowerCase() == sSiteName.toLowerCase())) {
+            matchedProj = pDoc;
+            break;
+          }
+        }
+
+        if (matchedProj != null) {
+          // Merge missing/site fields into existing project doc
+          final pData = matchedProj.data();
+          final mergeUpdates = <String, dynamic>{
+            'siteId': pData['siteId'] ?? sSiteId,
+            'siteName': pData['siteName'] ?? sSiteName,
+            'siteLocation': pData['siteLocation'] ?? sData['location'] ?? sData['siteLocation'] ?? '',
+            'latitude': pData['latitude'] ?? sData['latitude'],
+            'longitude': pData['longitude'] ?? sData['longitude'],
+            'projectCategory': pData['projectCategory'] ?? sData['projectCategory'] ?? '',
+            'status': pData['status'] ?? sData['status'] ?? pData['currentStatus'] ?? 'Planning',
+            'currentStatus': pData['currentStatus'] ?? sData['status'] ?? sData['status'] ?? 'Planning',
+            'startDate': pData['startDate'] ?? sData['startDate'] ?? pData['plannedStartDate'],
+            'endDate': pData['endDate'] ?? sData['endDate'] ?? pData['plannedEndDate'],
+            'plannedStartDate': pData['plannedStartDate'] ?? sData['startDate'] ?? pData['plannedStartDate'],
+            'plannedEndDate': pData['plannedEndDate'] ?? sData['endDate'] ?? pData['plannedEndDate'],
+            'actualStartDate': pData['actualStartDate'] ?? sData['actualStartDate'] ?? sData['actualStateDate'],
+            'actualStateDate': pData['actualStateDate'] ?? sData['actualStartDate'] ?? sData['actualStateDate'],
+            'actualEndDate': pData['actualEndDate'] ?? sData['actualEndDate'],
+            'projectBudget': pData['projectBudget'] ?? sData['projectBudget'] ?? 0,
+            'amountReceived': pData['amountReceived'] ?? sData['amountReceived'] ?? sData['amountPaid'] ?? 0,
+            'amountPaid': pData['amountPaid'] ?? sData['amountPaid'] ?? sData['amountReceived'] ?? 0,
+            'amountSpent': pData['amountSpent'] ?? sData['amountSpent'] ?? sData['amountSpend'] ?? 0,
+            'amountSpend': pData['amountSpend'] ?? sData['amountSpend'] ?? sData['amountSpent'] ?? 0,
+            'amountBalance': pData['amountBalance'] ?? sData['amountBalance'] ?? 0,
+            'receivedPayments': pData['receivedPayments'] ?? sData['receivedPayments'] ?? sData['amountReceived'] ?? sData['amountPaid'] ?? 0,
+            'isContractWork': pData['isContractWork'] ?? sData['isContractWork'] ?? false,
+            'contractorName': pData['contractorName'] ?? sData['contractorName'] ?? '',
+            'contractorBudget': pData['contractorBudget'] ?? sData['contractorBudget'] ?? 0,
+            'contractStartDate': pData['contractStartDate'] ?? sData['contractStartDate'],
+            'contractEndDate': pData['contractEndDate'] ?? sData['contractEndDate'],
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
+          await matchedProj.reference.set(mergeUpdates, SetOptions(merge: true));
+        } else {
+          // Create new project document for this site
+          final targetDocId = sProjId.isNotEmpty ? sProjId : sDocId;
+          final newProjectData = <String, dynamic>{
+            'projectId': targetDocId,
+            'projectName': sSiteName.isNotEmpty ? sSiteName : sDocId,
+            'siteId': sDocId,
+            'siteName': sSiteName,
+            'siteLocation': sData['location'] ?? sData['siteLocation'] ?? '',
+            'latitude': sData['latitude'],
+            'longitude': sData['longitude'],
+            'projectCategory': sData['projectCategory'] ?? '',
+            'projectSubCategory': sData['projectSubCategory'] ?? '',
+            'projectType': sData['projectType'] ?? '',
+            'projectContract': sData['projectContract'] ?? '',
+            'projectStage': sData['projectStage'] ?? '',
+            'currentStatus': sData['status'] ?? sData['currentStatus'] ?? 'Planning',
+            'status': sData['status'] ?? sData['currentStatus'] ?? 'Planning',
+            'ownerName': sData['ownerName'] ?? sData['clientName'] ?? '',
+            'ownerPhoneNumber': sData['ownerPhoneNumber'] ?? sData['clientPhone'] ?? '',
+            'plannedStartDate': sData['startDate'] ?? sData['plannedStartDate'] ?? Timestamp.now(),
+            'plannedEndDate': sData['endDate'] ?? sData['plannedEndDate'],
+            'startDate': sData['startDate'] ?? sData['plannedStartDate'],
+            'endDate': sData['endDate'] ?? sData['plannedEndDate'],
+            'actualStartDate': sData['actualStartDate'] ?? sData['actualStateDate'],
+            'actualStateDate': sData['actualStartDate'] ?? sData['actualStateDate'],
+            'actualEndDate': sData['actualEndDate'],
+            'projectBudget': sData['projectBudget'] ?? 0,
+            'isContractWork': sData['isContractWork'] ?? false,
+            'contractorName': sData['contractorName'] ?? '',
+            'contractorBudget': sData['contractorBudget'] ?? 0,
+            'contractStartDate': sData['contractStartDate'],
+            'contractEndDate': sData['contractEndDate'],
+            'amountReceived': sData['amountReceived'] ?? sData['amountPaid'] ?? 0,
+            'amountPaid': sData['amountPaid'] ?? sData['amountReceived'] ?? 0,
+            'amountSpent': sData['amountSpent'] ?? sData['amountSpend'] ?? 0,
+            'amountSpend': sData['amountSpend'] ?? sData['amountSpent'] ?? 0,
+            'amountBalance': sData['amountBalance'] ?? 0,
+            'receivedPayments': sData['receivedPayments'] ?? sData['amountReceived'] ?? sData['amountPaid'] ?? 0,
+            'createdAt': sData['createdAt'] ?? FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
+          await projectsCol.doc(targetDocId).set(newProjectData, SetOptions(merge: true));
+        }
+      }
+      debugPrint('FirestoreService: Successfully finished migrating Site documents into projects.');
+    } catch (e) {
+      debugPrint('FirestoreService: Error during migrateSitesIntoProjects: $e');
+    }
   }
 }

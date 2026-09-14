@@ -81,11 +81,11 @@ class SupervisorRequestsPage extends StatelessWidget {
             },
           ),
           _MenuItemData(
-            title: 'Work Schedule Request',
-            subtitle: 'Submit site work timelines, phase plans & milestone requests',
+            title: 'Workforce Request',
+            subtitle: 'Submit site workforce requirements, timelines & labour allocation',
             icon: Icons.calendar_today_rounded,
             accentColor: const Color(0xFF10B981),
-            badgeText: 'Schedules',
+            badgeText: 'Workforce',
             onTap: () {
               Navigator.push(
                 context,

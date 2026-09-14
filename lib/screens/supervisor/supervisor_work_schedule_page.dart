@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 
 class SupervisorWorkSchedulePage extends StatefulWidget {
   final String supervisorId;
@@ -29,8 +30,6 @@ class _SupervisorWorkSchedulePageState
   // SiteSupervisorMap fields
   String? _siteLocation;
   String? _projectStage;
-  String? _joinedOn;
-  String? _siteComments;
   String? _supervisorName;
 
   // Loading state for supervisor site fetch
@@ -64,10 +63,42 @@ class _SupervisorWorkSchedulePageState
   @override
   void initState() {
     super.initState();
+    _daysController.addListener(_onDaysChanged);
     _fetchSitesForSupervisor();
     _fetchProjectPhases();
     _fetchLabours();
     _fetchAvailabilityForMonth(_focusedDay);
+  }
+
+  void _onDaysChanged() {
+    final parsed = int.tryParse(_daysController.text.trim());
+    if (_numberOfDays != parsed) {
+      setState(() {
+        _numberOfDays = parsed;
+      });
+    }
+  }
+
+  bool _isDayInSelectedRange(DateTime day) {
+    if (_selectedStartDate == null) return false;
+    final numDays =
+        _numberOfDays ?? int.tryParse(_daysController.text.trim()) ?? 0;
+    if (numDays <= 0) return false;
+
+    final start = DateTime(
+      _selectedStartDate!.year,
+      _selectedStartDate!.month,
+      _selectedStartDate!.day,
+    );
+    final end = DateTime(
+      _selectedStartDate!.year,
+      _selectedStartDate!.month,
+      _selectedStartDate!.day + numDays - 1,
+    );
+    final current = DateTime(day.year, day.month, day.day);
+
+    return (current.isAtSameMomentAs(start) || current.isAfter(start)) &&
+        (current.isAtSameMomentAs(end) || current.isBefore(end));
   }
 
   Future<void> _fetchAvailabilityForMonth(DateTime monthDate) async {
@@ -153,14 +184,10 @@ class _SupervisorWorkSchedulePageState
   // Project phases from Firestore
   List<String> _projectPhases = [];
   String? _selectedProjectPhase;
-  bool _loadingPhases = true;
 
   bool _isSubmitting = false;
 
   Future<void> _fetchProjectPhases() async {
-    setState(() {
-      _loadingPhases = true;
-    });
     final snapshot = await FirestoreService.getCollection(
       'projectStages',
     ).get();
@@ -169,7 +196,7 @@ class _SupervisorWorkSchedulePageState
         .where((s) => s.isNotEmpty)
         .toSet()
         .toList();
-    print('Loaded project phases from Firestore: $phases');
+    debugPrint('Loaded project phases from Firestore: $phases');
     String? newSelectedPhase = _selectedProjectPhase;
     if (newSelectedPhase == null || !phases.contains(newSelectedPhase)) {
       newSelectedPhase = null;
@@ -178,7 +205,6 @@ class _SupervisorWorkSchedulePageState
     setState(() {
       _projectPhases = phases;
       _selectedProjectPhase = newSelectedPhase;
-      _loadingPhases = false;
     });
   }
 
@@ -236,9 +262,10 @@ class _SupervisorWorkSchedulePageState
           final siteId = data['site']?.toString() ?? d.id;
           data['id'] = siteId;
           final siteName = siteNameMap[siteId] ?? '';
-          data['displayName'] = siteName.isNotEmpty
-              ? '${siteId}_$siteName'
-              : siteId;
+          data['displayName'] = SiteDisplayHelper.formatSiteDisplay(
+            siteId: siteId,
+            siteName: siteName.isNotEmpty ? siteName : data['siteName'] ?? data['projectName'],
+          );
           tempSiteMaps.add(data);
         }
       } else if (sitesSnap.docs.isNotEmpty) {
@@ -249,7 +276,7 @@ class _SupervisorWorkSchedulePageState
           tempSiteMaps.add({
             'id': sId,
             'site': sId,
-            'displayName': '${sId}_$sName',
+            'displayName': SiteDisplayHelper.formatSiteDisplay(siteId: sId, siteName: sName),
             'location': sDoc.data()['location']?.toString() ?? 'N/A',
             'projectStage': sDoc.data()['projectStage']?.toString() ?? 'N/A',
             'supervisor': widget.supervisorName,
@@ -301,8 +328,6 @@ class _SupervisorWorkSchedulePageState
     setState(() {
       _siteLocation = _parseStringOrTimestamp(site['location']);
       _projectStage = _parseStringOrTimestamp(site['projectStage']);
-      _joinedOn = _parseStringOrTimestamp(site['joinedOn']);
-      _siteComments = _parseStringOrTimestamp(site['siteComments']);
       _supervisorName = _parseStringOrTimestamp(site['supervisor']);
 
       _locationController.text = _siteLocation ?? '';
@@ -318,6 +343,7 @@ class _SupervisorWorkSchedulePageState
 
   @override
   void dispose() {
+    _daysController.removeListener(_onDaysChanged);
     _locationController.dispose();
     _supervisorController.dispose();
     _projectNameController.dispose();
@@ -370,7 +396,7 @@ class _SupervisorWorkSchedulePageState
     });
 
     try {
-      final grandTotal = _addedLabours.fold<int>(0, (sum, labour) {
+      final grandTotal = _addedLabours.fold<int>(0, (total, labour) {
         final countRaw = labour['count'];
         final count = (countRaw is int)
             ? countRaw
@@ -379,7 +405,7 @@ class _SupervisorWorkSchedulePageState
         final salary = (salaryRaw is int)
             ? salaryRaw
             : int.tryParse(salaryRaw?.toString() ?? '0') ?? 0;
-        return sum + (salary * (count));
+        return total + (salary * (count));
       });
       final numberOfDays = _numberOfDays ?? 1;
       final grandTotalWithDays = grandTotal * numberOfDays;
@@ -447,8 +473,8 @@ class _SupervisorWorkSchedulePageState
 
       // Notify both manager and organisation in a single unified record without duplicates
       await NotificationService.notifyManagerAndOrganisation(
-        title: '📅 New Work Schedule Submitted',
-        body: '$supervisorName (Site: $siteId) submitted Work Schedule #$wsReqId for $projectStage.',
+        title: '📅 New Workforce Request Submitted',
+        body: '$supervisorName (Site: $siteId) submitted Workforce Request #$wsReqId for $projectStage.',
         requestType: 'workforce',
         requestId: wsReqId,
         docId: docId,
@@ -456,10 +482,10 @@ class _SupervisorWorkSchedulePageState
         status: 'pending_manager_review',
         senderRole: 'Supervisor',
         senderName: supervisorName,
-        requiredAction: 'Action Required: Review & Approve Schedule',
+        requiredAction: 'Action Required: Review & Approve Workforce Request',
         forSupervisorName: supervisorName,
         extraData: {
-          'type': 'work_schedule',
+          'type': 'workforce_request',
           'wsReqId': wsReqId,
           'siteId': siteId,
           'supervisorName': supervisorName,
@@ -467,17 +493,19 @@ class _SupervisorWorkSchedulePageState
         },
       );
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Schedule saved and submitted for approval!'),
+          content: Text('Workforce request saved and submitted for approval!'),
           backgroundColor: mainColor,
         ),
       );
       _resetForm();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error saving schedule: $e'),
+          content: Text('Error saving request: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -496,7 +524,7 @@ class _SupervisorWorkSchedulePageState
       builder: (context) => AlertDialog(
         title: Text('Submit for Approval', style: TextStyle(color: mainColor)),
         content: Text(
-          'Are you sure you want to submit this schedule for approval?',
+          'Are you sure you want to submit this workforce request for approval?',
         ),
         actions: [
           TextButton(
@@ -526,7 +554,7 @@ class _SupervisorWorkSchedulePageState
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'Work Schedule',
+          'Workforce Request',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -834,6 +862,14 @@ class _SupervisorWorkSchedulePageState
             controller: _daysController,
             keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
+            onChanged: (value) {
+              final parsed = int.tryParse(value.trim());
+              if (_numberOfDays != parsed) {
+                setState(() {
+                  _numberOfDays = parsed;
+                });
+              }
+            },
             decoration: InputDecoration(
               labelText: 'Number of Days',
               labelStyle:
@@ -957,6 +993,12 @@ class _SupervisorWorkSchedulePageState
               rightChevronIcon: Icon(Icons.chevron_right, color: Color(0xFF0F172A)),
             ),
             calendarBuilders: CalendarBuilders(
+              selectedBuilder: (context, day, focusedDay) {
+                return _buildDayWithAvailability(day, primaryColor, darkAccent);
+              },
+              todayBuilder: (context, day, focusedDay) {
+                return _buildDayWithAvailability(day, primaryColor, darkAccent);
+              },
               defaultBuilder: (context, day, focusedDay) {
                 return _buildDayWithAvailability(day, primaryColor, darkAccent);
               },
@@ -981,12 +1023,16 @@ class _SupervisorWorkSchedulePageState
                 children: [
                   Icon(Icons.check_circle_rounded, color: darkAccent, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Selected Start: ${DateFormat('dd MMM yyyy').format(_selectedStartDate!)}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: darkAccent,
+                  Expanded(
+                    child: Text(
+                      _numberOfDays != null && _numberOfDays! > 1
+                          ? 'Selected Duration: ${DateFormat('dd MMM yyyy').format(_selectedStartDate!)} – ${DateFormat('dd MMM yyyy').format(DateTime(_selectedStartDate!.year, _selectedStartDate!.month, _selectedStartDate!.day + _numberOfDays! - 1))} ($_numberOfDays Days)'
+                          : 'Selected Start: ${DateFormat('dd MMM yyyy').format(_selectedStartDate!)} (Day 1)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: darkAccent,
+                      ),
                     ),
                   ),
                 ],
@@ -1509,6 +1555,47 @@ class _SupervisorWorkSchedulePageState
       dotColor = const Color(0xFFEF4444);
     }
 
+    final isInRange = _isDayInSelectedRange(day);
+
+    Color cellBgColor;
+    BoxBorder? cellBorder;
+    List<BoxShadow>? cellShadow;
+    Color textColor;
+    FontWeight textWeight;
+
+    if (isSelected) {
+      cellBgColor = darkAccent;
+      cellBorder = Border.all(
+        color: Colors.white.withValues(alpha: 0.3),
+        width: 1.5,
+      );
+      cellShadow = [
+        BoxShadow(
+          color: darkAccent.withValues(alpha: 0.35),
+          blurRadius: 6,
+          spreadRadius: 1,
+        ),
+      ];
+      textColor = Colors.white;
+      textWeight = FontWeight.bold;
+    } else if (isInRange) {
+      // Consecutive workdays in the calculated duration
+      cellBgColor = darkAccent.withValues(alpha: 0.15);
+      cellBorder = Border.all(
+        color: darkAccent.withValues(alpha: 0.65),
+        width: 1.5,
+      );
+      cellShadow = null;
+      textColor = darkAccent;
+      textWeight = FontWeight.bold;
+    } else {
+      cellBgColor = highlightColor;
+      cellBorder = isToday ? Border.all(color: darkAccent, width: 2) : null;
+      cellShadow = null;
+      textColor = isToday ? darkAccent : const Color(0xFF0F172A);
+      textWeight = isToday ? FontWeight.bold : FontWeight.normal;
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1517,40 +1604,33 @@ class _SupervisorWorkSchedulePageState
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: isSelected ? darkAccent : highlightColor,
+              color: cellBgColor,
               shape: BoxShape.circle,
-              border: isToday
-                  ? Border.all(color: darkAccent, width: 2)
-                  : isSelected
-                  ? Border.all(color: Colors.white24, width: 1)
-                  : null,
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: darkAccent.withValues(alpha: 0.35),
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
+              border: cellBorder,
+              boxShadow: cellShadow,
             ),
             child: Center(
               child: Text(
                 '${day.day}',
                 style: TextStyle(
-                  color: isSelected
-                      ? Colors.white
-                      : (isToday ? darkAccent : const Color(0xFF0F172A)),
-                  fontWeight: isSelected || isToday
-                      ? FontWeight.bold
-                      : FontWeight.normal,
+                  color: textColor,
+                  fontWeight: textWeight,
                   fontSize: 13.5,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 2),
-          if (busyCount > 0)
+          if (dotColor != Colors.transparent)
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+              ),
+            )
+          else if (busyCount > 0)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -1560,14 +1640,14 @@ class _SupervisorWorkSchedulePageState
                   width: 4,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isSelected ? darkAccent : dotColor,
+                    color: Colors.grey.withValues(alpha: 0.5),
                     shape: BoxShape.circle,
                   ),
                 ),
               ),
             )
           else
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
         ],
       ),
     );

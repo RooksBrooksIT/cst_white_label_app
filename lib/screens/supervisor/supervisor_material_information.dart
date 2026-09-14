@@ -2431,11 +2431,35 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
             ),
           ),
           items: sitesList.map((site) {
-            final displayId = (site['siteId'] ?? site['siteName'] ?? '').toString();
+            final siteIdVal = (site['siteId'] ?? '').toString().trim();
+            String siteCode = (site['siteCode'] ?? '').toString().trim();
+            String siteName = (site['siteName'] ?? '').toString().trim();
+
+            if (siteCode.isEmpty && siteIdVal.isNotEmpty) {
+              siteCode = siteIdVal.contains('_') ? siteIdVal.split('_').first : siteIdVal;
+            } else if (siteCode.contains('_')) {
+              siteCode = siteCode.split('_').first;
+            }
+
+            if (siteName.isEmpty && siteIdVal.contains('_')) {
+              siteName = siteIdVal.substring(siteIdVal.indexOf('_') + 1);
+            } else if (siteName.contains('_') && siteName.startsWith('${siteCode}_')) {
+              siteName = siteName.substring(siteCode.length + 1);
+            }
+
+            final String displayText;
+            if (siteCode.isNotEmpty && siteName.isNotEmpty && siteCode.toLowerCase() != siteName.toLowerCase()) {
+              displayText = '$siteCode — $siteName';
+            } else if (siteName.isNotEmpty) {
+              displayText = siteName;
+            } else {
+              displayText = siteCode.isNotEmpty ? siteCode : siteIdVal;
+            }
+
             return DropdownMenuItem<String>(
               value: site['siteId']?.toString(),
               child: Text(
-                displayId,
+                displayText,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
               ),

@@ -1180,10 +1180,28 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                           ),
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
                           items: _siteIds.map((sId) {
+                            String siteCode = sId.contains('_') ? sId.split('_').first : sId;
+                            String siteName = '';
+                            if (_siteDetailsMap.containsKey(sId)) {
+                              siteName = (_siteDetailsMap[sId]!['projectName'] ?? '').toString().trim();
+                            }
+                            if (siteName.isEmpty && sId.contains('_')) {
+                              siteName = sId.substring(sId.indexOf('_') + 1);
+                            }
+
+                            final String displayText;
+                            if (siteCode.isNotEmpty && siteName.isNotEmpty && siteCode.toLowerCase() != siteName.toLowerCase()) {
+                              displayText = '$siteCode — $siteName';
+                            } else if (siteName.isNotEmpty) {
+                              displayText = siteName;
+                            } else {
+                              displayText = sId;
+                            }
+
                             return DropdownMenuItem<String>(
                               value: sId,
                               child: Text(
-                                sId,
+                                displayText,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 13.5,

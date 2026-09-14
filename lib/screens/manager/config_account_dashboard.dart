@@ -78,7 +78,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
   );
   final ValueNotifier<int> _currentKpiPageNotifier = ValueNotifier<int>(0);
   int _currentIndex = 0;
-  String _selectedKpiPeriod = 'Today';
   Timer? _carouselTimer;
 
   final TextEditingController _dashboardSearchController =
@@ -1082,100 +1081,28 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Title & Filter Dropdown Row
+        // Title Row
         Padding(
           padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: primaryColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Operational Overview',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                ],
+              Container(
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-              // Filter Dropdown Pill
-              PopupMenuButton<String>(
-                initialValue: _selectedKpiPeriod,
-                onSelected: (val) => setState(() => _selectedKpiPeriod = val),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+              const SizedBox(width: 8),
+              const Text(
+                'Operational Overview',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
                 ),
-                elevation: 6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.calendar_today_rounded,
-                        size: 13,
-                        color: primaryColor,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _selectedKpiPeriod,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: Color(0xFF64748B),
-                      ),
-                    ],
-                  ),
-                ),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'Today', child: Text('Today')),
-                  const PopupMenuItem(
-                    value: 'This Week',
-                    child: Text('This Week'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'This Month',
-                    child: Text('This Month'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'All Time',
-                    child: Text('All Time'),
-                  ),
-                ],
               ),
             ],
           ),
@@ -1394,23 +1321,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                             }
 
                                             if (amount > 0) {
-                                              final docDateStr =
-                                                  (data['date'] ?? '')
-                                                      .toString();
-                                              final docDate =
-                                                  _parseFlexibleDate(
-                                                    data['updatedAt'] ??
-                                                        data['createdAt'] ??
-                                                        data['timestamp'] ??
-                                                        docDateStr,
-                                                  );
-                                              if (_isDateInPeriod(
-                                                docDate,
-                                                docDateStr,
-                                                _selectedKpiPeriod,
-                                              )) {
-                                                computedExpenses += amount;
-                                              }
+                                              computedExpenses += amount;
                                             }
                                           }
                                         }
@@ -1497,31 +1408,14 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                                             }
 
                                             if (amount > 0) {
-                                              final docDateStr =
-                                                  (data['date'] ?? '')
-                                                      .toString();
-                                              final docDate =
-                                                  _parseFlexibleDate(
-                                                    data['updatedAt'] ??
-                                                        data['createdAt'] ??
-                                                        data['timestamp'] ??
-                                                        docDateStr,
-                                                  );
-                                              if (_isDateInPeriod(
-                                                docDate,
-                                                docDateStr,
-                                                _selectedKpiPeriod,
-                                              )) {
-                                                if (computedExpenses == 0.0) {
-                                                  computedExpenses += amount;
-                                                }
+                                              if (computedExpenses == 0.0) {
+                                                computedExpenses += amount;
                                               }
                                             }
                                           }
                                         }
 
-                                        if (computedExpenses == 0.0 &&
-                                            _selectedKpiPeriod == 'All Time') {
+                                        if (computedExpenses == 0.0) {
                                           computedExpenses = totalAmountSpent;
                                         }
 
@@ -4231,51 +4125,7 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
     return null;
   }
 
-  bool _isDateInPeriod(DateTime? docDate, String docDateStr, String period) {
-    final now = DateTime.now();
-    final todayStr1 = DateFormat('yyyy-MM-dd').format(now);
-    final todayStr2 = DateFormat('dd-MM-yyyy').format(now);
-    final todayStr3 = DateFormat('d-M-yyyy').format(now);
-    final todayStr4 = DateFormat('dd/MM/yyyy').format(now);
-    final startOfWeek = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(Duration(days: now.weekday - 1));
-    final startOfMonth = DateTime(now.year, now.month, 1);
 
-    DateTime? effectiveDate = docDate ?? _parseFlexibleDate(docDateStr);
-
-    if (period == 'Today') {
-      if (docDateStr == todayStr1 ||
-          docDateStr == todayStr2 ||
-          docDateStr == todayStr3 ||
-          docDateStr == todayStr4) {
-        return true;
-      }
-      if (effectiveDate != null) {
-        return effectiveDate.year == now.year &&
-            effectiveDate.month == now.month &&
-            effectiveDate.day == now.day;
-      }
-      return false;
-    } else if (period == 'This Week') {
-      if (effectiveDate != null) {
-        return effectiveDate.isAfter(
-          startOfWeek.subtract(const Duration(seconds: 1)),
-        );
-      }
-      return true;
-    } else if (period == 'This Month') {
-      if (effectiveDate != null) {
-        return effectiveDate.isAfter(
-          startOfMonth.subtract(const Duration(seconds: 1)),
-        );
-      }
-      return true;
-    }
-    return true; // 'All Time'
-  }
 }
 
 class DashboardItem {

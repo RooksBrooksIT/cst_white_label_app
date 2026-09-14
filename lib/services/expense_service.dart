@@ -396,37 +396,13 @@ class ExpenseService {
   static Future<DocumentReference<Map<String, dynamic>>?>
       _findExistingProjectDocBySiteId(String siteId) async {
     try {
-      final docDirect = await FirestoreService.projects.doc(siteId).get();
-      if (docDirect.exists) {
-        return docDirect.reference;
-      }
-      final query = await FirestoreService.projects
-          .where('siteId', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (query.docs.isNotEmpty) {
-        return query.docs.first.reference;
-      }
-      final querySite = await FirestoreService.projects
-          .where('site', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (querySite.docs.isNotEmpty) {
-        return querySite.docs.first.reference;
-      }
-      final querySiteName = await FirestoreService.projects
-          .where('siteName', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (querySiteName.docs.isNotEmpty) {
-        return querySiteName.docs.first.reference;
-      }
-      final queryProjectName = await FirestoreService.projects
-          .where('projectName', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (queryProjectName.docs.isNotEmpty) {
-        return queryProjectName.docs.first.reference;
+      final docSnap = await FirestoreService.findLinkedProjectDoc(
+        siteDocId: siteId,
+        siteCode: siteId,
+        siteName: siteId,
+      );
+      if (docSnap != null && docSnap.exists) {
+        return docSnap.reference;
       }
       return null;
     } catch (e) {
@@ -439,31 +415,12 @@ class ExpenseService {
   static Future<DocumentReference<Map<String, dynamic>>?>
       _findExistingSiteDocBySiteId(String siteId) async {
     try {
-      final siteDocDirect =
-          await FirestoreService.getCollection('Site').doc(siteId).get();
-      if (siteDocDirect.exists) {
-        return siteDocDirect.reference;
-      }
-      final query = await FirestoreService.getCollection('Site')
-          .where('siteId', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (query.docs.isNotEmpty) {
-        return query.docs.first.reference;
-      }
-      final querySiteName = await FirestoreService.getCollection('Site')
-          .where('siteName', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (querySiteName.docs.isNotEmpty) {
-        return querySiteName.docs.first.reference;
-      }
-      final querySite = await FirestoreService.getCollection('Site')
-          .where('site', isEqualTo: siteId)
-          .limit(1)
-          .get();
-      if (querySite.docs.isNotEmpty) {
-        return querySite.docs.first.reference;
+      final siteSnap = await FirestoreService.findLinkedSiteDoc(
+        projectDocId: siteId,
+        siteId: siteId,
+      );
+      if (siteSnap != null && siteSnap.exists) {
+        return siteSnap.reference;
       }
       return null;
     } catch (e) {

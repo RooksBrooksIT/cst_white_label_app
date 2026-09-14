@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 import 'package:intl/intl.dart';
 
 class ManagerSiteEntryPage extends StatefulWidget {
@@ -437,19 +438,6 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         });
       }
     }
-  }
-
-  Future<void> _refreshData() async {
-    setState(() {
-      isLoadingMaterials = true;
-      isLoadingLabours = true;
-      isLoadingSites = true;
-    });
-    await Future.wait([
-      _fetchMaterialOptions(),
-      _fetchLabourOptions(),
-      _fetchSites(),
-    ]);
   }
 
   void _addMaterial() {
@@ -1071,7 +1059,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                               (site) => DropdownMenuItem(
                                                 value: site['siteId'],
                                                 child: Text(
-                                                  site['siteId'] ?? '',
+                                                  SiteDisplayHelper.formatSiteDisplay(
+                                                    siteId: site['siteId'],
+                                                    siteName: site['siteName'],
+                                                  ),
                                                   overflow: TextOverflow.ellipsis,
                                                   style: const TextStyle(
                                                     color: Color(0xFF0A183D),

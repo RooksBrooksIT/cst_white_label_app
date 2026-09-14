@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -8,12 +8,13 @@ import '/utils/responsive.dart';
 import 'package:ebricks/screens/reports/pdf_preview_page.dart';
 import 'package:ebricks/screens/reports/worker_report_pdf_helper.dart';
 import 'package:ebricks/screens/reports/overall_report_pdf_helper.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 
 class WorkerAttendanceSalaryPage extends StatefulWidget {
   const WorkerAttendanceSalaryPage({super.key});
 
   @override
-  _WorkerAttendanceSalaryPageState createState() =>
+  State<WorkerAttendanceSalaryPage> createState() =>
       _WorkerAttendanceSalaryPageState();
 }
 
@@ -32,6 +33,8 @@ class _WorkerAttendanceSalaryPageState
 
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  Map<String, int> _extraWorkersSummary = {};
+  int _totalExtraWorkersInMonth = 0;
 
   @override
   void initState() {
@@ -104,9 +107,22 @@ class _WorkerAttendanceSalaryPageState
       double totalPoints = 0;
       int totalDaysDetected = 0;
 
+      final Map<String, int> extraMap = {};
+      int totalExtraCount = 0;
+
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
+        final extraList = data['extraWorkers'] as List<dynamic>? ?? [];
+
+        for (final e in extraList) {
+          if (e is Map) {
+            final type = (e['workerType'] ?? 'General Labour').toString();
+            final count = (e['count'] as num?)?.toInt() ?? 0;
+            extraMap[type] = (extraMap[type] ?? 0) + count;
+            totalExtraCount += count;
+          }
+        }
 
         workersMap.forEach((name, details) {
           if (details is! Map) return;
@@ -188,6 +204,8 @@ class _WorkerAttendanceSalaryPageState
       if (mounted) {
         setState(() {
           _allWorkers = results;
+          _extraWorkersSummary = extraMap;
+          _totalExtraWorkersInMonth = totalExtraCount;
           _applySearchFilter();
           _overallAttendancePercentage = overallPercent;
           _isLoading = false;
@@ -506,6 +524,60 @@ class _WorkerAttendanceSalaryPageState
                       ),
                     ),
                   ),
+                  if (_extraWorkersSummary.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.handyman_rounded, color: Color(0xFFD97706), size: 16),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Extra / Unknown Labour Logged',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '$_totalExtraWorkersInMonth Total',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFB45309)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: _extraWorkersSummary.entries.map((entry) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFCD34D)),
+                                ),
+                                child: Text(
+                                  '${entry.key}: ${entry.value}',
+                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF78350F)),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -643,10 +715,15 @@ class _WorkerAttendanceSalaryPageState
               hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w400),
             ),
             items: items.map((item) {
+              final displayText = item == null
+                  ? hint
+                  : (label == 'Site'
+                      ? SiteDisplayHelper.formatSiteDisplay(siteId: item)
+                      : item);
               return DropdownMenuItem<String>(
                 value: item,
                 child: Text(
-                  item ?? hint,
+                  displayText,
                   overflow: TextOverflow.ellipsis,
                 ),
               );
@@ -733,7 +810,7 @@ class _WorkerAttendanceSalaryPageState
                             const SizedBox(width: 2),
                             Expanded(
                               child: Text(
-                                worker['site'],
+                                SiteDisplayHelper.formatSiteDisplay(siteId: worker['site']),
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 12,

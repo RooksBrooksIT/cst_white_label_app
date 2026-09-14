@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 
 /// A reusable dropdown widget for selecting a Site ID.
 ///
-/// It displays the site ID along with its name (if available) and
-/// uses the same visual style as the existing dropdown in `manager_expenses.dart`.
-/// The widget is fully responsive and avoids fixed pixel sizes, so it can be
-/// placed in any layout without causing overflow errors.
+/// Displays Site ID and Site Name formatted consistently as `{siteId}_{siteName}`.
 class SiteDropdown extends StatelessWidget {
   /// List of site IDs to choose from.
   final List<String> siteIds;
@@ -36,7 +34,7 @@ class SiteDropdown extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
-        isExpanded: true,
+      isExpanded: true,
       initialValue: (selectedSiteId != null && siteIds.contains(selectedSiteId))
           ? selectedSiteId
           : null,
@@ -59,10 +57,12 @@ class SiteDropdown extends StatelessWidget {
       dropdownColor: theme.cardColor,
       style: TextStyle(color: colorScheme.onSurface),
       items: siteIds.map((id) {
+        final name = siteNameMap[id] ?? '';
+        final displayName = SiteDisplayHelper.formatSiteDisplay(siteId: id, siteName: name);
         return DropdownMenuItem<String>(
           value: id,
           child: Text(
-            id,
+            displayName,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 14),
           ),

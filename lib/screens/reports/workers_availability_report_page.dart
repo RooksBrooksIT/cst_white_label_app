@@ -1,13 +1,14 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 import 'package:ebricks/screens/supervisor/worker_calendar_availability_page.dart';
 
 class WorkersAvailabilityReportPage extends StatefulWidget {
   const WorkersAvailabilityReportPage({super.key});
 
   @override
-  _WorkersAvailabilityReportPageState createState() =>
+  State<WorkersAvailabilityReportPage> createState() =>
       _WorkersAvailabilityReportPageState();
 }
 
@@ -36,57 +37,119 @@ class _WorkersAvailabilityReportPageState
   Future<void> _loadReportData() async {
     setState(() => _isLoading = true);
     try {
-      final snapshot = await FirestoreService.getCollection(
-        'workersAttendance',
-      ).orderBy('updatedAt', descending: true).get();
+      final Map<String, Map<String, dynamic>> sitesMap = {};
+      final Set<String> uniqueWorkerNames = {};
 
-      Map<String, Map<String, dynamic>> sitesMap = {};
-      int totalWorkers = 0;
-      Set<String> uniqueWorkerNames = {};
+      // 1. Fetch active worker mappings
+      try {
+        final mappingSnap = await FirestoreService.getCollection('workerSiteMapping').get();
+        for (final doc in mappingSnap.docs) {
+          final data = doc.data();
+          final siteId = doc.id;
+          final siteName = (data['siteName'] ?? data['site'] ?? siteId).toString();
+          final supervisor = (data['supervisor'] ?? 'Assigned').toString();
+          final workersList = data['workers'] as List<dynamic>? ?? [];
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final siteName = data['site'] ?? data['siteName'] ?? 'Unknown Site';
-        final workersData = data['workers'] as Map<String, dynamic>? ?? {};
+          final List<Map<String, dynamic>> formattedWorkers = [];
+          for (final item in workersList) {
+            if (item is Map) {
+              final wName = (item['workerName'] ?? item['name'] ?? '').toString().trim();
+              final wId = (item['workerId'] ?? item['id'] ?? wName).toString().trim();
+              if (wName.isNotEmpty) {
+                formattedWorkers.add({
+                  'workerId': wId,
+                  'workerName': wName,
+                  'workerDesignation': (item['workerDesignation'] ?? item['designation'] ?? 'Worker').toString(),
+                  'workerSalary': (item['workerSalary'] ?? item['salary'] ?? '0').toString(),
+                  'lastAttendance': 'Mapped',
+                  'lastUpdated': data['updatedAt'],
+                });
+                uniqueWorkerNames.add(wId.isNotEmpty ? wId : wName);
+              }
+            }
+          }
 
-        if (!sitesMap.containsKey(siteName)) {
-          sitesMap[siteName] = {
-            'id': siteName,
+          sitesMap[siteId] = {
+            'id': siteId,
             'site': siteName,
-            'projectName': 'Attendance Records',
-            'supervisor': 'Various',
-            'workers': <Map<String, dynamic>>[],
+            'siteId': siteId,
+            'siteName': siteName,
+            'projectName': siteName,
+            'supervisor': supervisor,
+            'workers': formattedWorkers,
+            'extraWorkers': <Map<String, dynamic>>[],
           };
         }
+      } catch (e) {
+        debugPrint('Error loading workerSiteMapping in report: $e');
+      }
 
-        workersData.forEach((workerId, workerInfo) {
-          final workersList =
-              sitesMap[siteName]!['workers'] as List<Map<String, dynamic>>;
+      // 2. Fetch latest attendance records to overlay actual status and extra worker counts
+      try {
+        final attendanceSnap = await FirestoreService.getCollection(
+          'workersAttendance',
+        ).orderBy('updatedAt', descending: true).limit(100).get();
 
-          bool exists = workersList.any((w) => w['workerId'] == workerId);
-          if (!exists) {
-            workersList.add({
-              'workerName': workerId,
-              'workerDesignation': workerInfo['designation'] ?? 'Worker',
-              'workerSalary': workerInfo['salary'] ?? '0',
-              'workerId': workerId,
-              'lastAttendance': workerInfo['attendance'],
-              'lastUpdated': data['updatedAt'],
-            });
-            uniqueWorkerNames.add(workerId);
+        for (var doc in attendanceSnap.docs) {
+          final data = doc.data();
+          final siteId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
+          final siteName = (data['siteName'] ?? data['site'] ?? siteId).toString();
+          final workersData = data['workers'] as Map<String, dynamic>? ?? {};
+          final extraList = data['extraWorkers'] as List<dynamic>? ?? [];
+
+          if (!sitesMap.containsKey(siteId)) {
+            sitesMap[siteId] = {
+              'id': siteId,
+              'site': siteName,
+              'siteId': siteId,
+              'siteName': siteName,
+              'projectName': siteName,
+              'supervisor': data['supervisor'] ?? 'Various',
+              'workers': <Map<String, dynamic>>[],
+              'extraWorkers': extraList,
+            };
+          } else if ((sitesMap[siteId]!['extraWorkers'] as List).isEmpty && extraList.isNotEmpty) {
+            sitesMap[siteId]!['extraWorkers'] = extraList;
           }
-        });
+
+          final currentWorkers = sitesMap[siteId]!['workers'] as List<Map<String, dynamic>>;
+
+          workersData.forEach((workerName, workerInfo) {
+            if (workerInfo is! Map) return;
+            final matchIndex = currentWorkers.indexWhere(
+              (w) => (w['workerName']?.toString().toLowerCase() == workerName.toString().toLowerCase()) ||
+                     (w['workerId']?.toString() == workerInfo['workerId']?.toString()),
+            );
+
+            if (matchIndex >= 0) {
+              currentWorkers[matchIndex]['lastAttendance'] = workerInfo['attendance'] ?? workerInfo['status'] ?? 'Present';
+              currentWorkers[matchIndex]['lastUpdated'] = data['updatedAt'];
+            } else {
+              currentWorkers.add({
+                'workerName': workerName,
+                'workerDesignation': (workerInfo['designation'] ?? 'Worker').toString(),
+                'workerSalary': (workerInfo['salary'] ?? '0').toString(),
+                'workerId': (workerInfo['workerId'] ?? workerName).toString(),
+                'lastAttendance': (workerInfo['attendance'] ?? workerInfo['status'] ?? 'Present').toString(),
+                'lastUpdated': data['updatedAt'],
+              });
+              uniqueWorkerNames.add(workerName);
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Error overlaying attendance in report: $e');
       }
 
       final mappings = sitesMap.values.toList();
-      totalWorkers = uniqueWorkerNames.length;
+      final totalWorkers = uniqueWorkerNames.length;
 
       if (!mounted) return;
       setState(() {
         _siteMappings = mappings;
         _totalWorkersCount = totalWorkers;
         _isLoading = false;
-        if (_siteMappings.isNotEmpty) {
+        if (_siteMappings.isNotEmpty && _selectedSiteId == null) {
           _selectedSiteId = _siteMappings.first['id'];
         }
       });
@@ -345,11 +408,14 @@ class _WorkersAvailabilityReportPageState
           fontWeight: FontWeight.w700,
         ),
         items: _siteMappings.map((m) {
-          final siteId = m['site'] ?? m['id'];
+          final displayName = SiteDisplayHelper.formatSiteDisplay(
+            siteId: m['siteId'] ?? m['id'],
+            siteName: m['siteName'] ?? m['site'],
+          );
           return DropdownMenuItem<String>(
             value: m['id'] as String?,
             child: Text(
-              '$siteId',
+              displayName,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 13.5),
             ),

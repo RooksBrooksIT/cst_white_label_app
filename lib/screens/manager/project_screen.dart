@@ -592,8 +592,11 @@ class _ProjectScreenState extends State<ProjectScreen>
         'actualEndDate': actualEndDate,
         'projectBudget': budget,
         'amountPaid': paid,
+        'amountReceived': paid,
         'amountSpent': spent,
+        'amountSpend': spent,
         'amountBalance': balance,
+        'receivedPayments': paid,
         'isContractWork': _isContractWork,
         'updatedAt': FieldValue.serverTimestamp(),
       };
