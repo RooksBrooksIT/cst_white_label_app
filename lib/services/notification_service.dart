@@ -661,43 +661,41 @@ class NotificationService {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // 1. Save in organization-scoped fcmTokens collection under canonical key
+      // 1. Save strictly in organization-scoped fcmTokens subcollection
       if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
         final orgTokens = FirestoreService.getCollection('fcmTokens');
-        await orgTokens.doc('${cleanUserType}_$cleanUserId').set(tokenData, SetOptions(merge: true));
-        // Prune legacy duplicate doc to prevent multiple dispatches to the same token
-        await orgTokens.doc(cleanUserId).delete().catchError((_) {});
-      }
-
-      // 2. Also save in root fcmTokens for instant global Cloud Function lookup
-      if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
         final rootTokens = FirebaseFirestore.instance.collection('fcmTokens');
-        await rootTokens.doc('${cleanOrgId}_${cleanUserType}_$cleanUserId').set(tokenData, SetOptions(merge: true));
-        await rootTokens.doc('${cleanOrgId}_$cleanUserId').delete().catchError((_) {});
+        
+        await Future.wait([
+          orgTokens.doc('${cleanUserType}_$cleanUserId').set(tokenData, SetOptions(merge: true)),
+          orgTokens.doc(cleanUserId).delete().catchError((_) {}),
+          rootTokens.doc('${cleanOrgId}_${cleanUserType}_$cleanUserId').delete().catchError((_) {}),
+          rootTokens.doc('${cleanOrgId}_$cleanUserId').delete().catchError((_) {}),
+          rootTokens.doc('${cleanUserType}_$cleanUserId').delete().catchError((_) {}),
+        ]);
       } else {
+        // Fallback only when organisation is not yet initialized
         await FirebaseFirestore.instance
             .collection('fcmTokens')
             .doc('${cleanUserType}_$cleanUserId')
             .set(tokenData, SetOptions(merge: true));
-        await FirebaseFirestore.instance
-            .collection('fcmTokens')
-            .doc(cleanUserId)
-            .delete()
-            .catchError((_) {});
       }
 
       // 3. Subscribe to org and role topics for broadcast push delivery
       if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
         final sanitizedOrgId = cleanOrgId.replaceAll(RegExp(r'\W'), '_');
-        await _messaging.subscribeToTopic('org_$sanitizedOrgId');
-        await _messaging.subscribeToTopic('org_${sanitizedOrgId}_$cleanUserType');
+        final topicFutures = <Future>[
+          _messaging.subscribeToTopic('org_$sanitizedOrgId').catchError((_) {}),
+          _messaging.subscribeToTopic('org_${sanitizedOrgId}_$cleanUserType').catchError((_) {}),
+        ];
         if (cleanUserType == 'organisation' || cleanUserType == 'organization' || cleanUserType == 'config') {
-          await _messaging.subscribeToTopic('org_${sanitizedOrgId}_organisation');
-          await _messaging.subscribeToTopic('org_${sanitizedOrgId}_organization');
+          topicFutures.add(_messaging.subscribeToTopic('org_${sanitizedOrgId}_organisation').catchError((_) {}));
+          topicFutures.add(_messaging.subscribeToTopic('org_${sanitizedOrgId}_organization').catchError((_) {}));
         }
         if (cleanUserType == 'config') {
-          await _messaging.subscribeToTopic('org_${sanitizedOrgId}_manager');
+          topicFutures.add(_messaging.subscribeToTopic('org_${sanitizedOrgId}_manager').catchError((_) {}));
         }
+        await Future.wait(topicFutures);
       }
 
       // 4. Activate the realtime notification tray bridge
@@ -729,44 +727,28 @@ class NotificationService {
 
       if (cleanOrgId.isNotEmpty && cleanOrgId != 'uninitialized') {
         final sanitizedOrgId = cleanOrgId.replaceAll(RegExp(r'\W'), '_');
-        await _messaging
-            .unsubscribeFromTopic('org_$sanitizedOrgId')
-            .catchError((_) {});
-        await _messaging
-            .unsubscribeFromTopic('org_${sanitizedOrgId}_$cleanUserType')
-            .catchError((_) {});
-        if (cleanUserType == 'config' || cleanUserType == 'organisation' || cleanUserType == 'organization') {
-          await _messaging
-              .unsubscribeFromTopic('org_${sanitizedOrgId}_organisation')
-              .catchError((_) {});
-          await _messaging
-              .unsubscribeFromTopic('org_${sanitizedOrgId}_organization')
-              .catchError((_) {});
-          await _messaging
-              .unsubscribeFromTopic('org_${sanitizedOrgId}_manager')
-              .catchError((_) {});
-        }
-
-        // Delete from org subcollection (both role-isolated and generic key)
         final orgTokens = FirestoreService.getCollection('fcmTokens');
-        await orgTokens.doc('${cleanUserType}_$cleanUserId').delete().catchError((_) {});
-        await orgTokens.doc(cleanUserId).delete().catchError((_) {});
-
-        // Delete from global root collection
         final rootTokens = FirebaseFirestore.instance.collection('fcmTokens');
-        await rootTokens.doc('${cleanOrgId}_${cleanUserType}_$cleanUserId').delete().catchError((_) {});
-        await rootTokens.doc('${cleanOrgId}_$cleanUserId').delete().catchError((_) {});
+
+        final operations = <Future>[
+          _messaging.unsubscribeFromTopic('org_$sanitizedOrgId').catchError((_) {}),
+          _messaging.unsubscribeFromTopic('org_${sanitizedOrgId}_$cleanUserType').catchError((_) {}),
+          orgTokens.doc('${cleanUserType}_$cleanUserId').delete().catchError((_) {}),
+          orgTokens.doc(cleanUserId).delete().catchError((_) {}),
+          rootTokens.doc('${cleanOrgId}_${cleanUserType}_$cleanUserId').delete().catchError((_) {}),
+          rootTokens.doc('${cleanOrgId}_$cleanUserId').delete().catchError((_) {}),
+        ];
+        if (cleanUserType == 'config' || cleanUserType == 'organisation' || cleanUserType == 'organization') {
+          operations.add(_messaging.unsubscribeFromTopic('org_${sanitizedOrgId}_organisation').catchError((_) {}));
+          operations.add(_messaging.unsubscribeFromTopic('org_${sanitizedOrgId}_organization').catchError((_) {}));
+          operations.add(_messaging.unsubscribeFromTopic('org_${sanitizedOrgId}_manager').catchError((_) {}));
+        }
+        await Future.wait(operations);
       } else {
-        await FirebaseFirestore.instance
-            .collection('fcmTokens')
-            .doc('${cleanUserType}_$cleanUserId')
-            .delete()
-            .catchError((_) {});
-        await FirebaseFirestore.instance
-            .collection('fcmTokens')
-            .doc(cleanUserId)
-            .delete()
-            .catchError((_) {});
+        await Future.wait([
+          FirebaseFirestore.instance.collection('fcmTokens').doc('${cleanUserType}_$cleanUserId').delete().catchError((_) {}),
+          FirebaseFirestore.instance.collection('fcmTokens').doc(cleanUserId).delete().catchError((_) {}),
+        ]);
       }
 
       debugPrint(
@@ -975,8 +957,8 @@ class NotificationService {
       final idempotencyKey = extraData?['idempotencyKey'] ??
           'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
 
-      for (final token in uniqueTokens) {
-        await _sendFcmPush(
+      if (uniqueTokens.isNotEmpty) {
+        await Future.wait(uniqueTokens.map((token) => _sendFcmPush(
           token: token,
           title: title,
           body: body,
@@ -989,7 +971,7 @@ class NotificationService {
             'status': status ?? '',
             'requiredAction': requiredAction ?? '',
           },
-        );
+        )));
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending dual-target FCM: $e');
@@ -1065,8 +1047,8 @@ class NotificationService {
       final idempotencyKey = extraData?['idempotencyKey'] ??
           'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
 
-      for (final token in uniqueTokens) {
-        await _sendFcmPush(
+      if (uniqueTokens.isNotEmpty) {
+        await Future.wait(uniqueTokens.map((token) => _sendFcmPush(
           token: token,
           title: title,
           body: body,
@@ -1079,7 +1061,7 @@ class NotificationService {
             'status': status ?? '',
             'requiredAction': requiredAction ?? '',
           },
-        );
+        )));
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending manager FCM: $e');
@@ -1148,8 +1130,8 @@ class NotificationService {
           data?['idempotencyKey'] ??
           'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
 
-      for (final token in uniqueTokens) {
-        await _sendFcmPush(
+      if (uniqueTokens.isNotEmpty) {
+        await Future.wait(uniqueTokens.map((token) => _sendFcmPush(
           token: token,
           title: title,
           body: body,
@@ -1164,7 +1146,7 @@ class NotificationService {
             if (data != null) ...data,
             if (extraData != null) ...extraData,
           },
-        );
+        )));
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending org FCM: $e');
@@ -1249,8 +1231,8 @@ class NotificationService {
           data?['idempotencyKey'] ??
           'evt_${orgId}_${effectiveType}_${targetEntity}_$timeBucket';
 
-      for (final token in uniqueTokens) {
-        await _sendFcmPush(
+      if (uniqueTokens.isNotEmpty) {
+        await Future.wait(uniqueTokens.map((token) => _sendFcmPush(
           token: token,
           title: title,
           body: body,
@@ -1267,7 +1249,7 @@ class NotificationService {
             if (data != null) ...data,
             if (extraData != null) ...extraData,
           },
-        );
+        )));
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending supervisor FCM: $e');
@@ -1593,8 +1575,8 @@ class NotificationService {
           uniqueTokens.add(token);
         }
       }
-      for (final token in uniqueTokens) {
-        await _sendFcmPush(
+      if (uniqueTokens.isNotEmpty) {
+        await Future.wait(uniqueTokens.map((token) => _sendFcmPush(
           token: token,
           title: title,
           body: body,
@@ -1604,7 +1586,7 @@ class NotificationService {
             'configType': configType,
             'itemTitle': itemTitle,
           },
-        );
+        )));
       }
     } catch (e) {
       debugPrint('NotificationService: Error sending master_config FCM: $e');

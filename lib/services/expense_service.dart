@@ -50,6 +50,24 @@ class SiteDetails {
 }
 
 class ExpenseService {
+  static final Map<String, SiteDetails> _siteDetailsCache = {};
+  static final Map<String, DateTime> _siteDetailsCacheTimestamp = {};
+  static const Duration _siteCacheTtl = Duration(minutes: 5);
+
+  /// Clears or invalidates cached site details
+  static void invalidateSiteCache([String? siteKey]) {
+    if (siteKey != null && siteKey.isNotEmpty) {
+      final k = siteKey.trim().toLowerCase();
+      _siteDetailsCache.remove(k);
+      _siteDetailsCache.remove(siteKey);
+      _siteDetailsCacheTimestamp.remove(k);
+      _siteDetailsCacheTimestamp.remove(siteKey);
+    } else {
+      _siteDetailsCache.clear();
+      _siteDetailsCacheTimestamp.clear();
+    }
+  }
+
   /// Formats canonical site document ID in the format: SiteCode_SiteName (e.g. ST001_AbineshHouse)
   static String formatCanonicalSiteDocId(String siteCode, String siteName) {
     var cleanCode = siteCode.trim();
@@ -237,10 +255,12 @@ class ExpenseService {
           pettyCashExpenseTotal;
 
       final firestore = FirebaseFirestore.instance;
-      final DocumentReference<Map<String, dynamic>>? projectRef =
-          await _findExistingProjectDocBySiteId(canonicalDocId);
-      final DocumentReference<Map<String, dynamic>>? siteRef =
-          await _findExistingSiteDocBySiteId(canonicalDocId);
+      final refResults = await Future.wait([
+        _findExistingProjectDocBySiteId(canonicalDocId),
+        _findExistingSiteDocBySiteId(canonicalDocId),
+      ]);
+      final DocumentReference<Map<String, dynamic>>? projectRef = refResults[0];
+      final DocumentReference<Map<String, dynamic>>? siteRef = refResults[1];
 
       // Determine actual customer amount paid across documents
       double amountPaid = 0.0;
@@ -432,6 +452,23 @@ class ExpenseService {
   /// Resolves canonical document ID, code, name, and search keys for any site identifier
   static Future<SiteDetails> resolveSiteDetails(String inputId) async {
     final trimmed = inputId.trim();
+    if (trimmed.isEmpty || trimmed == 'uninitialized') {
+      return SiteDetails(
+        canonicalDocId: trimmed,
+        siteCode: '',
+        siteName: '',
+        allKeys: {trimmed},
+      );
+    }
+
+    final cacheKey = trimmed.toLowerCase();
+    final cachedTime = _siteDetailsCacheTimestamp[cacheKey];
+    if (cachedTime != null &&
+        DateTime.now().difference(cachedTime) < _siteCacheTtl &&
+        _siteDetailsCache.containsKey(cacheKey)) {
+      return _siteDetailsCache[cacheKey]!;
+    }
+
     final keys = <String>{trimmed};
     String resolvedDocId = '';
     String resolvedCode = '';
@@ -667,7 +704,7 @@ class ExpenseService {
     }
     keys.removeWhere((k) => k.isEmpty);
 
-    return SiteDetails(
+    final details = SiteDetails(
       canonicalDocId: canonicalDocId,
       siteCode: resolvedCode,
       siteName: resolvedName,
@@ -678,6 +715,22 @@ class ExpenseService {
       projectName: resolvedProjectName,
       projectStage: resolvedProjectStage,
     );
+
+    final now = DateTime.now();
+    _siteDetailsCache[cacheKey] = details;
+    _siteDetailsCacheTimestamp[cacheKey] = now;
+    if (canonicalDocId.isNotEmpty) {
+      final canKey = canonicalDocId.toLowerCase();
+      _siteDetailsCache[canKey] = details;
+      _siteDetailsCacheTimestamp[canKey] = now;
+    }
+    for (final k in keys) {
+      final lk = k.toLowerCase();
+      _siteDetailsCache[lk] = details;
+      _siteDetailsCacheTimestamp[lk] = now;
+    }
+
+    return details;
   }
 
   /// Helper to resolve all possible identifier aliases for a site (docId, siteId, site, siteName)
@@ -746,41 +799,30 @@ class ExpenseService {
       final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
       for (final key in siteKeys) {
-        final snap1 = await FirestoreService.siteSupervisorEntries
-            .where('siteId', isEqualTo: key)
-            .get();
-        for (final doc in snap1.docs) {
-          matchedDocs[doc.id] = doc.data();
-        }
+        queryFutures.add(FirestoreService.siteSupervisorEntries.where('siteId', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.siteSupervisorEntries.where('site', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.siteSupervisorEntries.where('siteName', isEqualTo: key).get());
+      }
+      queryFutures.add(FirestoreService.siteSupervisorEntries.get());
 
-        final snap2 = await FirestoreService.siteSupervisorEntries
-            .where('site', isEqualTo: key)
-            .get();
-        for (final doc in snap2.docs) {
-          matchedDocs[doc.id] = doc.data();
-        }
-
-        final snap3 = await FirestoreService.siteSupervisorEntries
-            .where('siteName', isEqualTo: key)
-            .get();
-        for (final doc in snap3.docs) {
+      final snapshots = await Future.wait(queryFutures);
+      for (int i = 0; i < snapshots.length - 1; i++) {
+        for (final doc in snapshots[i].docs) {
           matchedDocs[doc.id] = doc.data();
         }
       }
 
-      // Check all entries to match docId prefix e.g. {siteKey}_{ddMMyyyy}
-      try {
-        final allEntriesSnap = await FirestoreService.siteSupervisorEntries.get();
-        for (final doc in allEntriesSnap.docs) {
-          for (final key in siteKeys) {
-            if (doc.id.startsWith('${key}_') ||
-                doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
-              matchedDocs[doc.id] = doc.data();
-            }
+      final allEntriesSnap = snapshots.last;
+      for (final doc in allEntriesSnap.docs) {
+        for (final key in siteKeys) {
+          if (doc.id.startsWith('${key}_') ||
+              doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
+            matchedDocs[doc.id] = doc.data();
           }
         }
-      } catch (_) {}
+      }
 
       for (final data in matchedDocs.values) {
         // Skip manager or org entries recorded in supervisor collection, and any petty cash flagged entries
@@ -808,92 +850,90 @@ class ExpenseService {
       final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
-      // 1. Ingest direct managerExpenses collection (Primary collection used by Manager Expenses screen)
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+      // 1. Direct managerExpenses
       for (final key in siteKeys) {
-        final snap1 = await FirestoreService.managerExpenses
-            .where('siteId', isEqualTo: key)
-            .get();
-        for (final doc in snap1.docs) {
-          matchedDocs[doc.id] = doc.data();
-        }
+        queryFutures.add(FirestoreService.managerExpenses.where('siteId', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.managerExpenses.where('site', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.managerExpenses.where('projectName', isEqualTo: key).get());
+      }
+      final directExpCount = queryFutures.length;
 
-        final snap2 = await FirestoreService.managerExpenses
-            .where('site', isEqualTo: key)
-            .get();
-        for (final doc in snap2.docs) {
-          matchedDocs[doc.id] = doc.data();
-        }
+      // 2. managerExpenseSummary
+      for (final key in siteKeys) {
+        queryFutures.add(FirestoreService.managerExpenseSummary.where('siteId', isEqualTo: key).get());
+      }
+      final summaryCount = queryFutures.length - directExpCount;
 
-        final snap3 = await FirestoreService.managerExpenses
-            .where('projectName', isEqualTo: key)
-            .get();
-        for (final doc in snap3.docs) {
+      // 3. managerEntries
+      for (final key in siteKeys) {
+        queryFutures.add(FirestoreService.managerEntries.where('siteId', isEqualTo: key).get());
+      }
+      final mgrEntriesCount = queryFutures.length - directExpCount - summaryCount;
+
+      // 4. supervisor entries for manager entries
+      for (final key in siteKeys) {
+        queryFutures.add(FirestoreService.siteSupervisorEntries.where('siteId', isEqualTo: key).get());
+      }
+
+      // All collections full snap for prefix matching
+      queryFutures.add(FirestoreService.managerExpenses.get());
+      queryFutures.add(FirestoreService.managerExpenseSummary.get());
+
+      final results = await Future.wait(queryFutures);
+
+      int idx = 0;
+      // 1. Ingest direct managerExpenses
+      for (int i = 0; i < directExpCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
           matchedDocs[doc.id] = doc.data();
         }
       }
 
-      // Check managerExpenses docId prefix {siteKey}_{ddMMyyyy}
-      try {
-        final allExpSnap = await FirestoreService.managerExpenses.get();
-        for (final doc in allExpSnap.docs) {
-          for (final key in siteKeys) {
-            if (doc.id.startsWith('${key}_') ||
-                doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
-              matchedDocs[doc.id] = doc.data();
-            }
+      // 2. Ingest managerExpenseSummary
+      for (int i = 0; i < summaryCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
+          matchedDocs.putIfAbsent(doc.id, () => doc.data());
+        }
+      }
+
+      // 3. Ingest managerEntries
+      for (int i = 0; i < mgrEntriesCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
+          matchedDocs.putIfAbsent('mgr_${doc.id}', () => doc.data());
+        }
+      }
+
+      // 4. Ingest supervisorEntries for manager entries
+      final remainingCount = siteKeys.length;
+      for (int i = 0; i < remainingCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
+          final data = doc.data();
+          if (data['isManagerEntry'] == true || data['createdBy'] == 'manager') {
+            matchedDocs.putIfAbsent('sup_mgr_${doc.id}', () => data);
           }
         }
-      } catch (_) {}
+      }
 
-      // 2. Ingest managerExpenseSummary (fallback / mirror for docs not already present)
-      for (final key in siteKeys) {
-        try {
-          final snapSummarySite = await FirestoreService.managerExpenseSummary
-              .where('siteId', isEqualTo: key)
-              .get();
-          for (final doc in snapSummarySite.docs) {
+      // Prefix matches from full scans
+      final allExpSnap = results[idx++];
+      for (final doc in allExpSnap.docs) {
+        for (final key in siteKeys) {
+          if (doc.id.startsWith('${key}_') ||
+              doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
+            matchedDocs[doc.id] = doc.data();
+          }
+        }
+      }
+
+      final allSummarySnap = results[idx++];
+      for (final doc in allSummarySnap.docs) {
+        for (final key in siteKeys) {
+          if (doc.id.startsWith('${key}_') ||
+              doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
             matchedDocs.putIfAbsent(doc.id, () => doc.data());
           }
-        } catch (_) {}
-      }
-
-      try {
-        final allSummarySnap = await FirestoreService.managerExpenseSummary.get();
-        for (final doc in allSummarySnap.docs) {
-          for (final key in siteKeys) {
-            if (doc.id.startsWith('${key}_') ||
-                doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
-              matchedDocs.putIfAbsent(doc.id, () => doc.data());
-            }
-          }
         }
-      } catch (_) {}
-
-      // 3. Ingest managerEntries collection
-      for (final key in siteKeys) {
-        try {
-          final managerEntriesSnapshot = await FirestoreService.managerEntries
-              .where('siteId', isEqualTo: key)
-              .get();
-          for (final doc in managerEntriesSnapshot.docs) {
-            matchedDocs.putIfAbsent('mgr_${doc.id}', () => doc.data());
-          }
-        } catch (_) {}
-      }
-
-      // 4. Ingest manager site entries saved in siteSupervisorEntries
-      for (final key in siteKeys) {
-        try {
-          final supervisorEntriesSnapshot = await FirestoreService.siteSupervisorEntries
-              .where('siteId', isEqualTo: key)
-              .get();
-          for (final doc in supervisorEntriesSnapshot.docs) {
-            final data = doc.data();
-            if (data['isManagerEntry'] == true || data['createdBy'] == 'manager') {
-              matchedDocs.putIfAbsent('sup_mgr_${doc.id}', () => data);
-            }
-          }
-        } catch (_) {}
       }
 
       for (final data in matchedDocs.values) {
@@ -931,88 +971,88 @@ class ExpenseService {
       final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
-      // 1. Ingest direct organizationEntries
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+
+      // 1. Direct organizationEntries
       for (final key in siteKeys) {
-        final orgDirectSnap = await FirestoreService.organizationEntries
-            .where('siteId', isEqualTo: key)
-            .get();
-        for (final doc in orgDirectSnap.docs) {
+        queryFutures.add(FirestoreService.organizationEntries.where('siteId', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.organizationEntries.where('site', isEqualTo: key).get());
+      }
+      final directOrgCount = queryFutures.length;
+
+      // 2. organizationExpenses
+      for (final key in siteKeys) {
+        queryFutures.add(FirestoreService.getCollection('organizationExpenses').where('siteId', isEqualTo: key).get());
+      }
+      final orgExpCount = queryFutures.length - directOrgCount;
+
+      // 3. organizationExpenseSummary
+      for (final key in siteKeys) {
+        queryFutures.add(FirestoreService.organizationExpenseSummary.where('siteId', isEqualTo: key).get());
+      }
+      final orgSumCount = queryFutures.length - directOrgCount - orgExpCount;
+
+      // 4. supervisorEntries for org
+      for (final key in siteKeys) {
+        queryFutures.add(FirestoreService.siteSupervisorEntries.where('siteId', isEqualTo: key).get());
+      }
+
+      // Full snaps for prefix match
+      queryFutures.add(FirestoreService.organizationEntries.get());
+      queryFutures.add(FirestoreService.organizationExpenseSummary.get());
+
+      final results = await Future.wait(queryFutures);
+
+      int idx = 0;
+      for (int i = 0; i < directOrgCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
           matchedDocs[doc.id] = doc.data();
         }
+      }
 
-        final orgDirectSnap2 = await FirestoreService.organizationEntries
-            .where('site', isEqualTo: key)
-            .get();
-        for (final doc in orgDirectSnap2.docs) {
-          matchedDocs[doc.id] = doc.data();
+      for (int i = 0; i < orgExpCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
+          matchedDocs.putIfAbsent(doc.id, () => doc.data());
         }
       }
 
-      try {
-        final allOrgSnap = await FirestoreService.organizationEntries.get();
-        for (final doc in allOrgSnap.docs) {
-          for (final key in siteKeys) {
-            if (doc.id.startsWith('${key}_') ||
-                doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
-              matchedDocs[doc.id] = doc.data();
-            }
+      for (int i = 0; i < orgSumCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
+          matchedDocs.putIfAbsent(doc.id, () => doc.data());
+        }
+      }
+
+      final supOrgCount = siteKeys.length;
+      for (int i = 0; i < supOrgCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
+          final data = doc.data();
+          if (data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+            matchedDocs.putIfAbsent('sup_org_${doc.id}', () => data);
           }
         }
-      } catch (_) {}
+      }
 
-      // 2. Ingest organizationExpenses collection if present
-      for (final key in siteKeys) {
-        try {
-          final orgExpSnap = await FirestoreService.getCollection('organizationExpenses')
-              .where('siteId', isEqualTo: key)
-              .get();
-          for (final doc in orgExpSnap.docs) {
+      final allOrgSnap = results[idx++];
+      for (final doc in allOrgSnap.docs) {
+        for (final key in siteKeys) {
+          if (doc.id.startsWith('${key}_') ||
+              doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
+            matchedDocs[doc.id] = doc.data();
+          }
+        }
+      }
+
+      final allOrgSumSnap = results[idx++];
+      for (final doc in allOrgSumSnap.docs) {
+        for (final key in siteKeys) {
+          if (doc.id.startsWith('${key}_') ||
+              doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
             matchedDocs.putIfAbsent(doc.id, () => doc.data());
           }
-        } catch (_) {}
-      }
-
-      // 3. Fallback to organizationExpenseSummary
-      for (final key in siteKeys) {
-        try {
-          final snapSummary = await FirestoreService.organizationExpenseSummary
-              .where('siteId', isEqualTo: key)
-              .get();
-          for (final doc in snapSummary.docs) {
-            matchedDocs.putIfAbsent(doc.id, () => doc.data());
-          }
-        } catch (_) {}
-      }
-
-      try {
-        final allOrgSumSnap = await FirestoreService.organizationExpenseSummary.get();
-        for (final doc in allOrgSumSnap.docs) {
-          for (final key in siteKeys) {
-            if (doc.id.startsWith('${key}_') ||
-                doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
-              matchedDocs.putIfAbsent(doc.id, () => doc.data());
-            }
-          }
         }
-      } catch (_) {}
-
-      // 4. Ingest manager site entry organization expenses saved in siteSupervisorEntries
-      for (final key in siteKeys) {
-        try {
-          final orgEntriesSnapshot = await FirestoreService.siteSupervisorEntries
-              .where('siteId', isEqualTo: key)
-              .get();
-          for (final doc in orgEntriesSnapshot.docs) {
-            final data = doc.data();
-            if (data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
-              matchedDocs.putIfAbsent('sup_org_${doc.id}', () => data);
-            }
-          }
-        } catch (_) {}
       }
 
       for (final data in matchedDocs.values) {
-        // Check if bills array exists
         final bills = data['bills'];
         if (bills is List && bills.isNotEmpty) {
           double billsSum = 0.0;
@@ -1046,11 +1086,13 @@ class ExpenseService {
       final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
       for (final key in siteKeys) {
-        final snapshot = await FirestoreService.contractorEntries
-            .where('siteId', isEqualTo: key)
-            .get();
-        for (final doc in snapshot.docs) {
+        queryFutures.add(FirestoreService.contractorEntries.where('siteId', isEqualTo: key).get());
+      }
+      final snapshots = await Future.wait(queryFutures);
+      for (final snap in snapshots) {
+        for (final doc in snap.docs) {
           matchedDocs[doc.id] = doc.data();
         }
       }
@@ -1072,22 +1114,17 @@ class ExpenseService {
       final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
       for (final key in siteKeys) {
-        final snapshot = await FirestoreService.siteSupervisorIncentives
-            .where('siteId', isEqualTo: key)
-            .get();
-        for (final doc in snapshot.docs) {
+        queryFutures.add(FirestoreService.siteSupervisorIncentives.where('siteId', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.getCollection('supervisorIncentives').where('siteId', isEqualTo: key).get());
+      }
+
+      final snapshots = await Future.wait(queryFutures);
+      for (final snap in snapshots) {
+        for (final doc in snap.docs) {
           matchedDocs[doc.id] = doc.data();
         }
-
-        try {
-          final snap2 = await FirestoreService.getCollection('supervisorIncentives')
-              .where('siteId', isEqualTo: key)
-              .get();
-          for (final doc in snap2.docs) {
-            matchedDocs[doc.id] = doc.data();
-          }
-        } catch (_) {}
       }
 
       for (final data in matchedDocs.values) {
@@ -1109,40 +1146,35 @@ class ExpenseService {
       final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
       for (final key in siteKeys) {
-        final snap1 = await FirestoreService.pettyCashTransactions
-            .where('siteId', isEqualTo: key)
-            .get();
-        for (final doc in snap1.docs) {
-          matchedDocs[doc.id] = doc.data();
-        }
+        queryFutures.add(FirestoreService.pettyCashTransactions.where('siteId', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.pettyCashTransactions.where('siteName', isEqualTo: key).get());
+      }
+      queryFutures.add(FirestoreService.pettyCashTransactions.get());
 
-        final snap2 = await FirestoreService.pettyCashTransactions
-            .where('siteName', isEqualTo: key)
-            .get();
-        for (final doc in snap2.docs) {
+      final results = await Future.wait(queryFutures);
+      for (int i = 0; i < results.length - 1; i++) {
+        for (final doc in results[i].docs) {
           matchedDocs[doc.id] = doc.data();
         }
       }
 
-      // Ingest all petty cash transactions to match site identifiers
-      try {
-        final allTxnsSnap = await FirestoreService.pettyCashTransactions.get();
-        for (final doc in allTxnsSnap.docs) {
-          final data = doc.data();
-          final sId = (data['siteId'] ?? '').toString().trim();
-          final sName = (data['siteName'] ?? '').toString().trim();
-          for (final key in siteKeys) {
-            if (sId == key ||
-                sName == key ||
-                (sId.isNotEmpty && sId.toLowerCase() == key.toLowerCase()) ||
-                (sName.isNotEmpty && sName.toLowerCase() == key.toLowerCase()) ||
-                doc.id.startsWith('${key}_')) {
-              matchedDocs[doc.id] = data;
-            }
+      final allTxnsSnap = results.last;
+      for (final doc in allTxnsSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim();
+        final sName = (data['siteName'] ?? '').toString().trim();
+        for (final key in siteKeys) {
+          if (sId == key ||
+              sName == key ||
+              (sId.isNotEmpty && sId.toLowerCase() == key.toLowerCase()) ||
+              (sName.isNotEmpty && sName.toLowerCase() == key.toLowerCase()) ||
+              doc.id.startsWith('${key}_')) {
+            matchedDocs[doc.id] = data;
           }
         }
-      } catch (_) {}
+      }
 
       for (final data in matchedDocs.values) {
         final txnType = (data['transactionType'] ?? 'EXPENSE').toString().toUpperCase();
@@ -1164,38 +1196,34 @@ class ExpenseService {
       final siteKeys = preResolvedSiteKeys ?? await resolveSiteKeys(siteId);
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
       for (final key in siteKeys) {
-        final snap1 = await FirestoreService.pettyCashRequests
-            .where('siteId', isEqualTo: key)
-            .get();
-        for (final doc in snap1.docs) {
-          matchedDocs[doc.id] = doc.data();
-        }
+        queryFutures.add(FirestoreService.pettyCashRequests.where('siteId', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.pettyCashRequests.where('siteName', isEqualTo: key).get());
+      }
+      queryFutures.add(FirestoreService.pettyCashRequests.get());
 
-        final snap2 = await FirestoreService.pettyCashRequests
-            .where('siteName', isEqualTo: key)
-            .get();
-        for (final doc in snap2.docs) {
+      final results = await Future.wait(queryFutures);
+      for (int i = 0; i < results.length - 1; i++) {
+        for (final doc in results[i].docs) {
           matchedDocs[doc.id] = doc.data();
         }
       }
 
-      try {
-        final allReqSnap = await FirestoreService.pettyCashRequests.get();
-        for (final doc in allReqSnap.docs) {
-          final data = doc.data();
-          final sId = (data['siteId'] ?? '').toString().trim();
-          final sName = (data['siteName'] ?? '').toString().trim();
-          for (final key in siteKeys) {
-            if (sId == key ||
-                sName == key ||
-                (sId.isNotEmpty && sId.toLowerCase() == key.toLowerCase()) ||
-                (sName.isNotEmpty && sName.toLowerCase() == key.toLowerCase())) {
-              matchedDocs[doc.id] = data;
-            }
+      final allReqSnap = results.last;
+      for (final doc in allReqSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim();
+        final sName = (data['siteName'] ?? '').toString().trim();
+        for (final key in siteKeys) {
+          if (sId == key ||
+              sName == key ||
+              (sId.isNotEmpty && sId.toLowerCase() == key.toLowerCase()) ||
+              (sName.isNotEmpty && sName.toLowerCase() == key.toLowerCase())) {
+            matchedDocs[doc.id] = data;
           }
         }
-      } catch (_) {}
+      }
 
       for (final data in matchedDocs.values) {
         final isReceived = data['isReceived'] == true ||

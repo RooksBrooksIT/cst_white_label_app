@@ -520,28 +520,56 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
       const db = admin.firestore();
 
       if (txnid) {
-        const orgIdFromUdf = (payload.udf1 || "").trim();
+        // Dynamically resolve organization ID from udf1 or top-level organisation search
+        let effectiveOrgId = (payload.udf1 || "").trim();
+        if (!effectiveOrgId || effectiveOrgId === "onboarding_temp") {
+          const orgQuery = await db.collection("organisation")
+            .where("paymentTxnId", "==", txnid)
+            .limit(1)
+            .get()
+            .catch(() => ({ empty: true, docs: [] }));
+          if (!orgQuery.empty) {
+            effectiveOrgId = orgQuery.docs[0].id;
+          }
+        }
 
         // -------------------------------------------------------------
         // 2. IDEMPOTENCY CHECK
         // Prevent duplicate processing on repeated PayU webhook deliveries
         // -------------------------------------------------------------
-        const existingLogDoc = await db.collection("payment_logs").doc(txnid).get().catch(() => null);
-        if (existingLogDoc && existingLogDoc.exists) {
-          const logData = existingLogDoc.data() || {};
-          if (logData.processedByApp === true && logData.status === "success" && isSuccess) {
-            logger.info(`[eBricks PayU Webhook] Transaction ${txnid} already processed. Skipping duplicate execution.`);
-            if (isBrowserRedirect) {
-              res.set("Content-Type", "text/html");
-              return res.status(200).send(renderBridgeHtml(payload));
+        let alreadyProcessed = false;
+        if (effectiveOrgId && effectiveOrgId !== "onboarding_temp") {
+          const orgLogDoc = await db.collection("organisation").doc(effectiveOrgId).collection("payment_logs").doc(txnid).get().catch(() => null);
+          if (orgLogDoc && orgLogDoc.exists) {
+            const logData = orgLogDoc.data() || {};
+            if (logData.processedByApp === true && logData.status === "success" && isSuccess) {
+              alreadyProcessed = true;
             }
-            return res.status(200).json({ status: "success", message: "Transaction already processed", txnid });
+          }
+        }
+        if (!alreadyProcessed) {
+          const legacyLogDoc = await db.collection("payment_logs").doc(txnid).get().catch(() => null);
+          if (legacyLogDoc && legacyLogDoc.exists) {
+            const logData = legacyLogDoc.data() || {};
+            if (logData.processedByApp === true && logData.status === "success" && isSuccess) {
+              alreadyProcessed = true;
+            }
           }
         }
 
-        // Record verified eBricks webhook audit log in Firestore
-        await db.collection("payment_logs").doc(txnid).set({
+        if (alreadyProcessed) {
+          logger.info(`[eBricks PayU Webhook] Transaction ${txnid} already processed. Skipping duplicate execution.`);
+          if (isBrowserRedirect) {
+            res.set("Content-Type", "text/html");
+            return res.status(200).send(renderBridgeHtml(payload));
+          }
+          return res.status(200).json({ status: "success", message: "Transaction already processed", txnid });
+        }
+
+        // Record verified eBricks webhook audit log in Firestore (scoped under organisation/{orgId}/payment_logs/{txnid})
+        const paymentLogData = {
           txnid,
+          orgId: effectiveOrgId || "",
           app: "eBricks",
           processedByApp: true,
           status: status || "UNKNOWN",
@@ -552,11 +580,18 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
           payuMoneyId: mihpayid,
           receivedAt: admin.firestore.FieldValue.serverTimestamp(),
           rawData: payload,
-        }, { merge: true }).catch((err) => logger.warn("Log write warning:", err));
+        };
 
-        // 3. If udf1 carries the orgId, update organisation and subscription document directly
-        if (orgIdFromUdf && orgIdFromUdf !== "onboarding_temp") {
-          const orgRef = db.collection("organisation").doc(orgIdFromUdf);
+        if (effectiveOrgId && effectiveOrgId !== "onboarding_temp") {
+          await db.collection("organisation").doc(effectiveOrgId).collection("payment_logs").doc(txnid).set(paymentLogData, { merge: true }).catch((err) => logger.warn("Log write warning:", err));
+        } else {
+          // Fallback only if organization is unresolvable
+          await db.collection("payment_logs").doc(txnid).set(paymentLogData, { merge: true }).catch((err) => logger.warn("Log write warning:", err));
+        }
+
+        // 3. If effectiveOrgId is valid, update organisation and subscription document directly
+        if (effectiveOrgId && effectiveOrgId !== "onboarding_temp") {
+          const orgRef = db.collection("organisation").doc(effectiveOrgId);
           await orgRef.set({
             isSubscriptionActive: isSuccess,
             paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
@@ -613,8 +648,8 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
             let orgName = "eBricks Workspace";
             let planName = productinfo || "Silver";
 
-            if (orgIdFromUdf && orgIdFromUdf !== "onboarding_temp") {
-              const orgDoc = await db.collection("organisation").doc(orgIdFromUdf).get();
+            if (effectiveOrgId && effectiveOrgId !== "onboarding_temp") {
+              const orgDoc = await db.collection("organisation").doc(effectiveOrgId).get();
               if (orgDoc.exists) {
                 const oData = orgDoc.data() || {};
                 orgName = oData.org_name || oData.name || orgName;
@@ -627,7 +662,7 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
               const isUpgrade = (planName || "").toLowerCase().includes("upgrade") || String(txnid).startsWith("UPG");
 
               await emailService.sendSubscriptionInvoice({
-                orgId: orgIdFromUdf || "",
+                orgId: effectiveOrgId || "",
                 txnid,
                 payerEmail,
                 payerName,
@@ -679,8 +714,21 @@ exports.payuResponse = functions.region("us-central1").https.onRequest((req, res
 
       if (txnid) {
         const db = admin.firestore();
-        db.collection("payment_logs").doc(txnid).set({
+        let effectiveOrgId = (rawData.udf1 || "").trim();
+        if (!effectiveOrgId || effectiveOrgId === "onboarding_temp") {
+          const orgQuery = await db.collection("organisation")
+            .where("paymentTxnId", "==", txnid)
+            .limit(1)
+            .get()
+            .catch(() => ({ empty: true, docs: [] }));
+          if (!orgQuery.empty) {
+            effectiveOrgId = orgQuery.docs[0].id;
+          }
+        }
+
+        const logPayload = {
           txnid,
+          orgId: effectiveOrgId || "",
           app: "eBricks",
           status,
           amount: parseFloat(rawData.amount || 0),
@@ -689,7 +737,13 @@ exports.payuResponse = functions.region("us-central1").https.onRequest((req, res
           payuMoneyId: mihpayid,
           receivedAt: admin.firestore.FieldValue.serverTimestamp(),
           rawData,
-        }, { merge: true }).catch(() => {});
+        };
+
+        if (effectiveOrgId && effectiveOrgId !== "onboarding_temp") {
+          await db.collection("organisation").doc(effectiveOrgId).collection("payment_logs").doc(txnid).set(logPayload, { merge: true }).catch(() => {});
+        } else {
+          await db.collection("payment_logs").doc(txnid).set(logPayload, { merge: true }).catch(() => {});
+        }
       }
 
       res.set("Content-Type", "text/html");
@@ -709,17 +763,57 @@ exports.payuResponse = functions.region("us-central1").https.onRequest((req, res
 exports.resendSubscriptionInvoice = functions.region("us-central1").https.onCall(async (data, context) => {
   try {
     const payload = data || {};
-    const { txnid, emailOverride } = payload;
+    const { txnid, emailOverride, orgId: reqOrgId } = payload;
 
     if (!txnid) {
       throw new HttpsError("invalid-argument", "Missing required parameter: txnid");
     }
 
     const db = admin.firestore();
-    const invoiceRef = db.collection("invoices").doc(txnid);
-    const invoiceSnap = await invoiceRef.get();
+    let effectiveOrgId = (reqOrgId || "").trim();
+    let invoiceRef = null;
+    let invoiceSnap = null;
 
-    if (!invoiceSnap.exists) {
+    // 1. Check direct org path if orgId provided
+    if (effectiveOrgId) {
+      const candidateRef = db.collection("organisation").doc(effectiveOrgId).collection("invoices").doc(txnid);
+      const candidateSnap = await candidateRef.get();
+      if (candidateSnap.exists) {
+        invoiceRef = candidateRef;
+        invoiceSnap = candidateSnap;
+      }
+    }
+
+    // 2. Search across organisation documents if not found yet
+    if (!invoiceSnap || !invoiceSnap.exists) {
+      try {
+        const orgsSnap = await db.collection("organisation").get();
+        for (const oDoc of orgsSnap.docs) {
+          const candidateRef = oDoc.ref.collection("invoices").doc(txnid);
+          const candidateSnap = await candidateRef.get();
+          if (candidateSnap.exists) {
+            invoiceRef = candidateRef;
+            invoiceSnap = candidateSnap;
+            effectiveOrgId = oDoc.id;
+            break;
+          }
+        }
+      } catch (err) {
+        logger.warn("Org search for invoice warning:", err);
+      }
+    }
+
+    // 3. Backward compatibility fallback: check legacy root collection
+    if (!invoiceSnap || !invoiceSnap.exists) {
+      const legacyRef = db.collection("invoices").doc(txnid);
+      const legacySnap = await legacyRef.get();
+      if (legacySnap.exists) {
+        invoiceRef = legacyRef;
+        invoiceSnap = legacySnap;
+      }
+    }
+
+    if (!invoiceSnap || !invoiceSnap.exists) {
       throw new HttpsError("not-found", `No invoice or transaction record found for txnid: ${txnid}`);
     }
 
@@ -904,7 +998,13 @@ exports.sendNewSubscriptionInvoice = functions.region("us-central1").https.onCal
 async function isEventAlreadyProcessed(idempotencyKey, eventDetails = {}) {
   if (!idempotencyKey) return false;
   const db = admin.firestore();
-  const ref = db.collection("processed_events").doc(idempotencyKey);
+  const orgId = (eventDetails.orgId || eventDetails.forOrgId || "").trim();
+
+  // Route to organisation subcollection if orgId is available
+  const isOrgScoped = orgId && orgId !== "uninitialized" && orgId !== "all";
+  const ref = isOrgScoped ?
+    db.collection("organisation").doc(orgId).collection("processed_events").doc(idempotencyKey) :
+    db.collection("processed_events").doc(idempotencyKey);
 
   try {
     // .create() fails atomically with gRPC code 6 (ALREADY_EXISTS) if doc exists
@@ -920,7 +1020,7 @@ async function isEventAlreadyProcessed(idempotencyKey, eventDetails = {}) {
       logger.info(`[Idempotency] Duplicate event detected and dropped: ${idempotencyKey}`);
       return true; // Already processed!
     }
-    // Fallback check
+    // Fallback check on current ref
     try {
       const doc = await ref.get();
       if (doc.exists) {
@@ -928,6 +1028,17 @@ async function isEventAlreadyProcessed(idempotencyKey, eventDetails = {}) {
         return true;
       }
     } catch (_) {}
+
+    // Backward compatibility check on legacy root collection if org scoped
+    if (isOrgScoped) {
+      try {
+        const legacyDoc = await db.collection("processed_events").doc(idempotencyKey).get();
+        if (legacyDoc.exists) {
+          logger.info(`[Idempotency] Duplicate event confirmed via legacy root get(): ${idempotencyKey}`);
+          return true;
+        }
+      } catch (_) {}
+    }
     return false;
   }
 }

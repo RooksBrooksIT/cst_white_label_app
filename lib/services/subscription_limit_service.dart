@@ -336,24 +336,26 @@ class SubscriptionLimitService {
     int supervisorCount = 0;
 
     try {
-      final sitesSnap = await FirestoreService.getCollection('Site').get();
-      siteCount = sitesSnap.docs.length;
-    } catch (e) {
-      debugPrint('Error getting site count: $e');
-    }
+      final results = await Future.wait([
+        FirestoreService.getCollection('Site').get().catchError((e) {
+          debugPrint('Error getting site count: $e');
+          return FirestoreService.getCollection('Site').limit(0).get();
+        }),
+        FirestoreService.getCollection('manager').get().catchError((e) {
+          debugPrint('Error getting manager count: $e');
+          return FirestoreService.getCollection('manager').limit(0).get();
+        }),
+        FirestoreService.getCollection('supervisor').get().catchError((e) {
+          debugPrint('Error getting supervisor count: $e');
+          return FirestoreService.getCollection('supervisor').limit(0).get();
+        }),
+      ]);
 
-    try {
-      final managerSnap = await FirestoreService.getCollection('manager').get();
-      managerCount = managerSnap.docs.length;
+      siteCount = results[0].docs.length;
+      managerCount = results[1].docs.length;
+      supervisorCount = results[2].docs.length;
     } catch (e) {
-      debugPrint('Error getting manager count: $e');
-    }
-
-    try {
-      final supSnap = await FirestoreService.getCollection('supervisor').get();
-      supervisorCount = supSnap.docs.length;
-    } catch (e) {
-      debugPrint('Error getting supervisor count: $e');
+      debugPrint('Error getting organization usage: $e');
     }
 
     final totalUserCount = managerCount + supervisorCount;
@@ -375,23 +377,24 @@ class SubscriptionLimitService {
     int totalUploadCount = 0;
 
     try {
-      // 1. Calculate active documents from siteDrawings collection
-      final drawingsSnap = await FirestoreService.getCollection('siteDrawings')
-          .where('siteId', isEqualTo: siteId.trim())
-          .get();
+      final results = await Future.wait([
+        FirestoreService.getCollection('siteDrawings')
+            .where('siteId', isEqualTo: siteId.trim())
+            .get(),
+        FirestoreService.getCollection('siteDrawingsUsage')
+            .doc(cleanSiteId)
+            .get(),
+      ]);
 
+      final drawingsSnap = results[0] as QuerySnapshot<Map<String, dynamic>>;
       for (var doc in drawingsSnap.docs) {
         final data = doc.data();
         final docsList = data['siteDocs'] as List<dynamic>? ?? [];
         activeDocsCount += docsList.length;
       }
 
-      // 2. Fetch delete and re-upload tracking history from siteDrawingsUsage
-      final usageDoc = await FirestoreService.getCollection('siteDrawingsUsage')
-          .doc(cleanSiteId)
-          .get();
-
-      if (usageDoc.exists) {
+      final usageDoc = results[1] as DocumentSnapshot<Map<String, dynamic>>;
+      if (usageDoc.exists && usageDoc.data() != null) {
         final data = usageDoc.data()!;
         deleteCount = (data['deleteCount'] as num?)?.toInt() ?? 0;
         reuploadCount = (data['reuploadCount'] as num?)?.toInt() ?? 0;

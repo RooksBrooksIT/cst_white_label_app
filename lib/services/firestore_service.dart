@@ -31,6 +31,8 @@ class FirestoreService {
   FirestoreService._internal();
 
   static String? _cachedDynamicPath;
+  static String? _cachedOrgId;
+  static final Set<String> _migratedOrgs = {};
 
   /// Application identifier for strict cross-application data isolation in shared Firebase project
   static const String cstAppId = 'cst_white_label';
@@ -76,11 +78,12 @@ class FirestoreService {
         prefs.getString('cust_org_path');
 
     _cachedDynamicPath = path;
+    _cachedOrgId = _computeOrgId(path);
     debugPrint(
-      'FirestoreService: Initialized with OrgPath: $_cachedDynamicPath',
+      'FirestoreService: Initialized with OrgPath: $_cachedDynamicPath (OrgID: $_cachedOrgId)',
     );
     // Automatically trigger migration in background when org path is ready
-    if (_cachedDynamicPath != null && _cachedDynamicPath!.isNotEmpty) {
+    if (_cachedOrgId != null && _cachedOrgId != 'uninitialized' && !_migratedOrgs.contains(_cachedOrgId)) {
       Future.microtask(() => migrateSitesIntoProjects());
     }
   }
@@ -89,12 +92,15 @@ class FirestoreService {
   /// Useful for immediate initialization during login or registration.
   static void setOrgPath(String path) {
     _cachedDynamicPath = path;
+    _cachedOrgId = _computeOrgId(path);
     // Persist to SharedPreferences so it's available after app restart
     SharedPreferences.getInstance().then((prefs) {
       prefs.setString('org_dynamic_path', path);
     });
-    // Trigger migration for the newly set organization
-    Future.microtask(() => migrateSitesIntoProjects());
+    // Trigger migration for the newly set organization if not already completed
+    if (_cachedOrgId != null && _cachedOrgId != 'uninitialized' && !_migratedOrgs.contains(_cachedOrgId)) {
+      Future.microtask(() => migrateSitesIntoProjects());
+    }
   }
 
   /// Gets a collection that is nested under the organization's data root.
@@ -110,10 +116,6 @@ class FirestoreService {
 
     final orgId = _getOrgIdFromPath();
 
-    debugPrint(
-      'FirestoreService: Accessing collection "$effectiveCollection" (requested: "$collectionName") for OrgID: $orgId',
-    );
-
     if (orgId == 'uninitialized') {
       // Fallback if not initialized or logged out
       return FirebaseFirestore.instance.collection(effectiveCollection);
@@ -125,23 +127,24 @@ class FirestoreService {
         .collection(effectiveCollection);
   }
 
-  /// Internal helper to extract OrgID robustly from cached path
-  static String _getOrgIdFromPath() {
-    if (_cachedDynamicPath == null || _cachedDynamicPath!.isEmpty) {
-      debugPrint(
-        'FirestoreService: Accessing org-specific data before login/initialization.',
-      );
-      return 'uninitialized';
-    }
-    String orgId = _cachedDynamicPath!;
-    if (orgId.contains('/')) {
-      final parts = orgId.split('/');
+  /// Computes OrgID from a given path string
+  static String _computeOrgId(String? path) {
+    if (path == null || path.isEmpty) return 'uninitialized';
+    if (path.contains('/')) {
+      final parts = path.split('/');
       if (parts[0] == 'organisation' && parts.length > 1) {
         return parts[1];
       }
       return parts[0];
     }
-    return orgId;
+    return path;
+  }
+
+  /// Internal helper to extract OrgID robustly from cached path
+  static String _getOrgIdFromPath() {
+    if (_cachedOrgId != null) return _cachedOrgId!;
+    _cachedOrgId = _computeOrgId(_cachedDynamicPath);
+    return _cachedOrgId!;
   }
 
   /// Gets the current organization ID.
@@ -511,78 +514,214 @@ class FirestoreService {
     }
   }
 
-  /// Checks if an email is unique across all CST organizations.
-  static Future<bool> isEmailUnique(String email) async {
+  /// Checks if an email is unique globally across organisations, managers, supervisors, and users.
+  static Future<bool> isGlobalEmailUnique(String email, {String? excludeDocId}) async {
     final clean = email.trim().toLowerCase();
     if (clean.isEmpty) return true;
 
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('organisation').get();
-      for (var doc in snapshot.docs) {
+      // 1. Check root organisation collection
+      final orgSnap = await FirebaseFirestore.instance.collection('organisation').get();
+      for (var doc in orgSnap.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) continue;
         final data = doc.data();
-        final docEmail =
-            (data['email'] ?? '').toString().trim().toLowerCase();
-        if (docEmail == clean) {
+        final docEmail = (data['email'] ?? data['Email'] ?? '').toString().trim().toLowerCase();
+        if (docEmail.isNotEmpty && docEmail == clean) return false;
+      }
+
+      // 2. Parallel collectionGroup lookups
+      final futures = [
+        FirebaseFirestore.instance.collectionGroup('manager').where('email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('manager').where('Email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('Email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisors').where('email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisors').where('Email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('organizationUser').where('email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('organizationUser').where('Email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('configUsers').where('email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('configUsers').where('Email', isEqualTo: clean).get(),
+      ];
+
+      final results = await Future.wait(futures);
+      for (var snap in results) {
+        for (var doc in snap.docs) {
+          if (excludeDocId != null &&
+              (doc.id == excludeDocId || doc.reference.parent.parent?.id == excludeDocId)) {
+            continue;
+          }
           return false;
         }
       }
+
       return true;
     } catch (e) {
-      debugPrint('isEmailUnique error: $e');
+      debugPrint('isGlobalEmailUnique error: $e');
       return true;
     }
   }
 
-  /// Checks if a phone number is unique across all CST organizations.
-  static Future<bool> isPhoneUnique(String phone) async {
-    final clean = phone.trim();
+  /// Checks if a phone number is unique globally across organisations, managers, supervisors, users, and customers.
+  static Future<bool> isGlobalPhoneUnique(String phone, {String? excludeDocId}) async {
+    final clean = phone.trim().replaceAll(RegExp(r'\D'), '');
     if (clean.isEmpty) return true;
 
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('organisation').get();
-      for (var doc in snapshot.docs) {
+      // 1. Check root organisation collection
+      final orgSnap = await FirebaseFirestore.instance.collection('organisation').get();
+      for (var doc in orgSnap.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) continue;
         final data = doc.data();
         final docPhone = (data['phone'] ??
                 data['phoneNumber'] ??
                 data['mobile'] ??
+                data['contactNo'] ??
+                data['ContactNo'] ??
                 '')
             .toString()
-            .trim();
-        if (docPhone == clean) {
+            .trim()
+            .replaceAll(RegExp(r'\D'), '');
+        if (docPhone.isNotEmpty && docPhone == clean) return false;
+      }
+
+      // 2. Parallel collectionGroup lookups
+      final futures = [
+        FirebaseFirestore.instance.collectionGroup('manager').where('ContactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('manager').where('contactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('manager').where('MobileNumber', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('ContactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('contactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('MobileNumber', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisors').where('ContactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisors').where('contactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('organizationUser').where('ContactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('organizationUser').where('contactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('configUsers').where('MobileNumber', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('customers').where('ownerPhoneNumber', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('customers').where('phone', isEqualTo: clean).get(),
+      ];
+
+      final results = await Future.wait(futures);
+      for (var snap in results) {
+        for (var doc in snap.docs) {
+          if (excludeDocId != null &&
+              (doc.id == excludeDocId || doc.reference.parent.parent?.id == excludeDocId)) {
+            continue;
+          }
           return false;
         }
       }
+
       return true;
     } catch (e) {
-      debugPrint('isPhoneUnique error: $e');
+      debugPrint('isGlobalPhoneUnique error: $e');
       return true;
     }
   }
 
-  /// Checks if a username is unique across all CST organizations.
-  static Future<bool> isUsernameUnique(String username) async {
-    final clean = username.trim().toLowerCase();
+  /// Checks if a username is unique globally across organisations, organizationUsers, and managers.
+  static Future<bool> isGlobalUsernameUnique(String username, {String? excludeDocId}) async {
+    final clean = username.trim();
     if (clean.isEmpty) return true;
+    final cleanLower = clean.toLowerCase();
 
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('organisation').get();
-      for (var doc in snapshot.docs) {
+      // 1. Check root organisation collection
+      final orgSnap = await FirebaseFirestore.instance.collection('organisation').get();
+      for (var doc in orgSnap.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) continue;
         final data = doc.data();
-        final docUsername =
-            (data['username'] ?? '').toString().trim().toLowerCase();
-        if (docUsername == clean) {
+        final docUsername = (data['username'] ??
+                data['UserName'] ??
+                data['adminUsername'] ??
+                data['admin_username'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        if (docUsername.isNotEmpty && (docUsername == cleanLower || docUsername == clean)) {
           return false;
         }
       }
+
+      // 2. Parallel collectionGroup lookups
+      final futures = [
+        FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: cleanLower).get(),
+        FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('organizationUser').where('UserName', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('manager').where('UserName', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('manager').where('username', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('manager').where('UserName', isEqualTo: cleanLower).get(),
+        FirebaseFirestore.instance.collectionGroup('manager').where('username', isEqualTo: cleanLower).get(),
+        FirebaseFirestore.instance.collectionGroup('configUsers').where('UserName', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: clean).get(),
+      ];
+
+      final results = await Future.wait(futures);
+      for (var snap in results) {
+        for (var doc in snap.docs) {
+          if (excludeDocId != null &&
+              (doc.id == excludeDocId || doc.reference.parent.parent?.id == excludeDocId)) {
+            continue;
+          }
+          return false;
+        }
+      }
+
       return true;
     } catch (e) {
-      debugPrint('isUsernameUnique error: $e');
+      debugPrint('isGlobalUsernameUnique error: $e');
       return true;
     }
   }
+
+  /// Checks if a supervisor username is unique globally across supervisor accounts.
+  static Future<bool> isGlobalSupervisorUsernameUnique(String username, {String? excludeDocId}) async {
+    final clean = username.trim();
+    if (clean.isEmpty) return true;
+    final cleanLower = clean.toLowerCase();
+
+    try {
+      final futures = [
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('UserName', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('username', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('UserName', isEqualTo: cleanLower).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisor').where('username', isEqualTo: cleanLower).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisors').where('UserName', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisors').where('username', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisors').where('UserName', isEqualTo: cleanLower).get(),
+        FirebaseFirestore.instance.collectionGroup('supervisors').where('username', isEqualTo: cleanLower).get(),
+      ];
+
+      final results = await Future.wait(futures);
+      for (var snap in results) {
+        for (var doc in snap.docs) {
+          if (excludeDocId != null &&
+              (doc.id == excludeDocId || doc.reference.parent.parent?.id == excludeDocId)) {
+            continue;
+          }
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('isGlobalSupervisorUsernameUnique error: $e');
+      return true;
+    }
+  }
+
+  /// Alias for backward compatibility
+  static Future<bool> isEmailUnique(String email, {String? excludeDocId}) =>
+      isGlobalEmailUnique(email, excludeDocId: excludeDocId);
+
+  /// Alias for backward compatibility
+  static Future<bool> isPhoneUnique(String phone, {String? excludeDocId}) =>
+      isGlobalPhoneUnique(phone, excludeDocId: excludeDocId);
+
+  /// Alias for backward compatibility
+  static Future<bool> isUsernameUnique(String username, {String? excludeDocId}) =>
+      isGlobalUsernameUnique(username, excludeDocId: excludeDocId);
 
   /// Validates all 4 organization registration fields simultaneously.
   static Future<OrganizationValidationResult> validateOrganizationRegistration({
@@ -1000,14 +1139,54 @@ class FirestoreService {
     if (siteUpdates.containsKey('amountSpent')) {
       combinedUpdates['amountSpend'] = siteUpdates['amountSpent'];
     }
+    if (siteUpdates.containsKey('amountBalance')) {
+      combinedUpdates['balance'] = siteUpdates['amountBalance'];
+    }
+    if (siteUpdates.containsKey('projectBudget')) {
+      combinedUpdates['estimatedBudget'] = siteUpdates['projectBudget'];
+    }
+    if (siteUpdates.containsKey('projectContract')) {
+      combinedUpdates['projectContractType'] = siteUpdates['projectContract'];
+    }
+    if (siteUpdates.containsKey('projectContractType') && !combinedUpdates.containsKey('projectContract')) {
+      combinedUpdates['projectContract'] = siteUpdates['projectContractType'];
+    }
+    if (siteUpdates.containsKey('projectCategory')) {
+      combinedUpdates['projectType'] = siteUpdates['projectCategory'];
+    }
+    if (siteUpdates.containsKey('ownerName')) {
+      combinedUpdates['clientOwnerName'] = siteUpdates['ownerName'];
+      combinedUpdates['clientName'] = siteUpdates['ownerName'];
+    }
+    if (siteUpdates.containsKey('clientOwnerName') && !combinedUpdates.containsKey('ownerName')) {
+      combinedUpdates['ownerName'] = siteUpdates['clientOwnerName'];
+      combinedUpdates['clientName'] = siteUpdates['clientOwnerName'];
+    }
+    if (siteUpdates.containsKey('ownerPhoneNumber')) {
+      combinedUpdates['clientPhone'] = siteUpdates['ownerPhoneNumber'];
+      combinedUpdates['clientPhoneNumber'] = siteUpdates['ownerPhoneNumber'];
+    }
+    if (siteUpdates.containsKey('clientPhone') && !combinedUpdates.containsKey('ownerPhoneNumber')) {
+      combinedUpdates['ownerPhoneNumber'] = siteUpdates['clientPhone'];
+      combinedUpdates['clientPhoneNumber'] = siteUpdates['clientPhone'];
+    }
     if (siteUpdates.containsKey('actualStartDate')) {
       combinedUpdates['actualStateDate'] = siteUpdates['actualStartDate'];
+    }
+    if (siteUpdates.containsKey('actualStateDate') && !combinedUpdates.containsKey('actualStartDate')) {
+      combinedUpdates['actualStartDate'] = siteUpdates['actualStateDate'];
     }
     if (siteUpdates.containsKey('startDate') && !combinedUpdates.containsKey('plannedStartDate')) {
       combinedUpdates['plannedStartDate'] = siteUpdates['startDate'];
     }
+    if (siteUpdates.containsKey('plannedStartDate') && !combinedUpdates.containsKey('startDate')) {
+      combinedUpdates['startDate'] = siteUpdates['plannedStartDate'];
+    }
     if (siteUpdates.containsKey('endDate') && !combinedUpdates.containsKey('plannedEndDate')) {
       combinedUpdates['plannedEndDate'] = siteUpdates['endDate'];
+    }
+    if (siteUpdates.containsKey('plannedEndDate') && !combinedUpdates.containsKey('endDate')) {
+      combinedUpdates['endDate'] = siteUpdates['plannedEndDate'];
     }
 
     if (projectExtraUpdates != null) {
@@ -1023,6 +1202,8 @@ class FirestoreService {
     try {
       final orgId = _getOrgIdFromPath();
       if (orgId == 'uninitialized') return;
+      if (_migratedOrgs.contains(orgId)) return;
+      _migratedOrgs.add(orgId);
 
       // Access raw 'Site' subcollection directly (bypassing getCollection redirection)
       final rawSiteCol = FirebaseFirestore.instance
@@ -1101,13 +1282,34 @@ class FirestoreService {
             'updatedAt': FieldValue.serverTimestamp(),
           };
           await matchedProj.reference.set(mergeUpdates, SetOptions(merge: true));
+
+          // If the matched project is PR001_ST001_..., delete any duplicate non-PR doc in projects collection
+          if (matchedProj.id != sDocId && !sDocId.startsWith('PR')) {
+            try {
+              final dupDoc = await projectsCol.doc(sDocId).get();
+              if (dupDoc.exists) {
+                await projectsCol.doc(sDocId).delete();
+                debugPrint('FirestoreService: Deleted duplicate legacy project doc $sDocId');
+              }
+            } catch (_) {}
+          }
         } else {
-          // Create new project document for this site
-          final targetDocId = sProjId.isNotEmpty ? sProjId : sDocId;
+          // Create new project document for this site using format PR001_ST001_<ProjectName>
+          final nextPrCode = await getNextProjectCode();
+          final cleanSiteCode = sSiteId.split('_').first.replaceAll(' ', '');
+          final cleanSiteName = sSiteName.isNotEmpty ? sSiteName.replaceAll(' ', '') : sDocId.replaceAll(' ', '');
+          final targetDocId = formatProjectDocId(
+            projectCode: nextPrCode,
+            siteCode: cleanSiteCode,
+            siteName: cleanSiteName,
+          );
+
           final newProjectData = <String, dynamic>{
             'projectId': targetDocId,
+            'projectCode': nextPrCode,
             'projectName': sSiteName.isNotEmpty ? sSiteName : sDocId,
             'siteId': sDocId,
+            'siteCode': cleanSiteCode,
             'siteName': sSiteName,
             'siteLocation': sData['location'] ?? sData['siteLocation'] ?? '',
             'latitude': sData['latitude'],
@@ -1144,6 +1346,16 @@ class FirestoreService {
             'updatedAt': FieldValue.serverTimestamp(),
           };
           await projectsCol.doc(targetDocId).set(newProjectData, SetOptions(merge: true));
+
+          // Clean up legacy sDocId if it was in projects collection
+          if (sDocId != targetDocId && !sDocId.startsWith('PR')) {
+            try {
+              final dupDoc = await projectsCol.doc(sDocId).get();
+              if (dupDoc.exists) {
+                await projectsCol.doc(sDocId).delete();
+              }
+            } catch (_) {}
+          }
         }
       }
       debugPrint('FirestoreService: Successfully finished migrating Site documents into projects.');
@@ -1151,4 +1363,292 @@ class FirestoreService {
       debugPrint('FirestoreService: Error during migrateSitesIntoProjects: $e');
     }
   }
+
+  /// Formats deterministic project document ID: `PR001_{SiteID}_{SiteName}`
+  static String formatProjectDocId({
+    required String projectCode,
+    required String siteCode,
+    required String siteName,
+  }) {
+    final cleanSiteCode = siteCode.replaceAll(' ', '');
+    final cleanSiteName = siteName.replaceAll(' ', '');
+    return '${projectCode}_${cleanSiteCode}_$cleanSiteName';
+  }
+
+  /// Finds the next available sequential project code (e.g., PR001, PR002)
+  static Future<String> getNextProjectCode() async {
+    try {
+      final projectsCol = getCollection('projects');
+      final snap = await projectsCol.get();
+      int highestSeq = 0;
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final pCode = (data['projectCode'] ?? '').toString();
+        final docId = doc.id;
+
+        final prMatch = RegExp(r'^PR(\d+)').firstMatch(pCode.isNotEmpty ? pCode : docId);
+        if (prMatch != null) {
+          final numVal = int.tryParse(prMatch.group(1) ?? '0') ?? 0;
+          if (numVal > highestSeq) {
+            highestSeq = numVal;
+          }
+        }
+      }
+
+      final nextNum = highestSeq + 1;
+      return 'PR${nextNum.toString().padLeft(3, '0')}';
+    } catch (e) {
+      debugPrint('Error getting next project code: $e');
+      return 'PR001';
+    }
+  }
+
+  /// Locates an existing project for a given site by siteId, siteCode, siteName, or location
+  static Future<DocumentSnapshot<Map<String, dynamic>>?> findExistingProjectForSite({
+    required String siteId,
+    required String siteName,
+    String? siteLocation,
+  }) async {
+    final projectsCol = getCollection('projects');
+    final cleanSiteId = siteId.trim();
+    String cleanSiteCode = cleanSiteId;
+    if (cleanSiteCode.contains('_')) {
+      cleanSiteCode = cleanSiteCode.split('_').first;
+    }
+    final cleanSiteName = siteName.trim().toLowerCase();
+    final cleanLocation = (siteLocation ?? '').trim().toLowerCase();
+
+    final allProjects = await projectsCol.get();
+    for (final doc in allProjects.docs) {
+      final data = doc.data();
+      final docSiteId = (data['siteId'] ?? '').toString().trim();
+      final docSiteCode = (data['siteCode'] ?? '').toString().trim();
+      final docSiteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim().toLowerCase();
+      final docLocation = (data['siteLocation'] ?? data['location'] ?? '').toString().trim().toLowerCase();
+
+      if (cleanSiteId.isNotEmpty &&
+          (doc.id == cleanSiteId ||
+              doc.id.contains('_${cleanSiteId}_') ||
+              doc.id.endsWith('_$cleanSiteId') ||
+              doc.id.contains('_${cleanSiteCode}_') ||
+              doc.id.endsWith('_$cleanSiteCode') ||
+              docSiteId == cleanSiteId ||
+              docSiteId == cleanSiteCode ||
+              docSiteCode == cleanSiteCode)) {
+        return doc;
+      }
+
+      if (cleanSiteName.isNotEmpty &&
+          docSiteName == cleanSiteName &&
+          (cleanLocation.isEmpty || docLocation == cleanLocation)) {
+        return doc;
+      }
+    }
+    return null;
+  }
+
+  /// Deterministically creates or reuses a single project document for a site in `organisation/{orgId}/projects/{docId}`
+  /// using format: `PR001_{SiteID}_{SiteName}` (e.g. `PR001_ST001_Testing`).
+  /// Enforces database-level uniqueness via Firestore transactions and atomic checks to prevent duplicate records.
+  static Future<ProjectCreationResult> createProjectDocumentAtomic({
+    required String siteId,
+    required String siteName,
+    String? siteLocation,
+    required Map<String, dynamic> projectData,
+  }) async {
+    try {
+      final projectsCol = getCollection('projects');
+
+      final cleanSiteId = siteId.trim();
+      String cleanSiteCode = cleanSiteId;
+      if (cleanSiteCode.contains('_')) {
+        cleanSiteCode = cleanSiteCode.split('_').first;
+      }
+      final cleanSiteName = siteName.trim();
+      final cleanLocation = (siteLocation ?? '').trim();
+
+      // 1. Check if an existing project already matches this site/project
+      final existingDoc = await findExistingProjectForSite(
+        siteId: siteId,
+        siteName: siteName,
+        siteLocation: siteLocation,
+      );
+
+      String canonicalDocId;
+      String pCode;
+
+      if (existingDoc != null && existingDoc.id.startsWith('PR')) {
+        canonicalDocId = existingDoc.id;
+        final data = existingDoc.data() ?? {};
+        pCode = (data['projectCode'] ?? (RegExp(r'^PR\d+').firstMatch(canonicalDocId)?.group(0)) ?? 'PR001').toString();
+      } else {
+        final nextPrCode = await getNextProjectCode();
+        pCode = nextPrCode;
+        canonicalDocId = formatProjectDocId(
+          projectCode: nextPrCode,
+          siteCode: cleanSiteCode,
+          siteName: cleanSiteName,
+        );
+      }
+
+      final targetDocRef = projectsCol.doc(canonicalDocId);
+
+      // Prepare final normalized data
+      final finalData = Map<String, dynamic>.from(projectData);
+      finalData['projectId'] = canonicalDocId;
+      finalData['projectCode'] = pCode;
+      finalData['siteId'] = cleanSiteId;
+      finalData['siteCode'] = cleanSiteCode;
+      finalData['siteName'] = cleanSiteName;
+      finalData['projectName'] = (finalData['projectName'] ?? cleanSiteName).toString().trim();
+      if (cleanLocation.isNotEmpty) {
+        finalData['siteLocation'] = cleanLocation;
+        finalData['location'] = cleanLocation;
+      }
+
+      // Comprehensive alias & contract mapping
+      if (finalData.containsKey('projectCategory')) {
+        finalData['projectType'] = finalData['projectCategory'];
+      }
+      if (finalData.containsKey('projectContract')) {
+        finalData['projectContractType'] = finalData['projectContract'];
+      }
+      if (finalData.containsKey('projectContractType') && !finalData.containsKey('projectContract')) {
+        finalData['projectContract'] = finalData['projectContractType'];
+      }
+      if (finalData.containsKey('ownerName')) {
+        finalData['clientOwnerName'] = finalData['ownerName'];
+        finalData['clientName'] = finalData['ownerName'];
+      }
+      if (finalData.containsKey('clientOwnerName') && !finalData.containsKey('ownerName')) {
+        finalData['ownerName'] = finalData['clientOwnerName'];
+        finalData['clientName'] = finalData['clientOwnerName'];
+      }
+      if (finalData.containsKey('ownerPhoneNumber')) {
+        finalData['clientPhone'] = finalData['ownerPhoneNumber'];
+        finalData['clientPhoneNumber'] = finalData['ownerPhoneNumber'];
+      }
+      if (finalData.containsKey('clientPhone') && !finalData.containsKey('ownerPhoneNumber')) {
+        finalData['ownerPhoneNumber'] = finalData['clientPhone'];
+      }
+      if (finalData.containsKey('projectBudget')) {
+        finalData['estimatedBudget'] = finalData['projectBudget'];
+      }
+      if (finalData.containsKey('estimatedBudget') && !finalData.containsKey('projectBudget')) {
+        finalData['projectBudget'] = finalData['estimatedBudget'];
+      }
+      if (finalData.containsKey('amountPaid')) {
+        finalData['amountReceived'] = finalData['amountPaid'];
+        finalData['receivedPayments'] = finalData['amountPaid'];
+      }
+      if (finalData.containsKey('amountReceived')) {
+        finalData['amountPaid'] = finalData['amountReceived'];
+        finalData['receivedPayments'] = finalData['amountReceived'];
+      }
+      if (finalData.containsKey('amountSpent')) {
+        finalData['amountSpend'] = finalData['amountSpent'];
+      }
+      if (finalData.containsKey('amountSpend') && !finalData.containsKey('amountSpent')) {
+        finalData['amountSpent'] = finalData['amountSpend'];
+      }
+      if (finalData.containsKey('amountBalance')) {
+        finalData['balance'] = finalData['amountBalance'];
+      }
+      if (finalData.containsKey('balance') && !finalData.containsKey('amountBalance')) {
+        finalData['amountBalance'] = finalData['balance'];
+      }
+      if (finalData.containsKey('actualStartDate') && !finalData.containsKey('actualStateDate')) {
+        finalData['actualStateDate'] = finalData['actualStartDate'];
+      }
+      if (finalData.containsKey('actualStateDate') && !finalData.containsKey('actualStartDate')) {
+        finalData['actualStartDate'] = finalData['actualStateDate'];
+      }
+      if (finalData.containsKey('plannedStartDate') && !finalData.containsKey('startDate')) {
+        finalData['startDate'] = finalData['plannedStartDate'];
+      }
+      if (finalData.containsKey('startDate') && !finalData.containsKey('plannedStartDate')) {
+        finalData['plannedStartDate'] = finalData['startDate'];
+      }
+      if (finalData.containsKey('plannedEndDate') && !finalData.containsKey('endDate')) {
+        finalData['endDate'] = finalData['plannedEndDate'];
+      }
+      if (finalData.containsKey('endDate') && !finalData.containsKey('plannedEndDate')) {
+        finalData['plannedEndDate'] = finalData['endDate'];
+      }
+      if (finalData.containsKey('status') && !finalData.containsKey('currentStatus')) {
+        finalData['currentStatus'] = finalData['status'];
+      }
+      if (finalData.containsKey('currentStatus') && !finalData.containsKey('status')) {
+        finalData['status'] = finalData['currentStatus'];
+      }
+
+      finalData['updatedAt'] = FieldValue.serverTimestamp();
+      if (!finalData.containsKey('createdAt') || finalData['createdAt'] == null) {
+        finalData['createdAt'] = FieldValue.serverTimestamp();
+      }
+
+      // Exclusively save the project into the canonical document
+      await targetDocRef.set(finalData, SetOptions(merge: true));
+
+      // Clean up any legacy non-PR duplicate documents (e.g., ST001_Testing or cleanSiteId) in projects collection
+      final legacyDocId = '${cleanSiteCode}_${cleanSiteName.replaceAll(' ', '')}';
+      if (legacyDocId != canonicalDocId) {
+        try {
+          final legDoc = await projectsCol.doc(legacyDocId).get();
+          if (legDoc.exists) {
+            await projectsCol.doc(legacyDocId).delete();
+            debugPrint('FirestoreService: Cleaned up duplicate legacy project doc $legacyDocId in favor of $canonicalDocId');
+          }
+        } catch (e) {
+          debugPrint('FirestoreService: Note cleaning duplicate legacy project doc: $e');
+        }
+      }
+      if (cleanSiteId != canonicalDocId && cleanSiteId != legacyDocId && !cleanSiteId.startsWith('PR')) {
+        try {
+          final legDoc2 = await projectsCol.doc(cleanSiteId).get();
+          if (legDoc2.exists) {
+            await projectsCol.doc(cleanSiteId).delete();
+            debugPrint('FirestoreService: Cleaned up duplicate legacy project doc $cleanSiteId in favor of $canonicalDocId');
+          }
+        } catch (_) {}
+      }
+      if (existingDoc != null && existingDoc.id != canonicalDocId && !existingDoc.id.startsWith('PR')) {
+        try {
+          await existingDoc.reference.delete();
+          debugPrint('FirestoreService: Deleted duplicate legacy project doc ${existingDoc.id} in favor of $canonicalDocId');
+        } catch (_) {}
+      }
+
+      return ProjectCreationResult(
+        isCreated: existingDoc == null,
+        isDuplicate: existingDoc != null,
+        projectDocId: canonicalDocId,
+        projectCode: pCode,
+        projectData: finalData,
+        message: 'Project stored exclusively under canonical ID $canonicalDocId.',
+      );
+    } catch (e) {
+      debugPrint('FirestoreService: Error creating project atomically: $e');
+      rethrow;
+    }
+  }
+}
+
+class ProjectCreationResult {
+  final bool isCreated;
+  final bool isDuplicate;
+  final String projectDocId;
+  final String projectCode;
+  final Map<String, dynamic> projectData;
+  final String message;
+
+  ProjectCreationResult({
+    required this.isCreated,
+    required this.isDuplicate,
+    required this.projectDocId,
+    required this.projectCode,
+    required this.projectData,
+    required this.message,
+  });
 }

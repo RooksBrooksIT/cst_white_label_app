@@ -57,11 +57,19 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------------
-    // Collection Group Queries ('data', 'admin', 'branding')
+    // Collection Group Queries ('data', 'admin', 'branding', 'manager', 'supervisor')
     // ---------------------------------------------------------------------------
     match /{path=**}/data/{docId} {
       allow read: if resource.data.app_id == 'cst_white_label' || resource == null;
       allow write: if request.resource.data.app_id == 'cst_white_label';
+    }
+
+    match /{path=**}/manager/{docId} {
+      allow read: if true;
+    }
+
+    match /{path=**}/supervisor/{docId} {
+      allow read: if true;
     }
   }
 }

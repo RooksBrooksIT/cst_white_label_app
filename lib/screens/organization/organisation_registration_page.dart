@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -175,24 +175,24 @@ class _OrganisationRegistrationPageState
       _isEmailValid = null;
     });
 
-    _emailDebounce = Timer(const Duration(milliseconds: 200), () async {
+    _emailDebounce = Timer(const Duration(milliseconds: 250), () async {
       try {
-        final isUnique = await FirestoreService.isEmailUnique(clean);
+        final isUnique = await FirestoreService.isGlobalEmailUnique(clean);
         if (mounted && _emailController.text.trim().toLowerCase() == clean) {
           setState(() {
             _isCheckingEmail = false;
             _isEmailValid = isUnique;
             _emailStatusText = isUnique
-                ? 'Mail ID is available ✓'
-                : 'Mail ID already exists. Please use another mail.';
+                ? 'Email address is available ✓'
+                : 'Email address already registered. Please use another email address.';
           });
         }
       } catch (e) {
         if (mounted && _emailController.text.trim().toLowerCase() == clean) {
           setState(() {
             _isCheckingEmail = false;
-            _emailStatusText = null;
-            _isEmailValid = null;
+            _emailStatusText = 'Error validating email. Please check network.';
+            _isEmailValid = false;
           });
         }
       }
@@ -226,24 +226,24 @@ class _OrganisationRegistrationPageState
       _isPhoneValid = null;
     });
 
-    _phoneDebounce = Timer(const Duration(milliseconds: 200), () async {
+    _phoneDebounce = Timer(const Duration(milliseconds: 250), () async {
       try {
-        final isUnique = await FirestoreService.isPhoneUnique(clean);
+        final isUnique = await FirestoreService.isGlobalPhoneUnique(clean);
         if (mounted && _phoneController.text.trim() == clean) {
           setState(() {
             _isCheckingPhone = false;
             _isPhoneValid = isUnique;
             _phoneStatusText = isUnique
-                ? 'Mobile number is available ✓'
-                : 'Mobile number already exists. Please use another number.';
+                ? 'Phone number is available ✓'
+                : 'Phone number already registered. Please use another number.';
           });
         }
       } catch (e) {
         if (mounted && _phoneController.text.trim() == clean) {
           setState(() {
             _isCheckingPhone = false;
-            _phoneStatusText = null;
-            _isPhoneValid = null;
+            _phoneStatusText = 'Error validating phone. Please check network.';
+            _isPhoneValid = false;
           });
         }
       }
@@ -277,24 +277,24 @@ class _OrganisationRegistrationPageState
       _isUsernameValid = null;
     });
 
-    _usernameDebounce = Timer(const Duration(milliseconds: 200), () async {
+    _usernameDebounce = Timer(const Duration(milliseconds: 250), () async {
       try {
-        final isUnique = await FirestoreService.isUsernameUnique(clean);
+        final isUnique = await FirestoreService.isGlobalUsernameUnique(clean);
         if (mounted && _usernameController.text.trim().toLowerCase() == clean) {
           setState(() {
             _isCheckingUsername = false;
             _isUsernameValid = isUnique;
             _usernameStatusText = isUnique
                 ? 'Username is available ✓'
-                : 'Username already exists. Please use a different name.';
+                : 'Username already exists. Please choose another username.';
           });
         }
       } catch (e) {
         if (mounted && _usernameController.text.trim().toLowerCase() == clean) {
           setState(() {
             _isCheckingUsername = false;
-            _usernameStatusText = null;
-            _isUsernameValid = null;
+            _usernameStatusText = 'Error validating username. Please check network.';
+            _isUsernameValid = false;
           });
         }
       }

@@ -99,6 +99,7 @@ class _LandingPageState extends State<LandingPage> {
     if (_loginResolved) return true;
     final cleanInput = username.trim();
     final cleanLower = cleanInput.toLowerCase();
+    final cleanDigits = cleanInput.replaceAll(RegExp(r'\D'), '');
     final cleanPass = password.trim();
 
     try {
@@ -106,133 +107,136 @@ class _LandingPageState extends State<LandingPage> {
       String? dynamicPath;
       String? fullConfigPath;
 
-      // Strategy A: Check in fetched orgDocs (Instant, zero index needed)
-      for (var doc in orgDocs) {
-        final data = doc.data();
-        final docEmail = (data['email'] ?? data['Email'] ?? data['emailId'] ?? '')
-            .toString()
-            .trim()
-            .toLowerCase();
-        final docUser = (data['username'] ?? data['UserName'] ?? data['userName'] ?? '')
-            .toString()
-            .trim()
-            .toLowerCase();
-        final docPhone = (data['phone'] ??
-                data['MobileNumber'] ??
-                data['phone_number'] ??
-                data['phoneNumber'] ??
-                '')
-            .toString()
-            .trim();
-        final docOrgName = (data['org_name'] ?? data['orgName'] ?? '')
-            .toString()
-            .trim()
-            .toLowerCase();
-        final docId = doc.id.toLowerCase();
+      // Helper function to check if a data map matches credentials
+      bool isMatch(Map<String, dynamic> data, [String docId = '']) {
+        final dEmail = (data['email'] ?? data['Email'] ?? data['emailId'] ?? data['email_id'] ?? '')
+            .toString().trim().toLowerCase();
+        final dUser = (data['username'] ?? data['UserName'] ?? data['userName'] ?? data['adminUsername'] ?? data['admin_username'] ?? '')
+            .toString().trim().toLowerCase();
+        final dPhone = (data['phone'] ?? data['Phone'] ?? data['MobileNumber'] ?? data['mobileNumber'] ?? data['mobile'] ?? data['contactNo'] ?? data['ContactNo'] ?? data['phone_number'] ?? data['phoneNumber'] ?? '')
+            .toString().replaceAll(RegExp(r'\D'), '');
+        final dOrgName = (data['org_name'] ?? data['orgName'] ?? data['appName'] ?? data['app_name'] ?? '')
+            .toString().trim().toLowerCase();
+        final idLower = docId.toLowerCase();
 
-        if (docEmail == cleanLower ||
-            docUser == cleanLower ||
-            docUser == cleanInput ||
-            docPhone == cleanInput ||
-            docId == cleanLower ||
-            docId == 'cst_$cleanLower' ||
-            (cleanLower.isNotEmpty && docOrgName == cleanLower)) {
-          userData = data;
-          dynamicPath = doc.id;
-          fullConfigPath = doc.reference.path;
-          break;
+        if (dEmail.isNotEmpty && dEmail == cleanLower) return true;
+        if (dUser.isNotEmpty && (dUser == cleanLower || dUser == cleanInput.toLowerCase())) return true;
+        if (cleanDigits.isNotEmpty && dPhone.isNotEmpty && dPhone == cleanDigits) return true;
+        if (cleanLower.isNotEmpty && (dOrgName == cleanLower || idLower == cleanLower || idLower == 'cst_$cleanLower')) return true;
+        return false;
+      }
+
+      // Strategy A: Targeted collectionGroup lookups in parallel (fast indexed lookup)
+      try {
+        final userQueries = await Future.wait([
+          FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('organizationUser').where('UserName', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('organizationUser').where('email', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('organizationUser').where('Email', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('data').where('username', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('data').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('data').where('UserName', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('data').where('email', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('data').where('Email', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('configUsers').where('email', isEqualTo: cleanLower).limit(1).get(),
+        ]);
+
+        for (final snap in userQueries) {
+          if (snap.docs.isNotEmpty) {
+            final doc = snap.docs.first;
+            final segments = doc.reference.path.split('/');
+            final orgIndex = segments.indexOf('organisation');
+            if (orgIndex != -1 && orgIndex + 1 < segments.length) {
+              dynamicPath = segments[orgIndex + 1];
+            }
+            userData = doc.data();
+            fullConfigPath = doc.reference.path;
+            break;
+          }
+        }
+      } catch (_) {}
+
+      // Strategy B: Check in fetched orgDocs (in-memory scan across all root docs)
+      if (userData == null && orgDocs.isNotEmpty) {
+        for (var doc in orgDocs) {
+          final data = doc.data();
+          if (isMatch(data, doc.id)) {
+            userData = data;
+            dynamicPath = doc.id;
+            fullConfigPath = doc.reference.path;
+            break;
+          }
         }
       }
 
-      // Strategy B: If matched org root or need to check data/admin & organizationUser
-      if (userData != null && dynamicPath != null) {
-        try {
-          final adminDoc = await FirebaseFirestore.instance
-              .collection('organisation')
-              .doc(dynamicPath)
-              .collection('data')
-              .doc('admin')
-              .get();
-          if (adminDoc.exists && adminDoc.data() != null) {
-            userData = {...userData, ...adminDoc.data()!};
-            fullConfigPath = adminDoc.reference.path;
-          }
-        } catch (_) {}
-      } else {
-        // Fast targeted collectionGroup queries first
-        try {
-          final userQueries = await Future.wait([
-            FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: cleanLower).limit(1).get(),
-            FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: cleanInput).limit(1).get(),
-            FirebaseFirestore.instance.collectionGroup('organizationUser').where('UserName', isEqualTo: cleanInput).limit(1).get(),
-          ]);
-          for (final snap in userQueries) {
-            if (snap.docs.isNotEmpty) {
-              final doc = snap.docs.first;
-              final segments = doc.reference.path.split('/');
-              final orgIndex = segments.indexOf('organisation');
-              if (orgIndex != -1 && orgIndex + 1 < segments.length) {
-                dynamicPath = segments[orgIndex + 1];
-              }
-              userData = doc.data();
-              fullConfigPath = doc.reference.path;
-              break;
-            }
-          }
-        } catch (_) {}
-
-        // Fallback: Parallel search inside organisation subcollections if needed
-        if (userData == null && orgDocs.isNotEmpty) {
-          final searchFutures = orgDocs.map((doc) async {
-            try {
-              final adminDoc =
-                  await doc.reference.collection('data').doc('admin').get();
-              if (adminDoc.exists && adminDoc.data() != null) {
-                final aData = adminDoc.data()!;
-                final aEmail = (aData['email'] ?? '').toString().trim().toLowerCase();
-                final aUser = (aData['username'] ?? '').toString().trim().toLowerCase();
-                final aPhone =
-                    (aData['phone'] ?? aData['MobileNumber'] ?? '').toString().trim();
-                if (aEmail == cleanLower || aUser == cleanLower || aPhone == cleanInput) {
-                  return {
-                    'data': aData,
-                    'dynamicPath': doc.id,
-                    'path': adminDoc.reference.path,
-                  };
-                }
-              }
-
-              final userDoc =
-                  await doc.reference.collection('organizationUser').doc(cleanLower).get();
-              if (userDoc.exists && userDoc.data() != null) {
+      // Strategy C: Parallel search inside organisation subcollections (data/admin, organizationUser)
+      if (userData == null && orgDocs.isNotEmpty) {
+        final searchFutures = orgDocs.map((doc) async {
+          try {
+            // Check data/admin
+            final adminDoc = await doc.reference.collection('data').doc('admin').get();
+            if (adminDoc.exists && adminDoc.data() != null) {
+              final aData = adminDoc.data()!;
+              if (isMatch(aData, adminDoc.id)) {
                 return {
-                  'data': userDoc.data()!,
+                  'data': aData,
                   'dynamicPath': doc.id,
-                  'path': userDoc.reference.path,
+                  'path': adminDoc.reference.path,
                 };
               }
-            } catch (_) {}
-            return null;
-          });
-
-          final results = await Future.wait(searchFutures);
-          for (final match in results) {
-            if (match != null) {
-              userData = match['data'] as Map<String, dynamic>?;
-              dynamicPath = match['dynamicPath'] as String?;
-              fullConfigPath = match['path'] as String?;
-              break;
             }
+
+            // Check organizationUser subcollection
+            final orgUserDocs = await doc.reference.collection('organizationUser').get();
+            for (final uDoc in orgUserDocs.docs) {
+              final uData = uDoc.data();
+              if (isMatch(uData, uDoc.id)) {
+                return {
+                  'data': uData,
+                  'dynamicPath': doc.id,
+                  'path': uDoc.reference.path,
+                };
+              }
+            }
+
+            // Check configUsers subcollection
+            final cfgDocs = await doc.reference.collection('configUsers').get();
+            for (final cDoc in cfgDocs.docs) {
+              final cData = cDoc.data();
+              if (isMatch(cData, cDoc.id)) {
+                return {
+                  'data': cData,
+                  'dynamicPath': doc.id,
+                  'path': cDoc.reference.path,
+                };
+              }
+            }
+          } catch (_) {}
+          return null;
+        });
+
+        final results = await Future.wait(searchFutures);
+        for (final match in results) {
+          if (match != null) {
+            userData = match['data'] as Map<String, dynamic>?;
+            dynamicPath = match['dynamicPath'] as String?;
+            fullConfigPath = match['path'] as String?;
+            break;
           }
         }
       }
 
-      // Strategy C: Direct doc ID fallback
+      // Strategy D: Direct doc ID fallback
       if (userData == null) {
         try {
           final directDocs = await Future.wait([
             FirebaseFirestore.instance.collection('organisation').doc(cleanInput).get(),
             FirebaseFirestore.instance.collection('organisation').doc('cst_$cleanInput').get(),
+            FirebaseFirestore.instance.collection('organisation').doc(cleanLower).get(),
+            FirebaseFirestore.instance.collection('organisation').doc('cst_$cleanLower').get(),
           ]);
           for (final directDoc in directDocs) {
             if (directDoc.exists && directDoc.data() != null) {
@@ -245,16 +249,63 @@ class _LandingPageState extends State<LandingPage> {
         } catch (_) {}
       }
 
-      if (userData == null) return false;
+      if (userData == null || dynamicPath == null) return false;
 
-      final String storedPassword =
-          (userData['password'] ?? userData['Password'] ?? '').toString().trim();
-      final String email =
-          (userData['email'] ?? userData['Email'] ?? '').toString().trim();
-      final String actualUsername =
-          (userData['username'] ?? userData['UserName'] ?? cleanInput).toString().trim();
-      final String? storedOrgName =
-          (userData['org_name'] ?? userData['orgName']) as String?;
+      final Map<String, dynamic> resolvedUserData = Map<String, dynamic>.from(userData);
+      final String resolvedDynamicPath = dynamicPath;
+
+      // Fully aggregate profile across root, data/admin, and organizationUser documents
+      try {
+        final profileFetches = await Future.wait([
+          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).get(),
+          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('data').doc('admin').get(),
+          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('organizationUser').doc(cleanLower).get(),
+          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('organizationUser').doc(cleanInput).get(),
+        ]);
+
+        for (final pDoc in profileFetches) {
+          if (pDoc.exists && pDoc.data() != null) {
+            resolvedUserData.addAll(pDoc.data()!);
+          }
+        }
+      } catch (_) {}
+
+      final String storedPassword = (resolvedUserData['password'] ??
+              resolvedUserData['Password'] ??
+              resolvedUserData['pass'] ??
+              resolvedUserData['Pass'] ??
+              resolvedUserData['adminPassword'] ??
+              resolvedUserData['admin_password'] ??
+              resolvedUserData['userPassword'] ??
+              resolvedUserData['user_password'] ??
+              '')
+          .toString()
+          .trim();
+
+      final String email = (resolvedUserData['email'] ??
+              resolvedUserData['Email'] ??
+              resolvedUserData['emailId'] ??
+              resolvedUserData['email_id'] ??
+              '')
+          .toString()
+          .trim();
+
+      final String actualUsername = (resolvedUserData['username'] ??
+              resolvedUserData['UserName'] ??
+              resolvedUserData['userName'] ??
+              resolvedUserData['adminUsername'] ??
+              resolvedUserData['admin_username'] ??
+              cleanInput)
+          .toString()
+          .trim();
+
+      final String? storedOrgName = (resolvedUserData['org_name'] ??
+              resolvedUserData['orgName'] ??
+              resolvedUserData['appName'] ??
+              resolvedUserData['app_name'] ??
+              resolvedUserData['name'])
+          ?.toString()
+          .trim();
 
       bool isPasswordValid = false;
 
@@ -263,23 +314,23 @@ class _LandingPageState extends State<LandingPage> {
         isPasswordValid = true;
       }
 
-      // 2. Firebase Auth login attempt
+      // 2. Firebase Auth login attempt (Fallback if email exists)
       if (email.isNotEmpty && !isPasswordValid) {
         try {
           await AuthService().loginWithEmail(email, cleanPass);
           isPasswordValid = true;
 
-          // Sync password if updated in background
+          // Sync password if updated
           if (storedPassword != cleanPass && fullConfigPath != null) {
             final WriteBatch batch = FirebaseFirestore.instance.batch();
             batch.update(FirebaseFirestore.instance.doc(fullConfigPath), {
               'password': cleanPass,
             });
-            if (dynamicPath != null && dynamicPath != 'uninitialized') {
+            if (resolvedDynamicPath != 'uninitialized') {
               batch.update(
                 FirebaseFirestore.instance
                     .collection('organisation')
-                    .doc(dynamicPath)
+                    .doc(resolvedDynamicPath)
                     .collection('organizationUser')
                     .doc(actualUsername),
                 {'password': cleanPass},
@@ -287,7 +338,7 @@ class _LandingPageState extends State<LandingPage> {
               batch.update(
                 FirebaseFirestore.instance
                     .collection('organisation')
-                    .doc(dynamicPath),
+                    .doc(resolvedDynamicPath),
                 {'password': cleanPass},
               );
             }
@@ -302,21 +353,22 @@ class _LandingPageState extends State<LandingPage> {
       if (_loginResolved) return true;
       _loginResolved = true;
 
-      final String? referralCode = userData['referralCode']?.toString() ??
-          userData['orgReferralCode']?.toString();
+      final String? referralCode = resolvedUserData['referralCode']?.toString() ??
+          resolvedUserData['orgReferralCode']?.toString();
 
       // Set org path and sync branding in background
-      FirestoreService.setOrgPath(dynamicPath ?? '');
-      if (dynamicPath != null && dynamicPath != 'uninitialized') {
-        AppTheme.syncWithFirestore(dynamicPath).catchError((_) {});
+      FirestoreService.setOrgPath(resolvedDynamicPath);
+      if (resolvedDynamicPath != 'uninitialized') {
+        AppTheme.syncWithFirestore(resolvedDynamicPath).catchError((_) {});
       }
 
       await AuthService().login(UserRole.organization, {
         'username': actualUsername,
-        'dynamicPath': dynamicPath,
+        'dynamicPath': resolvedDynamicPath,
         'org_name': storedOrgName,
-        'org_doc_path': fullConfigPath,
+        'org_doc_path': fullConfigPath ?? 'organisation/$resolvedDynamicPath/data/admin',
         if (referralCode != null && referralCode.isNotEmpty) 'referral_code': referralCode,
+        ...resolvedUserData,
       });
 
       NotificationService.saveToken(

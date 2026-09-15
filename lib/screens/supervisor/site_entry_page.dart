@@ -818,6 +818,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   }
 
   Future<void> _saveToFirestore() async {
+    // Prevent duplicate submissions while operation is in progress
+    if (isSaving) return;
+
     if (siteCode.isEmpty ||
         selectedDate == null ||
         supervisorId == null ||
@@ -825,20 +828,22 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Missing site code, date, or supervisor ID!'),
+          backgroundColor: Colors.redAccent,
         ),
       );
       return;
     }
+
     setState(() {
       isSaving = true;
     });
-    final entriesColl = FirestoreService.siteSupervisorEntries;
 
+    final entriesColl = FirestoreService.siteSupervisorEntries;
     final dateForId = DateFormat('ddMMyyyy').format(selectedDate!);
     final docId = '${siteCode}_$dateForId';
     final dateIso = selectedDate!.toIso8601String();
 
-    List<Map<String, dynamic>> newMaterials = materials
+    final List<Map<String, dynamic>> newMaterials = materials
         .map(
           (m) => {
             "type": (m['type'] ?? m['materialName'] ?? '').toString(),
@@ -853,7 +858,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         )
         .toList();
 
-    List<Map<String, dynamic>> newLabours = labours
+    final List<Map<String, dynamic>> newLabours = labours
         .map(
           (l) => {
             "type": l['type'] ?? '',
@@ -865,20 +870,30 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         )
         .toList();
 
+    final int totalAmt = _getTotalAmount();
+    final int foodVal = int.tryParse(foodCost.text) ?? 0;
+    final int fuelVal = int.tryParse(fuelCost.text) ?? 0;
+    final int transportVal = int.tryParse(transportCost.text) ?? 0;
+    final int savedMaterialCount = newMaterials.length;
+    final int savedLabourCount = newLabours.length;
+    final DateTime savedDate = selectedDate!;
+    final String savedSiteCode = siteCode;
+    final String savedLocation = siteLocation;
+
     try {
       if (!OfflineSyncService().isOnline) {
         final payload = {
           'docId': docId,
           'date': dateIso,
-          'food': int.tryParse(foodCost.text) ?? 0,
-          'fuel': int.tryParse(fuelCost.text) ?? 0,
+          'food': foodVal,
+          'fuel': fuelVal,
           'labours': newLabours,
           'materials': newMaterials,
           'supervisorId': supervisorId ?? '',
           'supervisorName': widget.userName,
           'projectStage': selectedProjectPhase ?? '',
-          'transport': int.tryParse(transportCost.text) ?? 0,
-          'totalAmount': _getTotalAmount(),
+          'transport': transportVal,
+          'totalAmount': totalAmt,
           'siteLocation': siteLocation,
           'siteId': siteCode,
           'projectName': projectName ?? '',
@@ -892,11 +907,25 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
 
         if (!mounted) return;
 
+        setState(() {
+          materials.clear();
+          labours.clear();
+          materialQty = 0;
+          materialQtyController.text = '0';
+          labourQty = 0;
+          labourQtyController.text = '0';
+          foodCost.text = '0';
+          transportCost.text = '0';
+          fuelCost.text = '0';
+          _showCustomMaterialFields = false;
+          _showCustomLabourFields = false;
+        });
+
         await showDialog(
           context: context,
           builder: (context) => AlertDialog(
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+                borderRadius: BorderRadius.circular(20)),
             title: const Row(
               children: [
                 Icon(Icons.wifi_off_rounded, color: Colors.orange),
@@ -912,6 +941,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('OK'),
@@ -919,44 +951,26 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
             ],
           ),
         );
-
-        setState(() {
-          materials.clear();
-          labours.clear();
-          foodCost.text = '0';
-          transportCost.text = '0';
-          fuelCost.text = '0';
-          isSaving = false;
-        });
         return;
       }
-      // Check for existing entry for this site and date across canonical and alias keys
-      bool isSameDate = false;
-      DocumentSnapshot<Map<String, dynamic>>? existing;
-      final keys = await ExpenseService.resolveSiteKeys(siteCode);
-      for (final k in keys) {
-        final candidateDocId = '${k}_$dateForId';
-        final snap = await entriesColl.doc(candidateDocId).get();
-        if (snap.exists) {
-          existing = snap;
-          isSameDate = true;
-          break;
-        }
-      }
-      if (!isSameDate) {
-        final directSnap = await entriesColl.doc(docId).get();
-        if (directSnap.exists) {
-          existing = directSnap;
-          isSameDate = true;
-        }
-      }
 
-      if (isSameDate) {
+      // Fast check for existing entry for this site and date
+      final directSnap = await entriesColl.doc(docId).get();
+      if (directSnap.exists) {
         if (!mounted) return;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Duplicate Entry'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.amber),
+                SizedBox(width: 8),
+                Text('Duplicate Entry'),
+              ],
+            ),
             content: const Text(
               'An entry for this site and date already exists.',
             ),
@@ -968,13 +982,90 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
             ],
           ),
         );
-        setState(() {
-          isSaving = false;
-        });
         return;
       }
 
-      // Record universal material consumption in inventory service
+      final data = <String, dynamic>{
+        "date": dateIso,
+        "food": foodVal,
+        "fuel": fuelVal,
+        "labours": newLabours,
+        "materials": newMaterials,
+        "supervisorId": supervisorId ?? '',
+        "supervisorName": widget.userName,
+        "projectStage": selectedProjectPhase ?? '',
+        "transport": transportVal,
+        "totalAmount": totalAmt,
+        "siteLocation": siteLocation,
+        "siteId": siteCode,
+        "projectName": projectName ?? '',
+        "createdAt": FieldValue.serverTimestamp(),
+        "updatedAt": FieldValue.serverTimestamp(),
+      };
+
+      // 1. Primary write: Save daily site supervisor entry
+      await entriesColl.doc(docId).set(data);
+
+      // 2. Prepare actual stage doc update
+      final actualColl = FirestoreService.siteSupervisorProjectStageActual;
+      final actualDocId =
+          '${siteCode}_${widget.userName}_${selectedProjectPhase ?? ''}';
+      final List<Map<String, dynamic>> actLabours = labours
+          .map(
+            (l) => {
+              "labourCount": l['count'] ?? 0,
+              "labourDesignation": l['type'] ?? '',
+            },
+          )
+          .toList();
+      final actualData = <String, dynamic>{
+        "actLabours": actLabours,
+        "actPayment": totalAmt,
+        "projectName": projectName ?? '',
+        "projectStage": selectedProjectPhase ?? '',
+        "siteId": siteCode,
+        "supervisorName": widget.userName,
+        "updatedAt": FieldValue.serverTimestamp(),
+      };
+
+      // Execute secondary backend tasks in parallel for optimal speed
+      final List<Future<void>> backgroundTasks = [];
+
+      // Task A: Update stage actuals
+      backgroundTasks.add(() async {
+        try {
+          final actualDoc = await actualColl.doc(actualDocId).get();
+          if (actualDoc.exists) {
+            final existingActData = actualDoc.data()!;
+            final List<dynamic> existingActLabours =
+                existingActData['actLabours'] as List? ?? [];
+            final List<dynamic> mergedActLabours = [
+              ...existingActLabours,
+              ...actLabours,
+            ];
+            final double existingActPayment =
+                (existingActData['actPayment'] ?? 0).toDouble();
+            final int prevDays = (existingActData['actDays'] ?? 0) as int;
+
+            await actualColl.doc(actualDocId).update({
+              ...actualData,
+              "actLabours": mergedActLabours,
+              "actPayment": existingActPayment + totalAmt,
+              "actDays": prevDays + 1,
+            });
+          } else {
+            await actualColl.doc(actualDocId).set({
+              ...actualData,
+              "actDays": 1,
+              "createdAt": FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (e) {
+          debugPrint('Error updating stage actuals: $e');
+        }
+      }());
+
+      // Task B: Material consumption in inventory service
       if (materials.isNotEmpty) {
         final consumedItems = materials.map((m) => {
           'materialName': (m['materialName'] ?? m['type']).toString(),
@@ -985,156 +1076,74 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
           'remarks': 'Daily consumption at $siteCode by ${widget.userName}',
         }).toList();
 
-        await MaterialInventoryService.recordDailyMaterialConsumption(
-          siteId: siteCode,
-          siteName: siteLocation,
-          date: dateIso,
-          supervisorId: supervisorId ?? '',
-          supervisorName: widget.userName,
-          consumedMaterials: consumedItems,
-          remarks: 'Daily consumption at $siteCode by ${widget.userName}',
-        );
+        backgroundTasks.add(() async {
+          try {
+            await MaterialInventoryService.recordDailyMaterialConsumption(
+              siteId: siteCode,
+              siteName: siteLocation,
+              date: dateIso,
+              supervisorId: supervisorId ?? '',
+              supervisorName: widget.userName,
+              consumedMaterials: consumedItems,
+              remarks: 'Daily consumption at $siteCode by ${widget.userName}',
+            );
+          } catch (e) {
+            debugPrint('Error recording material consumption: $e');
+          }
+        }());
       }
 
-      Map<String, dynamic> data;
-
-      if (isSameDate && existing != null && existing.data() != null) {
-        // Merge with existing entry
-        final existingData = existing.data()!;
-        final List<dynamic> existingMaterials =
-            existingData['materials'] as List? ?? [];
-        final List<dynamic> existingLabours =
-            existingData['labours'] as List? ?? [];
-        final int existingFood = (existingData['food'] ?? 0) is int
-            ? existingData['food']
-            : (existingData['food'] as num?)?.toInt() ?? 0;
-        final int existingFuel = (existingData['fuel'] ?? 0) is int
-            ? existingData['fuel']
-            : (existingData['fuel'] as num?)?.toInt() ?? 0;
-        final int existingTransport = (existingData['transport'] ?? 0) is int
-            ? existingData['transport']
-            : (existingData['transport'] as num?)?.toInt() ?? 0;
-
-        final List<dynamic> mergedMaterials = [
-          ...existingMaterials,
-          ...newMaterials,
-        ];
-        final List<dynamic> mergedLabours = [...existingLabours, ...newLabours];
-        final int mergedFood =
-            existingFood + (int.tryParse(foodCost.text) ?? 0);
-        final int mergedFuel =
-            existingFuel + (int.tryParse(fuelCost.text) ?? 0);
-        final int mergedTransport =
-            existingTransport + (int.tryParse(transportCost.text) ?? 0);
-
-        int mergedTotalAmount = mergedFood + mergedFuel + mergedTransport;
-        for (var m in mergedMaterials) {
-          mergedTotalAmount += ((m['amount'] ?? 0) as num).toInt();
+      // Task C: Update total site expense aggregation
+      backgroundTasks.add(() async {
+        try {
+          await ExpenseService.updateTotalSiteExpense(siteCode);
+        } catch (e) {
+          debugPrint('Error updating total site expense: $e');
         }
-        for (var l in mergedLabours) {
-          mergedTotalAmount += ((l['amount'] ?? 0) as num).toInt();
-        }
+      }());
 
-        data = {
-          "date": dateIso,
-          "food": mergedFood,
-          "fuel": mergedFuel,
-          "labours": mergedLabours,
-          "materials": mergedMaterials,
-          "supervisorId": supervisorId ?? '',
-          "supervisorName": widget.userName,
-          "projectStage": selectedProjectPhase ?? '',
-          "transport": mergedTransport,
-          "totalAmount": mergedTotalAmount,
-          "siteLocation": siteLocation,
-          "siteId": siteCode,
-        };
-      } else {
-        data = {
-          "date": dateIso,
-          "food": int.tryParse(foodCost.text) ?? 0,
-          "fuel": int.tryParse(fuelCost.text) ?? 0,
-          "labours": newLabours,
-          "materials": newMaterials,
-          "supervisorId": supervisorId ?? '',
-          "supervisorName": widget.userName,
-          "projectStage": selectedProjectPhase ?? '',
-          "transport": int.tryParse(transportCost.text) ?? 0,
-          "totalAmount": _getTotalAmount(),
-          "siteLocation": siteLocation,
-          "siteId": siteCode,
-        };
+      // Await all parallel backend operations to complete reliably
+      await Future.wait(backgroundTasks);
+
+      // Clear the form data
+      if (mounted) {
+        setState(() {
+          materials.clear();
+          labours.clear();
+          materialQty = 0;
+          materialQtyController.text = '0';
+          labourQty = 0;
+          labourQtyController.text = '0';
+          foodCost.text = '0';
+          transportCost.text = '0';
+          fuelCost.text = '0';
+          _showCustomMaterialFields = false;
+          _showCustomLabourFields = false;
+        });
       }
 
-      await entriesColl.doc(docId).set(data);
-      // Update total site expense aggregation
-      await ExpenseService.updateTotalSiteExpense(siteCode);
-      // --- Update siteSupervisorProjectStageActual collection ---
-      final actualColl = FirestoreService.siteSupervisorProjectStageActual;
-      final actualDocId =
-          '${siteCode}_${widget.userName}_${selectedProjectPhase ?? ''}';
-      final actualDoc = await actualColl.doc(actualDocId).get();
-      List<Map<String, dynamic>> actLabours = labours
-          .map(
-            (l) => {
-              "labourCount": l['count'] ?? 0,
-              "labourDesignation": l['type'] ?? '',
-            },
-          )
-          .toList();
-      final actualData = {
-        "actLabours": actLabours,
-        "actPayment": _getTotalAmount(),
-        "projectName": projectName ?? '',
-        "projectStage": selectedProjectPhase ?? '',
-        "siteId": siteCode,
-        "supervisorName": widget.userName,
-      };
-      if (actualDoc.exists) {
-        final existingActData = actualDoc.data()!;
-        final List<dynamic> existingActLabours =
-            existingActData['actLabours'] as List? ?? [];
-        final List<dynamic> mergedActLabours = [
-          ...existingActLabours,
-          ...actLabours,
-        ];
-        final double existingActPayment = (existingActData['actPayment'] ?? 0)
-            .toDouble();
-        int prevDays = (existingActData['actDays'] ?? 0) as int;
-
-        if (isSameDate) {
-          await actualColl.doc(actualDocId).update({
-            ...actualData,
-            "actLabours": mergedActLabours,
-            "actPayment": existingActPayment + _getTotalAmount(),
-            "actDays": prevDays,
-          });
-        } else {
-          await actualColl.doc(actualDocId).update({
-            ...actualData,
-            "actLabours": mergedActLabours,
-            "actPayment": existingActPayment + _getTotalAmount(),
-            "actDays": prevDays + 1,
-          });
-        }
-      } else {
-        await actualColl.doc(actualDocId).set({...actualData, "actDays": 1});
-      }
-      setState(() {
-        materials.clear();
-        materialQty = 0;
-        materialQtyController.text = '0';
-      });
+      // Refresh site material pool in background
       await _fetchSiteMaterialPool();
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Entry saved successfully!')),
+
+      // Show clear Success modal/dialog to the supervisor after successful backend save
+      await _showSuccessModal(
+        siteCode: savedSiteCode,
+        location: savedLocation,
+        date: savedDate,
+        totalAmount: totalAmt,
+        materialCount: savedMaterialCount,
+        labourCount: savedLabourCount,
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to save entry: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save entry: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -1142,6 +1151,189 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         });
       }
     }
+  }
+
+  Future<void> _showSuccessModal({
+    required String siteCode,
+    required String location,
+    required DateTime date,
+    required int totalAmount,
+    required int materialCount,
+    required int labourCount,
+  }) async {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final formattedDate = DateFormat('dd MMM yyyy').format(date);
+    final currencyFormatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 12,
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFF10B981),
+                      size: 44,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Daily Entry Saved!',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0A183D),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Your daily site report has been saved successfully to the backend.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildSuccessModalRow(
+                        Icons.apartment_rounded,
+                        'Site',
+                        siteCode,
+                        isDark,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSuccessModalRow(
+                        Icons.calendar_today_rounded,
+                        'Date',
+                        formattedDate,
+                        isDark,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSuccessModalRow(
+                        Icons.inventory_2_outlined,
+                        'Materials Logged',
+                        '$materialCount item(s)',
+                        isDark,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSuccessModalRow(
+                        Icons.groups_outlined,
+                        'Labours Logged',
+                        '$labourCount type(s)',
+                        isDark,
+                      ),
+                      const Divider(height: 18),
+                      _buildSuccessModalRow(
+                        Icons.payments_outlined,
+                        'Total Cost',
+                        currencyFormatter.format(totalAmount),
+                        isDark,
+                        isTotal: true,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSuccessModalRow(
+    IconData icon,
+    String label,
+    String value,
+    bool isDark, {
+    bool isTotal = false,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: isTotal
+              ? const Color(0xFF10B981)
+              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isTotal ? FontWeight.w700 : FontWeight.w500,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isTotal ? FontWeight.w800 : FontWeight.w600,
+            color: isTotal
+                ? const Color(0xFF10B981)
+                : (isDark ? Colors.white : const Color(0xFF0F172A)),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildSectionHeader(String title) {
@@ -2882,25 +3074,35 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           child: GlassButton(
                             label: 'Reset',
                             icon: Icons.restart_alt,
-                            onPressed: () {
-                              setState(() {
-                                materials.clear();
-                                labours.clear();
-                                selectedMaterial = materialOptions.isNotEmpty
-                                    ? materialOptions.first
-                                    : null;
-                                selectedLabour = labourOptions.isNotEmpty
-                                    ? labourOptions.first
-                                    : null;
-                                materialQty = 0;
-                                materialQtyController.text = '0';
-                                labourQty = 0;
-                                labourQtyController.text = '0';
-                                foodCost.text = '0';
-                                transportCost.text = '0';
-                                fuelCost.text = '0';
-                              });
-                            },
+                            onPressed: isSaving
+                                ? null
+                                : () {
+                                    setState(() {
+                                      materials.clear();
+                                      labours.clear();
+                                      selectedMaterial = materialOptions.isNotEmpty
+                                          ? materialOptions.first
+                                          : null;
+                                      selectedLabour = labourOptions.isNotEmpty
+                                          ? labourOptions.first
+                                          : null;
+                                      materialQty = 0;
+                                      materialQtyController.text = '0';
+                                      labourQty = 0;
+                                      labourQtyController.text = '0';
+                                      foodCost.text = '0';
+                                      transportCost.text = '0';
+                                      fuelCost.text = '0';
+                                      _showCustomMaterialFields = false;
+                                      _customMaterialNameController.clear();
+                                      _customMaterialQtyController.text = '0';
+                                      _customMaterialPriceController.text = '0';
+                                      _showCustomLabourFields = false;
+                                      _customLabourNameController.clear();
+                                      _customLabourSalaryController.text = '0';
+                                      _customLabourCountController.text = '0';
+                                    });
+                                  },
                             isSecondary: true,
                           ),
                         ),

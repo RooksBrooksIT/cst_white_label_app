@@ -490,18 +490,40 @@ async function sendSubscriptionInvoice(params, db) {
   // 1. Check Idempotency in Firestore
   if (db && txnid) {
     try {
-      const invoiceRef = db.collection("invoices").doc(txnid);
-      const invoiceSnap = await invoiceRef.get();
-      if (invoiceSnap.exists) {
-        const invData = invoiceSnap.data() || {};
-        if (invData.emailStatus === "SENT") {
-          logger.info(`Invoice email already sent for txnid ${txnid} (MessageID: ${invData.emailMessageId}). Skipping duplicate.`);
-          return {
-            success: true,
-            alreadySent: true,
-            messageId: invData.emailMessageId,
-          };
+      let isAlreadySent = false;
+      let existingMessageId = null;
+
+      // Check organization-scoped subcollection first
+      if (orgId) {
+        const orgInvoiceSnap = await db.collection("organisation").doc(orgId).collection("invoices").doc(txnid).get();
+        if (orgInvoiceSnap.exists) {
+          const invData = orgInvoiceSnap.data() || {};
+          if (invData.emailStatus === "SENT") {
+            isAlreadySent = true;
+            existingMessageId = invData.emailMessageId;
+          }
         }
+      }
+
+      // Backward compatibility: Fallback check on legacy root collection if not found under organization
+      if (!isAlreadySent) {
+        const legacySnap = await db.collection("invoices").doc(txnid).get();
+        if (legacySnap.exists) {
+          const invData = legacySnap.data() || {};
+          if (invData.emailStatus === "SENT") {
+            isAlreadySent = true;
+            existingMessageId = invData.emailMessageId;
+          }
+        }
+      }
+
+      if (isAlreadySent) {
+        logger.info(`Invoice email already sent for txnid ${txnid} (MessageID: ${existingMessageId}). Skipping duplicate.`);
+        return {
+          success: true,
+          alreadySent: true,
+          messageId: existingMessageId,
+        };
       }
     } catch (e) {
       logger.warn("Idempotency check warning:", e.message || e);
@@ -557,7 +579,7 @@ async function sendSubscriptionInvoice(params, db) {
     html,
   });
 
-  // 3. Persist Delivery Audit Record in Firestore
+  // 3. Persist Delivery Audit Record in Firestore (isolated under organisation/{orgId}/invoices/{txnid})
   if (db && txnid) {
     try {
       const invoiceRecord = {
@@ -582,9 +604,9 @@ async function sendSubscriptionInvoice(params, db) {
         updatedAt: new Date(),
       };
 
-      await db.collection("invoices").doc(txnid).set(invoiceRecord, { merge: true });
-
       if (orgId) {
+        await db.collection("organisation").doc(orgId).collection("invoices").doc(txnid).set(invoiceRecord, { merge: true });
+
         await db.collection("organisation").doc(orgId).collection("data").doc("subscription").set({
           lastInvoice: {
             invoiceNo,
@@ -593,6 +615,9 @@ async function sendSubscriptionInvoice(params, db) {
             emailMessageId: result.messageId || null,
           },
         }, { merge: true });
+      } else {
+        // Fallback only if orgId is completely unknown
+        await db.collection("invoices").doc(txnid).set(invoiceRecord, { merge: true });
       }
     } catch (dbErr) {
       logger.warn("Failed to persist invoice audit record:", dbErr.message || dbErr);
@@ -814,8 +839,8 @@ async function sendSubscriptionExpiryReminder(params, db) {
         sentAt: new Date(),
       };
 
-      // Write to audit collection
-      await db.collection("subscription_reminders").doc(reminderDocId).set(reminderRecord, { merge: true });
+      // Write to organization subcollection (isolated under organisation/{orgId}/subscription_reminders)
+      await db.collection("organisation").doc(orgId).collection("subscription_reminders").doc(reminderDocId).set(reminderRecord, { merge: true });
 
       // Update subscription document to permanently record that this period received its reminder
       if (result.success) {

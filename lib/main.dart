@@ -44,10 +44,12 @@ void main() async {
     debugPrint('Dotenv initialization warning: $e');
   }
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await FirestoreService.initialize();
-  await AppTheme.initialize();
-  await AuthService.initialize();
-  await OfflineSyncService.initialize();
+  await Future.wait([
+    FirestoreService.initialize(),
+    AppTheme.initialize(),
+    AuthService.initialize(),
+    OfflineSyncService.initialize(),
+  ]);
 
   // Initialize FCM: request permissions, foreground listener
   await NotificationService.initialize(navigatorKey);

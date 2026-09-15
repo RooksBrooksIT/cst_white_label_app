@@ -1,4 +1,5 @@
-﻿import 'dart:io';
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
@@ -29,6 +30,24 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   bool _isSubmitting = false;
   File? _imageFile;
 
+  // Real-time debounced validation states
+  Timer? _usernameDebounceTimer;
+  Timer? _contactNoDebounceTimer;
+  Timer? _emailDebounceTimer;
+  Timer? _fullNameDebounceTimer;
+
+  bool _isCheckingUsername = false;
+  String? _usernameError;
+
+  bool _isCheckingContactNo = false;
+  String? _contactNoError;
+
+  bool _isCheckingEmail = false;
+  String? _emailError;
+
+  bool _isCheckingFullName = false;
+  String? _fullNameError;
+
   int _supervisorInfoCurrentPage = 1;
   final int _supervisorInfoItemsPerPage = 10;
   String _supervisorSearchQuery = '';
@@ -42,28 +61,198 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     super.initState();
   }
 
-  Future<bool> _isUsernameUnique(String username) async {
-    try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'supervisor',
-      ).where('UserName', isEqualTo: username.trim()).get();
+  // ── UNIQUENESS CHECKS AGAINST BACKEND/DATABASE ─────────────────────────
 
-      return querySnapshot.docs.isEmpty;
+  Future<bool> _isUsernameUnique(String username, {String? excludeDocId}) async {
+    if (username.trim().isEmpty) return true;
+    return await FirestoreService.isGlobalSupervisorUsernameUnique(
+      username,
+      excludeDocId: excludeDocId,
+    );
+  }
+
+  Future<bool> _isContactNoUnique(String contactNo, {String? excludeDocId}) async {
+    if (contactNo.trim().isEmpty) return true;
+    return await FirestoreService.isGlobalPhoneUnique(
+      contactNo,
+      excludeDocId: excludeDocId,
+    );
+  }
+
+  Future<bool> _isEmailUnique(String email, {String? excludeDocId}) async {
+    if (email.trim().isEmpty) return true;
+    return await FirestoreService.isGlobalEmailUnique(
+      email,
+      excludeDocId: excludeDocId,
+    );
+  }
+
+  Future<bool> _isFullNameUnique(String fullName, {String? excludeDocId}) async {
+    final cleanInput = fullName.trim().toLowerCase();
+    if (cleanInput.isEmpty) return true;
+    try {
+      final snapshot = await FirestoreService.getCollection('supervisor').get();
+      for (var doc in snapshot.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) continue;
+        final data = doc.data();
+        final existing = (data['FullName'] ?? data['fullName'] ?? data['name'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        if (existing.isNotEmpty && existing == cleanInput) return false;
+      }
+      return true;
     } catch (e) {
-      return false;
+      debugPrint('Error checking supervisor fullName uniqueness: $e');
+      return true;
     }
   }
 
-  Future<bool> _isContactNoUnique(String contactNo) async {
-    try {
-      final querySnapshot = await FirestoreService.getCollection(
-        'supervisor',
-      ).where('ContactNo', isEqualTo: contactNo.trim()).get();
+  // ── REAL-TIME DEBOUNCED INPUT HANDLERS ─────────────────────────────────
 
-      return querySnapshot.docs.isEmpty;
-    } catch (e) {
-      return false;
+  void _onFullNameChanged(String value) {
+    _fullNameDebounceTimer?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _isCheckingFullName = false;
+        _fullNameError = null;
+      });
+      return;
     }
+
+    setState(() {
+      _isCheckingFullName = true;
+      _fullNameError = null;
+    });
+
+    _fullNameDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final isUnique = await _isFullNameUnique(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _isCheckingFullName = false;
+        if (!isUnique) {
+          _fullNameError = 'Full name already exists. Please use a unique name.';
+        } else {
+          _fullNameError = null;
+        }
+      });
+    });
+  }
+
+  void _onUsernameChanged(String value) {
+    _usernameDebounceTimer?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingUsername = true;
+      _usernameError = null;
+    });
+
+    _usernameDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final isUnique = await _isUsernameUnique(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _isCheckingUsername = false;
+        if (!isUnique) {
+          _usernameError = 'Username already exists. Please choose another username.';
+        } else {
+          _usernameError = null;
+        }
+      });
+    });
+  }
+
+  void _onContactNoChanged(String value) {
+    _contactNoDebounceTimer?.cancel();
+    final trimmed = value.trim().replaceAll(RegExp(r'\D'), '');
+    if (trimmed.isEmpty) {
+      setState(() {
+        _isCheckingContactNo = false;
+        _contactNoError = null;
+      });
+      return;
+    }
+
+    if (trimmed.length != 10) {
+      setState(() {
+        _isCheckingContactNo = false;
+        _contactNoError = 'Phone number must be exactly 10 digits';
+      });
+      return;
+    }
+
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(trimmed)) {
+      setState(() {
+        _isCheckingContactNo = false;
+        _contactNoError = 'Enter a valid 10-digit phone number (starts with 6-9)';
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingContactNo = true;
+      _contactNoError = null;
+    });
+
+    _contactNoDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final isUnique = await _isContactNoUnique(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _isCheckingContactNo = false;
+        if (!isUnique) {
+          _contactNoError = 'Phone number already registered. Please use another number.';
+        } else {
+          _contactNoError = null;
+        }
+      });
+    });
+  }
+
+  void _onEmailChanged(String value) {
+    _emailDebounceTimer?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _isCheckingEmail = false;
+        _emailError = null;
+      });
+      return;
+    }
+
+    final emailRegex = RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(trimmed)) {
+      setState(() {
+        _isCheckingEmail = false;
+        _emailError = 'Enter a valid email address (e.g. name@domain.com)';
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingEmail = true;
+      _emailError = null;
+    });
+
+    _emailDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final isUnique = await _isEmailUnique(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _isCheckingEmail = false;
+        if (!isUnique) {
+          _emailError = 'Email address already registered. Please use another email address.';
+        } else {
+          _emailError = null;
+        }
+      });
+    });
   }
 
   Future<void> _validateAndSubmit() async {
@@ -73,24 +262,79 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
 
     if (_isSubmitting) return;
 
+    if (_fullNameError != null ||
+        _usernameError != null ||
+        _contactNoError != null ||
+        _emailError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please resolve duplicate or invalid field errors before saving.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
 
     try {
+      final fullName = _fullNameController.text.trim();
       final username = _userNameController.text.trim();
-      final contactNo = _contactNoController.text.trim();
+      final contactNo = _contactNoController.text.trim().replaceAll(RegExp(r'\D'), '');
+      final email = _emailController.text.trim();
 
-      bool isUsernameUnique = await _isUsernameUnique(username);
-      if (!isUsernameUnique) {
+      if (contactNo.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(contactNo)) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid 10-digit phone number (starts with 6-9).'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      if (email.isNotEmpty && !RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid email address (e.g. name@domain.com).'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      bool isFullNameUniqueVal = await _isFullNameUnique(fullName);
+      if (!isFullNameUniqueVal) {
+        if (!mounted) return;
+        setState(() => _fullNameError = 'Full name already exists. Please use a unique name.');
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Username "$username" is already taken. Please choose a different one.',
-            ),
+            content: Text('Full name "$fullName" already exists. Please use a unique name.'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
+          ),
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      bool isUsernameUniqueVal = await _isUsernameUnique(username);
+      if (!isUsernameUniqueVal) {
+        if (!mounted) return;
+        setState(() => _usernameError = 'Username already exists. Please choose another username.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Username already exists. Please choose another username.',
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
         setState(() {
@@ -99,22 +343,44 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         return;
       }
 
-      bool isContactNoUnique = await _isContactNoUnique(contactNo);
-      if (!isContactNoUnique) {
+      bool isContactNoUniqueVal = await _isContactNoUnique(contactNo);
+      if (!isContactNoUniqueVal) {
         if (!mounted) return;
+        setState(() => _contactNoError = 'Phone number already registered. Please use another number.');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
-              'Contact number "$contactNo" is already registered. Please use a different one.',
+              'Phone number already registered. Please use another number.',
             ),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
+            duration: Duration(seconds: 3),
           ),
         );
         setState(() {
           _isSubmitting = false;
         });
         return;
+      }
+
+      if (email.isNotEmpty) {
+        bool isEmailUniqueVal = await _isEmailUnique(email);
+        if (!isEmailUniqueVal) {
+          if (!mounted) return;
+          setState(() => _emailError = 'Email address already registered. Please use another email address.');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Email address already registered. Please use another email address.',
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          setState(() {
+            _isSubmitting = false;
+          });
+          return;
+        }
       }
 
       await _createSupervisorAccount();
@@ -194,7 +460,9 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                               newImageFile = File(pickedFile.path);
                             });
                           }
-                        } catch (e) {}
+                        } catch (e) {
+                          debugPrint('Error picking supervisor photo: $e');
+                        }
                       },
                       child: Container(
                         height: 90,
@@ -296,8 +564,12 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                         LengthLimitingTextInputFormatter(10),
                       ],
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        if (v.trim().length != 10) return 'Must be 10 digits';
+                        if (v == null || v.trim().isEmpty) return 'Contact number is required';
+                        final clean = v.trim().replaceAll(RegExp(r'\D'), '');
+                        if (clean.length != 10) return 'Phone number must be exactly 10 digits';
+                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                          return 'Enter a valid 10-digit phone number (starts with 6-9)';
+                        }
                         return null;
                       },
                     ),
@@ -311,6 +583,14 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                         prefixIcon: Icon(Icons.email, color: primaryColor),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
+                      validator: (v) {
+                        if (v != null && v.trim().isNotEmpty) {
+                          if (!RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v.trim())) {
+                            return 'Enter a valid email address (e.g. name@domain.com)';
+                          }
+                        }
+                        return null;
+                      },
                     ),
                   ],
                 ),
@@ -330,6 +610,70 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                       setDialogState(() => isSubmittingEdit = true);
 
                       try {
+                        final editUsername = userNameCtrl.text.trim();
+                        final editContactNo = contactNoCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
+                        final editEmail = emailCtrl.text.trim();
+
+                        if (editContactNo.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(editContactNo)) {
+                          setDialogState(() => isSubmittingEdit = false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter a valid 10-digit phone number (starts with 6-9).'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (editEmail.isNotEmpty && !RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(editEmail)) {
+                          setDialogState(() => isSubmittingEdit = false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter a valid email address (e.g. name@domain.com).'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (!(await _isUsernameUnique(editUsername, excludeDocId: documentId))) {
+                          setDialogState(() => isSubmittingEdit = false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Username already exists. Please choose another username.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (!(await _isContactNoUnique(editContactNo, excludeDocId: documentId))) {
+                          setDialogState(() => isSubmittingEdit = false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Phone number already registered. Please use another number.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (editEmail.isNotEmpty && !(await _isEmailUnique(editEmail, excludeDocId: documentId))) {
+                          setDialogState(() => isSubmittingEdit = false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Email address already registered. Please use another email address.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
                         String photoUrl = existingPhotoUrl;
                         if (newImageFile != null) {
                           try {
@@ -346,11 +690,11 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
 
                         await FirestoreService.getCollection('supervisor').doc(documentId).update({
                           'FullName': fullNameCtrl.text.trim(),
-                          'UserName': userNameCtrl.text.trim(),
+                          'UserName': editUsername,
                           'Password': passwordCtrl.text.trim(),
                           'Designation': designationCtrl.text.trim(),
-                          'ContactNo': contactNoCtrl.text.trim(),
-                          'Email': emailCtrl.text.trim(),
+                          'ContactNo': editContactNo,
+                          'Email': editEmail,
                           'Photo': photoUrl,
                           'updatedAt': FieldValue.serverTimestamp(),
                         });
@@ -564,6 +908,10 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   }
 
   void _resetForm() {
+    _usernameDebounceTimer?.cancel();
+    _contactNoDebounceTimer?.cancel();
+    _emailDebounceTimer?.cancel();
+    _fullNameDebounceTimer?.cancel();
     _formKey.currentState?.reset();
     _fullNameController.clear();
     _userNameController.clear();
@@ -574,11 +922,23 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     setState(() {
       _imageFile = null;
       _isPasswordVisible = false;
+      _usernameError = null;
+      _contactNoError = null;
+      _emailError = null;
+      _fullNameError = null;
+      _isCheckingUsername = false;
+      _isCheckingContactNo = false;
+      _isCheckingEmail = false;
+      _isCheckingFullName = false;
     });
   }
 
   @override
   void dispose() {
+    _usernameDebounceTimer?.cancel();
+    _contactNoDebounceTimer?.cancel();
+    _emailDebounceTimer?.cancel();
+    _fullNameDebounceTimer?.cancel();
     _designationController.dispose();
     _fullNameController.dispose();
     _userNameController.dispose();
@@ -795,6 +1155,11 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                     _fullNameController,
                     isRequired: true,
                     icon: Icons.person_rounded,
+                    onChanged: _onFullNameChanged,
+                    isChecking: _isCheckingFullName,
+                    checkingText: 'Checking name availability...',
+                    errorText: _fullNameError,
+                    successText: 'Full name is available ✓',
                   ),
                   const SizedBox(height: 14),
                   _buildTextField(
@@ -802,6 +1167,11 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                     _userNameController,
                     isRequired: true,
                     icon: Icons.account_circle_rounded,
+                    onChanged: _onUsernameChanged,
+                    isChecking: _isCheckingUsername,
+                    checkingText: 'Checking username...',
+                    errorText: _usernameError,
+                    successText: 'Username is available ✓',
                   ),
                   const SizedBox(height: 14),
                   _buildTextField(
@@ -829,6 +1199,24 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(10),
                     ],
+                    onChanged: _onContactNoChanged,
+                    isChecking: _isCheckingContactNo,
+                    checkingText: 'Checking phone number...',
+                    errorText: _contactNoError,
+                    successText: 'Phone number is available ✓',
+                    customValidator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Contact number is required';
+                      }
+                      final clean = val.trim();
+                      if (clean.length != 10) {
+                        return 'Phone number must be exactly 10 digits';
+                      }
+                      if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                        return 'Enter a valid 10-digit phone number (starts with 6-9)';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 14),
                   _buildTextField(
@@ -836,6 +1224,20 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                     _emailController,
                     keyboardType: TextInputType.emailAddress,
                     icon: Icons.email_rounded,
+                    onChanged: _onEmailChanged,
+                    isChecking: _isCheckingEmail,
+                    checkingText: 'Checking email...',
+                    errorText: _emailError,
+                    successText: 'Mail ID is available ✓',
+                    customValidator: (val) {
+                      if (val != null && val.trim().isNotEmpty) {
+                        final clean = val.trim();
+                        if (!RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(clean)) {
+                          return 'Enter a valid email address (e.g. name@domain.com)';
+                        }
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
 
@@ -861,8 +1263,17 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
     IconData? icon,
+    ValueChanged<String>? onChanged,
+    bool isChecking = false,
+    String checkingText = 'Checking availability...',
+    String? errorText,
+    String? successText,
+    String? Function(String?)? customValidator,
   }) {
     final brandIconColor = Theme.of(context).primaryColor;
+    final hasValue = controller.text.trim().isNotEmpty;
+    final hasError = errorText != null && errorText.isNotEmpty;
+    final isSuccess = hasValue && !isChecking && !hasError && successText != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -880,13 +1291,19 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+            border: Border.all(
+              color: hasError
+                  ? const Color(0xFFDC2626)
+                  : (isSuccess ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1)),
+              width: (hasError || isSuccess) ? 1.5 : 1.0,
+            ),
           ),
           child: TextFormField(
             controller: controller,
             obscureText: isPassword ? !_isPasswordVisible : false,
             keyboardType: keyboardType,
             inputFormatters: inputFormatters,
+            onChanged: onChanged,
             style: const TextStyle(
               color: Color(0xFF0A183D),
               fontSize: 14.5,
@@ -902,7 +1319,13 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
               prefixIcon: icon != null
                   ? Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(icon, color: brandIconColor, size: 20),
+                      child: Icon(
+                        icon,
+                        color: hasError
+                            ? const Color(0xFFDC2626)
+                            : (isSuccess ? const Color(0xFF16A34A) : brandIconColor),
+                        size: 20,
+                      ),
                     )
                   : null,
               suffixIcon: isPassword
@@ -919,7 +1342,23 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                         });
                       },
                     )
-                  : null,
+                  : (isChecking
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF64748B)),
+                            ),
+                          ),
+                        )
+                      : (hasError
+                          ? const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 20)
+                          : (isSuccess
+                              ? const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20)
+                              : null))),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -928,26 +1367,70 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
             ),
             validator: (value) {
               if (isRequired && (value == null || value.trim().isEmpty)) {
-                return 'This field is required';
+                return '$label is required';
               }
-              if (label == 'Contact No' &&
-                  value != null &&
-                  value.trim().isNotEmpty) {
-                if (value.trim().length != 10) {
-                  return 'Phone number must be 10 digits';
-                }
+              if (customValidator != null) {
+                final customErr = customValidator(value);
+                if (customErr != null) return customErr;
               }
-              if (label == 'Email' && value != null && value.trim().isNotEmpty) {
-                if (!RegExp(
-                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                ).hasMatch(value.trim())) {
-                  return 'Please enter a valid email address';
-                }
+              if (errorText != null) {
+                return errorText;
               }
               return null;
             },
           ),
         ),
+        if (hasValue && (isChecking || hasError || isSuccess))
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Row(
+              children: [
+                if (isChecking) ...[
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.8,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF64748B)),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    checkingText,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ] else if (hasError) ...[
+                  const Icon(Icons.error_outline_rounded, size: 13, color: Color(0xFFDC2626)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      errorText,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ] else if (isSuccess) ...[
+                  const Icon(Icons.check_circle_outline_rounded, size: 13, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 4),
+                  Text(
+                    successText,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
       ],
     );
   }

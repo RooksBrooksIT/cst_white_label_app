@@ -621,28 +621,28 @@ class _ProjectScreenState extends State<ProjectScreen>
         }
 
         projectData['siteId'] = _selectedSiteId;
-        projectData['createdAt'] = FieldValue.serverTimestamp();
+        final targetSiteName = _projectNameController.text.trim();
 
-        final query = await FirestoreService.getCollection(
-          'projects',
-        ).where('siteId', isEqualTo: _selectedSiteId).get();
+        final projectResult = await FirestoreService.createProjectDocumentAtomic(
+          siteId: _selectedSiteId!,
+          siteName: targetSiteName,
+          projectData: projectData,
+        );
 
-        if (query.docs.isNotEmpty) {
-          final docId = query.docs.first.id;
-          await FirestoreService.getCollection(
-            'projects',
-          ).doc(docId).update(projectData);
-        } else {
-          await FirestoreService.getCollection('projects').add(projectData);
+        if (projectResult.isDuplicate) {
+          // If project already existed, merge updates into it safely
+          await FirestoreService.getCollection('projects')
+              .doc(projectResult.projectDocId)
+              .set(projectData, SetOptions(merge: true));
         }
 
         try {
           await NotificationService.notifyProjectCreatedOrUpdated(
-            projectId: _selectedSiteId ?? '',
+            projectId: projectResult.projectDocId,
             projectName: _projectNameController.text.trim(),
             siteId: _selectedSiteId ?? '',
-            siteName: _selectedSiteId ?? '',
-            isCreated: true,
+            siteName: targetSiteName,
+            isCreated: !projectResult.isDuplicate,
           );
         } catch (notifErr) {
           debugPrint('Error notifying project create: $notifErr');

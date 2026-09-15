@@ -479,6 +479,16 @@ class MaterialTransactionRecord {
 
 /// Central Unified Engine for Material Inventory, Availability, Allocation, and Consumption
 class MaterialInventoryService {
+  static final Map<String, double> _masterRatesCache = {};
+  static DateTime? _masterRatesCacheTime;
+  static const Duration _ratesCacheDuration = Duration(minutes: 5);
+
+  /// Invalidate material unit rates cache
+  static void invalidateRatesCache() {
+    _masterRatesCache.clear();
+    _masterRatesCacheTime = null;
+  }
+
   /// Converts a material name (e.g. "Cement OPC" or "Steel 12mm") into a standardized doc ID (e.g. "cement_opc")
   static String getMaterialDocId(String materialName) {
     return materialName.trim().toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
@@ -497,22 +507,36 @@ class MaterialInventoryService {
   /// Calculates effective unit rate, records allocation history, updates the Site Material Pool,
   /// Fetches the configured master unit rate for a material from the 'materials' collection.
   static Future<double> fetchConfiguredMaterialUnitRate(String materialName) async {
+    final target = materialName.trim().toLowerCase();
+    if (target.isEmpty) return 0.0;
+
+    final cachedTime = _masterRatesCacheTime;
+    if (cachedTime != null &&
+        DateTime.now().difference(cachedTime) < _ratesCacheDuration &&
+        _masterRatesCache.containsKey(target)) {
+      return _masterRatesCache[target] ?? 0.0;
+    }
+
     try {
       if (!FirestoreService.isReady) {
         await FirestoreService.initialize();
       }
       final snap = await FirestoreService.getCollection('materials').get();
-      final target = materialName.trim().toLowerCase();
+      _masterRatesCache.clear();
       for (final doc in snap.docs) {
         final data = doc.data();
         final name = (data['materialName'] ?? data['matName'] ?? '').toString().trim().toLowerCase();
-        if (name == target) {
+        if (name.isNotEmpty) {
           final price = (data['unitPrice'] as num?)?.toDouble() ??
               double.tryParse((data['materialPrice'] ?? '0').toString()) ??
               0.0;
-          if (price > 0) return price;
+          if (price > 0) {
+            _masterRatesCache[name] = price;
+          }
         }
       }
+      _masterRatesCacheTime = DateTime.now();
+      return _masterRatesCache[target] ?? 0.0;
     } catch (e) {
       debugPrint('Error fetching configured unit rate for $materialName: $e');
     }
@@ -776,8 +800,14 @@ class MaterialInventoryService {
 
       final cleanLow = cleanSiteId.toLowerCase();
 
-      // 1. Fetch pool documents matching site (flexible case & docId matching)
-      final poolSnap = await FirestoreService.siteMaterialPool.get();
+      final results = await Future.wait([
+        FirestoreService.siteMaterialPool.get(),
+        fetchSiteRecordedConsumptions(cleanSiteId),
+        fetchSiteInventory(cleanSiteId),
+        FirestoreService.getCollection('materials').get(),
+      ]);
+
+      final poolSnap = results[0] as QuerySnapshot<Map<String, dynamic>>;
       final Map<String, SiteMaterialPoolItem> poolMap = {};
 
       for (final doc in poolSnap.docs) {
@@ -801,13 +831,9 @@ class MaterialInventoryService {
         }
       }
 
-      // 2. Fetch recorded consumptions for this site from dailyMaterialConsumptions & siteSupervisorEntries
-      final Map<String, double> recordedConsumptions = await fetchSiteRecordedConsumptions(cleanSiteId);
-
-      // 3. Fetch legacy inventory & master materials to resolve accurate allocated stock and specific units
-      final legacyList = await fetchSiteInventory(cleanSiteId);
-
-      final masterSnap = await FirestoreService.getCollection('materials').get();
+      final recordedConsumptions = results[1] as Map<String, double>;
+      final legacyList = results[2] as List<Map<String, dynamic>>;
+      final masterSnap = results[3] as QuerySnapshot<Map<String, dynamic>>;
       final Map<String, String> masterUnits = {};
       final Map<String, double> masterPrices = {};
       for (final d in masterSnap.docs) {

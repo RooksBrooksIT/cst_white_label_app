@@ -413,12 +413,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   ) async {
     final snapshot = await FirestoreService.getCollection(
       collection,
-    ).orderBy(FieldPath.documentId).get();
+    ).get();
     int maxNum = 0;
+    final regex = RegExp('^${RegExp.escape(prefix)}(\\d+)');
     for (var doc in snapshot.docs) {
-      final id = field != null ? (doc[field]?.toString() ?? '') : doc.id;
-      if (id.startsWith(prefix)) {
-        final numPart = int.tryParse(id.substring(prefix.length));
+      final id = field != null ? (doc.data()[field]?.toString() ?? '') : doc.id;
+      final match = regex.firstMatch(id);
+      if (match != null) {
+        final numPart = int.tryParse(match.group(1)!);
         if (numPart != null && numPart > maxNum) maxNum = numPart;
       }
     }
@@ -447,177 +449,57 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                color: AppTheme.primaryColor.value,
-                strokeWidth: 3,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                skipSupervisorMapping
-                    ? 'Saving project details...'
-                    : 'Setting up your project...',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0A183D),
+      builder: (context) => PopScope(
+        canPop: false,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Please wait while we initialize services',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-              ),
-            ],
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  color: AppTheme.primaryColor.value,
+                  strokeWidth: 3,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  skipSupervisorMapping
+                      ? 'Saving project & site details...'
+                      : 'Creating Project & Site...',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A183D),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Processing and saving data securely. Please wait...',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
 
     try {
-      final siteId = await _getNextId('Site', 'ST', 'siteId');
-      final projectId = await _getNextId('projects', 'PR', null);
-      final siteDocId =
-          '${siteId}_${_siteNameController.text.trim().replaceAll(' ', '')}';
+      final minWait = Future.delayed(const Duration(seconds: 5));
+      final saveTask = _executeWizardBackendSave(skipSupervisorMapping);
 
-      // Save Site
-      final siteData = {
-        'siteId': siteId,
-        'siteName': _siteNameController.text.trim(),
-        'location': _locationController.text.trim(),
-        'latitude': double.tryParse(_latitudeController.text),
-        'longitude': double.tryParse(_longitudeController.text),
-        'projectCategory': _siteProjectCategory,
-        'startDate': _siteStartDate != null
-            ? DateFormat('yyyy-MM-dd').format(_siteStartDate!)
-            : '',
-        'endDate': _siteEndDate != null
-            ? DateFormat('yyyy-MM-dd').format(_siteEndDate!)
-            : '',
-        'status': _siteStatus ?? 'Ongoing',
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-      await FirestoreService.getCollection('Site').doc(siteDocId).set(siteData);
-
-      // Save Project
-      final projectData = {
-        'projectName': _projectNameController.text.trim(),
-        'ownerName': _ownerNameController.text.trim(),
-        'ownerPhoneNumber': _ownerPhoneController.text.trim(),
-        'amountPaid': double.tryParse(_amountPaidController.text) ?? 0,
-        'amountReceived': double.tryParse(_amountPaidController.text) ?? 0,
-        'amountSpent': 0.0,
-        'amountSpend': 0.0,
-        'amountBalance': double.tryParse(_amountPaidController.text) ?? 0,
-        'receivedPayments': double.tryParse(_amountPaidController.text) ?? 0,
-        'projectBudget': double.tryParse(_projectBudgetController.text) ?? 0,
-        'projectCategory': _siteProjectCategory ?? '',
-        'projectSubCategory': _projectSubCategory ?? '',
-        'projectContract': _projectContract ?? '',
-        'projectStage': _projectStage ?? '',
-        'currentStatus':
-            _projectStatus ?? (_statuses.isNotEmpty ? _statuses.first : ''),
-        'plannedStartDate': _siteStartDate != null
-            ? Timestamp.fromDate(_siteStartDate!)
-            : Timestamp.now(),
-        'plannedEndDate': _siteEndDate != null
-            ? Timestamp.fromDate(_siteEndDate!)
-            : null,
-        'actualStateDate': _actualStartDate != null
-            ? Timestamp.fromDate(_actualStartDate!)
-            : null,
-        'actualEndDate': _actualEndDate != null
-            ? Timestamp.fromDate(_actualEndDate!)
-            : null,
-        'contractStartDate': _contractStartDate != null
-            ? Timestamp.fromDate(_contractStartDate!)
-            : null,
-        'contractEndDate': _contractEndDate != null
-            ? Timestamp.fromDate(_contractEndDate!)
-            : null,
-        'isContractWork': _isContractWork,
-        'contractorName':
-            _isContractWork ? _contractorNameController.text.trim() : null,
-        'contractorBudget': _isContractWork
-            ? (double.tryParse(_contractorBudgetController.text) ?? 0.0)
-            : null,
-        'siteId': siteDocId,
-        'siteName': _siteNameController.text.trim(),
-        'siteLocation': _locationController.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'projectType': _siteProjectCategory ?? '',
-        'status':
-            _projectStatus ?? (_statuses.isNotEmpty ? _statuses.first : ''),
-      };
-      await FirestoreService.getCollection(
-        'projects',
-      ).doc(projectId).set(projectData);
-
-      // Initialize Expenses
-      await FirestoreService.getCollection(
-        'totalSiteExpensesPerDay',
-      ).doc(siteDocId).set({
-        'siteId': siteDocId,
-        'siteCode': siteId,
-        'siteName': _siteNameController.text.trim(),
-        'totalMgrExpense': 0.0,
-        'totalOrgExpense': 0.0,
-        'totalSiteExpense': 0.0,
-        'totalContractorExpense': 0.0,
-        'totalIncentiveExpenses': 0.0,
-        'totalAllExpenses': 0.0,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // Central financial sync
-      await ExpenseService.recalcTotalsAndSyncProject(siteDocId);
-
-      if (!skipSupervisorMapping && _selectedSupervisorId != null) {
-        // Map Supervisor
-        final supervisorMapId =
-            '${siteId}_${_locationController.text.trim().replaceAll(' ', '')}_$_selectedSupervisorId';
-        await FirestoreService.getCollection(
-          'siteSupervisorMap',
-        ).doc(supervisorMapId).set({
-          'site': siteDocId,
-          'siteId': siteId,
-          'siteName': _siteNameController.text.trim(),
-          'projectName': _projectNameController.text.trim(),
-          'supervisor': _selectedSupervisorName,
-          'Supervisor ID': _selectedSupervisorId,
-          'supervisorId': _selectedSupervisorId,
-          'location': _locationController.text.trim(),
-          'projectStage': _mapProjectStage ?? _projectStage,
-          'siteComments': _commentsController.text.trim(),
-          'joinedOn': _joinedDate != null
-              ? DateFormat('yyyy-MM-dd').format(_joinedDate!)
-              : '',
-          'startDate': _siteStartDate != null
-              ? DateFormat('yyyy-MM-dd').format(_siteStartDate!)
-              : '',
-          'endDate': _siteEndDate != null
-              ? DateFormat('yyyy-MM-dd').format(_siteEndDate!)
-              : '',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
+      await Future.wait([saveTask, minWait]);
 
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
@@ -625,11 +507,155 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       }
     } catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        _showErrorSnackBar('Error saving project: $e');
+        Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _executeWizardBackendSave(bool skipSupervisorMapping) async {
+    final siteId = await _getNextId('Site', 'ST', 'siteId');
+    final siteDocId =
+        '${siteId}_${_siteNameController.text.trim().replaceAll(' ', '')}';
+
+    final double budget = double.tryParse(_projectBudgetController.text.replaceAll(',', '').trim()) ?? 0.0;
+    final double amountPaid = double.tryParse(_amountPaidController.text.replaceAll(',', '').trim()) ?? 0.0;
+
+    final parsedLat = double.tryParse(_latitudeController.text.trim());
+    final parsedLng = double.tryParse(_longitudeController.text.trim());
+    final effectiveCategory = _siteProjectCategory ?? '';
+    final effectiveStatus = _projectStatus ?? _siteStatus ?? (_statuses.isNotEmpty ? _statuses.first : 'Ongoing');
+
+    // Unified Project & Site payload storing all values into projects collection
+    final unifiedProjectData = <String, dynamic>{
+      'siteId': siteDocId,
+      'siteCode': siteId,
+      'siteName': _siteNameController.text.trim(),
+      'location': _locationController.text.trim(),
+      'siteLocation': _locationController.text.trim(),
+      'latitude': parsedLat,
+      'longitude': parsedLng,
+      'projectName': _projectNameController.text.trim(),
+      'ownerName': _ownerNameController.text.trim(),
+      'clientOwnerName': _ownerNameController.text.trim(),
+      'clientName': _ownerNameController.text.trim(),
+      'ownerPhoneNumber': _ownerPhoneController.text.trim(),
+      'clientPhone': _ownerPhoneController.text.trim(),
+      'amountPaid': amountPaid,
+      'amountReceived': amountPaid,
+      'amountSpent': 0.0,
+      'amountSpend': 0.0,
+      'amountBalance': amountPaid,
+      'balance': amountPaid,
+      'receivedPayments': amountPaid,
+      'projectBudget': budget,
+      'estimatedBudget': budget,
+      'projectCategory': effectiveCategory,
+      'projectType': effectiveCategory,
+      'projectSubCategory': _projectSubCategory ?? '',
+      'projectContract': _projectContract ?? '',
+      'projectContractType': _projectContract ?? '',
+      'projectStage': _projectStage ?? '',
+      'currentStatus': effectiveStatus,
+      'status': effectiveStatus,
+      'startDate': _siteStartDate != null
+          ? Timestamp.fromDate(_siteStartDate!)
+          : Timestamp.now(),
+      'plannedStartDate': _siteStartDate != null
+          ? Timestamp.fromDate(_siteStartDate!)
+          : Timestamp.now(),
+      'endDate': _siteEndDate != null
+          ? Timestamp.fromDate(_siteEndDate!)
+          : null,
+      'plannedEndDate': _siteEndDate != null
+          ? Timestamp.fromDate(_siteEndDate!)
+          : null,
+      'actualStartDate': _actualStartDate != null
+          ? Timestamp.fromDate(_actualStartDate!)
+          : null,
+      'actualStateDate': _actualStartDate != null
+          ? Timestamp.fromDate(_actualStartDate!)
+          : null,
+      'actualEndDate': _actualEndDate != null
+          ? Timestamp.fromDate(_actualEndDate!)
+          : null,
+      'contractStartDate': _contractStartDate != null
+          ? Timestamp.fromDate(_contractStartDate!)
+          : null,
+      'contractEndDate': _contractEndDate != null
+          ? Timestamp.fromDate(_contractEndDate!)
+          : null,
+      'isContractWork': _isContractWork,
+      'contractorName':
+          _isContractWork ? _contractorNameController.text.trim() : null,
+      'contractorBudget': _isContractWork
+          ? (double.tryParse(_contractorBudgetController.text.replaceAll(',', '')) ?? 0.0)
+          : null,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    await FirestoreService.createProjectDocumentAtomic(
+      siteId: siteId,
+      siteName: _siteNameController.text.trim(),
+      siteLocation: _locationController.text.trim(),
+      projectData: unifiedProjectData,
+    );
+
+    // Initialize Expenses
+    await FirestoreService.getCollection(
+      'totalSiteExpensesPerDay',
+    ).doc(siteDocId).set({
+      'siteId': siteDocId,
+      'siteCode': siteId,
+      'siteName': _siteNameController.text.trim(),
+      'totalMgrExpense': 0.0,
+      'totalOrgExpense': 0.0,
+      'totalSiteExpense': 0.0,
+      'totalContractorExpense': 0.0,
+      'totalIncentiveExpenses': 0.0,
+      'totalAllExpenses': 0.0,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // Central financial sync
+    await ExpenseService.recalcTotalsAndSyncProject(siteDocId);
+
+    if (!skipSupervisorMapping && _selectedSupervisorId != null) {
+      // Map Supervisor
+      final supervisorMapId =
+          '${siteId}_${_locationController.text.trim().replaceAll(' ', '')}_$_selectedSupervisorId';
+      await FirestoreService.getCollection(
+        'siteSupervisorMap',
+      ).doc(supervisorMapId).set({
+        'site': siteDocId,
+        'siteId': siteId,
+        'siteName': _siteNameController.text.trim(),
+        'projectName': _projectNameController.text.trim(),
+        'supervisor': _selectedSupervisorName,
+        'Supervisor ID': _selectedSupervisorId,
+        'supervisorId': _selectedSupervisorId,
+        'location': _locationController.text.trim(),
+        'projectStage': _mapProjectStage ?? _projectStage,
+        'siteComments': _commentsController.text.trim(),
+        'joinedOn': _joinedDate != null
+            ? DateFormat('yyyy-MM-dd').format(_joinedDate!)
+            : '',
+        'startDate': _siteStartDate != null
+            ? DateFormat('yyyy-MM-dd').format(_siteStartDate!)
+            : '',
+        'endDate': _siteEndDate != null
+            ? DateFormat('yyyy-MM-dd').format(_siteEndDate!)
+            : '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
     }
   }
 
@@ -659,7 +685,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ),
             const SizedBox(height: 18),
             const Text(
-              'Project Created!',
+              'Project & Site Created!',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -667,13 +693,23 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Your project and site architecture have been configured successfully.',
+            const Text(
+              'Project & Site created successfully.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF10B981),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Your project and site architecture have been configured and saved securely.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
                 color: Colors.grey.shade600,
-                height: 1.4,
+                height: 1.35,
               ),
             ),
             const SizedBox(height: 20),
@@ -716,7 +752,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   ),
                 ),
                 child: const Text(
-                  'Done & Return to Dashboard',
+                  'OK / Continue to Dashboard',
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                 ),
               ),

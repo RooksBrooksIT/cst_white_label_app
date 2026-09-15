@@ -188,9 +188,12 @@ class PettyCashService {
           ? (await ExpenseService.resolveSiteKeys(siteId)).map((k) => k.toLowerCase()).toSet()
           : <String>{};
 
-      // 1. Query siteSupervisorEntries collection
-      final entriesSnap =
-          await FirestoreService.getCollection('siteSupervisorEntries').get();
+      // 1. Query siteSupervisorEntries and siteSupervisorPayments in parallel
+      final snaps = await Future.wait([
+        FirestoreService.getCollection('siteSupervisorEntries').get(),
+        FirestoreService.getCollection('siteSupervisorPayments').get(),
+      ]);
+      final entriesSnap = snaps[0];
       for (final doc in entriesSnap.docs) {
         final data = doc.data();
         final sSupId = (data['supervisorId'] ?? data['Supervisor ID'] ?? '')
@@ -235,9 +238,8 @@ class PettyCashService {
         }
       }
 
-      // 2. Query siteSupervisorPayments collection
-      final paymentsSnap =
-          await FirestoreService.getCollection('siteSupervisorPayments').get();
+      // 2. Process siteSupervisorPayments collection
+      final paymentsSnap = snaps[1];
       for (final doc in paymentsSnap.docs) {
         final data = doc.data();
         final sSiteId = (data['siteId'] ?? '').toString().trim();

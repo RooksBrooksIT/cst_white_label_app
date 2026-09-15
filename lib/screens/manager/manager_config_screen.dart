@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lottie/lottie.dart';
 import 'package:ebricks/services/firestore_service.dart';
@@ -123,56 +124,26 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
 
   Future<bool> _isUsernameUnique(String username, {String? excludeDocId}) async {
     if (username.trim().isEmpty) return true;
-    try {
-      final snapshot = await FirestoreService.getCollection('manager').get();
-      final cleanInput = username.trim().toLowerCase();
-      for (var doc in snapshot.docs) {
-        if (excludeDocId != null && doc.id == excludeDocId) continue;
-        final data = doc.data();
-        final existing = (data['UserName'] ?? data['username'] ?? '').toString().trim().toLowerCase();
-        if (existing.isNotEmpty && existing == cleanInput) return false;
-      }
-      return true;
-    } catch (e) {
-      debugPrint('Error checking username uniqueness: $e');
-      return true;
-    }
+    return await FirestoreService.isGlobalUsernameUnique(
+      username,
+      excludeDocId: excludeDocId,
+    );
   }
 
   Future<bool> _isContactNoUnique(String contactNo, {String? excludeDocId}) async {
     if (contactNo.trim().isEmpty) return true;
-    try {
-      final snapshot = await FirestoreService.getCollection('manager').get();
-      final cleanInput = contactNo.trim().replaceAll(RegExp(r'\D'), '');
-      for (var doc in snapshot.docs) {
-        if (excludeDocId != null && doc.id == excludeDocId) continue;
-        final data = doc.data();
-        final existing = (data['ContactNo'] ?? data['contactNo'] ?? data['phone'] ?? '').toString().trim().replaceAll(RegExp(r'\D'), '');
-        if (existing.isNotEmpty && cleanInput.isNotEmpty && existing == cleanInput) return false;
-      }
-      return true;
-    } catch (e) {
-      debugPrint('Error checking contactNo uniqueness: $e');
-      return true;
-    }
+    return await FirestoreService.isGlobalPhoneUnique(
+      contactNo,
+      excludeDocId: excludeDocId,
+    );
   }
 
   Future<bool> _isEmailUnique(String email, {String? excludeDocId}) async {
     if (email.trim().isEmpty) return true;
-    try {
-      final snapshot = await FirestoreService.getCollection('manager').get();
-      final cleanInput = email.trim().toLowerCase();
-      for (var doc in snapshot.docs) {
-        if (excludeDocId != null && doc.id == excludeDocId) continue;
-        final data = doc.data();
-        final existing = (data['Email'] ?? data['email'] ?? '').toString().trim().toLowerCase();
-        if (existing.isNotEmpty && cleanInput.isNotEmpty && existing == cleanInput) return false;
-      }
-      return true;
-    } catch (e) {
-      debugPrint('Error checking email uniqueness: $e');
-      return true;
-    }
+    return await FirestoreService.isGlobalEmailUnique(
+      email,
+      excludeDocId: excludeDocId,
+    );
   }
 
   Future<bool> _isFullNameUnique(String fullName, {String? excludeDocId}) async {
@@ -247,7 +218,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
       setState(() {
         _isCheckingUsername = false;
         if (!isUnique) {
-          _usernameError = 'Username already exists. Please use a different name.';
+          _usernameError = 'Username already exists. Please choose another username.';
         } else {
           _usernameError = null;
         }
@@ -257,11 +228,27 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
 
   void _onContactNoChanged(String value) {
     _contactNoDebounceTimer?.cancel();
-    final trimmed = value.trim();
+    final trimmed = value.trim().replaceAll(RegExp(r'\D'), '');
     if (trimmed.isEmpty) {
       setState(() {
         _isCheckingContactNo = false;
         _contactNoError = null;
+      });
+      return;
+    }
+
+    if (trimmed.length != 10) {
+      setState(() {
+        _isCheckingContactNo = false;
+        _contactNoError = 'Phone number must be exactly 10 digits';
+      });
+      return;
+    }
+
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(trimmed)) {
+      setState(() {
+        _isCheckingContactNo = false;
+        _contactNoError = 'Enter a valid 10-digit phone number (starts with 6-9)';
       });
       return;
     }
@@ -277,7 +264,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
       setState(() {
         _isCheckingContactNo = false;
         if (!isUnique) {
-          _contactNoError = 'Phone number already exists. Please use another phone number.';
+          _contactNoError = 'Phone number already registered. Please use another number.';
         } else {
           _contactNoError = null;
         }
@@ -296,6 +283,15 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
       return;
     }
 
+    final emailRegex = RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(trimmed)) {
+      setState(() {
+        _isCheckingEmail = false;
+        _emailError = 'Enter a valid email address (e.g. name@domain.com)';
+      });
+      return;
+    }
+
     setState(() {
       _isCheckingEmail = true;
       _emailError = null;
@@ -307,7 +303,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
       setState(() {
         _isCheckingEmail = false;
         if (!isUnique) {
-          _emailError = 'Mail ID already exists. Please use another mail.';
+          _emailError = 'Email address already registered. Please use another email address.';
         } else {
           _emailError = null;
         }
@@ -320,7 +316,22 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     if (_isSubmitting) return;
 
     if (_fullNameError != null || _usernameError != null || _contactNoError != null || _emailError != null) {
-      _showErrorSnackBar('Please resolve duplicate field errors before saving.');
+      _showErrorSnackBar('Please resolve duplicate or invalid field errors before saving.');
+      return;
+    }
+
+    final contactNo = _contactNoController.text.trim().replaceAll(RegExp(r'\D'), '');
+    final email = _emailController.text.trim();
+
+    if (contactNo.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(contactNo)) {
+      setState(() => _contactNoError = 'Enter a valid 10-digit phone number (starts with 6-9)');
+      _showErrorSnackBar('Please enter a valid 10-digit phone number.');
+      return;
+    }
+
+    if (email.isNotEmpty && !RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      setState(() => _emailError = 'Enter a valid email address (e.g. name@domain.com)');
+      _showErrorSnackBar('Please enter a valid email address.');
       return;
     }
 
@@ -344,8 +355,6 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
 
       final fullName = _fullNameController.text.trim();
       final username = _userNameController.text.trim();
-      final contactNo = _contactNoController.text.trim();
-      final email = _emailController.text.trim();
 
       if (!(await _isFullNameUnique(fullName))) {
         setState(() => _fullNameError = 'Full name already exists. Please use a unique name.');
@@ -355,22 +364,22 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
       }
 
       if (!(await _isUsernameUnique(username))) {
-        setState(() => _usernameError = 'Username already exists. Please use a different name.');
-        _showErrorSnackBar('Username "$username" already exists. Please use a different name.');
+        setState(() => _usernameError = 'Username already exists. Please choose another username.');
+        _showErrorSnackBar('Username already exists. Please choose another username.');
         setState(() => _isSubmitting = false);
         return;
       }
 
       if (!(await _isContactNoUnique(contactNo))) {
-        setState(() => _contactNoError = 'Phone number already exists. Please use another phone number.');
-        _showErrorSnackBar('Phone number "$contactNo" already exists. Please use another phone number.');
+        setState(() => _contactNoError = 'Phone number already registered. Please use another number.');
+        _showErrorSnackBar('Phone number already registered. Please use another number.');
         setState(() => _isSubmitting = false);
         return;
       }
 
       if (email.isNotEmpty && !(await _isEmailUnique(email))) {
-        setState(() => _emailError = 'Mail ID already exists. Please use another mail.');
-        _showErrorSnackBar('Mail ID "$email" already exists. Please use another mail.');
+        setState(() => _emailError = 'Email address already registered. Please use another email address.');
+        _showErrorSnackBar('Email address already registered. Please use another email address.');
         setState(() => _isSubmitting = false);
         return;
       }
@@ -635,6 +644,9 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
 
   void _showEditManagerModal(Map<String, dynamic> data, String docId) {
     final editFullNameController = TextEditingController(text: data['FullName'] ?? '');
+    final editUserNameController = TextEditingController(
+      text: (data['UserName'] ?? data['username'] ?? '').toString(),
+    );
     final editContactNoController = TextEditingController(text: data['ContactNo'] ?? '');
     final editEmailController = TextEditingController(text: data['Email'] ?? '');
     String? editDesignation = data['Designation'];
@@ -729,6 +741,19 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                       ),
                       const SizedBox(height: 14),
 
+                      // Username
+                      _buildModalFieldLabel('User Name *'),
+                      TextFormField(
+                        controller: editUserNameController,
+                        style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
+                        decoration: _getInputDecoration('User Name', Icons.alternate_email),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) return 'Username is required';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
                       // Designation
                       _buildModalFieldLabel('Designation *'),
                       DropdownButtonFormField<String>(
@@ -760,9 +785,21 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                       TextFormField(
                         controller: editContactNoController,
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
                         style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
                         decoration: _getInputDecoration('Contact Number', Icons.phone),
-                        validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) return 'Contact number is required';
+                          final clean = val.trim();
+                          if (clean.length != 10) return 'Phone number must be exactly 10 digits';
+                          if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                            return 'Enter a valid 10-digit phone number (starts with 6-9)';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -773,6 +810,15 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                         keyboardType: TextInputType.emailAddress,
                         style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
                         decoration: _getInputDecoration('Email Address', Icons.email),
+                        validator: (val) {
+                          if (val != null && val.trim().isNotEmpty) {
+                            final clean = val.trim();
+                            if (!RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(clean)) {
+                              return 'Enter a valid email address (e.g. name@domain.com)';
+                            }
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -792,7 +838,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: editStatus == 'Active'
-                                  ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                   ? const Color(0xFF10B981).withValues(alpha: 0.15)
                                   : const Color(0xFFEF4444).withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -842,9 +888,34 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                                   if (!editFormKey.currentState!.validate()) return;
                                   setModalState(() => isSaving = true);
                                   try {
-                                    final editContact = editContactNoController.text.trim();
+                                    final editContact = editContactNoController.text.trim().replaceAll(RegExp(r'\D'), '');
                                     final editEmail = editEmailController.text.trim();
                                     final editName = editFullNameController.text.trim();
+                                    final editUsername = editUserNameController.text.trim();
+
+                                    if (editUsername.isEmpty) {
+                                      setModalState(() => isSaving = false);
+                                      _showErrorSnackBar('Username is required.');
+                                      return;
+                                    }
+
+                                    if (!(await _isUsernameUnique(editUsername, excludeDocId: docId))) {
+                                      setModalState(() => isSaving = false);
+                                      _showErrorSnackBar('Username already exists. Please choose another username.');
+                                      return;
+                                    }
+
+                                    if (editContact.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(editContact)) {
+                                      setModalState(() => isSaving = false);
+                                      _showErrorSnackBar('Please enter a valid 10-digit phone number (starts with 6-9).');
+                                      return;
+                                    }
+
+                                    if (editEmail.isNotEmpty && !RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(editEmail)) {
+                                      setModalState(() => isSaving = false);
+                                      _showErrorSnackBar('Please enter a valid email address (e.g. name@domain.com).');
+                                      return;
+                                    }
 
                                     if (editName.isNotEmpty && !(await _isFullNameUnique(editName, excludeDocId: docId))) {
                                       setModalState(() => isSaving = false);
@@ -854,18 +925,19 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
 
                                     if (!(await _isContactNoUnique(editContact, excludeDocId: docId))) {
                                       setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Phone number "$editContact" already exists. Please use another phone number.');
+                                      _showErrorSnackBar('Phone number already registered. Please use another number.');
                                       return;
                                     }
 
                                     if (editEmail.isNotEmpty && !(await _isEmailUnique(editEmail, excludeDocId: docId))) {
                                       setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Mail ID "$editEmail" already exists. Please use another mail.');
+                                      _showErrorSnackBar('Email address already registered. Please use another email address.');
                                       return;
                                     }
 
                                     await FirestoreService.getCollection('manager').doc(docId).update({
                                       'FullName': editName,
+                                      'UserName': editUsername,
                                       'Designation': editDesignation,
                                       'Department': editDepartment,
                                       'ContactNo': editContact,
@@ -1255,6 +1327,10 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               controller: _contactNoController,
               isRequired: true,
               keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
               icon: Icons.phone_android_rounded,
               hint: 'e.g. 9876543210',
               isDesktop: isDesktop,
@@ -1263,6 +1339,19 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               checkingText: 'Checking phone number...',
               errorText: _contactNoError,
               successText: 'Phone number is available ✓',
+              customValidator: (val) {
+                if (val == null || val.trim().isEmpty) {
+                  return 'Contact number is required';
+                }
+                final clean = val.trim();
+                if (clean.length != 10) {
+                  return 'Phone number must be exactly 10 digits';
+                }
+                if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                  return 'Enter a valid 10-digit phone number (starts with 6-9)';
+                }
+                return null;
+              },
             ),
             SizedBox(height: isDesktop ? 16.0 : 14.0),
             _buildTextField(
@@ -1277,6 +1366,15 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               checkingText: 'Checking email...',
               errorText: _emailError,
               successText: 'Mail ID is available ✓',
+              customValidator: (val) {
+                if (val != null && val.trim().isNotEmpty) {
+                  final clean = val.trim();
+                  if (!RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(clean)) {
+                    return 'Enter a valid email address (e.g. name@domain.com)';
+                  }
+                }
+                return null;
+              },
             ),
             SizedBox(height: isDesktop ? 28.0 : 22.0),
             _buildActionButtons(isDesktop, isTablet, isMobile),
@@ -1336,6 +1434,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     bool isRequired = false,
     bool isPassword = false,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
     IconData? icon,
     String? hint,
     required bool isDesktop,
@@ -1344,6 +1443,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     String checkingText = 'Checking availability...',
     String? errorText,
     String? successText,
+    String? Function(String?)? customValidator,
   }) {
     final hasValue = controller.text.trim().isNotEmpty;
     final hasError = errorText != null && errorText.isNotEmpty;
@@ -1365,6 +1465,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
           controller: controller,
           obscureText: isPassword && !_isPasswordVisible,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           onChanged: onChanged,
           style: const TextStyle(
             color: Color(0xFF0A183D),
@@ -1443,6 +1544,10 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
           validator: (value) {
             if (isRequired && (value == null || value.trim().isEmpty)) {
               return '$label is required';
+            }
+            if (customValidator != null) {
+              final customErr = customValidator(value);
+              if (customErr != null) return customErr;
             }
             if (errorText != null) {
               return errorText;
