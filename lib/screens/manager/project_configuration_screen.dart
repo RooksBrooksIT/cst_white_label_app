@@ -913,78 +913,78 @@ class __ProjectConfigSectionCardState
               Expanded(
                 child: TextField(
                   controller: _inputController,
+                  textAlignVertical: TextAlignVertical.center,
                   style: const TextStyle(
                     fontSize: 13.5,
                     color: Color(0xFF0A183D),
                     fontWeight: FontWeight.w600,
                   ),
                   decoration: InputDecoration(
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
                     hintText: meta.hintText,
-                    hintStyle: TextStyle(
+                    hintStyle: const TextStyle(
                       fontSize: 12.5,
-                      color: Colors.grey.shade500,
+                      color: Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 14,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Color(0xFFCBD5E1),
-                      ),
+                      vertical: 12.5,
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(
                         color: Color(0xFFCBD5E1),
+                        width: 1.0,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
                         color: meta.themeColor,
-                        width: 1.8,
+                        width: 1.5,
                       ),
                     ),
-                    filled: true,
-                    fillColor: Colors.white,
                   ),
                   onSubmitted: (_) => _addItem(),
                 ),
               ),
               const SizedBox(width: 10),
-              ElevatedButton.icon(
-                onPressed: _isAdding ? null : () => _addItem(),
-                icon: _isAdding
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.add_rounded, size: 18),
-                label: const Text(
-                  'Add',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
+              SizedBox(
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: _isAdding ? null : () => _addItem(),
+                  icon: _isAdding
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.add_rounded, size: 18),
+                  label: const Text(
+                    'Add',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                    shadowColor: theme.primaryColor.withValues(alpha: 0.35),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                  shadowColor: theme.primaryColor.withValues(alpha: 0.35),
                 ),
               ),
             ],

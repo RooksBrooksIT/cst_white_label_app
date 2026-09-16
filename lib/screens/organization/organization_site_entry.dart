@@ -159,25 +159,58 @@ class _OrganizationSiteEntryState extends State<OrganizationSiteEntry> {
         });
       }
 
-      final validIds = ExpenseService.sanitizeSiteIds(
-        rawSites.map((s) => s['siteId']!).where((id) => id.isNotEmpty),
-      );
-
       final Map<String, Map<String, String>> uniqueSites = {};
       for (var s in rawSites) {
-        final id = s['siteId']!;
-        if (!validIds.contains(id)) continue;
-        if (!uniqueSites.containsKey(id)) {
-          uniqueSites[id] = Map.from(s);
+        var id = (s['siteId'] ?? '').trim();
+        if (id.isEmpty) continue;
+
+        id = ExpenseService.formatCanonicalSiteId(
+          rawId: id,
+          siteCode: s['siteCode'],
+          siteName: s['siteName'],
+        );
+        if (id.toUpperCase().startsWith('PR')) {
+          id = 'ST${id.substring(2)}';
+        }
+
+        if (!id.contains('_') || !id.toUpperCase().startsWith('ST')) {
+          continue;
+        }
+
+        final siteCodeKey = id.split('_').first.toUpperCase();
+        final displayLabel = SiteDisplayHelper.formatSiteDisplay(
+          siteId: id,
+          siteName: s['siteName'],
+        );
+        final displayKey = displayLabel.toLowerCase();
+
+        final existingKey = uniqueSites.keys.firstWhere(
+          (k) => k.toLowerCase() == id.toLowerCase() ||
+                 k.split('_').first.toUpperCase() == siteCodeKey ||
+                 SiteDisplayHelper.formatSiteDisplay(
+                   siteId: uniqueSites[k]!['siteId'],
+                   siteName: uniqueSites[k]!['siteName'],
+                 ).toLowerCase() == displayKey,
+          orElse: () => '',
+        );
+
+        if (existingKey.isEmpty) {
+          final entry = Map<String, String>.from(s);
+          entry['siteId'] = id;
+          uniqueSites[id] = entry;
         } else {
-          final existing = uniqueSites[id]!;
+          final existing = uniqueSites[existingKey]!;
           for (var entry in s.entries) {
             if ((existing[entry.key] == null ||
                     existing[entry.key] == 'Not Available' ||
-                    existing[entry.key] == 'Unnamed Site') &&
+                    existing[entry.key] == 'Unnamed Site' ||
+                    existing[entry.key] == 'Unknown' ||
+                    existing[entry.key] == 'Not found') &&
                 entry.value.isNotEmpty &&
                 entry.value != 'Not Available' &&
-                entry.value != 'Unnamed Site') {
+                entry.value != 'Unnamed Site' &&
+                entry.value != 'Unknown' &&
+                entry.value != 'Not found') {
               existing[entry.key] = entry.value;
             }
           }

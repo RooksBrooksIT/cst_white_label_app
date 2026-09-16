@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:ebricks/services/firestore_service.dart';
@@ -340,71 +340,65 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
               ],
             ),
             const SizedBox(height: 16),
-            _buildCustomTextField(
-              label: 'Vehicle Model Name *',
-              child: TextFormField(
-                controller: _modelNameController,
-                style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                decoration: const InputDecoration(
-                  hintText: 'e.g. Tata Prima / Ashok Leyland',
-                  hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  prefixIcon: Icon(Icons.directions_car_rounded, color: Color(0xFF64748B), size: 20),
-                ),
-                validator: (val) => val == null || val.trim().isEmpty ? 'Please enter model name' : null,
+            _buildFieldLabel('Vehicle Model Name *'),
+            TextFormField(
+              controller: _modelNameController,
+              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+              textAlignVertical: TextAlignVertical.center,
+              decoration: _buildInputDecoration(
+                primaryColor: primaryColor,
+                icon: Icons.directions_car_rounded,
+                hintText: 'e.g. Tata Prima / Ashok Leyland',
               ),
+              validator: (val) => val == null || val.trim().isEmpty ? 'Please enter model name' : null,
             ),
             const SizedBox(height: 14),
-            _buildCustomTextField(
-              label: 'Vehicle Number Plate *',
-              child: TextFormField(
-                controller: _numberPlateController,
-                style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                maxLength: 13,
-                buildCounter: (ctx, {required currentLength, required isFocused, required maxLength}) {
-                  return const SizedBox.shrink();
-                },
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')),
-                  LengthLimitingTextInputFormatter(13),
-                  NumberPlateFormatter(),
-                ],
-                decoration: const InputDecoration(
-                  hintText: 'TN-00-XX-0000',
-                  hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  prefixIcon: Icon(Icons.confirmation_number_rounded, color: Color(0xFF64748B), size: 20),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter vehicle number plate';
-                  }
-                  final RegExp numberPlateRegex = RegExp(
-                    r'^TN-[0-9]{2}-[A-Z]{2}-[0-9]{4}$',
-                    caseSensitive: false,
-                  );
-                  if (!numberPlateRegex.hasMatch(value)) {
-                    return 'Format must be TN-00-XX-0000';
-                  }
-                  return null;
-                },
-                onChanged: (value) {
-                  if (value.isNotEmpty && value.length <= 13) {
-                    final formatted = autoFormatNumberPlate(value);
-                    if (formatted != value) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        _numberPlateController.value = _numberPlateController.value.copyWith(
-                          text: formatted,
-                          selection: TextSelection.collapsed(offset: formatted.length),
-                        );
-                      });
-                    }
-                  }
-                },
+            _buildFieldLabel('Vehicle Number Plate *'),
+            TextFormField(
+              controller: _numberPlateController,
+              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+              textAlignVertical: TextAlignVertical.center,
+              maxLength: 13,
+              buildCounter: (ctx, {required currentLength, required isFocused, required maxLength}) {
+                return const SizedBox.shrink();
+              },
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')),
+                LengthLimitingTextInputFormatter(13),
+                NumberPlateFormatter(),
+              ],
+              decoration: _buildInputDecoration(
+                primaryColor: primaryColor,
+                icon: Icons.confirmation_number_rounded,
+                hintText: 'TN-00-XX-0000',
               ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter vehicle number plate';
+                }
+                final RegExp numberPlateRegex = RegExp(
+                  r'^TN-[0-9]{2}-[A-Z]{2}-[0-9]{4}$',
+                  caseSensitive: false,
+                );
+                if (!numberPlateRegex.hasMatch(value)) {
+                  return 'Format must be TN-00-XX-0000';
+                }
+                return null;
+              },
+              onChanged: (value) {
+                if (value.isNotEmpty && value.length <= 13) {
+                  final formatted = autoFormatNumberPlate(value);
+                  if (formatted != value) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _numberPlateController.value = _numberPlateController.value.copyWith(
+                        text: formatted,
+                        selection: TextSelection.collapsed(offset: formatted.length),
+                      );
+                    });
+                  }
+                }
+              },
             ),
             const SizedBox(height: 18),
             Row(
@@ -458,28 +452,85 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
     );
   }
 
-  Widget _buildCustomTextField({required String label, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
           style: const TextStyle(
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
           ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
         ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: child,
-        ),
-      ],
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required Color primaryColor,
+    required IconData icon,
+    required String hintText,
+  }) {
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 12, right: 8),
+        child: Icon(icon, color: primaryColor, size: 18),
+      ),
+      prefixIconConstraints: const BoxConstraints(
+        minWidth: 38,
+        minHeight: 38,
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 12.5,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: primaryColor, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+      ),
+      errorStyle: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFFEF4444),
+      ),
     );
   }
 
@@ -510,32 +561,42 @@ class _VehicleDetailsPageState extends State<VehicleDetailsPage> {
           ],
         ),
         const SizedBox(height: 10),
-        Container(
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: TextField(
-            controller: _searchController,
-            onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
-            decoration: InputDecoration(
-              hintText: 'Search vehicle model or number plate...',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-              border: InputBorder.none,
-              prefixIcon: Icon(Icons.search_rounded, color: primaryColor, size: 20),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        TextField(
+          controller: _searchController,
+          onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+          textAlignVertical: TextAlignVertical.center,
+          style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: 'Search vehicle model or number plate...',
+            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(Icons.search_rounded, color: primaryColor, size: 18),
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  )
+                : null,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
             ),
           ),
         ),

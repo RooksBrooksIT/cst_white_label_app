@@ -2170,14 +2170,16 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
             const SizedBox(height: 12),
             Container(
               height: 46,
+              width: double.infinity,
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: _dashboardSearchQuery.isNotEmpty
-                      ? primaryColor.withValues(alpha: 0.6)
-                      : const Color(0xFFE2E8F0),
-                  width: 1.2,
+                      ? primaryColor
+                      : const Color(0xFFCBD5E1),
+                  width: 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -2187,66 +2189,101 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                   ),
                 ],
               ),
-              child: TextField(
-                controller: _dashboardSearchController,
-                focusNode: _dashboardSearchFocusNode,
-                autofocus: true,
-                onChanged: (val) {
-                  setState(() {
-                    _dashboardSearchQuery = val.trim().toLowerCase();
-                  });
-                },
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  color: Color(0xFF0F172A),
-                  fontWeight: FontWeight.w600,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search modules, materials, tools, sites...',
-                  hintStyle: TextStyle(
-                    fontSize: 12.5,
-                    color: Colors.grey.shade500,
+              child: Center(
+                child: TextField(
+                  controller: _dashboardSearchController,
+                  focusNode: _dashboardSearchFocusNode,
+                  autofocus: true,
+                  textAlignVertical: TextAlignVertical.center,
+                  onChanged: (val) {
+                    setState(() {
+                      _dashboardSearchQuery = val.trim().toLowerCase();
+                    });
+                  },
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w600,
                   ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: primaryColor,
-                    size: 20,
-                  ),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_dashboardSearchQuery.isNotEmpty)
-                        IconButton(
-                          icon: Icon(
-                            Icons.clear_rounded,
-                            color: Colors.grey.shade600,
-                            size: 18,
-                          ),
-                          onPressed: () {
-                            _dashboardSearchController.clear();
-                            setState(() => _dashboardSearchQuery = '');
-                          },
-                        ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          color: Color(0xFF94A3B8),
-                          size: 18,
-                        ),
-                        tooltip: 'Close search',
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          setState(() {
-                            _isDashboardSearchOpen = false;
-                            _dashboardSearchController.clear();
-                            _dashboardSearchQuery = '';
-                          });
-                        },
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Search modules, materials, tools, sites...',
+                    hintStyle: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 12, right: 8),
+                      child: Icon(
+                        Icons.search_rounded,
+                        color: primaryColor,
+                        size: 20,
                       ),
-                    ],
+                    ),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                    suffixIcon: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_dashboardSearchQuery.isNotEmpty)
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  _dashboardSearchController.clear();
+                                  setState(() => _dashboardSearchQuery = '');
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: Icon(
+                                    Icons.clear_rounded,
+                                    color: Colors.grey.shade600,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                setState(() {
+                                  _isDashboardSearchOpen = false;
+                                  _dashboardSearchController.clear();
+                                  _dashboardSearchQuery = '';
+                                });
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.all(6),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: Color(0xFF94A3B8),
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    suffixIconConstraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 40,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 10,
+                    ),
                   ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),

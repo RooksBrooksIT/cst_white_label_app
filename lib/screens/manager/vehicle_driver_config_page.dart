@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:ebricks/services/firestore_service.dart';
@@ -400,144 +400,216 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildCustomTextField(
-                    label: 'Driver Name *',
-                    child: TextFormField(
-                      controller: _driverNameController,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                      decoration: const InputDecoration(
-                        hintText: 'Enter full name',
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        prefixIcon: Icon(Icons.person_rounded, color: Color(0xFF64748B), size: 20),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFieldLabel('Driver Name *'),
+                      TextFormField(
+                        controller: _driverNameController,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.person_rounded,
+                          hintText: 'Enter full name',
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Enter driver name' : null,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Enter driver name' : null,
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildCustomTextField(
-                    label: 'Phone Number *',
-                    child: TextFormField(
-                      controller: _driverPhoneController,
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
-                      ],
-                      decoration: const InputDecoration(
-                        hintText: 'Enter 10-digit phone number',
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        prefixIcon: Icon(Icons.phone_rounded, color: Color(0xFF64748B), size: 20),
+                  const SizedBox(height: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFieldLabel('Phone Number *'),
+                      TextFormField(
+                        controller: _driverPhoneController,
+                        keyboardType: TextInputType.number,
+                        textAlignVertical: TextAlignVertical.center,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.phone_rounded,
+                          hintText: 'Enter 10-digit phone number',
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Enter phone number';
+                          if (v.length != 10) return 'Phone number must be 10 digits';
+                          return null;
+                        },
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Enter phone number';
-                        if (v.length != 10) return 'Phone number must be 10 digits';
-                        return null;
-                      },
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildCustomTextField(
-                    label: 'License Number *',
-                    child: TextFormField(
-                      controller: _driverLicenseController,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                      decoration: const InputDecoration(
-                        hintText: 'Enter driver license number',
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        prefixIcon: Icon(Icons.badge_rounded, color: Color(0xFF64748B), size: 20),
+                  const SizedBox(height: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFieldLabel('License Number *'),
+                      TextFormField(
+                        controller: _driverLicenseController,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.badge_rounded,
+                          hintText: 'Enter driver license number',
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Enter license number' : null,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Enter license number' : null,
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildCustomTextField(
-                    label: 'Experience (years) *',
-                    child: TextFormField(
-                      controller: _experienceController,
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                      decoration: const InputDecoration(
-                        hintText: 'Years of driving experience',
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        prefixIcon: Icon(Icons.workspace_premium_rounded, color: Color(0xFF64748B), size: 20),
+                  const SizedBox(height: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFieldLabel('Experience (years) *'),
+                      TextFormField(
+                        controller: _experienceController,
+                        keyboardType: TextInputType.number,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.workspace_premium_rounded,
+                          hintText: 'Years of driving experience',
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Enter experience' : null,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Enter experience' : null,
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildCustomTextField(
-                    label: 'Address *',
-                    child: TextFormField(
-                      controller: _driverAddressController,
-                      maxLines: 2,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                      decoration: const InputDecoration(
-                        hintText: 'Enter resident address',
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        prefixIcon: Icon(Icons.location_on_rounded, color: Color(0xFF64748B), size: 20),
+                  const SizedBox(height: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFieldLabel('Address *'),
+                      TextFormField(
+                        controller: _driverAddressController,
+                        minLines: 2,
+                        maxLines: 4,
+                        textAlignVertical: TextAlignVertical.top,
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.location_on_rounded,
+                          hintText: 'Enter resident address',
+                          isMultiLine: true,
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Enter address' : null,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Enter address' : null,
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   _buildVehicleDropdown(primaryColor),
-                  const SizedBox(height: 12),
-                  _buildCustomTextField(
-                    label: 'Status *',
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      initialValue: _driverStatus,
-                      dropdownColor: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        prefixIcon: Icon(Icons.toggle_on_rounded, color: Color(0xFF64748B), size: 20),
+                  const SizedBox(height: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFieldLabel('Status *'),
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: _driverStatus,
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.toggle_on_rounded,
+                          hintText: 'Select Status',
+                        ),
+                        items: ['Active', 'Inactive'].map((e) {
+                          final isAct = e == 'Active';
+                          return DropdownMenuItem(
+                            value: e,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isAct ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                  ),
+                                ),
+                                Text(
+                                  e,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: isAct ? const Color(0xFF0F172A) : const Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val == null) return;
+                          setState(() {
+                            _driverStatus = val;
+                            if (_driverStatus == 'Inactive') {
+                              _selectedVehicleId = null;
+                              _selectedVehicleModel = null;
+                              _selectedVehiclePlate = null;
+                            }
+                          });
+                        },
                       ),
-                      items: ['Active', 'Inactive']
-                          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                          .toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _driverStatus = val!;
-                          if (_driverStatus == 'Inactive') {
-                            _selectedVehicleId = null;
-                            _selectedVehicleModel = null;
-                            _selectedVehiclePlate = null;
-                          }
-                        });
-                      },
-                    ),
+                    ],
                   ),
                   if (_driverStatus == 'Inactive') ...[
-                    const SizedBox(height: 6),
-                    const Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFDC2626)),
-                        SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Inactive drivers cannot hold assigned vehicles. Any assigned vehicle is released automatically upon save.',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFDC2626),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFFDC2626)),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Inactive drivers cannot hold assigned vehicles. Any assigned vehicle is released automatically upon save.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFDC2626),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -549,15 +621,15 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                 if (_isEditing) ...[
                   Expanded(
                     child: SizedBox(
-                      height: 50,
+                      height: 48,
                       child: OutlinedButton(
                         onPressed: _isSaving ? null : _resetForm,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF64748B),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
                       ),
                     ),
                   ),
@@ -565,14 +637,14 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                 ],
                 Expanded(
                   child: SizedBox(
-                    height: 50,
+                    height: 48,
                     child: ElevatedButton(
                       onPressed: _isSaving ? null : _saveDriver,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 1,
                       ),
                       child: _isSaving
                           ? const SizedBox(
@@ -585,7 +657,7 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                             )
                           : Text(
                               _isEditing ? 'UPDATE DRIVER' : 'SAVE DRIVER',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
                             ),
                     ),
                   ),
@@ -598,173 +670,251 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
     );
   }
 
-  Widget _buildVehicleDropdown(Color primaryColor) {
-    return _buildCustomTextField(
-      label: 'Assigned Vehicle',
-      child: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: DriverVehicleService.streamAvailableVehicles(
-          currentDriverId: _isEditing ? _currentDriverId : null,
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
         ),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    'Loading available vehicles...',
-                    style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final availableVehicles = snapshot.data ?? [];
-
-          final bool hasMatch = _selectedVehicleId == null ||
-              availableVehicles.any((v) => v['id'] == _selectedVehicleId);
-
-          return DropdownButtonFormField<String?>(
-            key: ValueKey('vehicle_${_selectedVehicleId}_$_isEditing'),
-            isExpanded: true,
-            initialValue: hasMatch ? _selectedVehicleId : null,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-            ),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              prefixIcon: Icon(Icons.directions_car_rounded, color: primaryColor, size: 20),
-              suffixIcon: _selectedVehicleId != null
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
-                      tooltip: 'Clear Vehicle Assignment',
-                      onPressed: () {
-                        setState(() {
-                          _selectedVehicleId = null;
-                          _selectedVehicleModel = null;
-                          _selectedVehiclePlate = null;
-                        });
-                      },
-                    )
-                  : null,
-            ),
-            hint: const Text(
-              'Select vehicle (Optional)',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-            ),
-            items: [
-              const DropdownMenuItem<String?>(
-                value: null,
-                child: Text(
-                  'No Vehicle Assigned (Unassigned)',
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13.5,
-                  ),
-                ),
-              ),
-              ...availableVehicles.map((vehicle) {
-                final vId = vehicle['id'] as String;
-                final model = vehicle['modelName'] as String;
-                final plate = vehicle['numberPlate'] as String;
-                final isCurrent = vehicle['isCurrentDriverAssigned'] == true;
-
-                return DropdownMenuItem<String?>(
-                  value: vId,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '$model ($plate)',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isCurrent ? primaryColor : const Color(0xFF0A183D),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isCurrent
-                              ? primaryColor.withValues(alpha: 0.12)
-                              : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          isCurrent ? '$vId (Current)' : vId,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            color: isCurrent ? primaryColor : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-            onChanged: _driverStatus == 'Inactive'
-                ? null
-                : (val) {
-                    setState(() {
-                      _selectedVehicleId = val;
-                      if (val != null) {
-                        final chosen = availableVehicles.firstWhere(
-                          (v) => v['id'] == val,
-                          orElse: () => {'modelName': '', 'numberPlate': ''},
-                        );
-                        _selectedVehicleModel = chosen['modelName'] as String?;
-                        _selectedVehiclePlate = chosen['numberPlate'] as String?;
-                      } else {
-                        _selectedVehicleModel = null;
-                        _selectedVehiclePlate = null;
-                      }
-                    });
-                  },
-          );
-        },
       ),
     );
   }
 
-  Widget _buildCustomTextField({required String label, required Widget child}) {
+  InputDecoration _buildInputDecoration({
+    required Color primaryColor,
+    required IconData icon,
+    required String hintText,
+    Widget? suffixIcon,
+    bool isMultiLine = false,
+  }) {
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIcon: Padding(
+        padding: EdgeInsets.only(
+          left: 12,
+          right: 8,
+          top: isMultiLine ? 10 : 0,
+          bottom: isMultiLine ? 10 : 0,
+        ),
+        child: Icon(icon, color: primaryColor, size: 18),
+      ),
+      prefixIconConstraints: BoxConstraints(
+        minWidth: 38,
+        minHeight: isMultiLine ? 24 : 38,
+      ),
+      suffixIcon: suffixIcon,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: isMultiLine ? 12 : 12.5,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: primaryColor, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+      ),
+      errorStyle: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFFEF4444),
+      ),
+    );
+  }
+
+  Widget _buildVehicleDropdown(Color primaryColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
+        _buildFieldLabel('Assigned Vehicle (Optional)'),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: DriverVehicleService.streamAvailableVehicles(
+            currentDriverId: _isEditing ? _currentDriverId : null,
           ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: child,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
+                ),
+                child: const Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Loading available vehicles...',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final availableVehicles = snapshot.data ?? [];
+
+            final bool hasMatch = _selectedVehicleId == null ||
+                availableVehicles.any((v) => v['id'] == _selectedVehicleId);
+
+            return DropdownButtonFormField<String?>(
+              key: ValueKey('vehicle_${_selectedVehicleId}_$_isEditing'),
+              isExpanded: true,
+              initialValue: hasMatch ? _selectedVehicleId : null,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              style: const TextStyle(
+                color: Color(0xFF0A183D),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+              ),
+              decoration: _buildInputDecoration(
+                primaryColor: primaryColor,
+                icon: Icons.directions_car_rounded,
+                hintText: 'Select vehicle (Optional)',
+                suffixIcon: _selectedVehicleId != null
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        tooltip: 'Clear Vehicle Assignment',
+                        onPressed: () {
+                          setState(() {
+                            _selectedVehicleId = null;
+                            _selectedVehicleModel = null;
+                            _selectedVehiclePlate = null;
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              hint: const Text(
+                'Select vehicle (Optional)',
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text(
+                    'No Vehicle Assigned (Unassigned)',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                ...availableVehicles.map((vehicle) {
+                  final vId = vehicle['id'] as String;
+                  final model = vehicle['modelName'] as String;
+                  final plate = vehicle['numberPlate'] as String;
+                  final isCurrent = vehicle['isCurrentDriverAssigned'] == true;
+
+                  return DropdownMenuItem<String?>(
+                    value: vId,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '$model ($plate)',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isCurrent ? primaryColor : const Color(0xFF0A183D),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isCurrent
+                                ? primaryColor.withValues(alpha: 0.12)
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isCurrent ? '$vId (Current)' : vId,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: isCurrent ? primaryColor : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+              onChanged: _driverStatus == 'Inactive'
+                  ? null
+                  : (val) {
+                      setState(() {
+                        _selectedVehicleId = val;
+                        if (val != null) {
+                          final chosen = availableVehicles.firstWhere(
+                            (v) => v['id'] == val,
+                            orElse: () => {'modelName': '', 'numberPlate': ''},
+                          );
+                          _selectedVehicleModel = chosen['modelName'] as String?;
+                          _selectedVehiclePlate = chosen['numberPlate'] as String?;
+                        } else {
+                          _selectedVehicleModel = null;
+                          _selectedVehiclePlate = null;
+                        }
+                      });
+                    },
+            );
+          },
         ),
       ],
     );
@@ -774,23 +924,29 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Container(
-            height: 44,
+            height: 48,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
             ),
             child: TextField(
               controller: _searchController,
               onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+              textAlignVertical: TextAlignVertical.center,
               style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'Search driver by name, phone, license, or vehicle...',
-                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500),
                 border: InputBorder.none,
-                prefixIcon: Icon(Icons.search_rounded, color: primaryColor, size: 20),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 8),
+                  child: Icon(Icons.search_rounded, color: primaryColor, size: 18),
+                ),
+                prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
@@ -800,7 +956,7 @@ class _VehicleDriverConfigPageState extends State<VehicleDriverConfigPage>
                         },
                       )
                     : null,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12.5),
               ),
             ),
           ),

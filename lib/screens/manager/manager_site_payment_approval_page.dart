@@ -115,6 +115,8 @@ class _ManagerSitePaymentApprovalPageState
                     controller: _tabController,
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
                     tabs: const [
                       Tab(text: "1. MGR REVIEW"),
                       Tab(text: "2. ORG APPROVAL"),
@@ -143,22 +145,31 @@ class _ManagerSitePaymentApprovalPageState
                     controller: _searchController,
                     onChanged: (v) =>
                         setState(() => _searchQuery = v.trim().toLowerCase()),
+                    textAlignVertical: TextAlignVertical.center,
                     style: const TextStyle(
                       color: Color(0xFF0F172A),
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
                     decoration: InputDecoration(
-                      hintText:
-                          'Search Payment Requests by Payee, Site, Category, ID...',
-                      hintStyle: TextStyle(
-                        color: Colors.grey.shade400,
+                      isDense: true,
+                      hintText: 'Search by Payee, Site, Category, ID...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8),
                         fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
                       ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: Color(0xFF059669),
-                        size: 18,
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 38,
+                        minHeight: 38,
+                      ),
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.only(left: 12, right: 8),
+                        child: Icon(
+                          Icons.search_rounded,
+                          color: Color(0xFF059669),
+                          size: 18,
+                        ),
                       ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
@@ -173,21 +184,21 @@ class _ManagerSitePaymentApprovalPageState
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                          horizontal: 14, vertical: 11),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide:
-                            const BorderSide(color: Color(0xFFE2E8F0)),
+                            const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide:
-                            const BorderSide(color: Color(0xFFE2E8F0)),
+                            const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
-                            color: Color(0xFF059669), width: 1.6),
+                            color: Color(0xFF059669), width: 1.5),
                       ),
                     ),
                   ),
@@ -346,56 +357,64 @@ class _ManagerSitePaymentApprovalPageState
             children: [
               // Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF059669).withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.payments_rounded,
-                            color: Color(0xFF059669), size: 16),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _currencyFormat.format(amountNum),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                          Text(
-                            'Voucher #$reqId',
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              color: Color(0xFF64748B),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: _getStageColor(stage).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFF059669).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      ApprovalWorkflowService.getStatusDisplayText(status),
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: _getStageColor(stage),
+                    child: const Icon(Icons.payments_rounded,
+                        color: Color(0xFF059669), size: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currencyFormat.format(amountNum),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Voucher #$reqId',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 0,
+                    child: Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: _getStageColor(stage).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        ApprovalWorkflowService.getStatusDisplayText(status),
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: _getStageColor(stage),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
@@ -410,6 +429,8 @@ class _ManagerSitePaymentApprovalPageState
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF334155),
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Text(
@@ -418,6 +439,8 @@ class _ManagerSitePaymentApprovalPageState
                   fontSize: 11.5,
                   color: Color(0xFF64748B),
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               if (data['fundedViaPettyCash'] == true || data['pettyCashRequestId'] != null) ...[
                 const SizedBox(height: 6),
@@ -433,12 +456,16 @@ class _ManagerSitePaymentApprovalPageState
                     children: [
                       const Icon(Icons.account_balance_wallet_rounded, size: 13, color: Color(0xFF059669)),
                       const SizedBox(width: 4),
-                      Text(
-                        'Funded via Petty Cash (${data['pettyCashRequestId'] ?? 'Disbursed'})',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF065F46),
+                      Flexible(
+                        child: Text(
+                          'Funded via Petty Cash (${data['pettyCashRequestId'] ?? 'Disbursed'})',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF065F46),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -975,9 +1002,34 @@ class _ManagerSitePaymentApprovalPageState
             const SizedBox(height: 12),
             TextField(
               controller: remarksController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Bills and attendance cross-verified with site logs.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF059669), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
@@ -1030,9 +1082,34 @@ class _ManagerSitePaymentApprovalPageState
             const SizedBox(height: 12),
             TextField(
               controller: remarksController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Funds allocated from Project site account.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
@@ -1086,9 +1163,34 @@ class _ManagerSitePaymentApprovalPageState
             const SizedBox(height: 12),
             TextField(
               controller: remarksController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Bank IMPS Ref: TXN998822 completed.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
@@ -1147,9 +1249,34 @@ class _ManagerSitePaymentApprovalPageState
             const SizedBox(height: 12),
             TextField(
               controller: reasonController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Invoice discrepancy or missing proof voucher.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),

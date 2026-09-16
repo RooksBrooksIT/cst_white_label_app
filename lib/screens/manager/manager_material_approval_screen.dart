@@ -198,10 +198,10 @@ class _ManagerMaterialApprovalScreenState
                       height: 46,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white,
-                          width: 1.2,
+                          color: const Color(0xFFCBD5E1),
+                          width: 1.0,
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -216,23 +216,32 @@ class _ManagerMaterialApprovalScreenState
                         controller: _searchController,
                         onChanged: (v) => setState(
                             () => _searchQuery = v.trim().toLowerCase()),
+                        textAlignVertical: TextAlignVertical.center,
                         style: const TextStyle(
                           color: Color(0xFF0F172A),
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
                         ),
                         decoration: InputDecoration(
+                          isDense: true,
                           hintText:
                               'Search by ID, Site, Supervisor or Stage...',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade400,
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF94A3B8),
                             fontSize: 12.5,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: FontWeight.w500,
                           ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: primaryColor,
-                            size: 18,
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 38,
+                            minHeight: 38,
+                          ),
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.only(left: 12, right: 8),
+                            child: Icon(
+                              Icons.search_rounded,
+                              color: primaryColor,
+                              size: 18,
+                            ),
                           ),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
@@ -246,7 +255,7 @@ class _ManagerMaterialApprovalScreenState
                               : null,
                           border: InputBorder.none,
                           contentPadding:
-                              const EdgeInsets.symmetric(vertical: 12),
+                              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         ),
                       ),
                     ),
@@ -1408,9 +1417,34 @@ class _ManagerMaterialApprovalScreenState
             const SizedBox(height: 12),
             TextField(
               controller: remarksController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Stock verified; approved for procurement.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
@@ -1463,9 +1497,34 @@ class _ManagerMaterialApprovalScreenState
             const SizedBox(height: 12),
             TextField(
               controller: remarksController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Authorized by HQ. Manager may dispatch.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
@@ -1524,9 +1583,34 @@ class _ManagerMaterialApprovalScreenState
             const SizedBox(height: 12),
             TextField(
               controller: reasonController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Items currently not needed for this stage.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),

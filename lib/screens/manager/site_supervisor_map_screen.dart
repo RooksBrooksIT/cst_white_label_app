@@ -978,12 +978,28 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Select Site ID / Site *',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0A183D),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: RichText(
+                text: const TextSpan(
+                  text: 'Select Site ID / Site',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A183D),
+                    letterSpacing: -0.1,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: ' *',
+                      style: TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (_isLoadingSites)
@@ -997,63 +1013,66 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
           ],
         ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+        DropdownButtonFormField<String>(
+          initialValue: (_allSites.any((s) => s['key'] == selectedSiteKey))
+              ? selectedSiteKey
+              : null,
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-          child: DropdownButtonFormField<String>(
-            initialValue: (_allSites.any((s) => s['key'] == selectedSiteKey))
-                ? selectedSiteKey
-                : null,
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: _isLoadingSites
+                ? 'Loading site IDs & sites...'
+                : (_allSites.isEmpty
+                    ? 'No sites found'
+                    : 'Select Site ID / Site'),
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: _isLoadingSites
-                  ? 'Loading site IDs & sites...'
-                  : (_allSites.isEmpty
-                      ? 'No sites found'
-                      : 'Select Site ID / Site'),
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Icon(
-                  Icons.location_on_rounded,
-                  color: brandIconColor,
-                  size: 20,
-                ),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(
+                Icons.location_on_rounded,
+                color: brandIconColor,
+                size: 18,
               ),
             ),
-            items: _allSites.map((site) {
-              return DropdownMenuItem<String>(
-                value: site['key'] as String,
-                child: Text(
-                  site['displayLabel'] as String,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              );
-            }).toList(),
-            onChanged: (value) {
-              _onSiteSelected(value);
-            },
+            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: brandIconColor, width: 1.5),
+            ),
           ),
+          items: _allSites.map((site) {
+            return DropdownMenuItem<String>(
+              value: site['key'] as String,
+              child: Text(
+                site['displayLabel'] as String,
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: (value) {
+            _onSiteSelected(value);
+          },
         ),
       ],
     );
@@ -1068,12 +1087,28 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Supervisor ID *',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0A183D),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: RichText(
+                text: const TextSpan(
+                  text: 'Supervisor ID',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A183D),
+                    letterSpacing: -0.1,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: ' *',
+                      style: TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (_isLoadingSupervisors)
@@ -1087,75 +1122,78 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               ),
           ],
         ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+        DropdownButtonFormField<String>(
+          initialValue:
+              (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
+                  ? selectedSupervisorId
+                  : null,
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-          child: DropdownButtonFormField<String>(
-            initialValue:
-                (_supervisorList.any((s) => s['id'] == selectedSupervisorId))
-                    ? selectedSupervisorId
-                    : null,
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: _isLoadingSupervisors
+                ? 'Loading supervisors...'
+                : (_supervisorList.isEmpty
+                    ? 'No supervisors found'
+                    : 'Select Supervisor ID'),
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: _isLoadingSupervisors
-                  ? 'Loading supervisors...'
-                  : (_supervisorList.isEmpty
-                      ? 'No supervisors found'
-                      : 'Select Supervisor ID'),
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Icon(
-                  Icons.badge_rounded,
-                  color: brandIconColor,
-                  size: 20,
-                ),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(
+                Icons.badge_rounded,
+                color: brandIconColor,
+                size: 18,
               ),
             ),
-            items: _supervisorList.map((sup) {
-              final id = sup['id'] ?? '';
-              final name = sup['fullName'] ?? '';
-              final label = name.isNotEmpty ? '$id - $name' : id;
-              return DropdownMenuItem<String>(
-                value: id,
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: brandIconColor, width: 1.5),
+            ),
+          ),
+          items: _supervisorList.map((sup) {
+            final id = sup['id'] ?? '';
+            final name = sup['fullName'] ?? '';
+            final label = name.isNotEmpty ? '$id - $name' : id;
+            return DropdownMenuItem<String>(
+              value: id,
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              selectedSupervisorId = value;
+              final match = _supervisorList.firstWhere(
+                (s) => s['id'] == value,
+                orElse: () => {'id': '', 'fullName': ''},
               );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                selectedSupervisorId = value;
-                final match = _supervisorList.firstWhere(
-                  (s) => s['id'] == value,
-                  orElse: () => {'id': '', 'fullName': ''},
-                );
-                selectedSupervisor = match['fullName'] ?? '';
-                supervisorNameController.text = selectedSupervisor ?? '';
-              });
-            },
-          ),
+              selectedSupervisor = match['fullName'] ?? '';
+              supervisorNameController.text = selectedSupervisor ?? '';
+            });
+          },
         ),
       ],
     );
@@ -1170,52 +1208,69 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     IconData? icon,
   }) {
     final brandIconColor = Theme.of(context).primaryColor;
+    final isMultiLine = maxLines > 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0A183D),
+              letterSpacing: -0.1,
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+        TextField(
+          controller: controller,
+          readOnly: readOnly,
+          maxLines: maxLines,
+          textAlignVertical: isMultiLine ? TextAlignVertical.top : TextAlignVertical.center,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-          child: TextField(
-            controller: controller,
-            readOnly: readOnly,
-            maxLines: maxLines,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+            hintText: hint,
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: icon != null
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(icon, color: brandIconColor, size: 20),
-                    )
-                  : null,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+            prefixIcon: icon != null
+                ? Padding(
+                    padding: EdgeInsets.only(
+                      left: 12,
+                      right: 8,
+                      top: isMultiLine ? 10 : 0,
+                      bottom: isMultiLine ? 10 : 0,
+                    ),
+                    child: Icon(icon, color: brandIconColor, size: 18),
+                  )
+                : null,
+            prefixIconConstraints: BoxConstraints(
+              minWidth: 38,
+              minHeight: isMultiLine ? 24 : 38,
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: isMultiLine ? 12 : 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: brandIconColor, width: 1.5),
             ),
           ),
         ),
@@ -1233,45 +1288,52 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0A183D),
+              letterSpacing: -0.1,
+            ),
           ),
         ),
-        const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: 12, right: 8),
+                child: Icon(Icons.calendar_today_rounded, color: brandIconColor, size: 18),
+              ),
+              prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: brandIconColor, width: 1.5),
+              ),
             ),
-            child: Row(
-              children: [
-                Icon(Icons.calendar_today_rounded,
-                    color: brandIconColor, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    date == null
-                        ? 'Select Joined Date'
-                        : DateFormat('MMM d, yyyy').format(date),
-                    style: TextStyle(
-                      color: date == null
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF0A183D),
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              date == null
+                  ? 'Select Joined Date'
+                  : DateFormat('MMM d, yyyy').format(date),
+              style: TextStyle(
+                color: date == null
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF0A183D),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -1471,58 +1533,59 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         // Live Search Bar
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+          child: TextField(
+            onChanged: (val) {
+              setState(() {
+                _infoSearchQuery = val;
+                _infoCurrentPage = 1;
+              });
+            },
+            textAlignVertical: TextAlignVertical.center,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF0A183D),
             ),
-            child: TextField(
-              onChanged: (val) {
-                setState(() {
-                  _infoSearchQuery = val;
-                  _infoCurrentPage = 1;
-                });
-              },
-              style: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0A183D),
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              hintText:
+                  'Search mapping by site, supervisor, project, stage...',
+              hintStyle: const TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF94A3B8),
+                fontWeight: FontWeight.w500,
               ),
-              decoration: InputDecoration(
-                hintText:
-                    'Search mapping by site, supervisor, project, stage...',
-                hintStyle: const TextStyle(
-                  fontSize: 12.5,
-                  color: Color(0xFF94A3B8),
-                ),
-                prefixIcon: Icon(
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: 12, right: 8),
+                child: Icon(
                   Icons.search_rounded,
                   color: primaryColor,
-                  size: 20,
+                  size: 18,
                 ),
-                suffixIcon: _infoSearchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded,
-                            size: 18, color: Color(0xFF64748B)),
-                        onPressed: () {
-                          setState(() {
-                            _infoSearchQuery = '';
-                            _infoCurrentPage = 1;
-                          });
-                        },
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+              suffixIcon: _infoSearchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded,
+                          size: 18, color: Color(0xFF64748B)),
+                      onPressed: () {
+                        setState(() {
+                          _infoSearchQuery = '';
+                          _infoCurrentPage = 1;
+                        });
+                      },
+                    )
+                  : null,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: primaryColor, width: 1.5),
               ),
             ),
           ),

@@ -18,6 +18,7 @@ import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
 import 'package:ebricks/screens/organization/org_menu_screen.dart';
 import 'package:ebricks/screens/organization/org_sites_list_page.dart';
+import 'package:ebricks/screens/organization/org_finance_page.dart';
 import 'package:ebricks/screens/manager/manager_config_screen.dart';
 import 'package:ebricks/widgets/bottom_nav.dart';
 
@@ -940,12 +941,17 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required Color primaryColor,
     required Color darkAccent,
   }) {
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         HapticFeedback.lightImpact();
-        _navigateToSitesList(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const OrgFinancePage(),
+          ),
+        );
       },
-      borderRadius: BorderRadius.circular(22),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
@@ -1156,77 +1162,77 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required String pending,
     required Color primaryColor,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.domain_rounded,
-                      color: Color(0xFF2563EB),
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Site Operations',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFDBEAFE)),
-                    ),
-                    child: Text(
-                      'Total: $totalSites',
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _navigateToSitesList(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Header Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.domain_rounded,
                         color: Color(0xFF2563EB),
+                        size: 16,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              InkWell(
-                onTap: () => _navigateToSitesList(context, 'All'),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Site Operations',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFDBEAFE)),
+                      ),
+                      child: Text(
+                        'Total: $totalSites',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 9,
                     vertical: 4,
@@ -1255,82 +1261,76 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                     ],
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // 2x2 Grid of Status Tiles filling the card
-          Expanded(
-            child: Column(
-              children: [
-                // Row 1: Planning & In Progress
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildSiteStatusTile(
-                          title: 'Planning',
-                          count: planning,
-                          icon: Icons.architecture_rounded,
-                          accentColor: const Color(0xFF2563EB),
-                          bgColor: const Color(0xFFEFF6FF),
-                          borderColor: const Color(0xFFDBEAFE),
-                          onTap: () =>
-                              _navigateToSitesList(context, 'Planning'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildSiteStatusTile(
-                          title: 'In Progress',
-                          count: inProgress,
-                          icon: Icons.engineering_rounded,
-                          accentColor: const Color(0xFF16A34A),
-                          bgColor: const Color(0xFFF0FDF4),
-                          borderColor: const Color(0xFFDCFCE7),
-                          onTap: () =>
-                              _navigateToSitesList(context, 'In Progress'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Row 2: Overdue & On Hold
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildSiteStatusTile(
-                          title: 'Overdue',
-                          count: overdue,
-                          icon: Icons.access_time_filled_rounded,
-                          accentColor: const Color(0xFFD97706),
-                          bgColor: const Color(0xFFFFFBEB),
-                          borderColor: const Color(0xFFFEF3C7),
-                          onTap: () => _navigateToSitesList(context, 'On Hold'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildSiteStatusTile(
-                          title: 'On Hold',
-                          count: pending,
-                          icon: Icons.hourglass_top_rounded,
-                          accentColor: const Color(0xFFDC2626),
-                          bgColor: const Color(0xFFFEF2F2),
-                          borderColor: const Color(0xFFFEE2E2),
-                          onTap: () => _navigateToSitesList(context, 'On Hold'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+
+            // 2x2 Grid of Status Tiles filling the card
+            Expanded(
+              child: Column(
+                children: [
+                  // Row 1: Planning & In Progress
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildSiteStatusTile(
+                            title: 'Planning',
+                            count: planning,
+                            icon: Icons.architecture_rounded,
+                            accentColor: const Color(0xFF2563EB),
+                            bgColor: const Color(0xFFEFF6FF),
+                            borderColor: const Color(0xFFDBEAFE),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSiteStatusTile(
+                            title: 'In Progress',
+                            count: inProgress,
+                            icon: Icons.engineering_rounded,
+                            accentColor: const Color(0xFF16A34A),
+                            bgColor: const Color(0xFFF0FDF4),
+                            borderColor: const Color(0xFFDCFCE7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Row 2: Overdue & On Hold
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildSiteStatusTile(
+                            title: 'Overdue',
+                            count: overdue,
+                            icon: Icons.access_time_filled_rounded,
+                            accentColor: const Color(0xFFD97706),
+                            bgColor: const Color(0xFFFFFBEB),
+                            borderColor: const Color(0xFFFEF3C7),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSiteStatusTile(
+                            title: 'On Hold',
+                            count: pending,
+                            icon: Icons.hourglass_top_rounded,
+                            accentColor: const Color(0xFFDC2626),
+                            bgColor: const Color(0xFFFEF2F2),
+                            borderColor: const Color(0xFFFEE2E2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1342,77 +1342,69 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required Color accentColor,
     required Color bgColor,
     required Color borderColor,
-    required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: 1.1),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: accentColor.withValues(alpha: 0.12),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Center(child: Icon(icon, color: accentColor, size: 17)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1.1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.12),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    count,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: accentColor,
-                      letterSpacing: -0.3,
-                      height: 1.0,
-                    ),
+            child: Center(child: Icon(icon, color: accentColor, size: 17)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  count,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: accentColor,
+                    letterSpacing: -0.3,
+                    height: 1.0,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF475569),
-                      height: 1.0,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF475569),
+                    height: 1.0,
                   ),
-                ],
-              ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 15,
-              color: accentColor.withValues(alpha: 0.5),
-            ),
-          ],
-        ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 15,
+            color: accentColor.withValues(alpha: 0.5),
+          ),
+        ],
       ),
     );
   }
@@ -1423,187 +1415,177 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required String pendingCount,
     required Color primaryColor,
   }) {
-    return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const OrgApprovalsMenuPage()),
-        );
-      },
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Top Bar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFD97706).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.fact_check_rounded,
-                        color: Color(0xFFD97706),
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Workflow Approvals',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD97706),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFD97706).withValues(alpha: 0.25),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Review All',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(width: 3),
-                      Icon(
-                        Icons.arrow_outward_rounded,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            // Middle Info
-            Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFFFEF3C7),
-                      width: 2,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      pendingCount,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFB45309),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Action Required',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF92400E),
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Supervisor & material requests are awaiting organizational authorization.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
-                          height: 1.25,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            // Bottom Alert Strip
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFEF3C7)),
-              ),
-              child: const Row(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Top Bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
                 children: [
-                  Icon(
-                    Icons.notification_important_rounded,
-                    color: Color(0xFFD97706),
-                    size: 13,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.fact_check_rounded,
+                      color: Color(0xFFD97706),
+                      size: 16,
+                    ),
                   ),
-                  SizedBox(width: 6),
-                  Text(
-                    'Prompt approvals keep site schedules on track',
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Workflow Approvals',
                     style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF92400E),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ],
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD97706),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFD97706).withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Review All',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(width: 3),
+                    Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Middle Info
+          Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFFEF3C7),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    pendingCount,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFB45309),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Action Required',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Supervisor & material requests are awaiting organizational authorization.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                        height: 1.25,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Bottom Alert Strip
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFEF3C7)),
             ),
-          ],
-        ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.notification_important_rounded,
+                  color: Color(0xFFD97706),
+                  size: 13,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  'Prompt approvals keep site schedules on track',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1616,12 +1598,17 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     required String period,
     required Color primaryColor,
   }) {
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         HapticFeedback.lightImpact();
-        _navigateToOrganizationExpenses(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const OrgFinancePage(),
+          ),
+        );
       },
-      borderRadius: BorderRadius.circular(22),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(

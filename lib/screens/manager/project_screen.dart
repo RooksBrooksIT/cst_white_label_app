@@ -54,7 +54,6 @@ class _ProjectScreenState extends State<ProjectScreen>
   DateTime? contractStartDate;
   DateTime? contractEndDate;
 
-  String? _updateAppBarSiteId;
   List<String> _unassignedSiteIds = [];
   String? _selectedSiteId;
 
@@ -228,7 +227,6 @@ class _ProjectScreenState extends State<ProjectScreen>
 
       selectedProjectId = null;
       selectedProjectData = null;
-      _updateAppBarSiteId = null;
     });
   }
 
@@ -307,7 +305,6 @@ class _ProjectScreenState extends State<ProjectScreen>
       actualEndDate = data['actualEndDate'] is Timestamp ? (data['actualEndDate'] as Timestamp).toDate() : null;
       contractStartDate = data['contractStartDate'] is Timestamp ? (data['contractStartDate'] as Timestamp).toDate() : null;
       contractEndDate = data['contractEndDate'] is Timestamp ? (data['contractEndDate'] as Timestamp).toDate() : null;
-      _updateAppBarSiteId = data['siteId'];
       _selectedSiteId = data['siteId'];
       _updateSiteIdController.text = data['siteId'] ?? '';
       _isContractWork = data['isContractWork'] ?? false;
@@ -370,23 +367,39 @@ class _ProjectScreenState extends State<ProjectScreen>
                           localSearch = val.trim().toLowerCase();
                         });
                       },
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0A183D),
+                      ),
+                      textAlignVertical: TextAlignVertical.center,
                       decoration: InputDecoration(
+                        isDense: true,
                         hintText: 'Search by project name, owner, site ID, stage...',
-                        prefixIcon: Icon(Icons.search_rounded, color: primaryColor),
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(left: 12, right: 8),
+                          child: Icon(Icons.search_rounded, color: primaryColor, size: 18),
+                        ),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: primaryColor, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 1.5),
                         ),
                       ),
                     ),
@@ -684,9 +697,11 @@ class _ProjectScreenState extends State<ProjectScreen>
         context: context,
         builder: (context) => _buildSuccessModal(context),
       );
+      if (!mounted) return;
       _resetForm();
       await _fetchUnassignedSiteIds();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error saving project: $e'),
@@ -734,7 +749,9 @@ class _ProjectScreenState extends State<ProjectScreen>
           currentStatus = null;
         });
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('Error loading planned dates for site: $e');
+    }
   }
   @override
   Widget build(BuildContext context) {
@@ -1746,6 +1763,37 @@ class _ProjectScreenState extends State<ProjectScreen>
     }
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildTextFormField(
     BuildContext context, {
     required TextEditingController controller,
@@ -1763,61 +1811,60 @@ class _ProjectScreenState extends State<ProjectScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
+        _buildFieldLabel(label),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          validator: validator,
+          readOnly: readOnly,
+          inputFormatters: inputFormatters,
+          maxLength: maxLength,
           style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: TextFormField(
-            controller: controller,
-            keyboardType: keyboardType,
-            validator: validator,
-            readOnly: readOnly,
-            inputFormatters: inputFormatters,
-            maxLength: maxLength,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+          textAlignVertical: TextAlignVertical.center,
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Enter ${label.replaceAll('*', '').trim()}',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: 'Enter $label',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Icon(icon, color: brandIconColor, size: 22),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              counterText: "",
+            filled: true,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(icon, color: brandIconColor, size: 18),
             ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
+            counterText: "",
           ),
         ),
       ],
@@ -1846,66 +1893,74 @@ class _ProjectScreenState extends State<ProjectScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
+        _buildFieldLabel(label),
+        DropdownButtonFormField<String>(
+          initialValue: (value != null && uniqueItems.contains(value.trim()))
+              ? value.trim()
+              : null,
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
           style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: enabled ? Colors.white : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: DropdownButtonFormField<String>(
-            initialValue: (value != null && uniqueItems.contains(value.trim()))
-                ? value.trim()
-                : null,
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Select ${label.replaceAll('*', '').trim()}',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: 'Select $label',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Icon(icon, color: brandIconColor, size: 22),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+            filled: true,
+            fillColor: enabled ? Colors.white : const Color(0xFFF8FAFC),
+            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(icon, color: brandIconColor, size: 18),
             ),
-            items: uniqueItems.map((item) {
-              return DropdownMenuItem<String>(value: item, child: Text(item));
-            }).toList(),
-            onChanged: enabled ? onChanged : null,
-            validator: validator,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
           ),
+          items: uniqueItems.map((item) {
+            return DropdownMenuItem<String>(
+              value: item,
+              child: Text(
+                item,
+                style: const TextStyle(
+                  color: Color(0xFF0A183D),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: enabled ? onChanged : null,
+          validator: validator,
         ),
       ],
     );
@@ -1925,42 +1980,29 @@ class _ProjectScreenState extends State<ProjectScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 8),
+        _buildFieldLabel(label),
         InkWell(
           onTap: enabled
               ? () => _selectDate(context, initialDate, onSelected)
               : null,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
             decoration: BoxDecoration(
-              color: enabled ? Colors.white : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              color: enabled ? Colors.white : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.calendar_today_rounded,
-                  color: brandIconColor,
-                  size: 20,
+                Padding(
+                  padding: const EdgeInsets.only(left: 0, right: 8),
+                  child: Icon(
+                    Icons.calendar_today_rounded,
+                    color: brandIconColor,
+                    size: 18,
+                  ),
                 ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     formatDate(initialDate),
@@ -1968,8 +2010,8 @@ class _ProjectScreenState extends State<ProjectScreen>
                       color: initialDate == null
                           ? const Color(0xFF94A3B8)
                           : const Color(0xFF0A183D),
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      fontWeight: initialDate == null ? FontWeight.w500 : FontWeight.w600,
                     ),
                   ),
                 ),

@@ -590,15 +590,6 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
           tooltip: 'Export Financial Statement',
           onPressed: _generateAndPreviewPdf,
         ),
-        IconButton(
-          icon: const Icon(
-            Icons.refresh_rounded,
-            color: Colors.white,
-            size: 22,
-          ),
-          tooltip: 'Refresh Financial Data',
-          onPressed: _fetchFinancialDetails,
-        ),
         const SizedBox(width: 4),
       ],
     );

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/manager/config_account_dashboard.dart';
 
 class ManagerNotificationScreen extends StatefulWidget {
   const ManagerNotificationScreen({super.key});
@@ -19,6 +20,13 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
   String _searchQuery = '';
 
   Color get primaryColor => Theme.of(context).colorScheme.primary;
+
+  void _navigateToDashboard() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const ConfigAccountDashboard()),
+      (route) => false,
+    );
+  }
 
   @override
   void initState() {
@@ -43,44 +51,51 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
     final isDesktop = screenWidth >= 1024;
     final isTablet = screenWidth >= 600 && screenWidth < 1024;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Notifications',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-            letterSpacing: -0.3,
-          ),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                darkAccent,
-                Color.alphaBlend(
-                  primaryColor.withValues(alpha: 0.35),
-                  darkAccent,
-                ),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _navigateToDashboard();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text(
+            'Notifications',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              letterSpacing: -0.3,
             ),
           ),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-            size: 18,
+          centerTitle: true,
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  darkAccent,
+                  Color.alphaBlend(
+                    primaryColor.withValues(alpha: 0.35),
+                    darkAccent,
+                  ),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            onPressed: _navigateToDashboard,
+          ),
         actions: [
           // Live Unread Badge
           StreamBuilder<int>(
@@ -153,33 +168,43 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                     ),
                     child: TextField(
                       controller: _searchController,
+                      textAlignVertical: TextAlignVertical.center,
                       style: const TextStyle(
-                        fontSize: 13.5,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                         color: Color(0xFF0F172A),
                       ),
                       decoration: InputDecoration(
                         hintText:
                             'Search by site, supervisor, request ID or keyword...',
-                        hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade500,
+                        hintStyle: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
                         ),
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          size: 20,
-                          color: Color(0xFF64748B),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 38,
+                          minHeight: 38,
+                        ),
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(left: 12, right: 8),
+                          child: Icon(
+                            Icons.search_rounded,
+                            size: 18,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(
                                   Icons.clear_rounded,
-                                  size: 18,
+                                  size: 16,
                                   color: Color(0xFF64748B),
                                 ),
                                 onPressed: () {
@@ -360,8 +385,9 @@ class _ManagerNotificationScreenState extends State<ManagerNotificationScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFilterChip(String label, int count) {
     final isSelected = _selectedFilter == label;

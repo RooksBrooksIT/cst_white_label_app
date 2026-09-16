@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -720,6 +720,37 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildCustomTextField({
     required TextEditingController controller,
     required String label,
@@ -732,56 +763,65 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     Widget? suffixIcon,
     int maxLines = 1,
   }) {
+    final bool isMultiLine = maxLines > 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
+        _buildFieldLabel(label),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          readOnly: readOnly,
+          onTap: onTap,
+          maxLines: maxLines,
+          textAlignVertical: isMultiLine ? TextAlignVertical.top : TextAlignVertical.center,
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
           ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            readOnly: readOnly,
-            onTap: onTap,
-            maxLines: maxLines,
-            style: const TextStyle(
-              fontSize: 14.5,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+            hintText: 'Enter ${label.replaceAll('*', '').trim()}',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Padding(
+              padding: EdgeInsets.only(
+                left: 12,
+                right: 8,
+                top: isMultiLine ? 10 : 0,
+                bottom: isMultiLine ? 10 : 0,
+              ),
+              child: Icon(icon, color: primaryColor, size: 18),
+            ),
+            prefixIconConstraints: BoxConstraints(
+              minWidth: 38,
+              minHeight: isMultiLine ? 24 : 38,
+            ),
+            prefixText: prefixText,
+            prefixStyle: const TextStyle(
+              fontSize: 13.5,
               fontWeight: FontWeight.w700,
               color: Color(0xFF0A183D),
             ),
-            decoration: InputDecoration(
-              hintText: 'Enter ${label.replaceAll('*', '').trim()}',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w400,
-              ),
-              prefixIcon: Icon(icon, color: primaryColor, size: 20),
-              prefixText: prefixText,
-              prefixStyle: const TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0A183D),
-              ),
-              suffixIcon: suffixIcon,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+            suffixIcon: suffixIcon,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: isMultiLine ? 12 : 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
             ),
           ),
         ),
@@ -793,93 +833,95 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Select Designation *',
-          style: TextStyle(
+        _buildFieldLabel('Select Designation *'),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedDesignation,
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
           ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: DropdownButtonFormField<String>(
-            initialValue: _selectedDesignation,
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
             ),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              prefixIcon: Icon(
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(
                 Icons.construction_rounded,
                 color: primaryColor,
-                size: 20,
-              ),
-              hintText: 'Choose designation (Mason, Helper, etc.)',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w400,
+                size: 18,
               ),
             ),
-            items: _designations.map<DropdownMenuItem<String>>((designation) {
-              final designationValue = designation['designation']?.toString() ?? '';
-              final salaryValue = designation['salary']?.toString() ?? '';
-              return DropdownMenuItem<String>(
-                value: designationValue.isEmpty ? null : designationValue,
-                onTap: () {
-                  setState(() {
-                    _salaryController.text = salaryValue;
-                    _isSalaryEditable = true;
-                  });
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(designationValue),
-                    if (salaryValue.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '₹$salaryValue/day',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF059669),
-                          ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            hintText: 'Choose designation (Mason, Helper, etc.)',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
+          ),
+          items: _designations.map<DropdownMenuItem<String>>((designation) {
+            final designationValue = designation['designation']?.toString() ?? '';
+            final salaryValue = designation['salary']?.toString() ?? '';
+            return DropdownMenuItem<String>(
+              value: designationValue.isEmpty ? null : designationValue,
+              onTap: () {
+                setState(() {
+                  _salaryController.text = salaryValue;
+                  _isSalaryEditable = true;
+                });
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(designationValue),
+                  if (salaryValue.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '₹$salaryValue/day',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF059669),
                         ),
                       ),
-                  ],
-                ),
-              );
-            }).toList(),
-            onChanged: (String? value) {
-              setState(() {
-                _selectedDesignation = value;
-              });
-            },
-          ),
+                    ),
+                ],
+              ),
+            );
+          }).toList(),
+          onChanged: (String? value) {
+            setState(() {
+              _selectedDesignation = value;
+            });
+          },
         ),
       ],
     );
@@ -919,60 +961,67 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           child: Column(
             children: [
               // Search Input Box
-              Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+              TextField(
+                controller: _searchController,
+                onChanged: (val) {
+                  setState(() {
+                    _searchQuery = val.trim().toLowerCase();
+                  });
+                },
+                textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(
+                  color: Color(0xFF0A183D),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (val) {
-                    setState(() {
-                      _searchQuery = val.trim().toLowerCase();
-                    });
-                  },
-                  style: const TextStyle(
-                    color: Color(0xFF0A183D),
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintText: 'Search worker name, ID, phone, designation...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
                   ),
-                  decoration: InputDecoration(
-                    hintText: 'Search worker name, ID, phone, designation...',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 13,
-                    ),
-                    prefixIcon: Icon(
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
                       Icons.search_rounded,
                       color: primaryColor,
-                      size: 20,
+                      size: 18,
                     ),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(
-                              Icons.clear_rounded,
-                              color: Color(0xFF64748B),
-                              size: 18,
-                            ),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 38,
+                    minHeight: 38,
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.clear_rounded,
+                            color: Color(0xFF64748B),
+                            size: 18,
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12.5,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 1.5),
                   ),
                 ),
               ),

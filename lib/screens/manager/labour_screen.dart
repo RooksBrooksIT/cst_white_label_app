@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -680,169 +680,169 @@ class _LabourScreenState extends State<LabourScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-
-              const Text(
-                'Labour Designation',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0A183D),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                ),
-                child: Autocomplete<String>(
-                  optionsBuilder: (TextEditingValue textEditingValue) {
-                    if (textEditingValue.text == '') {
-                      return allLabours
-                          .map((e) => e['designation'] as String)
-                          .where((des) => des.isNotEmpty)
-                          .toSet();
-                    }
+              _buildFieldLabel('Labour Designation *'),
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text == '') {
                     return allLabours
                         .map((e) => e['designation'] as String)
-                        .where(
-                          (option) => option.toLowerCase().contains(
-                            textEditingValue.text.toLowerCase(),
-                          ),
-                        )
+                        .where((des) => des.isNotEmpty)
                         .toSet();
-                  },
-                  onSelected: (String selection) {
-                    final labour = allLabours.firstWhere(
-                      (e) => e['designation'] == selection,
-                      orElse: () => {},
-                    );
-                    setState(() {
-                      selectedDesignation = selection;
-                      selectedLabourId = labour['labourId'];
-                      selectedSalary = labour['salary'];
-                      updateSalaryController.text = labour['salary'] ?? '';
-                      updateDesignationController.text = selection;
-                      isSalaryEditable = true;
-                    });
-                  },
-                  fieldViewBuilder:
-                      (context, controller, focusNode, onEditingComplete) {
-                    controller.text = selectedDesignation ?? '';
-                    return TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      style: const TextStyle(
-                        color: Color(0xFF0A183D),
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
+                  }
+                  return allLabours
+                      .map((e) => e['designation'] as String)
+                      .where(
+                        (option) => option.toLowerCase().contains(
+                          textEditingValue.text.toLowerCase(),
+                        ),
+                      )
+                      .toSet();
+                },
+                onSelected: (String selection) {
+                  final labour = allLabours.firstWhere(
+                    (e) => e['designation'] == selection,
+                    orElse: () => {},
+                  );
+                  setState(() {
+                    selectedDesignation = selection;
+                    selectedLabourId = labour['labourId'];
+                    selectedSalary = labour['salary'];
+                    updateSalaryController.text = labour['salary'] ?? '';
+                    updateDesignationController.text = selection;
+                    isSalaryEditable = true;
+                  });
+                },
+                fieldViewBuilder:
+                    (context, controller, focusNode, onEditingComplete) {
+                  controller.text = selectedDesignation ?? '';
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    textAlignVertical: TextAlignVertical.center,
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: 'Search designation...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'Search designation...',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        prefixIcon: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Icon(
-                            Icons.engineering_rounded,
-                            color: primaryColor,
-                            size: 20,
-                          ),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 8),
+                        child: Icon(
+                          Icons.engineering_rounded,
+                          color: primaryColor,
+                          size: 18,
                         ),
                       ),
-                      onChanged: (val) {
-                        setState(() {
-                          selectedDesignation = val;
-                          final labour = allLabours.firstWhere(
-                            (e) => e['designation'] == val,
-                            orElse: () => {},
-                          );
-                          selectedLabourId = labour['labourId'];
-                          selectedSalary = labour['salary'];
-                          updateSalaryController.text =
-                              labour['salary'] ?? '';
-                          updateDesignationController.text = val;
-                          isSalaryEditable = true;
-                        });
-                      },
-                    );
-                  },
-                ),
+                      prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12.5,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryColor, width: 1.5),
+                      ),
+                    ),
+                    onChanged: (val) {
+                      setState(() {
+                        selectedDesignation = val;
+                        final labour = allLabours.firstWhere(
+                          (e) => e['designation'] == val,
+                          orElse: () => {},
+                        );
+                        selectedLabourId = labour['labourId'];
+                        selectedSalary = labour['salary'];
+                        updateSalaryController.text =
+                            labour['salary'] ?? '';
+                        updateDesignationController.text = val;
+                        isSalaryEditable = true;
+                      });
+                    },
+                  );
+                },
               ),
               const SizedBox(height: 14),
 
-              const Text(
-                'Labour Salary (₹)',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0A183D),
-                ),
-              ),
-              const SizedBox(height: 8),
+              _buildFieldLabel('Labour Salary (₹) *'),
               Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                    child: TextField(
+                      controller: updateSalaryController,
+                      enabled: isSalaryEditable,
+                      keyboardType: TextInputType.number,
+                      textAlignVertical: TextAlignVertical.center,
+                      style: const TextStyle(
+                        color: Color(0xFF0A183D),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
                       ),
-                      child: TextField(
-                        controller: updateSalaryController,
-                        enabled: isSalaryEditable,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(
-                          color: Color(0xFF0A183D),
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        fillColor: isSalaryEditable ? Colors.white : const Color(0xFFF8FAFC),
+                        hintText: 'Enter salary amount',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
                         ),
-                        decoration: InputDecoration(
-                          hintText: 'Enter salary amount',
-                          hintStyle: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 13.5,
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(left: 12, right: 8),
+                          child: Icon(
+                            Icons.currency_rupee_rounded,
+                            color: primaryColor,
+                            size: 18,
                           ),
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Icon(
-                              Icons.currency_rupee_rounded,
-                              color: primaryColor,
-                              size: 20,
-                            ),
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
+                        ),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12.5,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 1.5),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Container(
+                  SizedBox(
                     width: 44,
                     height: 44,
-                    decoration: BoxDecoration(
-                      color: isSalaryEditable
-                          ? const Color(0xFFEF4444)
-                          : primaryColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isSalaryEditable
+                            ? const Color(0xFFEF4444)
+                            : primaryColor,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Icon(
                         isSalaryEditable
                             ? Icons.close_rounded
                             : Icons.edit_rounded,
@@ -928,58 +928,59 @@ class _LabourScreenState extends State<LabourScreen> {
         Row(
           children: [
             Expanded(
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) {
+                  setState(() {
+                    _searchQuery = val.trim().toLowerCase();
+                    _currentPage = 1;
+                  });
+                },
+                textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(
+                  color: Color(0xFF0A183D),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (val) {
-                    setState(() {
-                      _searchQuery = val.trim().toLowerCase();
-                      _currentPage = 1;
-                    });
-                  },
-                  style: const TextStyle(
-                    color: Color(0xFF0A183D),
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintText: 'Search designation or ID...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
                   ),
-                  decoration: InputDecoration(
-                    hintText: 'Search designation or ID...',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 13,
-                    ),
-                    prefixIcon: Icon(
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
                       Icons.search_rounded,
                       color: primaryColor,
-                      size: 20,
+                      size: 18,
                     ),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                                _currentPage = 1;
-                              });
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                              _currentPage = 1;
+                            });
+                          },
+                        )
+                      : null,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 1.5),
                   ),
                 ),
               ),
@@ -990,7 +991,7 @@ class _LabourScreenState extends State<LabourScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFCBD5E1)),
               ),
               child: DropdownButtonHideUnderline(
@@ -1381,6 +1382,37 @@ class _LabourScreenState extends State<LabourScreen> {
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildWhiteTextField({
     required String label,
     required IconData icon,
@@ -1392,45 +1424,42 @@ class _LabourScreenState extends State<LabourScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
+        _buildFieldLabel(label),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          textAlignVertical: TextAlignVertical.center,
           style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: hintText,
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Icon(icon, color: brandIconColor, size: 20),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(icon, color: brandIconColor, size: 18),
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: brandIconColor, width: 1.5),
             ),
           ),
         ),

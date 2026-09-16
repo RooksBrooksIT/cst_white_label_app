@@ -334,7 +334,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
     final cleanSiteId = siteId.trim().toLowerCase();
     final cleanSiteName = (_selectedProjectName ?? '').trim().toLowerCase();
-    final combinedKey = '${cleanSiteId}_${cleanSiteName}'.trim().toLowerCase();
+    final combinedKey = '${cleanSiteId}_$cleanSiteName'.trim().toLowerCase();
 
     final Set<String> candidateKeys = {
       cleanSiteId,
@@ -521,7 +521,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
       final cleanSiteId = siteId.trim();
       final cleanSiteName = siteName.trim();
-      final combinedKey = '${cleanSiteId}_${cleanSiteName}';
+      final combinedKey = '${cleanSiteId}_$cleanSiteName';
 
       final docData = {
         'site': cleanSiteId,
@@ -829,75 +829,105 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildSiteDropdown(Color primaryColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Select Site *',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: _selectedSite,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            decoration: InputDecoration(
-              hintText: 'Choose site location',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w400,
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              prefixIcon: Icon(
+        _buildFieldLabel('Select Site *'),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: _selectedSite,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: 'Choose site location',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(
                 Icons.location_on_rounded,
                 color: primaryColor,
-                size: 20,
+                size: 18,
               ),
             ),
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
-            items: _isLoadingSites
-                ? [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Loading sites...'),
-                    ),
-                  ]
-                : _sites.map<DropdownMenuItem<String>>((site) {
-                    final displayName = SiteDisplayHelper.formatSiteDisplay(
-                      siteId: site['siteId'] ?? site['site'],
-                      siteName: site['siteName'] ?? site['projectName'],
-                    );
-                    return DropdownMenuItem<String>(
-                      value: site['site'] as String?,
-                      child: Text(
-                        displayName,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-            onChanged: _onSiteSelected,
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
           ),
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+          ),
+          items: _isLoadingSites
+              ? [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Loading sites...'),
+                  ),
+                ]
+              : _sites.map<DropdownMenuItem<String>>((site) {
+                  final displayName = SiteDisplayHelper.formatSiteDisplay(
+                    siteId: site['siteId'] ?? site['site'],
+                    siteName: site['siteName'] ?? site['projectName'],
+                  );
+                  return DropdownMenuItem<String>(
+                    value: site['site'] as String?,
+                    child: Text(
+                      displayName,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+          onChanged: _onSiteSelected,
         ),
       ],
     );
@@ -924,112 +954,111 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Select Worker Profile *',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: DropdownButtonFormField<String>(
-            key: ValueKey('worker_dd_${currentDropdownValue}_${availableWorkers.length}'),
-            isExpanded: true,
-            initialValue: currentDropdownValue,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            decoration: InputDecoration(
-              hintText: _isLoadingWorkers
-                  ? 'Loading workers...'
-                  : (availableWorkers.isEmpty
-                      ? (_workers.isEmpty
-                          ? 'No workers registered in system'
-                          : 'All workers already added')
-                      : 'Choose registered worker'),
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w400,
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              prefixIcon: Icon(
+        _buildFieldLabel('Select Worker Profile *'),
+        DropdownButtonFormField<String>(
+          key: ValueKey('worker_dd_${currentDropdownValue}_${availableWorkers.length}'),
+          isExpanded: true,
+          initialValue: currentDropdownValue,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: _isLoadingWorkers
+                ? 'Loading workers...'
+                : (availableWorkers.isEmpty
+                    ? (_workers.isEmpty
+                        ? 'No workers registered in system'
+                        : 'All workers already added')
+                    : 'Choose registered worker'),
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(
                 Icons.badge_rounded,
                 color: primaryColor,
-                size: 20,
+                size: 18,
               ),
             ),
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
-            items: _isLoadingWorkers
-                ? [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Loading workers...'),
-                    ),
-                  ]
-                : availableWorkers.map<DropdownMenuItem<String>>((worker) {
-                    final String id = worker['id']?.toString() ?? '';
-                    final String name = worker['name']?.toString().trim() ?? '';
-                    final String des = worker['designation']?.toString().trim() ?? '';
-                    final String displayName = des.isNotEmpty ? '$name ($des)' : name;
-
-                    final assignedInfo = _getAssignedInfoForWorker(id, name);
-                    final isAssignedElsewhere = assignedInfo != null &&
-                        assignedInfo['siteId'] != null &&
-                        assignedInfo['siteId'] != _selectedSite;
-
-                    final assignedSiteLabel = assignedInfo?['siteName'] ?? assignedInfo?['siteId'] ?? '';
-
-                    return DropdownMenuItem<String>(
-                      value: worker['id'] as String?,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              displayName,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13.5),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isAssignedElsewhere ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: isAssignedElsewhere ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0),
-                              ),
-                            ),
-                            child: Text(
-                              isAssignedElsewhere ? 'Mapped: $assignedSiteLabel' : 'Available',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isAssignedElsewhere ? const Color(0xFFD97706) : const Color(0xFF059669),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-            onChanged: availableWorkers.isEmpty ? null : _onWorkerSelected,
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
           ),
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+          ),
+          items: _isLoadingWorkers
+              ? [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Loading workers...'),
+                  ),
+                ]
+              : availableWorkers.map<DropdownMenuItem<String>>((worker) {
+                  final String id = worker['id']?.toString() ?? '';
+                  final String name = worker['name']?.toString().trim() ?? '';
+                  final String des = worker['designation']?.toString().trim() ?? '';
+                  final String displayName = des.isNotEmpty ? '$name ($des)' : name;
+
+                  final assignedInfo = _getAssignedInfoForWorker(id, name);
+                  final isAssignedElsewhere = assignedInfo != null &&
+                      assignedInfo['siteId'] != null &&
+                      assignedInfo['siteId'] != _selectedSite;
+
+                  final assignedSiteLabel = assignedInfo?['siteName'] ?? assignedInfo?['siteId'] ?? '';
+
+                  return DropdownMenuItem<String>(
+                    value: worker['id'] as String?,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            displayName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13.5),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isAssignedElsewhere ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isAssignedElsewhere ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0),
+                            ),
+                          ),
+                          child: Text(
+                            isAssignedElsewhere ? 'Mapped: $assignedSiteLabel' : 'Available',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isAssignedElsewhere ? const Color(0xFFD97706) : const Color(0xFF059669),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+          onChanged: availableWorkers.isEmpty ? null : _onWorkerSelected,
         ),
       ],
     );

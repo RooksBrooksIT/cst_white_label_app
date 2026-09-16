@@ -66,6 +66,9 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   File? _selectedBillImage;
   final ImagePicker _picker = ImagePicker();
 
+  final Map<String, Map<String, dynamic>> _siteMetadataCache = {};
+  final Map<String, String> _supervisorNameCache = {};
+
   // --- LOGS TAB STATE ---
   final TextEditingController _logSearchController = TextEditingController();
   String _logSearchQuery = '';
@@ -121,6 +124,118 @@ class _ManagerExpensesState extends State<ManagerExpenses>
     super.dispose();
   }
 
+  void _storeSiteMeta(String key, Map<String, dynamic> meta, {bool merge = false}) {
+    if (key.trim().isEmpty) return;
+    final k = key.trim().toLowerCase();
+    if (merge && _siteMetadataCache.containsKey(k)) {
+      final existing = _siteMetadataCache[k]!;
+      _siteMetadataCache[k] = {
+        ...existing,
+        ...meta..removeWhere((_, v) => v == null || v.toString().trim().isEmpty),
+      };
+    } else {
+      _siteMetadataCache[k] = Map<String, dynamic>.from(meta);
+    }
+  }
+
+  Map<String, dynamic>? _findCachedSiteMeta(String siteId) {
+    final clean = siteId.trim().toLowerCase();
+    if (_siteMetadataCache.containsKey(clean)) {
+      return _siteMetadataCache[clean];
+    }
+    final cleanNoSpaces = clean.replaceAll(' ', '');
+    if (_siteMetadataCache.containsKey(cleanNoSpaces)) {
+      return _siteMetadataCache[cleanNoSpaces];
+    }
+    if (clean.contains('_')) {
+      final code = clean.split('_').first;
+      if (_siteMetadataCache.containsKey(code)) {
+        return _siteMetadataCache[code];
+      }
+    }
+    return null;
+  }
+
+  void _applySiteDetailsImmediately(String siteId) {
+    final meta = _findCachedSiteMeta(siteId);
+    final cachedDetails = ExpenseService.getCachedSiteDetails(siteId);
+
+    String? supName = meta?['supervisorName']?.toString().trim() ?? cachedDetails?.supervisor;
+    String? supId = meta?['supervisorId']?.toString().trim() ?? cachedDetails?.supervisorId;
+    String? stage = meta?['projectStage']?.toString().trim() ?? cachedDetails?.projectStage;
+    String? projName = meta?['projectName']?.toString().trim() ?? cachedDetails?.projectName;
+
+    if (supName == null || supName.isEmpty) {
+      if (supId != null && supId.isNotEmpty) {
+        supName = _supervisorNameCache[supId.toLowerCase()] ?? supId;
+      }
+    } else {
+      supName = _supervisorNameCache[supName.toLowerCase()] ?? supName;
+    }
+
+    if (projName == null || projName.isEmpty) {
+      projName = siteNameMap[siteId];
+      if (projName == null || projName.isEmpty) {
+        if (siteId.contains('_')) {
+          projName = siteId.split('_').skip(1).join('_');
+        } else {
+          projName = siteId;
+        }
+      }
+    }
+
+    final hasValidSup = (supName != null &&
+            supName.isNotEmpty &&
+            supName != 'NOT_ASSIGNED' &&
+            supName != 'Not Assigned') ||
+        (supId != null &&
+            supId.isNotEmpty &&
+            supId != 'NOT_ASSIGNED' &&
+            supId != 'Not Assigned');
+
+    final finalSupName = (supName != null &&
+            supName.isNotEmpty &&
+            supName != 'NOT_ASSIGNED' &&
+            supName != 'Not Assigned')
+        ? supName
+        : ((supId != null &&
+                supId.isNotEmpty &&
+                supId != 'NOT_ASSIGNED' &&
+                supId != 'Not Assigned')
+            ? supId
+            : null);
+
+    final finalSupId = (supId != null &&
+            supId.isNotEmpty &&
+            supId != 'NOT_ASSIGNED' &&
+            supId != 'Not Assigned')
+        ? supId
+        : (finalSupName ?? 'NOT_ASSIGNED');
+
+    final displaySup = hasValidSup
+        ? ((supName != null &&
+                supName.isNotEmpty &&
+                supName != 'NOT_ASSIGNED' &&
+                supName != 'Not Assigned' &&
+                supId != null &&
+                supId.isNotEmpty &&
+                supId != 'NOT_ASSIGNED' &&
+                supId != 'Not Assigned' &&
+                supId != supName)
+            ? '$supName ($supId)'
+            : (supName ?? supId!))
+        : 'Not Assigned';
+
+    selectedSupervisorId = finalSupId;
+    selectedSupervisorName = finalSupName ?? 'N/A';
+    selectedProjectStage = (stage != null && stage.isNotEmpty) ? stage : 'Not Assigned';
+    selectedProjectName = projName;
+
+    supervisorIdController.text = displaySup;
+    projectStageController.text = (stage != null && stage.isNotEmpty) ? stage : 'Not Assigned';
+    projectNameController.text = projName;
+  }
+
   Future<void> _loadSiteIds() async {
     setState(() => isLoadingSites = true);
     try {
@@ -129,41 +244,138 @@ class _ManagerExpensesState extends State<ManagerExpenses>
         final Map<String, String> nameOrCodeToCanonical = {};
         final Set<String> canonicalIds = {};
 
-        // 1. Fetch from Site collection (Primary Source)
-        final sitesSnapshot = await FirestoreService.sites.get();
-        for (var doc in sitesSnapshot.docs) {
-          if (doc.id.isEmpty) continue;
-          final data = doc.data();
-          final sCode = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
-          final sName = (data['siteName'] ?? data['name'] ?? data['projectName'] ?? data['site'] ?? '').toString().trim();
+        // Fetch sites, siteSupervisorMap, and supervisors concurrently in parallel
+        final results = await Future.wait([
+          FirestoreService.sites.get(),
+          FirestoreService.siteSupervisorMap.get().catchError((_) => null as dynamic),
+          FirestoreService.supervisors.get().catchError((_) => null as dynamic),
+        ]);
 
-          final canonical = ExpenseService.formatCanonicalSiteId(
-            rawId: doc.id,
-            siteCode: sCode,
-            siteName: sName,
-          );
+        final sitesSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>?;
+        final mapSnapshot = results[1] as QuerySnapshot<Map<String, dynamic>>?;
+        final supSnapshot = results[2] as QuerySnapshot<Map<String, dynamic>>?;
 
-          canonicalIds.add(canonical);
-          if (sName.isNotEmpty) {
-            names[canonical] = sName;
-            nameOrCodeToCanonical[sName.toLowerCase()] = canonical;
-            nameOrCodeToCanonical[sName.replaceAll(' ', '').toLowerCase()] = canonical;
+        // Cache all supervisor names for instant in-memory resolution
+        if (supSnapshot != null) {
+          for (var doc in supSnapshot.docs) {
+            final data = doc.data();
+            final fullName = (data['FullName'] ??
+                    data['fullName'] ??
+                    data['username'] ??
+                    data['UserName'] ??
+                    data['name'])
+                ?.toString()
+                .trim();
+            if (fullName != null && fullName.isNotEmpty) {
+              _supervisorNameCache[doc.id.toLowerCase()] = fullName;
+              final supId = (data['SupervisorId'] ?? data['supervisorId'] ?? data['Supervisor ID'])?.toString().trim();
+              if (supId != null && supId.isNotEmpty) {
+                _supervisorNameCache[supId.toLowerCase()] = fullName;
+              }
+              final username = (data['username'] ?? data['UserName'])?.toString().trim();
+              if (username != null && username.isNotEmpty) {
+                _supervisorNameCache[username.toLowerCase()] = fullName;
+              }
+            }
           }
-          if (sCode.isNotEmpty) {
-            nameOrCodeToCanonical[sCode.toLowerCase()] = canonical;
-          }
-          nameOrCodeToCanonical[doc.id.toLowerCase()] = canonical;
         }
 
-        // 2. Fetch from siteSupervisorMap
-        try {
-          final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
+        // 1. Process from Site collection (Primary Source)
+        if (sitesSnapshot != null) {
+          for (var doc in sitesSnapshot.docs) {
+            if (doc.id.isEmpty) continue;
+            final data = doc.data();
+            final sCode = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+            final sName = (data['siteName'] ?? data['name'] ?? data['projectName'] ?? data['site'] ?? '').toString().trim();
+            final sStage = (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+            final sSup = (data['Supervisor'] ??
+                    data['supervisor'] ??
+                    data['supervisorName'] ??
+                    data['supervisor_name'] ??
+                    data['FullName'] ??
+                    data['fullName'] ??
+                    data['name'] ??
+                    data['username'] ??
+                    data['UserName'])
+                ?.toString()
+                .trim();
+            final sSupId = (data['Supervisor ID'] ??
+                    data['supervisorId'] ??
+                    data['SupervisorId'] ??
+                    data['supervisor_id'] ??
+                    data['assignedSupervisor'])
+                ?.toString()
+                .trim();
+
+            final canonical = ExpenseService.formatCanonicalSiteId(
+              rawId: doc.id,
+              siteCode: sCode,
+              siteName: sName,
+            );
+
+            canonicalIds.add(canonical);
+            if (sName.isNotEmpty) {
+              names[canonical] = sName;
+              nameOrCodeToCanonical[sName.toLowerCase()] = canonical;
+              nameOrCodeToCanonical[sName.replaceAll(' ', '').toLowerCase()] = canonical;
+            }
+            if (sCode.isNotEmpty) {
+              nameOrCodeToCanonical[sCode.toLowerCase()] = canonical;
+            }
+            nameOrCodeToCanonical[doc.id.toLowerCase()] = canonical;
+
+            final meta = <String, dynamic>{
+              'projectName': sName.isNotEmpty ? sName : (data['projectName'] ?? '').toString().trim(),
+              'projectStage': sStage ?? '',
+              'supervisorName': sSup ?? '',
+              'supervisorId': sSupId ?? '',
+              'siteCode': sCode,
+              'canonical': canonical,
+            };
+            _storeSiteMeta(canonical, meta);
+            _storeSiteMeta(doc.id, meta);
+            if (sCode.isNotEmpty) _storeSiteMeta(sCode, meta);
+            if (sName.isNotEmpty) _storeSiteMeta(sName, meta);
+
+            ExpenseService.cacheSiteDetails(SiteDetails(
+              canonicalDocId: canonical,
+              siteCode: sCode,
+              siteName: sName,
+              allKeys: {canonical, doc.id, if (sCode.isNotEmpty) sCode, if (sName.isNotEmpty) sName},
+              supervisor: sSup,
+              supervisorId: sSupId,
+              projectName: sName,
+              projectStage: sStage,
+            ));
+          }
+        }
+
+        // 2. Process from siteSupervisorMap
+        if (mapSnapshot != null) {
           for (var doc in mapSnapshot.docs) {
             final data = doc.data();
             final sDocId = (data['siteDocId'] ?? '').toString().trim();
             final sId = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
             final sSite = (data['site'] ?? '').toString().trim();
             final sName = (data['siteName'] ?? data['projectName'] ?? data['site_name'] ?? data['location'] ?? '').toString().trim();
+            final sStage = (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+            final sSup = (data['supervisor'] ??
+                    data['supervisorName'] ??
+                    data['Supervisor'] ??
+                    data['supervisor_name'] ??
+                    data['FullName'] ??
+                    data['fullName'] ??
+                    data['name'] ??
+                    data['username'] ??
+                    data['UserName'])
+                ?.toString()
+                .trim();
+            final sSupId = (data['Supervisor ID'] ??
+                    data['supervisorId'] ??
+                    data['SupervisorId'] ??
+                    data['supervisor_id'])
+                ?.toString()
+                .trim();
 
             String? mapped = nameOrCodeToCanonical[sDocId.toLowerCase()] ??
                 nameOrCodeToCanonical[sSite.toLowerCase()] ??
@@ -188,8 +400,24 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                 names[mapped] = sName;
               }
             }
+
+            final targetKey = (mapped != null && mapped.isNotEmpty) ? mapped : doc.id;
+            final meta = <String, dynamic>{
+              'projectName': sName.isNotEmpty ? sName : (data['projectName'] ?? '').toString().trim(),
+              'projectStage': sStage ?? '',
+              'supervisorName': sSup ?? '',
+              'supervisorId': sSupId ?? '',
+              'siteCode': sId,
+              'canonical': targetKey,
+            };
+            _storeSiteMeta(targetKey, meta, merge: true);
+            if (sDocId.isNotEmpty) _storeSiteMeta(sDocId, meta, merge: true);
+            if (sId.isNotEmpty) _storeSiteMeta(sId, meta, merge: true);
+            if (sSite.isNotEmpty) _storeSiteMeta(sSite, meta, merge: true);
+            if (sName.isNotEmpty) _storeSiteMeta(sName, meta, merge: true);
+            _storeSiteMeta(doc.id, meta, merge: true);
           }
-        } catch (_) {}
+        }
 
         siteNameMap = names;
         siteIds = ExpenseService.sanitizeSiteIds(canonicalIds);
@@ -215,6 +443,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
 
         if (siteIds.length == 1) {
           selectedSiteId = siteIds.first;
+          _applySiteDetailsImmediately(selectedSiteId!);
           _loadSiteDetails(selectedSiteId!);
         }
       });
@@ -239,6 +468,11 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   Future<String?> _resolveSupervisorName(String? nameOrId) async {
     if (nameOrId == null || nameOrId.trim().isEmpty) return null;
     final clean = nameOrId.trim();
+    final lower = clean.toLowerCase();
+
+    if (_supervisorNameCache.containsKey(lower)) {
+      return _supervisorNameCache[lower];
+    }
 
     try {
       final supDoc = await FirestoreService.supervisors.doc(clean).get();
@@ -252,6 +486,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
             ?.toString()
             .trim();
         if (fullName != null && fullName.isNotEmpty) {
+          _supervisorNameCache[lower] = fullName;
           return fullName;
         }
       }
@@ -264,8 +499,8 @@ class _ManagerExpensesState extends State<ManagerExpenses>
         FirestoreService.supervisors.where('UserName', isEqualTo: clean),
       ];
 
-      for (var q in queries) {
-        final snap = await q.get();
+      final results = await Future.wait(queries.map((q) => q.get()));
+      for (var snap in results) {
         if (snap.docs.isNotEmpty) {
           final data = snap.docs.first.data();
           final fullName = (data['FullName'] ??
@@ -276,6 +511,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
               ?.toString()
               .trim();
           if (fullName != null && fullName.isNotEmpty) {
+            _supervisorNameCache[lower] = fullName;
             return fullName;
           }
         }
@@ -284,63 +520,74 @@ class _ManagerExpensesState extends State<ManagerExpenses>
       debugPrint('Error resolving supervisor name: $e');
     }
 
+    _supervisorNameCache[lower] = clean;
     return clean;
   }
 
   Future<void> _loadSiteDetails(String siteId) async {
-    String? supervisorId;
-    String? supervisorName;
-    String? projectPhase;
-    String? projectName;
+    if (selectedSiteId != siteId) return;
+
+    final cachedMeta = _findCachedSiteMeta(siteId);
+    final cachedDetails = ExpenseService.getCachedSiteDetails(siteId);
+
+    String? supervisorId = (cachedMeta?['supervisorId']?.toString().trim().isNotEmpty == true &&
+            cachedMeta!['supervisorId'] != 'NOT_ASSIGNED' &&
+            cachedMeta['supervisorId'] != 'Not Assigned')
+        ? cachedMeta['supervisorId'].toString().trim()
+        : (cachedDetails?.supervisorId?.isNotEmpty == true &&
+                cachedDetails!.supervisorId != 'NOT_ASSIGNED' &&
+                cachedDetails.supervisorId != 'Not Assigned'
+            ? cachedDetails.supervisorId
+            : null);
+
+    String? supervisorName = (cachedMeta?['supervisorName']?.toString().trim().isNotEmpty == true &&
+            cachedMeta!['supervisorName'] != 'NOT_ASSIGNED' &&
+            cachedMeta['supervisorName'] != 'Not Assigned')
+        ? cachedMeta['supervisorName'].toString().trim()
+        : (cachedDetails?.supervisor?.isNotEmpty == true &&
+                cachedDetails!.supervisor != 'NOT_ASSIGNED' &&
+                cachedDetails.supervisor != 'Not Assigned'
+            ? cachedDetails.supervisor
+            : null);
+
+    String? projectPhase = cachedMeta?['projectStage']?.toString().trim() ?? cachedDetails?.projectStage;
+    String? projectName = cachedMeta?['projectName']?.toString().trim() ?? cachedDetails?.projectName;
 
     try {
-      final siteKeys = await ExpenseService.resolveSiteKeys(siteId);
-
-      // 1. Check Site collection doc across all aliases
-      for (final key in siteKeys) {
-        final siteDoc = await FirestoreService.sites.doc(key).get();
-        if (siteDoc.exists && siteDoc.data() != null) {
-          final data = siteDoc.data()!;
-          projectName ??= (data['projectName'] ?? data['siteName'] ?? data['site'] ?? data['name'])?.toString();
-          projectPhase ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
-
-          final sup = data['Supervisor'] ??
-              data['supervisor'] ??
-              data['supervisorName'] ??
-              data['supervisor_name'] ??
-              data['FullName'] ??
-              data['fullName'] ??
-              data['name'] ??
-              data['username'] ??
-              data['UserName'];
-          final supId = data['Supervisor ID'] ??
-              data['supervisorId'] ??
-              data['SupervisorId'] ??
-              data['supervisor_id'] ??
-              data['assignedSupervisor'];
-
-          if (sup != null && sup.toString().trim().isNotEmpty) {
-            supervisorName = sup.toString().trim();
-          }
-          if (supId != null && supId.toString().trim().isNotEmpty) {
-            supervisorId = supId.toString().trim();
-          }
-          if (supervisorName != null || supervisorId != null) break;
-        }
+      // 1. Resolve from ExpenseService / cache
+      final details = await ExpenseService.resolveSiteDetails(siteId);
+      projectName ??= details.projectName ?? details.siteName;
+      if (details.projectStage != null && details.projectStage!.isNotEmpty) {
+        projectPhase = details.projectStage;
+      }
+      if (details.supervisor != null && details.supervisor!.isNotEmpty && details.supervisor != 'NOT_ASSIGNED' && details.supervisor != 'Not Assigned') {
+        supervisorName = details.supervisor;
+      }
+      if (details.supervisorId != null && details.supervisorId!.isNotEmpty && details.supervisorId != 'NOT_ASSIGNED' && details.supervisorId != 'Not Assigned') {
+        supervisorId = details.supervisorId;
       }
 
-      // 2. Direct lookup in siteSupervisorMap by docId = key
+      // 2. If supervisor is still missing, run fast parallel lookups
       if (supervisorName == null && supervisorId == null) {
-        for (final key in siteKeys) {
-          final mapDoc = await FirestoreService.siteSupervisorMap.doc(key).get();
-          if (mapDoc.exists && mapDoc.data() != null) {
-            final data = mapDoc.data()!;
-            projectPhase ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
-            projectName ??= (data['projectName'] ?? data['project_name'] ?? data['project'])?.toString();
+        final siteKeys = details.allKeys;
 
-            final sup = data['supervisor'] ??
+        final futures = <Future>[];
+        for (final key in siteKeys) {
+          futures.add(FirestoreService.sites.doc(key).get().catchError((_) => null as dynamic));
+          futures.add(FirestoreService.siteSupervisorMap.doc(key).get().catchError((_) => null as dynamic));
+          futures.add(FirestoreService.projects.doc(key).get().catchError((_) => null as dynamic));
+        }
+
+        final results = await Future.wait(futures);
+        for (final snap in results) {
+          if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
+            final data = snap.data()!;
+            projectName ??= (data['projectName'] ?? data['siteName'] ?? data['site'] ?? data['name'])?.toString();
+            projectPhase ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
+
+            final sup = data['Supervisor'] ??
+                data['supervisor'] ??
                 data['supervisorName'] ??
-                data['Supervisor'] ??
                 data['supervisor_name'] ??
                 data['FullName'] ??
                 data['fullName'] ??
@@ -350,85 +597,41 @@ class _ManagerExpensesState extends State<ManagerExpenses>
             final supId = data['Supervisor ID'] ??
                 data['supervisorId'] ??
                 data['SupervisorId'] ??
-                data['supervisor_id'];
+                data['supervisor_id'] ??
+                data['assignedSupervisor'];
 
-            if (sup != null && sup.toString().trim().isNotEmpty) {
+            if (supervisorName == null && sup != null && sup.toString().trim().isNotEmpty && sup.toString().trim() != 'NOT_ASSIGNED' && sup.toString().trim() != 'Not Assigned') {
               supervisorName = sup.toString().trim();
             }
-            if (supId != null && supId.toString().trim().isNotEmpty) {
+            if (supervisorId == null && supId != null && supId.toString().trim().isNotEmpty && supId.toString().trim() != 'NOT_ASSIGNED' && supId.toString().trim() != 'Not Assigned') {
               supervisorId = supId.toString().trim();
             }
-            if (supervisorName != null || supervisorId != null) break;
           }
         }
       }
 
-      // 3. Query siteSupervisorMap by siteDocId / siteId / site / siteName fields across all aliases
+      // 3. If supervisor is still missing, scan siteSupervisorMap for matching code/name
       if (supervisorName == null && supervisorId == null) {
-        for (final key in siteKeys) {
-          final queriesToTry = [
-            FirestoreService.siteSupervisorMap.where('siteDocId', isEqualTo: key),
-            FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: key),
-            FirestoreService.siteSupervisorMap.where('site', isEqualTo: key),
-            FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: key),
-          ];
+        final mapSnap = await FirestoreService.siteSupervisorMap.get();
+        final cleanSiteId = siteId.toLowerCase().trim();
+        final codePart = cleanSiteId.contains('_') ? cleanSiteId.split('_').first : cleanSiteId;
 
-          for (var q in queriesToTry) {
-            final snap = await q.get();
-            if (snap.docs.isNotEmpty) {
-              final data = snap.docs.first.data();
-              projectPhase ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
-              projectName ??= (data['projectName'] ?? data['project_name'] ?? data['project'])?.toString();
-
-              final sup = data['supervisor'] ??
-                  data['supervisorName'] ??
-                  data['Supervisor'] ??
-                  data['supervisor_name'] ??
-                  data['FullName'] ??
-                  data['fullName'] ??
-                  data['name'] ??
-                  data['username'] ??
-                  data['UserName'];
-              final supId = data['Supervisor ID'] ??
-                  data['supervisorId'] ??
-                  data['SupervisorId'] ??
-                  data['supervisor_id'];
-
-              if (sup != null && sup.toString().trim().isNotEmpty) {
-                supervisorName = sup.toString().trim();
-              }
-              if (supId != null && supId.toString().trim().isNotEmpty) {
-                supervisorId = supId.toString().trim();
-              }
-              if (supervisorName != null || supervisorId != null) break;
-            }
-          }
-          if (supervisorName != null || supervisorId != null) break;
-        }
-      }
-
-      // 4. Broad scan in siteSupervisorMap
-      if (supervisorName == null && supervisorId == null) {
-        final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
-        final lowerKeys = siteKeys.map((k) => k.toLowerCase().trim()).toSet();
-
-        for (var doc in mapSnapshot.docs) {
+        for (var doc in mapSnap.docs) {
           final data = doc.data();
-          final docSite = (data['site'] ?? '').toString().toLowerCase().trim();
-          final docSiteName = (data['siteName'] ?? '').toString().toLowerCase().trim();
-          final docSiteId = (data['siteId'] ?? '').toString().toLowerCase().trim();
           final docId = doc.id.toLowerCase().trim();
+          final sDocId = (data['siteDocId'] ?? '').toString().toLowerCase().trim();
+          final sSite = (data['site'] ?? '').toString().toLowerCase().trim();
+          final sId = (data['siteId'] ?? data['siteCode'] ?? '').toString().toLowerCase().trim();
+          final sName = (data['siteName'] ?? data['projectName'] ?? data['site_name'] ?? '').toString().toLowerCase().trim();
 
-          final isMatch = lowerKeys.contains(docId) ||
-              lowerKeys.contains(docSite) ||
-              lowerKeys.contains(docSiteName) ||
-              lowerKeys.contains(docSiteId) ||
-              lowerKeys.any((k) => docId.startsWith('${k}_') || docId.contains(k));
+          final match = docId == cleanSiteId ||
+              sDocId == cleanSiteId ||
+              sSite == cleanSiteId ||
+              sId == cleanSiteId ||
+              sName == cleanSiteId ||
+              (codePart.isNotEmpty && (docId.startsWith('${codePart}_') || sDocId.startsWith('${codePart}_') || sSite.startsWith('${codePart}_') || sId == codePart));
 
-          if (isMatch) {
-            projectPhase ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
-            projectName ??= (data['projectName'] ?? data['project_name'] ?? data['project'])?.toString();
-
+          if (match) {
             final sup = data['supervisor'] ??
                 data['supervisorName'] ??
                 data['Supervisor'] ??
@@ -441,64 +644,117 @@ class _ManagerExpensesState extends State<ManagerExpenses>
             final supId = data['Supervisor ID'] ??
                 data['supervisorId'] ??
                 data['SupervisorId'] ??
-                data['supervisor_id'];
+                data['supervisor_id'] ??
+                data['assignedSupervisor'];
 
-            if (sup != null && sup.toString().trim().isNotEmpty) {
+            if (sup != null && sup.toString().trim().isNotEmpty && sup.toString().trim() != 'NOT_ASSIGNED' && sup.toString().trim() != 'Not Assigned') {
               supervisorName = sup.toString().trim();
             }
-            if (supId != null && supId.toString().trim().isNotEmpty) {
+            if (supId != null && supId.toString().trim().isNotEmpty && supId.toString().trim() != 'NOT_ASSIGNED' && supId.toString().trim() != 'Not Assigned') {
               supervisorId = supId.toString().trim();
+            }
+            if (projectPhase == null || projectPhase.isEmpty) {
+              projectPhase = (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString();
+            }
+            if (projectName == null || projectName.isEmpty) {
+              projectName = (data['projectName'] ?? data['project_name'] ?? data['siteName'])?.toString();
             }
             if (supervisorName != null || supervisorId != null) break;
           }
         }
       }
 
-      // 5. Check projects collection if still missing
-      if (projectName == null || projectPhase == null) {
-        for (final key in siteKeys) {
-          final pDoc = await FirestoreService.projects.doc(key).get();
-          if (pDoc.exists && pDoc.data() != null) {
-            final data = pDoc.data()!;
-            projectName ??= (data['projectName'] ?? data['name'])?.toString();
-            projectPhase ??= (data['projectStage'] ?? data['stage'])?.toString();
-            break;
-          }
-        }
-      }
-
-      // Resolve supervisor name if we have supervisorName or supervisorId
+      // Resolve supervisor name if available
       String? resolvedName;
-      if (supervisorName != null && supervisorName.isNotEmpty) {
+      if (supervisorName != null && supervisorName.isNotEmpty && supervisorName != 'NOT_ASSIGNED' && supervisorName != 'Not Assigned') {
         resolvedName = await _resolveSupervisorName(supervisorName);
       }
-      if ((resolvedName == null || resolvedName.isEmpty) && supervisorId != null && supervisorId.isNotEmpty) {
+      if ((resolvedName == null || resolvedName.isEmpty) && supervisorId != null && supervisorId.isNotEmpty && supervisorId != 'NOT_ASSIGNED' && supervisorId != 'Not Assigned') {
         resolvedName = await _resolveSupervisorName(supervisorId);
       }
 
-      final finalSupervisorName = (resolvedName != null && resolvedName.isNotEmpty)
+      final resolvedSupervisor = (resolvedName != null && resolvedName.isNotEmpty)
           ? resolvedName
-          : (supervisorName ?? supervisorId);
+          : (supervisorName != null && supervisorName.isNotEmpty && supervisorName != 'NOT_ASSIGNED' && supervisorName != 'Not Assigned'
+              ? supervisorName
+              : (supervisorId != null && supervisorId.isNotEmpty && supervisorId != 'NOT_ASSIGNED' && supervisorId != 'Not Assigned'
+                  ? supervisorId
+                  : null));
 
-      projectName ??= siteNameMap[siteId] ?? 'N/A';
+      // Retain existing supervisor if remote query returned null but we already had a valid one
+      final currentFieldText = supervisorIdController.text.trim();
+      final currentValidSupervisor = (currentFieldText.isNotEmpty &&
+              currentFieldText != 'Not Assigned' &&
+              currentFieldText != 'NOT_ASSIGNED' &&
+              currentFieldText != 'N/A')
+          ? currentFieldText
+          : null;
 
-      if (mounted) {
+      final finalSupervisorName = resolvedSupervisor ??
+          (cachedMeta?['supervisorName']?.toString().trim().isNotEmpty == true &&
+                  cachedMeta!['supervisorName'] != 'NOT_ASSIGNED' &&
+                  cachedMeta['supervisorName'] != 'Not Assigned'
+              ? cachedMeta['supervisorName'].toString().trim()
+              : currentValidSupervisor);
+
+      final finalSupervisorId = (supervisorId != null &&
+              supervisorId.isNotEmpty &&
+              supervisorId != 'NOT_ASSIGNED' &&
+              supervisorId != 'Not Assigned')
+          ? supervisorId
+          : (cachedMeta?['supervisorId']?.toString().trim().isNotEmpty == true &&
+                  cachedMeta!['supervisorId'] != 'NOT_ASSIGNED' &&
+                  cachedMeta['supervisorId'] != 'Not Assigned'
+              ? cachedMeta['supervisorId'].toString().trim()
+              : (finalSupervisorName ?? 'NOT_ASSIGNED'));
+
+      projectName ??= siteNameMap[siteId] ?? (siteId.contains('_') ? siteId.split('_').skip(1).join('_') : 'N/A');
+
+      if (mounted && selectedSiteId == siteId) {
         setState(() {
-          selectedSupervisorId = supervisorId ?? finalSupervisorName ?? 'NOT_ASSIGNED';
-          selectedSupervisorName = finalSupervisorName ?? supervisorId ?? 'N/A';
-          selectedProjectStage = projectPhase ?? 'N/A';
+          selectedSupervisorId = finalSupervisorId;
+          selectedSupervisorName = finalSupervisorName ?? 'N/A';
+          selectedProjectStage = (projectPhase != null && projectPhase.isNotEmpty)
+              ? projectPhase
+              : (selectedProjectStage ?? 'N/A');
           selectedProjectName = projectName;
 
-          final displaySup = (finalSupervisorName != null && finalSupervisorName.isNotEmpty)
-              ? (supervisorId != null && supervisorId.isNotEmpty && supervisorId != finalSupervisorName && supervisorId != 'NOT_ASSIGNED'
-                  ? '$finalSupervisorName ($supervisorId)'
+          final hasValidSup = finalSupervisorName != null &&
+              finalSupervisorName.isNotEmpty &&
+              finalSupervisorName != 'NOT_ASSIGNED' &&
+              finalSupervisorName != 'Not Assigned';
+
+          final displaySup = hasValidSup
+              ? ((finalSupervisorId != finalSupervisorName &&
+                      finalSupervisorId != 'NOT_ASSIGNED' &&
+                      finalSupervisorId != 'Not Assigned')
+                  ? '$finalSupervisorName ($finalSupervisorId)'
                   : finalSupervisorName)
-              : (supervisorId ?? 'Not Assigned');
+              : ((finalSupervisorId != 'NOT_ASSIGNED' && finalSupervisorId != 'Not Assigned')
+                  ? finalSupervisorId
+                  : 'Not Assigned');
 
           supervisorIdController.text = displaySup;
-          projectStageController.text = projectPhase ?? 'Not Assigned';
-          projectNameController.text = projectName ?? 'Not Assigned';
+          projectStageController.text = (projectPhase != null && projectPhase.isNotEmpty)
+              ? projectPhase
+              : (selectedProjectStage ?? 'Not Assigned');
+          projectNameController.text = projectName!;
         });
+
+        // Store back into memory cache if valid
+        if (finalSupervisorName != null &&
+            finalSupervisorName.isNotEmpty &&
+            finalSupervisorName != 'NOT_ASSIGNED' &&
+            finalSupervisorName != 'Not Assigned') {
+          final meta = {
+            'projectName': projectName,
+            'projectStage': projectPhase ?? '',
+            'supervisorName': finalSupervisorName,
+            'supervisorId': finalSupervisorId,
+            'canonical': siteId,
+          };
+          _storeSiteMeta(siteId, meta, merge: true);
+        }
       }
     } catch (e) {
       debugPrint('Error loading site details: $e');
@@ -1186,15 +1442,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Site ID *',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A183D),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
+                        _buildFieldLabel('Site ID *'),
                         DropdownButtonFormField<String>(
                           initialValue: siteIds.contains(selectedSiteId)
                               ? selectedSiteId
@@ -1207,35 +1455,43 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                             fontWeight: FontWeight.w600,
                           ),
                           decoration: InputDecoration(
+                            isDense: true,
                             hintText: 'Select Site ID',
-                            hintStyle: TextStyle(
-                              color: Colors.grey.shade400,
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
                               fontSize: 12.5,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: FontWeight.w500,
                             ),
-                            prefixIcon: Icon(
-                              Icons.business_rounded,
-                              color: primaryColor,
-                              size: 20.0,
+                            prefixIconConstraints: const BoxConstraints(
+                              minWidth: 38,
+                              minHeight: 38,
+                            ),
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(
+                                Icons.business_rounded,
+                                color: primaryColor,
+                                size: 18.0,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
+                                horizontal: 14, vertical: 12.5),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide:
-                                  const BorderSide(color: Color(0xFFCBD5E1)),
+                                  const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide:
-                                  const BorderSide(color: Color(0xFFCBD5E1)),
+                                  const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide:
-                                  BorderSide(color: primaryColor, width: 1.8),
+                                  BorderSide(color: primaryColor, width: 1.5),
                             ),
                           ),
                           items: siteIds.map((site) {
@@ -1257,21 +1513,15 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                             );
                           }).toList(),
                           onChanged: (value) {
+                            if (value == null) return;
                             setState(() {
                               selectedSiteId = value;
-                              selectedSupervisorId = null;
-                              selectedProjectStage = null;
-                              selectedProjectName = null;
-                              supervisorIdController.clear();
-                              projectStageController.clear();
-                              projectNameController.clear();
                               bills = [];
                               initialBills = [];
                               existingDailyTotal = 0.0;
+                              _applySiteDetailsImmediately(value);
                             });
-                            if (value != null) {
-                              _loadSiteDetails(value);
-                            }
+                            _loadSiteDetails(value);
                           },
                         ),
                         const SizedBox(height: 14),
@@ -1300,15 +1550,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Entry Date *',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0A183D),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
+                  _buildFieldLabel('Entry Date *'),
                   InkWell(
                     onTap: () => _selectDate(context),
                     borderRadius: BorderRadius.circular(12.0),
@@ -1525,6 +1767,9 @@ class _ManagerExpensesState extends State<ManagerExpenses>
               .toString();
           final managerName = (data['managerName'] ??
                   data['raisedByName'] ??
+                  data['fullName'] ??
+                  data['FullName'] ??
+                  data['name'] ??
                   managerId)
               .toString();
           final userRole =
@@ -1948,46 +2193,61 @@ class _ManagerExpensesState extends State<ManagerExpenses>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Search Input
-          Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+          TextField(
+            controller: _logSearchController,
+            onChanged: (val) {
+              setState(() => _logSearchQuery = val.trim());
+            },
+            textAlignVertical: TextAlignVertical.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF0F172A),
             ),
-            child: TextField(
-              controller: _logSearchController,
-              onChanged: (val) {
-                setState(() => _logSearchQuery = val.trim());
-              },
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0F172A),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Search by Raiser, Vendor, Bill No, Site...',
+              hintStyle: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF94A3B8),
               ),
-              decoration: InputDecoration(
-                hintText: 'Search by Raiser, Vendor, Bill No, Site...',
-                hintStyle: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade400,
-                ),
-                prefixIcon: Icon(
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              prefixIconConstraints: const BoxConstraints(
+                minWidth: 38,
+                minHeight: 38,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: 12, right: 8),
+                child: Icon(
                   Icons.search_rounded,
                   color: primaryColor,
                   size: 18,
                 ),
-                suffixIcon: _logSearchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 16),
-                        onPressed: () {
-                          _logSearchController.clear();
-                          setState(() => _logSearchQuery = '');
-                        },
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
               ),
+              suffixIcon: _logSearchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 16),
+                      onPressed: () {
+                        _logSearchController.clear();
+                        setState(() => _logSearchQuery = '');
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: primaryColor, width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
           const SizedBox(height: 12),
@@ -2003,7 +2263,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -2046,7 +2306,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -2087,7 +2347,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -2130,7 +2390,6 @@ class _ManagerExpensesState extends State<ManagerExpenses>
     required VoidCallback onTap,
   }) {
     final String raisedByName = log['raisedByName']?.toString() ?? 'Manager';
-    final String raisedById = log['raisedById']?.toString() ?? '';
     final String userRole = log['userRole']?.toString() ?? 'Manager';
     final String siteId = log['siteId']?.toString() ?? 'N/A';
     final String siteName = log['siteName']?.toString() ?? siteId;
@@ -2207,48 +2466,33 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    raisedByName,
-                                    style: const TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF0F172A),
-                                      letterSpacing: -0.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: roleColor.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    userRole.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      color: roleColor,
-                                      letterSpacing: 0.4,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 1),
                             Text(
-                              'User ID: $raisedById',
+                              raisedByName,
                               style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF64748B),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 3),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: roleColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                userRole.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: roleColor,
+                                  letterSpacing: 0.4,
+                                ),
                               ),
                             ),
                           ],
@@ -2486,7 +2730,6 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   // --- LOG DETAILS MODAL ---
   void _showLogDetailsModal(BuildContext context, Map<String, dynamic> log) {
     final String raisedByName = log['raisedByName']?.toString() ?? 'Manager';
-    final String raisedById = log['raisedById']?.toString() ?? '';
     final String userRole = log['userRole']?.toString() ?? 'Manager';
     final String siteId = log['siteId']?.toString() ?? 'N/A';
     final String siteName = log['siteName']?.toString() ?? siteId;
@@ -2616,7 +2859,7 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                                           ),
                                         ),
                                         Text(
-                                          '$userRole • User ID: $raisedById',
+                                          userRole,
                                           style: const TextStyle(
                                             fontSize: 12,
                                             color: Color(0xFF64748B),
@@ -3033,6 +3276,37 @@ class _ManagerExpensesState extends State<ManagerExpenses>
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildCustomField({
     required String label,
     required TextEditingController controller,
@@ -3044,56 +3318,57 @@ class _ManagerExpensesState extends State<ManagerExpenses>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 6),
+        _buildFieldLabel(label),
         TextFormField(
           controller: controller,
           readOnly: readOnly,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
+          textAlignVertical: TextAlignVertical.center,
           style: const TextStyle(
             color: Color(0xFF0A183D),
             fontSize: 13.5,
             fontWeight: FontWeight.w600,
           ),
           decoration: InputDecoration(
+            isDense: true,
             hintText: 'Enter $label',
-            hintStyle: TextStyle(
-              color: Colors.grey.shade400,
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
               fontSize: 12.5,
-              fontWeight: FontWeight.w400,
+              fontWeight: FontWeight.w500,
             ),
             filled: true,
-            fillColor: readOnly ? Colors.grey.shade100 : Colors.white,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: primaryColor, width: 1.8),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
             ),
-            prefixIcon: Icon(
-              icon,
-              color: primaryColor,
-              size: 20,
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(
+                icon,
+                color: primaryColor,
+                size: 18,
+              ),
             ),
           ),
         ),

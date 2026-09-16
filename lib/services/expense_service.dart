@@ -68,6 +68,37 @@ class ExpenseService {
     }
   }
 
+  /// Returns synchronously cached SiteDetails if available and not expired.
+  static SiteDetails? getCachedSiteDetails(String siteKey) {
+    if (siteKey.isEmpty || siteKey == 'uninitialized') return null;
+    final k = siteKey.trim().toLowerCase();
+    final cachedTime = _siteDetailsCacheTimestamp[k];
+    if (cachedTime != null &&
+        DateTime.now().difference(cachedTime) < _siteCacheTtl &&
+        _siteDetailsCache.containsKey(k)) {
+      return _siteDetailsCache[k];
+    }
+    return null;
+  }
+
+  /// Manually populate or update cached SiteDetails
+  static void cacheSiteDetails(SiteDetails details) {
+    final now = DateTime.now();
+    final keys = {
+      details.canonicalDocId,
+      details.siteCode,
+      details.siteName,
+      ...details.allKeys,
+    };
+    for (final k in keys) {
+      if (k.isNotEmpty) {
+        final lk = k.toLowerCase().trim();
+        _siteDetailsCache[lk] = details;
+        _siteDetailsCacheTimestamp[lk] = now;
+      }
+    }
+  }
+
   /// Formats canonical site document ID in the format: SiteCode_SiteName (e.g. ST001_AbineshHouse)
   static String formatCanonicalSiteDocId(String siteCode, String siteName) {
     var cleanCode = siteCode.trim();
@@ -106,6 +137,19 @@ class ExpenseService {
     // 1. If cleanRaw already contains an underscore:
     if (cleanRaw.contains('_')) {
       final parts = cleanRaw.split('_');
+      // Format: PR001_ST001_ProjectName or similar multi-prefix patterns
+      if (parts.length >= 3) {
+        final stIdx = parts.indexWhere((p) => p.toUpperCase().startsWith('ST'));
+        if (stIdx != -1 && stIdx < parts.length - 1) {
+          final stCode = parts[stIdx].trim();
+          final namePart = parts.sublist(stIdx + 1).join('_').trim().replaceAll(' ', '');
+          if (stCode.isNotEmpty && namePart.isNotEmpty) {
+            final formattedName = namePart[0].toUpperCase() + namePart.substring(1);
+            return '${stCode}_$formattedName';
+          }
+        }
+      }
+
       var code = parts.first.trim();
       final namePart = parts.skip(1).join('_').trim().replaceAll(' ', '');
       if (code.toUpperCase().startsWith('PR')) {
@@ -547,7 +591,10 @@ class ExpenseService {
       // 2. Check projects collection if needed
       if (resolvedDocId.isEmpty ||
           resolvedCode.isEmpty ||
-          resolvedName.isEmpty) {
+          resolvedName.isEmpty ||
+          resolvedSupervisor == null ||
+          resolvedSupervisorId == null ||
+          resolvedProjectStage == null) {
         DocumentSnapshot<Map<String, dynamic>>? pSnap;
         final directProj = await FirestoreService.projects.doc(trimmed).get();
         if (directProj.exists && directProj.data() != null) {
@@ -598,9 +645,29 @@ class ExpenseService {
           keys.add(pSnap.id);
           if (pSnap.id.contains('_')) keys.add(pSnap.id.split('_').first);
 
-          if (resolvedSupervisor == null && pd['supervisor'] != null) resolvedSupervisor = pd['supervisor'].toString();
-          if (resolvedSupervisorId == null && (pd['Supervisor ID'] != null || pd['supervisorId'] != null)) {
-            resolvedSupervisorId = (pd['Supervisor ID'] ?? pd['supervisorId']).toString();
+          if (resolvedSupervisor == null) {
+            final sup = pd['supervisor'] ??
+                pd['supervisorName'] ??
+                pd['Supervisor'] ??
+                pd['supervisor_name'] ??
+                pd['FullName'] ??
+                pd['fullName'] ??
+                pd['name'] ??
+                pd['username'] ??
+                pd['UserName'];
+            if (sup != null && sup.toString().trim().isNotEmpty) {
+              resolvedSupervisor = sup.toString().trim();
+            }
+          }
+          if (resolvedSupervisorId == null) {
+            final supId = pd['Supervisor ID'] ??
+                pd['supervisorId'] ??
+                pd['SupervisorId'] ??
+                pd['supervisor_id'] ??
+                pd['assignedSupervisor'];
+            if (supId != null && supId.toString().trim().isNotEmpty) {
+              resolvedSupervisorId = supId.toString().trim();
+            }
           }
           if (resolvedLocation == null && pd['location'] != null) resolvedLocation = pd['location'].toString();
           if (resolvedProjectName == null && (pd['projectName'] ?? pd['project'] != null)) {
@@ -613,51 +680,86 @@ class ExpenseService {
       }
 
       // 3. Check siteSupervisorMap collection if needed
-      final mapSnap = await FirestoreService.siteSupervisorMap.get();
-      for (var doc in mapSnap.docs) {
-        final md = doc.data();
-        final mSite = (md['site'] ?? '').toString().trim();
-        final mSiteId = (md['siteId'] ?? '').toString().trim();
-        final mSiteName =
-            (md['siteName'] ?? md['projectName'] ?? '').toString().trim();
-        final mDocId = doc.id;
+      if (resolvedSupervisor == null || resolvedSupervisorId == null || resolvedProjectStage == null) {
+        final mapSnap = await FirestoreService.siteSupervisorMap.get();
+        for (var doc in mapSnap.docs) {
+          final md = doc.data();
+          final mDocId = doc.id.trim();
+          final mSiteDocId = (md['siteDocId'] ?? '').toString().trim();
+          final mSite = (md['site'] ?? '').toString().trim();
+          final mSiteId = (md['siteId'] ?? '').toString().trim();
+          final mSiteName =
+              (md['siteName'] ?? md['projectName'] ?? md['site_name'] ?? md['location'] ?? '').toString().trim();
 
-        if (mDocId == trimmed ||
-            mSite == trimmed ||
-            mSiteId == trimmed ||
-            mSiteName == trimmed ||
-            (mSiteName.isNotEmpty &&
-                mSiteName.toLowerCase() == trimmed.toLowerCase())) {
-          if (mSite.contains('_') && resolvedDocId.isEmpty) {
-            resolvedDocId = mSite;
-          }
-          if (mSiteId.contains('_') && resolvedDocId.isEmpty) {
-            resolvedDocId = mSiteId;
-          }
-          if (resolvedCode.isEmpty &&
-              mSiteId.isNotEmpty &&
-              !mSiteId.contains('_')) {
-            resolvedCode = mSiteId;
-          }
-          if (resolvedName.isEmpty && mSiteName.isNotEmpty) {
-            resolvedName = mSiteName;
-          }
-          if (mSite.isNotEmpty) keys.add(mSite);
-          if (mSiteId.isNotEmpty) keys.add(mSiteId);
-          if (mSiteName.isNotEmpty) keys.add(mSiteName);
+          final matchKeys = {
+            mDocId.toLowerCase(),
+            mSiteDocId.toLowerCase(),
+            mSite.toLowerCase(),
+            mSiteId.toLowerCase(),
+            mSiteName.toLowerCase(),
+            mSiteName.replaceAll(' ', '').toLowerCase(),
+          };
 
-          if (resolvedSupervisor == null && md['supervisor'] != null) resolvedSupervisor = md['supervisor'].toString();
-          if (resolvedSupervisorId == null && (md['Supervisor ID'] ?? md['supervisorId']) != null) {
-            resolvedSupervisorId = (md['Supervisor ID'] ?? md['supervisorId']).toString();
+          final isMatch = matchKeys.contains(trimmed.toLowerCase()) ||
+              matchKeys.contains(trimmed.replaceAll(' ', '').toLowerCase()) ||
+              (resolvedCode.isNotEmpty && matchKeys.contains(resolvedCode.toLowerCase())) ||
+              (resolvedName.isNotEmpty && matchKeys.contains(resolvedName.toLowerCase())) ||
+              (resolvedDocId.isNotEmpty && matchKeys.contains(resolvedDocId.toLowerCase()));
+
+          if (isMatch) {
+            if (mSite.contains('_') && resolvedDocId.isEmpty) {
+              resolvedDocId = mSite;
+            }
+            if (mSiteId.contains('_') && resolvedDocId.isEmpty) {
+              resolvedDocId = mSiteId;
+            }
+            if (resolvedCode.isEmpty &&
+                mSiteId.isNotEmpty &&
+                !mSiteId.contains('_')) {
+              resolvedCode = mSiteId;
+            }
+            if (resolvedName.isEmpty && mSiteName.isNotEmpty) {
+              resolvedName = mSiteName;
+            }
+            if (mSite.isNotEmpty) keys.add(mSite);
+            if (mSiteId.isNotEmpty) keys.add(mSiteId);
+            if (mSiteName.isNotEmpty) keys.add(mSiteName);
+
+            if (resolvedSupervisor == null) {
+              final sup = md['supervisor'] ??
+                  md['supervisorName'] ??
+                  md['Supervisor'] ??
+                  md['supervisor_name'] ??
+                  md['FullName'] ??
+                  md['fullName'] ??
+                  md['name'] ??
+                  md['username'] ??
+                  md['UserName'];
+              if (sup != null && sup.toString().trim().isNotEmpty) {
+                resolvedSupervisor = sup.toString().trim();
+              }
+            }
+
+            if (resolvedSupervisorId == null) {
+              final supId = md['Supervisor ID'] ??
+                  md['supervisorId'] ??
+                  md['SupervisorId'] ??
+                  md['supervisor_id'] ??
+                  md['assignedSupervisor'];
+              if (supId != null && supId.toString().trim().isNotEmpty) {
+                resolvedSupervisorId = supId.toString().trim();
+              }
+            }
+
+            if (resolvedLocation == null && md['location'] != null) resolvedLocation = md['location'].toString();
+            if (resolvedProjectName == null && (md['projectName'] ?? md['project']) != null) {
+              resolvedProjectName = (md['projectName'] ?? md['project']).toString();
+            }
+            if (resolvedProjectStage == null && (md['projectStage'] ?? md['stage']) != null) {
+              resolvedProjectStage = (md['projectStage'] ?? md['stage']).toString();
+            }
+            if (resolvedSupervisor != null || resolvedSupervisorId != null) break;
           }
-          if (resolvedLocation == null && md['location'] != null) resolvedLocation = md['location'].toString();
-          if (resolvedProjectName == null && (md['projectName'] ?? md['project']) != null) {
-            resolvedProjectName = (md['projectName'] ?? md['project']).toString();
-          }
-          if (resolvedProjectStage == null && (md['projectStage'] ?? md['stage']) != null) {
-            resolvedProjectStage = (md['projectStage'] ?? md['stage']).toString();
-          }
-          break;
         }
       }
     } catch (e) {

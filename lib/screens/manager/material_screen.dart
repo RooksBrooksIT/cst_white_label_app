@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/dialog_utils.dart';
@@ -465,47 +465,63 @@ class _MaterialScreenState extends State<MaterialScreen>
                           ],
                         ),
                         const SizedBox(height: 20),
-                        const Text(
-                          'Material / Category Name',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                        _buildFieldLabel('Material Name / Category *'),
+                        TextFormField(
+                          controller: nameController,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.words,
+                          textAlignVertical: TextAlignVertical.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: Color(0xFF0A183D),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                          ),
-                          child: TextFormField(
-                            controller: nameController,
-                            autofocus: true,
-                            textCapitalization: TextCapitalization.words,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0A183D),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'e.g. Cement, Steel, Bricks, Sand',
+                            hintStyle: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w500,
                             ),
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. Cement, Steel, Bricks, Sand',
-                              hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                              prefixIcon: Icon(Icons.category_rounded, size: 18, color: Color(0xFF64748B)),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(Icons.category_rounded, size: 18, color: Color(0xFF64748B)),
                             ),
-                            validator: (val) {
-                              final text = val?.trim() ?? '';
-                              if (text.isEmpty) return 'Please enter material name';
-                              final exists = categories.any(
-                                (c) => (c['name'] as String).toLowerCase() == text.toLowerCase(),
-                              );
-                              if (exists) return 'Material category already exists';
-                              return null;
-                            },
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: primaryColor, width: 1.5),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                            ),
                           ),
+                          validator: (val) {
+                            final text = val?.trim() ?? '';
+                            if (text.isEmpty) return 'Please enter material name';
+                            final exists = categories.any(
+                              (c) => (c['name'] as String).toLowerCase() == text.toLowerCase(),
+                            );
+                            if (exists) return 'Material category already exists';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
                         Row(
@@ -683,47 +699,63 @@ class _MaterialScreenState extends State<MaterialScreen>
                           ],
                         ),
                         const SizedBox(height: 20),
-                        const Text(
-                          'Subcategory Name',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                        _buildFieldLabel('Subcategory Name *'),
+                        TextFormField(
+                          controller: subCatController,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.words,
+                          textAlignVertical: TextAlignVertical.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: Color(0xFF0A183D),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                          ),
-                          child: TextFormField(
-                            controller: subCatController,
-                            autofocus: true,
-                            textCapitalization: TextCapitalization.words,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0A183D),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'e.g. OPC 53 Grade, TMT 12mm, Fine Sand',
+                            hintStyle: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w500,
                             ),
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. OPC 53 Grade, TMT 12mm, Fine Sand',
-                              hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                              prefixIcon: Icon(Icons.label_important_outline_rounded, size: 18, color: Color(0xFF64748B)),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(Icons.label_important_outline_rounded, size: 18, color: Color(0xFF64748B)),
                             ),
-                            validator: (val) {
-                              final text = val?.trim() ?? '';
-                              if (text.isEmpty) return 'Please enter subcategory name';
-                              final exists = subCategories.any(
-                                (s) => (s['name'] as String).toLowerCase() == text.toLowerCase(),
-                              );
-                              if (exists) return 'Subcategory already exists under this material';
-                              return null;
-                            },
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: primaryColor, width: 1.5),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                            ),
                           ),
+                          validator: (val) {
+                            final text = val?.trim() ?? '';
+                            if (text.isEmpty) return 'Please enter subcategory name';
+                            final exists = subCategories.any(
+                              (s) => (s['name'] as String).toLowerCase() == text.toLowerCase(),
+                            );
+                            if (exists) return 'Subcategory already exists under this material';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
                         Row(
@@ -892,47 +924,63 @@ class _MaterialScreenState extends State<MaterialScreen>
                           ],
                         ),
                         const SizedBox(height: 20),
-                        const Text(
-                          'Unit Name / Symbol',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                        _buildFieldLabel('Unit Name / Symbol *'),
+                        TextFormField(
+                          controller: unitController,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.words,
+                          textAlignVertical: TextAlignVertical.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: Color(0xFF0A183D),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                          ),
-                          child: TextFormField(
-                            controller: unitController,
-                            autofocus: true,
-                            textCapitalization: TextCapitalization.words,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0A183D),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'e.g. Bags, Ton, Liters, Bundle',
+                            hintStyle: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w500,
                             ),
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. Bags, Ton, Liters, Bundle',
-                              hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                              prefixIcon: Icon(Icons.straighten_rounded, size: 18, color: Color(0xFF64748B)),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(Icons.straighten_rounded, size: 18, color: Color(0xFF64748B)),
                             ),
-                            validator: (val) {
-                              final text = val?.trim() ?? '';
-                              if (text.isEmpty) return 'Please enter unit name';
-                              final exists = units.any(
-                                (u) => (u['name'] as String).toLowerCase() == text.toLowerCase(),
-                              );
-                              if (exists) return 'Unit already exists';
-                              return null;
-                            },
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: primaryColor, width: 1.5),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                            ),
                           ),
+                          validator: (val) {
+                            final text = val?.trim() ?? '';
+                            if (text.isEmpty) return 'Please enter unit name';
+                            final exists = units.any(
+                              (u) => (u['name'] as String).toLowerCase() == text.toLowerCase(),
+                            );
+                            if (exists) return 'Unit already exists';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
                         Row(
@@ -1649,36 +1697,51 @@ class _MaterialScreenState extends State<MaterialScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                TextField(
+                  controller: searchController,
+                  onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                  textAlignVertical: TextAlignVertical.center,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF0A183D),
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: TextField(
-                    controller: searchController,
-                    onChanged: (v) => setState(() => _searchQuery = v.trim()),
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      color: Color(0xFF0A183D),
-                      fontWeight: FontWeight.w600,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Search material by name, category, or ID...',
+                    hintStyle: const TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
                     ),
-                    decoration: InputDecoration(
-                      hintText: 'Search material by name, category, or ID...',
-                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                      prefixIcon: Icon(Icons.search_rounded, color: primaryColor, size: 20),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
-                              onPressed: () {
-                                searchController.clear();
-                                setState(() => _searchQuery = '');
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 12, right: 8),
+                      child: Icon(Icons.search_rounded, color: primaryColor, size: 18),
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                            onPressed: () {
+                              searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: primaryColor, width: 1.5),
                     ),
                   ),
                 ),
@@ -2002,6 +2065,45 @@ class _MaterialScreenState extends State<MaterialScreen>
 
   // --- 7. HELPER WIDGETS ---
 
+  Widget _buildFieldLabel(String label, {String? helperText}) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: [
+            if (isRequired)
+              const TextSpan(
+                text: ' *',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            if (helperText != null)
+              TextSpan(
+                text: '  ($helperText)',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDropdownWithAddButton({
     required String label,
     required String hintText,
@@ -2018,81 +2120,92 @@ class _MaterialScreenState extends State<MaterialScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 8),
+        _buildFieldLabel(label),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
+              child: DropdownButtonFormField<String>(
+                key: ValueKey(validValue),
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                initialValue: validValue,
+                style: const TextStyle(
+                  color: Color(0xFF0A183D),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  initialValue: validValue,
-                  style: const TextStyle(
-                    color: Color(0xFF0A183D),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: hintText,
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
                   ),
-                  decoration: InputDecoration(
-                    hintText: hintText,
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Icon(
-                        icon,
-                        color: brandIconColor,
-                        size: 20,
-                      ),
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 13,
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 38,
+                    minHeight: 38,
+                  ),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
+                      icon,
+                      color: brandIconColor,
+                      size: 18,
                     ),
                   ),
-                  items: items,
-                  onChanged: onChanged,
-                  validator: (v) => v == null ? 'Required' : null,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12.5,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: brandIconColor, width: 1.5),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                  ),
                 ),
+                items: items,
+                onChanged: onChanged,
+                validator: (v) => v == null ? 'Required' : null,
               ),
             ),
             const SizedBox(width: 10),
-            // Plus (+) Button to Add New Item Directly
+            // Plus (+) Button
             Tooltip(
               message: tooltip,
               child: Material(
                 color: brandIconColor,
-                borderRadius: BorderRadius.circular(14),
-                elevation: 1,
+                borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   onTap: onAddPressed,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    width: 48,
-                    height: 48,
+                    width: 44,
+                    height: 44,
                     alignment: Alignment.center,
                     child: const Icon(
                       Icons.add_rounded,
                       color: Colors.white,
-                      size: 24,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -2121,76 +2234,69 @@ class _MaterialScreenState extends State<MaterialScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (helperText != null)
-          Text.rich(
-            TextSpan(
-              text: label,
-              style: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0A183D),
-              ),
-              children: [
-                const TextSpan(text: '  '),
-                TextSpan(
-                  text: '($helperText)',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0A183D),
-            ),
+        _buildFieldLabel(label, helperText: helperText),
+        TextFormField(
+          controller: controller,
+          readOnly: readOnly,
+          maxLines: maxLines,
+          textAlignVertical: maxLines == 1 ? TextAlignVertical.center : TextAlignVertical.top,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          validator: validator,
+          style: TextStyle(
+            color: readOnly ? const Color(0xFF475569) : const Color(0xFF0A183D),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: TextFormField(
-            controller: controller,
-            readOnly: readOnly,
-            maxLines: maxLines,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            validator: validator,
-            style: TextStyle(
-              color: readOnly ? const Color(0xFF475569) : const Color(0xFF0A183D),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: hintText ?? 'Enter ${label.replaceAll('*', '').trim()}',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: hintText ?? 'Enter $label',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
+            prefixIconConstraints: BoxConstraints(
+              minWidth: 38,
+              minHeight: maxLines == 1 ? 38 : 24,
+            ),
+            prefixIcon: Padding(
+              padding: EdgeInsets.only(
+                left: 12,
+                right: 8,
+                top: maxLines > 1 ? 12 : 0,
               ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Icon(
-                  icon,
-                  color: brandIconColor,
-                  size: 20,
-                ),
+              child: Icon(
+                icon,
+                color: brandIconColor,
+                size: 18,
               ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 13,
-              ),
+            ),
+            filled: true,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: maxLines > 1 ? 12 : 12.5,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: brandIconColor, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
           ),
         ),

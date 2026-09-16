@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
@@ -280,56 +280,63 @@ class _ContractorPageState extends State<ContractorPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim().toLowerCase();
+                      });
+                    },
+                    textAlignVertical: TextAlignVertical.center,
+                    style: const TextStyle(
+                      color: Color(0xFF0A183D),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
                     ),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val.trim().toLowerCase();
-                        });
-                      },
-                      style: const TextStyle(
-                        color: Color(0xFF0A183D),
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: 'Search contractor name, stage, ID...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'Search contractor name, stage, ID...',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 13,
-                        ),
-                        prefixIcon: Icon(
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 8),
+                        child: Icon(
                           Icons.search_rounded,
                           color: primaryColor,
-                          size: 20,
+                          size: 18,
                         ),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() {
-                                    _searchQuery = '';
-                                  });
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 38,
+                        minHeight: 38,
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12.5,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryColor, width: 1.5),
                       ),
                     ),
                   ),
@@ -537,6 +544,37 @@ class _ContractorPageState extends State<ContractorPage> {
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _textField({
     required TextEditingController controller,
     required String label,
@@ -547,50 +585,72 @@ class _ContractorPageState extends State<ContractorPage> {
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
+    final bool isMultiLine = maxLines > 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
+        _buildFieldLabel(label),
+        TextFormField(
+          controller: controller,
+          maxLength: maxLength,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          validator: validator,
+          textAlignVertical: isMultiLine ? TextAlignVertical.top : TextAlignVertical.center,
           style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
           ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: TextFormField(
-            controller: controller,
-            maxLength: maxLength,
-            maxLines: maxLines,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            validator: validator,
-            style: const TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0A183D),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: 'Enter ${label.replaceAll('*', '').trim()}',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: 'Enter $label',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w400,
+            prefixIcon: Padding(
+              padding: EdgeInsets.only(
+                left: 12,
+                right: 8,
+                top: isMultiLine ? 10 : 0,
+                bottom: isMultiLine ? 10 : 0,
               ),
-              prefixIcon: Icon(icon, color: primaryColor, size: 20),
-              counterText: '',
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              border: InputBorder.none,
+              child: Icon(icon, color: primaryColor, size: 18),
+            ),
+            prefixIconConstraints: BoxConstraints(
+              minWidth: 38,
+              minHeight: isMultiLine ? 24 : 38,
+            ),
+            counterText: '',
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: isMultiLine ? 12 : 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
+            errorStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFEF4444),
             ),
           ),
         ),
@@ -617,62 +677,77 @@ class _ContractorPageState extends State<ContractorPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Project Stage",
-              style: TextStyle(
+            _buildFieldLabel("Project Stage *"),
+            DropdownButtonFormField<String>(
+              initialValue: currentValue,
+              isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                hintText: "Select Project Stage",
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 8),
+                  child: Icon(
+                    Icons.construction_rounded,
+                    color: primaryColor,
+                    size: 18,
+                  ),
+                ),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 38,
+                  minHeight: 38,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12.5,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: primaryColor, width: 1.5),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                ),
+                errorStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFEF4444),
+                ),
+              ),
+              items: stages
+                  .map(
+                    (stage) => DropdownMenuItem(
+                      value: stage,
+                      child: Text(stage),
+                    ),
+                  )
+                  .toList(),
+              onChanged: stages.isNotEmpty
+                  ? (v) => setState(() => _selectedProjectField = v)
+                  : null,
+              validator: (v) =>
+                  v == null ? "Please select a project stage" : null,
+              style: const TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF0A183D),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFCBD5E1)),
-              ),
-              child: DropdownButtonFormField<String>(
-                initialValue: currentValue,
-                isExpanded: true,
-                dropdownColor: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                decoration: InputDecoration(
-                  hintText: "Select Project Stage",
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.construction_rounded,
-                    color: primaryColor,
-                    size: 20,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  border: InputBorder.none,
-                ),
-                items: stages
-                    .map(
-                      (stage) => DropdownMenuItem(
-                        value: stage,
-                        child: Text(stage),
-                      ),
-                    )
-                    .toList(),
-                onChanged: stages.isNotEmpty
-                    ? (v) => setState(() => _selectedProjectField = v)
-                    : null,
-                validator: (v) =>
-                    v == null ? "Please select a project stage" : null,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0A183D),
-                ),
               ),
             ),
           ],

@@ -706,6 +706,7 @@ class _SiteScreenState extends State<SiteScreen>
                         const SizedBox(height: 14),
 
                         // 2. New / Additional Amount Input (Editable)
+                        _buildFieldLabel('New Amount (₹) *'),
                         TextFormField(
                           controller: amountController,
                           keyboardType: const TextInputType.numberWithOptions(
@@ -732,30 +733,64 @@ class _SiteScreenState extends State<SiteScreen>
                             return null;
                           },
                           style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
                             color: Color(0xFF0A183D),
                           ),
+                          textAlignVertical: TextAlignVertical.center,
                           decoration: InputDecoration(
-                            labelText: 'New Amount (₹) *',
+                            isDense: true,
                             hintText: 'e.g. 1000',
-                            prefixIcon: Icon(
-                              Icons.currency_rupee_rounded,
-                              color: primaryColor,
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(
+                                Icons.currency_rupee_rounded,
+                                color: primaryColor,
+                                size: 18,
+                              ),
                             ),
                             filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
                                 color: Color(0xFFCBD5E1),
+                                width: 1.0,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFCBD5E1),
+                                width: 1.0,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
                                 color: primaryColor,
-                                width: 2,
+                                width: 1.5,
+                              ),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFEF4444),
+                                width: 1.0,
+                              ),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFEF4444),
+                                width: 1.5,
                               ),
                             ),
                           ),
@@ -3103,47 +3138,64 @@ class _SiteScreenState extends State<SiteScreen>
                       );
                     }
 
-                    return DropdownButtonFormField<String>(
-                      key: ValueKey(_selectedSiteDocId),
-                      initialValue: _selectedSiteDocId != null &&
-                              docs.any((d) => d.id == _selectedSiteDocId)
-                          ? _selectedSiteDocId
-                          : null,
-                      isExpanded: true,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Choose Construction Site *',
-                        labelStyle: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: primaryColor,
-                        ),
-                        hintText: 'Select a site to edit...',
-                        hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
-                        prefixIcon: Icon(Icons.location_city_rounded, color: primaryColor, size: 20),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: primaryColor,
-                            width: 1.8,
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildFieldLabel('Choose Construction Site *'),
+                        DropdownButtonFormField<String>(
+                          key: ValueKey(_selectedSiteDocId),
+                          initialValue: _selectedSiteDocId != null &&
+                                  docs.any((d) => d.id == _selectedSiteDocId)
+                              ? _selectedSiteDocId
+                              : null,
+                          isExpanded: true,
+                          dropdownColor: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0A183D),
                           ),
-                        ),
-                      ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Select a site to edit...',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(Icons.location_city_rounded, color: primaryColor, size: 18),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: primaryColor,
+                                width: 1.5,
+                              ),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                            ),
+                          ),
                       items: docs.map((doc) {
                         final data = (doc.data() as Map<String, dynamic>?) ?? {};
                         final sId = (data['siteId'] as String?) ?? doc.id;
@@ -3166,8 +3218,10 @@ class _SiteScreenState extends State<SiteScreen>
                           _loadSiteForUpdate(docId);
                         }
                       },
-                    );
-                  },
+                    ),
+                  ],
+                );
+              },
                 ),
               ],
             ),
@@ -3892,6 +3946,37 @@ class _SiteScreenState extends State<SiteScreen>
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildAmountReceivedField({
     required TextEditingController controller,
     required Color primaryColor,
@@ -3905,14 +3990,18 @@ class _SiteScreenState extends State<SiteScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Flexible(
-              child: Text(
-                'Amount Received (₹)',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF334155),
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Amount Received (₹)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0A183D),
+                    letterSpacing: -0.1,
+                  ),
                 ),
               ),
             ),
@@ -3921,22 +4010,21 @@ class _SiteScreenState extends State<SiteScreen>
                 onTap: onHistoryPressed,
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  padding: const EdgeInsets.only(bottom: 6),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.history_rounded,
-                        size: 13.5,
+                        size: 14,
                         color: primaryColor,
                       ),
-                      const SizedBox(width: 2.5),
+                      const SizedBox(width: 3),
                       Text(
                         'History',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                           color: primaryColor,
                         ),
                       ),
@@ -3946,19 +4034,18 @@ class _SiteScreenState extends State<SiteScreen>
               ),
           ],
         ),
-        const SizedBox(height: 6),
         Container(
-          height: 48,
+          height: 44,
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
           ),
           child: Row(
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 12, right: 6),
+                  padding: const EdgeInsets.only(left: 14, right: 6),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
@@ -3966,15 +4053,15 @@ class _SiteScreenState extends State<SiteScreen>
                       controller.text.isEmpty ? '0.00' : controller.text,
                       style: const TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0A183D),
                       ),
                     ),
                   ),
                 ),
               ),
               Container(
-                margin: const EdgeInsets.only(right: 6, left: 2),
+                margin: const EdgeInsets.only(right: 6),
                 child: Material(
                   color: primaryColor,
                   borderRadius: BorderRadius.circular(8),
@@ -3984,7 +4071,7 @@ class _SiteScreenState extends State<SiteScreen>
                     child: const Tooltip(
                       message: 'Add Amount',
                       child: Padding(
-                        padding: EdgeInsets.all(7),
+                        padding: EdgeInsets.all(6),
                         child: Icon(
                           Icons.add_rounded,
                           color: Colors.white,
@@ -4013,20 +4100,13 @@ class _SiteScreenState extends State<SiteScreen>
     void Function(String)? onChanged,
     List<TextInputFormatter>? inputFormatters,
   }) {
-    final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
+    final theme = Theme.of(context);
+    final effectivePrimary = primaryColor ?? theme.primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF334155),
-          ),
-        ),
-        const SizedBox(height: 6),
+        _buildFieldLabel(label),
         TextFormField(
           controller: controller,
           validator: validator,
@@ -4035,30 +4115,44 @@ class _SiteScreenState extends State<SiteScreen>
           readOnly: readOnly,
           onChanged: onChanged,
           style: const TextStyle(
-            fontSize: 13.5,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF0F172A),
+            color: Color(0xFF0A183D),
           ),
+          textAlignVertical: TextAlignVertical.center,
           decoration: InputDecoration(
+            isDense: true,
             hintText: hintText,
-            hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
             filled: true,
-            fillColor: readOnly ? const Color(0xFFF8FAFC) : const Color(0xFFF8FAFC),
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
                 color: effectivePrimary,
-                width: 1.8,
+                width: 1.5,
               ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
           ),
         ),
@@ -4074,51 +4168,55 @@ class _SiteScreenState extends State<SiteScreen>
     Color? primaryColor,
     void Function(String?)? onChanged,
   }) {
+    final theme = Theme.of(context);
     final isValidValue = value != null && items.contains(value);
-    final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
+    final effectivePrimary = primaryColor ?? theme.primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF334155),
-          ),
-        ),
-        const SizedBox(height: 6),
+        _buildFieldLabel(label),
         DropdownButtonFormField<String>(
           initialValue: isValidValue ? value : null,
           isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
           style: const TextStyle(
-            fontSize: 13.5,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF0F172A),
+            color: Color(0xFF0A183D),
           ),
           decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: onChanged == null ? const Color(0xFFF8FAFC) : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
                 color: effectivePrimary,
-                width: 1.8,
+                width: 1.5,
               ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
             suffixIcon: onChanged == null
                 ? const Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF94A3B8))
@@ -4127,12 +4225,20 @@ class _SiteScreenState extends State<SiteScreen>
           icon: onChanged == null ? const SizedBox.shrink() : null,
           hint: Text(
             hint,
-            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade400),
+            style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
           ),
           items: items.map((item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(item, overflow: TextOverflow.ellipsis),
+              child: Text(
+                item,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0A183D),
+                ),
+              ),
             );
           }).toList(),
           onChanged: onChanged,
@@ -4147,31 +4253,24 @@ class _SiteScreenState extends State<SiteScreen>
     VoidCallback? onTap,
     Color? primaryColor,
   }) {
-    final effectivePrimary = primaryColor ?? AppTheme.primaryColor.value;
+    final theme = Theme.of(context);
+    final effectivePrimary = primaryColor ?? theme.primaryColor;
     final formattedDate =
         date == null ? 'Not Set' : DateFormat('dd MMM yyyy').format(date);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF334155),
-          ),
-        ),
-        const SizedBox(height: 6),
+        _buildFieldLabel(label),
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: onTap == null ? const Color(0xFFF8FAFC) : Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
             ),
             child: Row(
               children: [
@@ -4179,9 +4278,9 @@ class _SiteScreenState extends State<SiteScreen>
                   child: Text(
                     formattedDate,
                     style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: date == null ? FontWeight.normal : FontWeight.w600,
-                      color: date == null ? Colors.grey.shade400 : const Color(0xFF0F172A),
+                      fontSize: 14,
+                      fontWeight: date == null ? FontWeight.w500 : FontWeight.w600,
+                      color: date == null ? const Color(0xFF94A3B8) : const Color(0xFF0A183D),
                     ),
                   ),
                 ),

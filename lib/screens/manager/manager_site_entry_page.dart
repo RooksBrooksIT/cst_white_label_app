@@ -39,6 +39,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   List<String> materialOptions = [];
   List<String> labourOptions = [];
   List<String>? _filteredMaterialOptions;
+  List<String>? _filteredLabourOptions;
   bool isLoadingMaterials = true;
   bool isLoadingLabours = true;
   String? materialError;
@@ -110,12 +111,17 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     if (!mounted) return;
     setState(() => isLoadingSites = true);
     try {
-      final sitesSnapshot = await FirestoreService.sites.get();
+      final results = await Future.wait([
+        FirestoreService.sites.get(),
+        FirestoreService.siteSupervisorMap.get(),
+      ]);
+      final sitesSnapshot = results[0];
+      final snapshot = results[1];
+
       final Map<String, String> siteNames = {
         for (var doc in sitesSnapshot.docs)
           doc.id: doc.data()['siteName']?.toString() ?? 'Unnamed Site',
       };
-      final snapshot = await FirestoreService.siteSupervisorMap.get();
       final List<Map<String, String>> rawSites = [];
 
       for (var doc in snapshot.docs) {
@@ -198,25 +204,58 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         }
       }
 
-      final validIds = ExpenseService.sanitizeSiteIds(
-        rawSites.map((s) => s['siteId']!).where((id) => id.isNotEmpty),
-      ).where((id) => id.contains('_') && id.startsWith('ST')).toSet();
-
       final Map<String, Map<String, String>> uniqueSites = {};
       for (var s in rawSites) {
-        final id = s['siteId']!;
-        if (!validIds.contains(id)) continue;
-        if (!uniqueSites.containsKey(id)) {
-          uniqueSites[id] = Map.from(s);
+        var id = (s['siteId'] ?? '').trim();
+        if (id.isEmpty) continue;
+
+        id = ExpenseService.formatCanonicalSiteId(
+          rawId: id,
+          siteCode: s['siteCode'],
+          siteName: s['siteName'],
+        );
+        if (id.toUpperCase().startsWith('PR')) {
+          id = 'ST${id.substring(2)}';
+        }
+
+        if (!id.contains('_') || !id.toUpperCase().startsWith('ST')) {
+          continue;
+        }
+
+        final siteCodeKey = id.split('_').first.toUpperCase();
+        final displayLabel = SiteDisplayHelper.formatSiteDisplay(
+          siteId: id,
+          siteName: s['siteName'],
+        );
+        final displayKey = displayLabel.toLowerCase();
+
+        final existingKey = uniqueSites.keys.firstWhere(
+          (k) => k.toLowerCase() == id.toLowerCase() ||
+                 k.split('_').first.toUpperCase() == siteCodeKey ||
+                 SiteDisplayHelper.formatSiteDisplay(
+                   siteId: uniqueSites[k]!['siteId'],
+                   siteName: uniqueSites[k]!['siteName'],
+                 ).toLowerCase() == displayKey,
+          orElse: () => '',
+        );
+
+        if (existingKey.isEmpty) {
+          final entry = Map<String, String>.from(s);
+          entry['siteId'] = id;
+          uniqueSites[id] = entry;
         } else {
-          final existing = uniqueSites[id]!;
+          final existing = uniqueSites[existingKey]!;
           for (var entry in s.entries) {
             if ((existing[entry.key] == null ||
                     existing[entry.key] == 'Not Available' ||
-                    existing[entry.key] == 'Unnamed Site') &&
+                    existing[entry.key] == 'Unnamed Site' ||
+                    existing[entry.key] == 'Unknown' ||
+                    existing[entry.key] == 'Not found') &&
                 entry.value.isNotEmpty &&
                 entry.value != 'Not Available' &&
-                entry.value != 'Unnamed Site') {
+                entry.value != 'Unnamed Site' &&
+                entry.value != 'Unknown' &&
+                entry.value != 'Not found') {
               existing[entry.key] = entry.value;
             }
           }
@@ -367,13 +406,16 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final name = data['materialName']?.toString();
-        final price = data['unitPrice'];
+        final name = (data['materialName'] ?? data['name'] ?? data['title'])?.toString();
+        final price = data['unitPrice'] ?? data['price'] ?? data['rate'] ?? data['cost'];
 
         if (name != null && name.trim().isNotEmpty) {
-          loadedOptions.add(name.trim());
+          final cleanName = name.trim();
+          loadedOptions.add(cleanName);
           if (price != null) {
-            loadedPrices[name.trim()] = num.tryParse(price.toString()) ?? 0;
+            loadedPrices[cleanName] = num.tryParse(
+                    price.toString().replaceAll('₹', '').replaceAll(',', '').trim()) ??
+                0;
           }
         }
       }
@@ -407,14 +449,23 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final desig = data['designation']?.toString();
-        final salary = data['salaryPerDay'];
+        final desig = (data['designation'] ?? data['labourType'] ?? data['name'] ?? data['title'])?.toString();
+        final salary = data['salary'] ??
+            data['salaryPerDay'] ??
+            data['wage'] ??
+            data['rate'] ??
+            data['dailyWage'] ??
+            data['dailyRate'] ??
+            data['costPerDay'] ??
+            data['amount'];
 
         if (desig != null && desig.trim().isNotEmpty) {
-          loadedOptions.add(desig.trim());
+          final cleanDesig = desig.trim();
+          loadedOptions.add(cleanDesig);
           if (salary != null) {
-            loadedSalaries[desig.trim()] =
-                num.tryParse(salary.toString()) ?? 0;
+            loadedSalaries[cleanDesig] = num.tryParse(
+                    salary.toString().replaceAll('₹', '').replaceAll(',', '').trim()) ??
+                0;
           }
         }
       }
@@ -443,19 +494,32 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   void _addMaterial() {
     if (selectedMaterial != null) {
       final qty = int.tryParse(materialQtyController.text) ?? 0;
-      if (qty <= 0) return;
+      if (qty <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid quantity greater than 0'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
 
       setState(() {
         final existingIndex = materials.indexWhere(
           (m) => m['type'] == selectedMaterial,
         );
+        final price = materialPrices[selectedMaterial] ?? 0;
         if (existingIndex >= 0) {
-          materials[existingIndex]['quantity'] += qty;
+          materials[existingIndex]['quantity'] =
+              (materials[existingIndex]['quantity'] as int) + qty;
+          if (price > 0) {
+            materials[existingIndex]['unitPrice'] = price;
+          }
         } else {
           materials.add({
             'type': selectedMaterial,
             'quantity': qty,
-            'unitPrice': materialPrices[selectedMaterial] ?? 0,
+            'unitPrice': price,
           });
         }
         materialQtyController.text = '0';
@@ -467,14 +531,36 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   void _addCustomMaterial() {
     final name = _customMaterialNameController.text.trim();
     final qty = int.tryParse(_customMaterialQtyController.text) ?? 0;
-    final price = num.tryParse(_customMaterialPriceController.text) ?? 0;
+    final price = num.tryParse(
+            _customMaterialPriceController.text.replaceAll('₹', '').replaceAll(',', '').trim()) ??
+        0;
 
-    if (name.isEmpty || qty <= 0) return;
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter material name'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (qty <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid quantity greater than 0'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() {
+      materialPrices[name] = price;
       final existingIndex = materials.indexWhere((m) => m['type'] == name);
       if (existingIndex >= 0) {
-        materials[existingIndex]['quantity'] += qty;
+        materials[existingIndex]['quantity'] =
+            (materials[existingIndex]['quantity'] as int) + qty;
+        materials[existingIndex]['unitPrice'] = price;
       } else {
         materials.add({
           'type': name,
@@ -491,19 +577,32 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   void _addLabour() {
     if (selectedLabour != null) {
       final count = int.tryParse(labourQtyController.text) ?? 0;
-      if (count <= 0) return;
+      if (count <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid count greater than 0'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
 
       setState(() {
         final existingIndex = labours.indexWhere(
           (l) => l['type'] == selectedLabour,
         );
+        final sal = labourSalaries[selectedLabour] ?? 0;
         if (existingIndex >= 0) {
-          labours[existingIndex]['count'] += count;
+          labours[existingIndex]['count'] =
+              (labours[existingIndex]['count'] as int) + count;
+          if (sal > 0) {
+            labours[existingIndex]['salary'] = sal;
+          }
         } else {
           labours.add({
             'type': selectedLabour,
             'count': count,
-            'salary': labourSalaries[selectedLabour] ?? 0,
+            'salary': sal,
           });
         }
         labourQtyController.text = '0';
@@ -515,14 +614,36 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   void _addCustomLabour() {
     final name = _customLabourNameController.text.trim();
     final count = int.tryParse(_customLabourQtyController.text) ?? 0;
-    final salary = num.tryParse(_customLabourSalaryController.text) ?? 0;
+    final salary = num.tryParse(
+            _customLabourSalaryController.text.replaceAll('₹', '').replaceAll(',', '').trim()) ??
+        0;
 
-    if (name.isEmpty || count <= 0) return;
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter labour designation/type'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (count <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid count greater than 0'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() {
+      labourSalaries[name] = salary;
       final existingIndex = labours.indexWhere((l) => l['type'] == name);
       if (existingIndex >= 0) {
-        labours[existingIndex]['count'] += count;
+        labours[existingIndex]['count'] =
+            (labours[existingIndex]['count'] as int) + count;
+        labours[existingIndex]['salary'] = salary;
       } else {
         labours.add({
           'type': name,
@@ -685,15 +806,41 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       }
 
       materials = List<Map<String, dynamic>>.from(
-        (data['materials'] as List? ?? []).map(
-          (m) => Map<String, dynamic>.from(m as Map),
-        ),
+        (data['materials'] as List? ?? []).map((m) {
+          final map = Map<String, dynamic>.from(m as Map);
+          final type = map['type']?.toString() ?? '';
+          final qty = map['quantity'] is num
+              ? (map['quantity'] as num).toInt()
+              : (int.tryParse(map['quantity']?.toString() ?? '0') ?? 0);
+          final price = map['unitPrice'] is num
+              ? map['unitPrice'] as num
+              : (num.tryParse(map['unitPrice']?.toString() ?? '0') ??
+                  (materialPrices[type] ?? 0));
+          return {
+            'type': type,
+            'quantity': qty,
+            'unitPrice': price,
+          };
+        }),
       );
 
       labours = List<Map<String, dynamic>>.from(
-        (data['labours'] as List? ?? []).map(
-          (l) => Map<String, dynamic>.from(l as Map),
-        ),
+        (data['labours'] as List? ?? []).map((l) {
+          final map = Map<String, dynamic>.from(l as Map);
+          final type = map['type']?.toString() ?? '';
+          final count = map['count'] is num
+              ? (map['count'] as num).toInt()
+              : (int.tryParse(map['count']?.toString() ?? '0') ?? 0);
+          final sal = map['salary'] is num
+              ? map['salary'] as num
+              : (num.tryParse(map['salary']?.toString() ?? '0') ??
+                  (labourSalaries[type] ?? 0));
+          return {
+            'type': type,
+            'count': count,
+            'salary': sal,
+          };
+        }),
       );
 
       final expenses = data['expenses'] as Map<String, dynamic>? ?? {};
@@ -791,16 +938,28 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B))),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text(
+              'CANCEL',
+              style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,
+              elevation: 1.5,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('SAVE'),
+            child: const Text(
+              'SAVE',
+              style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -896,27 +1055,39 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   num _getTotalAmount() {
     num total = 0;
     for (var m in materials) {
-      final qty = m['quantity'] ?? 0;
-      final price = m['unitPrice'] ?? 0;
+      final qty = m['quantity'] is num
+          ? (m['quantity'] as num)
+          : (num.tryParse(m['quantity']?.toString() ?? '0') ?? 0);
+      final price = (m['unitPrice'] is num && (m['unitPrice'] as num) > 0)
+          ? (m['unitPrice'] as num)
+          : (materialPrices[m['type']] ?? 0);
       total += qty * price;
     }
     for (var l in labours) {
-      final count = l['count'] ?? 0;
-      final sal = l['salary'] ?? 0;
+      final count = l['count'] is num
+          ? (l['count'] as num)
+          : (num.tryParse(l['count']?.toString() ?? '0') ?? 0);
+      final sal = (l['salary'] is num && (l['salary'] as num) > 0)
+          ? (l['salary'] as num)
+          : (labourSalaries[l['type']] ?? 0);
       total += count * sal;
     }
     total += _getTotalExpenses();
     return total;
   }
 
-  String _calculateMaterialAmount(String type, int qty) {
-    final price = materialPrices[type] ?? 0;
-    return '₹${qty * price}';
+  String _calculateMaterialAmount(String type, int qty, [num? customPrice]) {
+    final price = (customPrice != null && customPrice > 0)
+        ? customPrice
+        : (materialPrices[type] ?? 0);
+    return '₹${(qty * price).toStringAsFixed(0)}';
   }
 
-  String _calculateLabourAmount(String type, int count) {
-    final sal = labourSalaries[type] ?? 0;
-    return '₹${count * sal}';
+  String _calculateLabourAmount(String type, int count, [num? customSalary]) {
+    final sal = (customSalary != null && customSalary > 0)
+        ? customSalary
+        : (labourSalaries[type] ?? 0);
+    return '₹${(count * sal).toStringAsFixed(0)}';
   }
 
   Future<void> _pickDate() async {
@@ -1203,7 +1374,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                           children: [
                             Expanded(
                               child: SizedBox(
-                                height: 48,
+                                height: 46,
                                 child: ElevatedButton.icon(
                                   icon: const Icon(
                                     Icons.history_rounded,
@@ -1220,15 +1391,16 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                     foregroundColor: Colors.white,
                                     disabledBackgroundColor: Colors.grey.shade300,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                    elevation: 2,
+                                    elevation: 1.5,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
                                   ),
                                   label: const Text(
                                     'Select Existing Entry',
                                     style: TextStyle(
                                       fontSize: 13.5,
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                       color: Colors.white,
                                     ),
                                   ),
@@ -1239,7 +1411,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                             if (isUpdateMode)
                               Expanded(
                                 child: SizedBox(
-                                  height: 48,
+                                  height: 46,
                                   child: OutlinedButton(
                                     onPressed: () {
                                       setState(() {
@@ -1252,9 +1424,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                       backgroundColor: Colors.white,
                                       foregroundColor: const Color(0xFF0A183D),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                      side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
                                     ),
                                     child: const Text(
                                       'Exit Update',
@@ -1325,7 +1498,12 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                             Expanded(
                               flex: 3,
                               child: isLoadingMaterials
-                                  ? const Center(child: CircularProgressIndicator())
+                                  ? const Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(12),
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    )
                                   : Column(
                                       children: [
                                         _buildTextField(
@@ -1390,10 +1568,12 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
                                 foregroundColor: Colors.white,
+                                disabledBackgroundColor: Colors.grey.shade300,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                elevation: 2,
+                                elevation: 1.5,
+                                padding: const EdgeInsets.symmetric(horizontal: 18),
                               ),
                               onPressed: isLoadingMaterials || materialOptions.isEmpty
                                   ? null
@@ -1402,7 +1582,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                 'Add Material',
                                 style: TextStyle(
                                   fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
                               ),
@@ -1418,6 +1598,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                   ? Icons.keyboard_arrow_up_rounded
                                   : Icons.keyboard_arrow_down_rounded,
                               color: primaryColor,
+                              size: 18,
                             ),
                             onPressed: () {
                               setState(() {
@@ -1430,7 +1611,8 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                   : 'Other Materials',
                               style: TextStyle(
                                 color: primaryColor,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
                               ),
                             ),
                           ),
@@ -1453,22 +1635,30 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                             _customMaterialPriceController,
                           ),
                           const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            icon: Icon(Icons.check, size: 18, color: primaryColor),
-                            label: Text(
-                              'ADD OTHER MATERIAL',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: primaryColor,
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                icon: Icon(Icons.check, size: 18, color: primaryColor),
+                                label: Text(
+                                  'ADD OTHER MATERIAL',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                                onPressed: _addCustomMaterial,
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  side: BorderSide(color: primaryColor, width: 1.2),
+                                ),
                               ),
-                            ),
-                            onPressed: _addCustomMaterial,
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              side: BorderSide(color: primaryColor),
                             ),
                           ),
                         ],
@@ -1498,10 +1688,55 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                         _buildSectionHeader('Labour Details'),
                         const SizedBox(height: 16),
                         isLoadingLabours
-                            ? const CircularProgressIndicator()
-                            : _buildLabourDropdown(),
+                            ? const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : Column(
+                                children: [
+                                  _buildTextField(
+                                    'Search Labour',
+                                    null,
+                                    hintText: 'Search Labour...',
+                                    icon: Icons.search_rounded,
+                                    onChanged: (query) {
+                                      setState(() {
+                                        final q = query.toLowerCase();
+                                        final filtered = labourOptions
+                                            .where(
+                                              (item) => item
+                                                  .toLowerCase()
+                                                  .contains(q),
+                                            )
+                                            .toList();
+                                        if (filtered.isNotEmpty) {
+                                          selectedLabour =
+                                              filtered.contains(selectedLabour)
+                                                  ? selectedLabour
+                                                  : filtered.first;
+                                        } else {
+                                          selectedLabour = null;
+                                        }
+                                        _filteredLabourOptions = filtered;
+                                      });
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildLabourDropdown(),
+                                ],
+                              ),
                         const SizedBox(height: 14),
-                        _buildQtyField('Count', labourQtyController),
+                        _buildQtyField(
+                          'Count',
+                          labourQtyController,
+                          onChanged: (value) {
+                            setState(() {
+                              labourQty = int.tryParse(value) ?? 0;
+                            });
+                          },
+                        ),
                         const SizedBox(height: 16),
                         Align(
                           alignment: Alignment.centerLeft,
@@ -1516,17 +1751,21 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
                                 foregroundColor: Colors.white,
+                                disabledBackgroundColor: Colors.grey.shade300,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                elevation: 2,
+                                elevation: 1.5,
+                                padding: const EdgeInsets.symmetric(horizontal: 18),
                               ),
-                              onPressed: _addLabour,
+                              onPressed: isLoadingLabours || labourOptions.isEmpty
+                                  ? null
+                                  : _addLabour,
                               label: const Text(
-                                'ADD LABOUR',
+                                'Add Labour',
                                 style: TextStyle(
                                   fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
                               ),
@@ -1542,6 +1781,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                   ? Icons.keyboard_arrow_up_rounded
                                   : Icons.keyboard_arrow_down_rounded,
                               color: primaryColor,
+                              size: 18,
                             ),
                             onPressed: () {
                               setState(() {
@@ -1554,7 +1794,8 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                   : 'Add Custom Labour',
                               style: TextStyle(
                                 color: primaryColor,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
                               ),
                             ),
                           ),
@@ -1574,22 +1815,30 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                           const SizedBox(height: 10),
                           _buildQtyField('Count', _customLabourQtyController),
                           const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            icon: Icon(Icons.check, size: 18, color: primaryColor),
-                            label: Text(
-                              'ADD CUSTOM',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: primaryColor,
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                icon: Icon(Icons.check, size: 18, color: primaryColor),
+                                label: Text(
+                                  'ADD CUSTOM',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                                onPressed: _addCustomLabour,
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  side: BorderSide(color: primaryColor, width: 1.2),
+                                ),
                               ),
-                            ),
-                            onPressed: _addCustomLabour,
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              side: BorderSide(color: primaryColor),
                             ),
                           ),
                         ],
@@ -1622,39 +1871,50 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                           'Food (₹)',
                           foodCost,
                           icon: Icons.fastfood_rounded,
+                          onChanged: (_) => setState(() {}),
                         ),
                         const SizedBox(height: 12),
                         _buildQtyField(
                           'Transport (₹)',
                           transportCost,
                           icon: Icons.directions_car_rounded,
+                          onChanged: (_) => setState(() {}),
                         ),
                         const SizedBox(height: 12),
                         _buildQtyField(
                           'Fuel (₹)',
                           fuelCost,
                           icon: Icons.local_gas_station_rounded,
+                          onChanged: (_) => setState(() {}),
                         ),
                         const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          icon: Icon(Icons.add, size: 18, color: primaryColor),
-                          label: Text(
-                            'ADD EXPENSES',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: primaryColor,
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            height: 44,
+                            child: OutlinedButton.icon(
+                              icon: Icon(Icons.add_rounded, size: 18, color: primaryColor),
+                              label: Text(
+                                'Add Expenses',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: primaryColor,
+                                ),
+                              ),
+                              onPressed: () {
+                                FocusScope.of(context).unfocus();
+                                setState(() {});
+                              },
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 18),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                side: BorderSide(color: primaryColor, width: 1.2),
+                              ),
                             ),
-                          ),
-                          onPressed: () {
-                            FocusScope.of(context).unfocus();
-                            setState(() {});
-                          },
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: BorderSide(color: primaryColor),
                           ),
                         ),
                       ],
@@ -1723,9 +1983,9 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                     child: Row(
                       children: [
                         Expanded(
-                          flex: 2,
+                          flex: 3,
                           child: SizedBox(
-                            height: 50,
+                            height: 46,
                             child: ElevatedButton(
                               onPressed: isSaving
                                   ? null
@@ -1736,11 +1996,11 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                 backgroundColor: primaryColor,
                                 foregroundColor: Colors.white,
                                 disabledBackgroundColor: Colors.grey.shade300,
-                                padding: EdgeInsets.zero,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                elevation: 2,
+                                elevation: 1.5,
                               ),
                               child: isSaving
                                   ? const SizedBox(
@@ -1766,9 +2026,9 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                           isUpdateMode ? 'UPDATE' : 'SAVE',
                                           style: const TextStyle(
                                             color: Colors.white,
-                                            fontSize: 14.5,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.6,
+                                            letterSpacing: 0.5,
                                           ),
                                         ),
                                       ],
@@ -1777,37 +2037,42 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        SizedBox(
-                          height: 50,
-                          child: OutlinedButton(
-                            onPressed: _resetForm,
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF0A183D),
-                              padding: const EdgeInsets.symmetric(horizontal: 18),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                        Expanded(
+                          flex: 2,
+                          child: SizedBox(
+                            height: 46,
+                            child: OutlinedButton(
+                              onPressed: _resetForm,
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFF0A183D),
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
                               ),
-                              side: const BorderSide(color: Color(0xFFCBD5E1)),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(
-                                  Icons.refresh_rounded,
-                                  size: 18,
-                                  color: Color(0xFF0A183D),
-                                ),
-                                SizedBox(width: 6),
-                                Text(
-                                  'RESET',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.refresh_rounded,
+                                    size: 18,
                                     color: Color(0xFF0A183D),
-                                    letterSpacing: 0.5,
                                   ),
-                                ),
-                              ],
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'RESET',
+                                    style: TextStyle(
+                                      color: Color(0xFF0A183D),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -1873,119 +2138,199 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     );
   }
 
-  Widget _buildMaterialDropdown() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
-      ),
-      child: DropdownButtonFormField<String>(
-        initialValue: selectedMaterial,
-        isExpanded: true,
-        dropdownColor: Colors.white,
-        iconEnabledColor: const Color(0xFF0A183D),
-        borderRadius: BorderRadius.circular(14),
-        style: const TextStyle(
-          color: Color(0xFF0A183D),
-          fontSize: 14.5,
-          fontWeight: FontWeight.w700,
-        ),
-        decoration: InputDecoration(
-          hintText: 'Select Material',
-          hintStyle: const TextStyle(
-            color: Color(0xFF94A3B8),
-            fontSize: 13.5,
-            fontWeight: FontWeight.w500,
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
           ),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Icon(
-              Icons.category_rounded,
-              color: primaryColor,
-              size: 20,
-            ),
-          ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 12,
-          ),
-        ),
-        items: (_filteredMaterialOptions ?? materialOptions)
-            .map(
-              (item) => DropdownMenuItem(
-                value: item,
-                child: Text(
-                  item,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF0A183D),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-              ),
-            )
-            .toList(),
-        onChanged: (value) => setState(() => selectedMaterial = value),
+                ]
+              : null,
+        ),
       ),
     );
   }
 
-  Widget _buildLabourDropdown() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
+  Widget _buildMaterialDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: selectedMaterial,
+      isExpanded: true,
+      dropdownColor: Colors.white,
+      iconEnabledColor: const Color(0xFF0A183D),
+      borderRadius: BorderRadius.circular(12),
+      style: const TextStyle(
+        color: Color(0xFF0A183D),
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
       ),
-      child: DropdownButtonFormField<String>(
-        initialValue: selectedLabour,
-        isExpanded: true,
-        dropdownColor: Colors.white,
-        iconEnabledColor: const Color(0xFF0A183D),
-        borderRadius: BorderRadius.circular(14),
-        style: const TextStyle(
-          color: Color(0xFF0A183D),
-          fontSize: 14.5,
-          fontWeight: FontWeight.w700,
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        hintText: 'Select Material',
+        hintStyle: const TextStyle(
+          color: Color(0xFF94A3B8),
+          fontSize: 12.5,
+          fontWeight: FontWeight.w500,
         ),
-        decoration: InputDecoration(
-          hintText: 'Select Labour',
-          hintStyle: const TextStyle(
-            color: Color(0xFF94A3B8),
-            fontSize: 13.5,
-            fontWeight: FontWeight.w500,
-          ),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Icon(
-              Icons.engineering_rounded,
-              color: primaryColor,
-              size: 20,
-            ),
-          ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 12,
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 12, right: 8),
+          child: Icon(
+            Icons.category_rounded,
+            color: primaryColor,
+            size: 18,
           ),
         ),
-        items: labourOptions
-            .map(
-              (l) => DropdownMenuItem(
-                value: l,
-                child: Text(
-                  l,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF0A183D),
-                  ),
+        prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12.5,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        ),
+      ),
+      items: (_filteredMaterialOptions ?? materialOptions)
+          .map(
+            (item) => DropdownMenuItem(
+              value: item,
+              child: Text(
+                item,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF0A183D),
                 ),
               ),
-            )
-            .toList(),
-        onChanged: (v) => setState(() => selectedLabour = v),
+            ),
+          )
+          .toList(),
+      onChanged: (value) => setState(() => selectedMaterial = value),
+    );
+  }
+
+  Widget _buildLabourDropdown() {
+    final currentOptions = _filteredLabourOptions ?? labourOptions;
+    return DropdownButtonFormField<String>(
+      initialValue: selectedLabour,
+      isExpanded: true,
+      dropdownColor: Colors.white,
+      iconEnabledColor: const Color(0xFF0A183D),
+      borderRadius: BorderRadius.circular(12),
+      style: const TextStyle(
+        color: Color(0xFF0A183D),
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
       ),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        hintText: 'Select Labour',
+        hintStyle: const TextStyle(
+          color: Color(0xFF94A3B8),
+          fontSize: 12.5,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 12, right: 8),
+          child: Icon(
+            Icons.engineering_rounded,
+            color: primaryColor,
+            size: 18,
+          ),
+        ),
+        prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12.5,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        ),
+      ),
+      items: currentOptions
+          .map(
+            (l) => DropdownMenuItem(
+              value: l,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF0A183D),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if ((labourSalaries[l] ?? 0) > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '₹${labourSalaries[l]}/day',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (v) => setState(() => selectedLabour = v),
     );
   }
 
@@ -1999,47 +2344,54 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
+        _buildFieldLabel(label),
+        TextField(
+          controller: ctrl,
+          onChanged: onChanged,
+          textAlignVertical: TextAlignVertical.center,
           style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: TextField(
-            controller: ctrl,
-            onChanged: onChanged,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: hintText ?? 'Enter $label',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: hintText ?? 'Enter $label',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: icon != null
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(icon, color: primaryColor, size: 20),
-                    )
-                  : null,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
-              ),
+            prefixIcon: icon != null
+                ? Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(icon, color: primaryColor, size: 18),
+                  )
+                : null,
+            prefixIconConstraints: icon != null
+                ? const BoxConstraints(minWidth: 38, minHeight: 38)
+                : null,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
           ),
         ),
@@ -2056,48 +2408,55 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
+        _buildFieldLabel(label),
+        TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          onChanged: onChanged,
+          textAlignVertical: TextAlignVertical.center,
           style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: TextField(
-            controller: ctrl,
-            keyboardType: TextInputType.number,
-            onChanged: onChanged,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: '0',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: '0',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: icon != null
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(icon, color: primaryColor, size: 20),
-                    )
-                  : null,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
-              ),
+            prefixIcon: icon != null
+                ? Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(icon, color: primaryColor, size: 18),
+                  )
+                : null,
+            prefixIconConstraints: icon != null
+                ? const BoxConstraints(minWidth: 38, minHeight: 38)
+                : null,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
           ),
         ),
@@ -2148,18 +2507,21 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
             (e) => DataRow(
               cells: [
                 DataCell(Text(
-                  e.value['type'],
+                  e.value['type']?.toString() ?? '',
                   style: const TextStyle(color: Color(0xFF0A183D)),
                 )),
                 DataCell(Text(
-                  '${e.value['quantity']}',
+                  '${e.value['quantity'] ?? 0}',
                   style: const TextStyle(color: Color(0xFF0A183D)),
                 )),
                 DataCell(
                   Text(
                     _calculateMaterialAmount(
-                      e.value['type'],
-                      e.value['quantity'],
+                      e.value['type']?.toString() ?? '',
+                      e.value['quantity'] is num
+                          ? (e.value['quantity'] as num).toInt()
+                          : (int.tryParse(e.value['quantity']?.toString() ?? '0') ?? 0),
+                      e.value['unitPrice'],
                     ),
                     style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.w700),
                   ),
@@ -2181,16 +2543,22 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
             (e) => DataRow(
               cells: [
                 DataCell(Text(
-                  e.value['type'],
+                  e.value['type']?.toString() ?? '',
                   style: const TextStyle(color: Color(0xFF0A183D)),
                 )),
                 DataCell(Text(
-                  '${e.value['count']}',
+                  '${e.value['count'] ?? 0}',
                   style: const TextStyle(color: Color(0xFF0A183D)),
                 )),
                 DataCell(
                   Text(
-                    _calculateLabourAmount(e.value['type'], e.value['count']),
+                    _calculateLabourAmount(
+                      e.value['type']?.toString() ?? '',
+                      e.value['count'] is num
+                          ? (e.value['count'] as num).toInt()
+                          : (int.tryParse(e.value['count']?.toString() ?? '0') ?? 0),
+                      e.value['salary'],
+                    ),
                     style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.w700),
                   ),
                 ),

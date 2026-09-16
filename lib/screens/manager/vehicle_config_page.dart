@@ -704,77 +704,79 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       icon: Icons.directions_car_rounded,
       primaryColor: primaryColor,
       children: [
-        _buildCustomField(
-          label: 'Select Vehicle *',
-          child: DropdownButtonFormField<String>(
-            key: ValueKey('vehicle_$_selectedVehicle'),
-            initialValue: _selectedVehicle,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            decoration: InputDecoration(
-              hintText: 'Choose vehicle',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              prefixIcon: const Icon(Icons.local_shipping_rounded, color: Color(0xFF64748B), size: 20),
-              suffixIcon: _selectedVehicle != null
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
-                      tooltip: 'Clear vehicle selection',
-                      onPressed: () {
-                        setState(() {
-                          _selectedVehicle = null;
-                          _updateAssignedDriverForSelectedVehicle();
-                        });
-                      },
-                    )
-                  : null,
-            ),
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            items: _vehicles.map<DropdownMenuItem<String>>((v) {
-              final model = v['modelName'] as String? ?? '';
-              final plate = v['numberPlate'] as String? ?? '';
-              final id = v['id'] as String;
-              return DropdownMenuItem<String>(
-                value: id,
-                child: Text(
-                  '$model ($plate) - $id',
-                  overflow: TextOverflow.ellipsis,
-                ),
-              );
-            }).toList(),
-            onChanged: _vehicles.isEmpty
-                ? null
-                : (val) {
-                    setState(() {
-                      _selectedVehicle = val;
-                      _updateAssignedDriverForSelectedVehicle();
-                    });
-                  },
-            validator: (val) => val == null ? 'Please select a vehicle' : null,
-            isExpanded: true,
+        _buildFieldLabel('Select Vehicle *'),
+        DropdownButtonFormField<String>(
+          key: ValueKey('vehicle_$_selectedVehicle'),
+          initialValue: _selectedVehicle,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          decoration: _buildInputDecoration(
+            primaryColor: primaryColor,
+            icon: Icons.local_shipping_rounded,
+            hintText: 'Choose vehicle',
+            suffixIcon: _selectedVehicle != null
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                    tooltip: 'Clear vehicle selection',
+                    onPressed: () {
+                      setState(() {
+                        _selectedVehicle = null;
+                        _updateAssignedDriverForSelectedVehicle();
+                      });
+                    },
+                  )
+                : null,
           ),
+          style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+          items: _vehicles.map<DropdownMenuItem<String>>((v) {
+            final model = v['modelName'] as String? ?? '';
+            final plate = v['numberPlate'] as String? ?? '';
+            final id = v['id'] as String;
+            return DropdownMenuItem<String>(
+              value: id,
+              child: Text(
+                '$model ($plate) - $id',
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: _vehicles.isEmpty
+              ? null
+              : (val) {
+                  setState(() {
+                    _selectedVehicle = val;
+                    _updateAssignedDriverForSelectedVehicle();
+                  });
+                },
+          validator: (val) => val == null ? 'Please select a vehicle' : null,
+          isExpanded: true,
         ),
         if (_selectedVehicle != null) ...[
           _buildAssignedDriverBanner(primaryColor),
         ],
         const SizedBox(height: 12),
-        _buildCustomField(
-          label: 'Log Date *',
-          child: InkWell(
-            onTap: () => _selectDate(context),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Icon(Icons.calendar_today_rounded, color: primaryColor, size: 18),
-                  const SizedBox(width: 10),
-                  Text(
+        _buildFieldLabel('Log Date *'),
+        InkWell(
+          onTap: () => _selectDate(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_rounded, color: primaryColor, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
                     DateFormat('EEEE, MMM dd, yyyy').format(_selectedDate),
-                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -920,76 +922,66 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       icon: Icons.swap_horiz_rounded,
       primaryColor: primaryColor,
       children: [
-        _buildCustomField(
-          label: 'Movement Type *',
-          child: DropdownButtonFormField<String>(
-            initialValue: _movementType,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            isExpanded: true,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              prefixIcon: Icon(Icons.alt_route_rounded, color: Color(0xFF64748B), size: 20),
-            ),
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            items: ['Company → Site', 'Site → Site', 'Site → Company']
-                .map((type) => DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis)))
-                .toList(),
-            onChanged: (value) {
-              setState(() => _movementType = value!);
-              _updateLocationFields();
-            },
+        _buildFieldLabel('Movement Type *'),
+        DropdownButtonFormField<String>(
+          initialValue: _movementType,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          isExpanded: true,
+          decoration: _buildInputDecoration(
+            primaryColor: primaryColor,
+            icon: Icons.alt_route_rounded,
+            hintText: 'Select movement type',
           ),
+          style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+          items: ['Company → Site', 'Site → Site', 'Site → Company']
+              .map((type) => DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis)))
+              .toList(),
+          onChanged: (value) {
+            setState(() => _movementType = value!);
+            _updateLocationFields();
+          },
         ),
         if (_movementType != 'Company → Site') ...[
           const SizedBox(height: 12),
-          _buildCustomField(
-            label: 'From Site *',
-            child: DropdownButtonFormField<String>(
-              initialValue: _selectedFromSite,
-              dropdownColor: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              isExpanded: true,
-              decoration: const InputDecoration(
-                hintText: 'Select origin site',
-                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                prefixIcon: Icon(Icons.location_on_rounded, color: Color(0xFF64748B), size: 20),
-              ),
-              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-              items: _siteNames.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
-              onChanged: (val) => setState(() => _selectedFromSite = val),
-              validator: (val) => (_movementType != 'Company → Site' && (val == null || val.isEmpty))
-                  ? 'Please select origin site'
-                  : null,
+          _buildFieldLabel('From Site *'),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedFromSite,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            isExpanded: true,
+            decoration: _buildInputDecoration(
+              primaryColor: primaryColor,
+              icon: Icons.location_on_rounded,
+              hintText: 'Select origin site',
             ),
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+            items: _siteNames.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
+            onChanged: (val) => setState(() => _selectedFromSite = val),
+            validator: (val) => (_movementType != 'Company → Site' && (val == null || val.isEmpty))
+                ? 'Please select origin site'
+                : null,
           ),
         ],
         if (_movementType != 'Site → Company') ...[
           const SizedBox(height: 12),
-          _buildCustomField(
-            label: 'To Site *',
-            child: DropdownButtonFormField<String>(
-              initialValue: _selectedToSite,
-              dropdownColor: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              isExpanded: true,
-              decoration: const InputDecoration(
-                hintText: 'Select destination site',
-                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                prefixIcon: Icon(Icons.place_rounded, color: Color(0xFF64748B), size: 20),
-              ),
-              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-              items: _siteNames.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
-              onChanged: (val) => setState(() => _selectedToSite = val),
-              validator: (val) => (_movementType != 'Site → Company' && (val == null || val.isEmpty))
-                  ? 'Please select destination site'
-                  : null,
+          _buildFieldLabel('To Site *'),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedToSite,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            isExpanded: true,
+            decoration: _buildInputDecoration(
+              primaryColor: primaryColor,
+              icon: Icons.place_rounded,
+              hintText: 'Select destination site',
             ),
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+            items: _siteNames.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
+            onChanged: (val) => setState(() => _selectedToSite = val),
+            validator: (val) => (_movementType != 'Site → Company' && (val == null || val.isEmpty))
+                ? 'Please select destination site'
+                : null,
           ),
         ],
       ],
@@ -1007,72 +999,68 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       icon: Icons.person_pin_rounded,
       primaryColor: primaryColor,
       children: [
-        _buildCustomField(
-          label: 'Select Driver *',
-          child: DropdownButtonFormField<String>(
-            key: ValueKey('driver_${_selectedDriver}_$_selectedVehicle'),
-            initialValue: _selectedDriver,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            isExpanded: true,
-            decoration: InputDecoration(
-              hintText: 'Assign driver for trip',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              prefixIcon: const Icon(Icons.person_rounded, color: Color(0xFF64748B), size: 20),
-              suffixIcon: (_assignedDriverName != null && _selectedDriver == _assignedDriverName)
-                  ? Container(
-                      margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: const Tooltip(
-                        message: 'Assigned Driver from Configuration',
-                        child: Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 18),
+        _buildFieldLabel('Select Driver *'),
+        DropdownButtonFormField<String>(
+          key: ValueKey('driver_${_selectedDriver}_$_selectedVehicle'),
+          initialValue: _selectedDriver,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          isExpanded: true,
+          decoration: _buildInputDecoration(
+            primaryColor: primaryColor,
+            icon: Icons.person_rounded,
+            hintText: 'Assign driver for trip',
+            suffixIcon: (_assignedDriverName != null && _selectedDriver == _assignedDriverName)
+                ? Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: const Tooltip(
+                      message: 'Assigned Driver from Configuration',
+                      child: Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 18),
+                    ),
+                  )
+                : null,
+          ),
+          style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+          items: allDriverOptions.map((d) {
+            final isVehicleDriver = d == _assignedDriverName;
+            return DropdownMenuItem(
+              value: d,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      d,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: isVehicleDriver ? FontWeight.w800 : FontWeight.w700,
+                        color: isVehicleDriver ? const Color(0xFF059669) : const Color(0xFF0A183D),
                       ),
-                    )
-                  : null,
-            ),
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            items: allDriverOptions.map((d) {
-              final isVehicleDriver = d == _assignedDriverName;
-              return DropdownMenuItem(
-                value: d,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        d,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isVehicleDriver)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                      ),
+                      child: const Text(
+                        'Assigned',
                         style: TextStyle(
-                          fontWeight: isVehicleDriver ? FontWeight.w800 : FontWeight.w700,
-                          color: isVehicleDriver ? const Color(0xFF059669) : const Color(0xFF0A183D),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF059669),
                         ),
                       ),
                     ),
-                    if (isVehicleDriver)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFA7F3D0)),
-                        ),
-                        child: const Text(
-                          'Assigned',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF059669),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }).toList(),
-            onChanged: (val) => setState(() => _selectedDriver = val),
-            validator: (val) => (val == null || val.isEmpty) ? 'Please select driver' : null,
-          ),
+                ],
+              ),
+            );
+          }).toList(),
+          onChanged: (val) => setState(() => _selectedDriver = val),
+          validator: (val) => (val == null || val.isEmpty) ? 'Please select driver' : null,
         ),
         if (_assignedDriverName != null && _assignedDriverName!.isNotEmpty) ...[
           const SizedBox(height: 4),
@@ -1114,72 +1102,59 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
           ),
         ],
         const SizedBox(height: 12),
-        _buildCustomField(
-          label: 'Material Type *',
-          child: DropdownButtonFormField<String>(
-            key: ValueKey('material_$_selectedMaterial'),
-            initialValue: _selectedMaterial,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            isExpanded: true,
-            decoration: const InputDecoration(
-              hintText: 'Select material',
-              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              prefixIcon: Icon(Icons.inventory_2_rounded, color: Color(0xFF64748B), size: 18),
-            ),
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
-            items: [
-              ..._materials.map((m) {
-                final name = m['materialName'] as String;
-                return DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis));
-              }),
-              const DropdownMenuItem(
-                value: 'Other',
-                child: Row(
-                  children: [
-                    Icon(Icons.category_rounded, size: 16, color: Color(0xFF2563EB)),
-                    SizedBox(width: 8),
-                    Text(
-                      'Other (Custom Material)',
-                      style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2563EB)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            onChanged: _onMaterialSelected,
-            validator: (val) => (val == null || val.isEmpty) ? 'Select material' : null,
+        _buildFieldLabel('Material Type *'),
+        DropdownButtonFormField<String>(
+          key: ValueKey('material_$_selectedMaterial'),
+          initialValue: _selectedMaterial,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          isExpanded: true,
+          decoration: _buildInputDecoration(
+            primaryColor: primaryColor,
+            icon: Icons.inventory_2_rounded,
+            hintText: 'Select material',
           ),
+          style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+          items: [
+            ..._materials.map((m) {
+              final name = m['materialName'] as String;
+              return DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis));
+            }),
+            const DropdownMenuItem(
+              value: 'Other',
+              child: Row(
+                children: [
+                  Icon(Icons.category_rounded, size: 16, color: Color(0xFF2563EB)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Other (Custom Material)',
+                    style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2563EB)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          onChanged: _onMaterialSelected,
+          validator: (val) => (val == null || val.isEmpty) ? 'Select material' : null,
         ),
         if (_selectedMaterial == 'Other') ...[
           _buildOtherMaterialSection(primaryColor),
         ] else ...[
           const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _buildCustomField(
-                  label: 'Quantity *',
-                  child: TextFormField(
-                    controller: _quantityController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                    decoration: InputDecoration(
-                      hintText: 'Enter quantity',
-                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      suffixText: _selectedUnit.isNotEmpty ? _selectedUnit : null,
-                      suffixStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 12),
-                    ),
-                    validator: (val) => (_selectedMaterial != 'Other' && (val == null || val.isEmpty)) ? 'Enter qty' : null,
-                  ),
-                ),
-              ),
-            ],
+          _buildFieldLabel('Quantity *'),
+          TextFormField(
+            controller: _quantityController,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+            textAlignVertical: TextAlignVertical.center,
+            decoration: _buildInputDecoration(
+              primaryColor: primaryColor,
+              icon: Icons.numbers_rounded,
+              hintText: 'Enter quantity',
+              suffixText: _selectedUnit.isNotEmpty ? _selectedUnit : null,
+              suffixStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+            validator: (val) => (_selectedMaterial != 'Other' && (val == null || val.isEmpty)) ? 'Enter qty' : null,
           ),
           if (_selectedMaterial != null && _selectedMaterial != 'Other') ...[
             const SizedBox(height: 6),
@@ -1248,94 +1223,102 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildCustomField(
-            label: 'Material Name *',
-            child: TextFormField(
-              controller: _otherMaterialNameController,
-              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
-              decoration: const InputDecoration(
-                hintText: 'Enter material name',
-                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                prefixIcon: Icon(Icons.drive_file_rename_outline_rounded, color: Color(0xFF64748B), size: 18),
-              ),
-              validator: (val) => (_selectedMaterial == 'Other' && (val == null || val.trim().isEmpty))
-                  ? 'Please enter material name'
-                  : null,
+          _buildFieldLabel('Material Name *'),
+          TextFormField(
+            controller: _otherMaterialNameController,
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+            textAlignVertical: TextAlignVertical.center,
+            decoration: _buildInputDecoration(
+              primaryColor: primaryColor,
+              icon: Icons.drive_file_rename_outline_rounded,
+              hintText: 'Enter material name',
             ),
+            validator: (val) => (_selectedMaterial == 'Other' && (val == null || val.trim().isEmpty))
+                ? 'Please enter material name'
+                : null,
           ),
           const SizedBox(height: 12),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 flex: 2,
-                child: _buildCustomField(
-                  label: 'Quantity *',
-                  child: TextFormField(
-                    controller: _otherQuantityController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
-                    decoration: const InputDecoration(
-                      hintText: 'Enter quantity',
-                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      prefixIcon: Icon(Icons.numbers_rounded, color: Color(0xFF64748B), size: 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFieldLabel('Quantity *'),
+                    TextFormField(
+                      controller: _otherQuantityController,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+                      textAlignVertical: TextAlignVertical.center,
+                      decoration: _buildInputDecoration(
+                        primaryColor: primaryColor,
+                        icon: Icons.numbers_rounded,
+                        hintText: 'Enter quantity',
+                      ),
+                      validator: (val) => (_selectedMaterial == 'Other' && (val == null || val.trim().isEmpty))
+                          ? 'Please enter quantity'
+                          : null,
                     ),
-                    validator: (val) => (_selectedMaterial == 'Other' && (val == null || val.trim().isEmpty))
-                        ? 'Please enter quantity'
-                        : null,
-                  ),
+                  ],
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 flex: 1,
-                child: _buildCustomField(
-                  label: 'Unit',
-                  child: TextFormField(
-                    controller: _otherUnitController,
-                    style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
-                    decoration: const InputDecoration(
-                      hintText: 'Kg/Nos',
-                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFieldLabel('Unit'),
+                    TextFormField(
+                      controller: _otherUnitController,
+                      style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+                      textAlignVertical: TextAlignVertical.center,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Kg/Nos',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 1.5),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _buildCustomField(
-            label: 'Shop Name (Optional)',
-            child: TextFormField(
-              controller: _otherShopNameController,
-              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
-              decoration: const InputDecoration(
-                hintText: 'Enter shop name (optional)',
-                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                prefixIcon: Icon(Icons.storefront_rounded, color: Color(0xFF64748B), size: 18),
-              ),
+          _buildFieldLabel('Shop Name (Optional)'),
+          TextFormField(
+            controller: _otherShopNameController,
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+            textAlignVertical: TextAlignVertical.center,
+            decoration: _buildInputDecoration(
+              primaryColor: primaryColor,
+              icon: Icons.storefront_rounded,
+              hintText: 'Enter shop name (optional)',
             ),
           ),
           const SizedBox(height: 12),
-          _buildCustomField(
-            label: 'Vendor (Optional)',
-            child: TextFormField(
-              controller: _otherVendorController,
-              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
-              decoration: const InputDecoration(
-                hintText: 'Enter vendor name (optional)',
-                hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                prefixIcon: Icon(Icons.business_rounded, color: Color(0xFF64748B), size: 18),
-              ),
+          _buildFieldLabel('Vendor (Optional)'),
+          TextFormField(
+            controller: _otherVendorController,
+            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+            textAlignVertical: TextAlignVertical.center,
+            decoration: _buildInputDecoration(
+              primaryColor: primaryColor,
+              icon: Icons.business_rounded,
+              hintText: 'Enter vendor name (optional)',
             ),
           ),
         ],
@@ -1352,62 +1335,63 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
         Row(
           children: [
             Expanded(
-              child: _buildCustomField(
-                label: 'Start Time *',
-                child: TextFormField(
-                  controller: _startTimeController,
-                  readOnly: true,
-                  onTap: () => _selectTime(context, _startTimeController),
-                  style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                  decoration: const InputDecoration(
-                    hintText: 'hh:mm a',
-                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    prefixIcon: Icon(Icons.access_time_rounded, color: Color(0xFF64748B), size: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel('Start Time *'),
+                  TextFormField(
+                    controller: _startTimeController,
+                    readOnly: true,
+                    onTap: () => _selectTime(context, _startTimeController),
+                    style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+                    textAlignVertical: TextAlignVertical.center,
+                    decoration: _buildInputDecoration(
+                      primaryColor: primaryColor,
+                      icon: Icons.access_time_rounded,
+                      hintText: 'hh:mm a',
+                    ),
+                    validator: (val) => val == null || val.isEmpty ? 'Start time' : null,
                   ),
-                  validator: (val) => val == null || val.isEmpty ? 'Start time' : null,
-                ),
+                ],
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: _buildCustomField(
-                label: 'End Time *',
-                child: TextFormField(
-                  controller: _endTimeController,
-                  readOnly: true,
-                  onTap: () => _selectTime(context, _endTimeController),
-                  style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-                  decoration: const InputDecoration(
-                    hintText: 'hh:mm a',
-                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    prefixIcon: Icon(Icons.access_time_filled_rounded, color: Color(0xFF64748B), size: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel('End Time *'),
+                  TextFormField(
+                    controller: _endTimeController,
+                    readOnly: true,
+                    onTap: () => _selectTime(context, _endTimeController),
+                    style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+                    textAlignVertical: TextAlignVertical.center,
+                    decoration: _buildInputDecoration(
+                      primaryColor: primaryColor,
+                      icon: Icons.access_time_filled_rounded,
+                      hintText: 'hh:mm a',
+                    ),
+                    validator: (val) => val == null || val.isEmpty ? 'End time' : null,
                   ),
-                  validator: (val) => val == null || val.isEmpty ? 'End time' : null,
-                ),
+                ],
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        _buildCustomField(
-          label: 'Distance (km) *',
-          child: TextFormField(
-            controller: _distanceController,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            decoration: const InputDecoration(
-              hintText: 'Distance in kilometers',
-              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              prefixIcon: Icon(Icons.speed_rounded, color: Color(0xFF64748B), size: 20),
-            ),
-            validator: (val) => val == null || val.isEmpty ? 'Enter distance' : null,
+        _buildFieldLabel('Distance (km) *'),
+        TextFormField(
+          controller: _distanceController,
+          keyboardType: TextInputType.number,
+          style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+          textAlignVertical: TextAlignVertical.center,
+          decoration: _buildInputDecoration(
+            primaryColor: primaryColor,
+            icon: Icons.speed_rounded,
+            hintText: 'Distance in kilometers',
           ),
+          validator: (val) => val == null || val.isEmpty ? 'Enter distance' : null,
         ),
       ],
     );
@@ -1419,18 +1403,16 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
       icon: Icons.note_alt_rounded,
       primaryColor: primaryColor,
       children: [
-        _buildCustomField(
-          label: 'Remarks / Notes',
-          child: TextFormField(
-            controller: _remarksController,
-            maxLines: 2,
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            decoration: const InputDecoration(
-              hintText: 'Any extra trip notes or remarks...',
-              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
+        _buildFieldLabel('Remarks / Notes'),
+        TextFormField(
+          controller: _remarksController,
+          maxLines: 3,
+          style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
+          decoration: _buildInputDecoration(
+            primaryColor: primaryColor,
+            icon: Icons.edit_note_rounded,
+            hintText: 'Any extra trip notes or remarks...',
+            isMultiLine: true,
           ),
         ),
       ],
@@ -1489,28 +1471,97 @@ class _AddVehicleLogPageState extends State<AddVehicleLogPage> {
     );
   }
 
-  Widget _buildCustomField({required String label, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
           style: const TextStyle(
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
           ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
         ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: child,
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required Color primaryColor,
+    required IconData icon,
+    required String hintText,
+    Widget? suffixIcon,
+    String? suffixText,
+    TextStyle? suffixStyle,
+    bool isMultiLine = false,
+  }) {
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+      ),
+      suffixText: suffixText,
+      suffixStyle: suffixStyle,
+      prefixIcon: Padding(
+        padding: EdgeInsets.only(
+          left: 12,
+          right: 8,
+          top: isMultiLine ? 10 : 0,
+          bottom: isMultiLine ? 10 : 0,
         ),
-      ],
+        child: Icon(icon, color: primaryColor, size: 18),
+      ),
+      prefixIconConstraints: BoxConstraints(
+        minWidth: 38,
+        minHeight: isMultiLine ? 24 : 38,
+      ),
+      suffixIcon: suffixIcon,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: isMultiLine ? 12 : 12.5,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: primaryColor, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+      ),
+      errorStyle: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFFEF4444),
+      ),
     );
   }
 

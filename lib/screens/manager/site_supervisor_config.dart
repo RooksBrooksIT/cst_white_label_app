@@ -492,105 +492,109 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: fullNameCtrl,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Full Name',
-                        prefixIcon: Icon(Icons.person, color: primaryColor),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    _buildDialogField(
+                      label: 'Full Name *',
+                      child: TextFormField(
+                        controller: fullNameCtrl,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
+                        decoration: _buildDialogInputDecoration('Full Name', Icons.person_rounded),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: userNameCtrl,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'User Name',
-                        prefixIcon: Icon(Icons.account_circle, color: primaryColor),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    _buildDialogField(
+                      label: 'User Name *',
+                      child: TextFormField(
+                        controller: userNameCtrl,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
+                        decoration: _buildDialogInputDecoration('User Name', Icons.account_circle_rounded),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: passwordCtrl,
-                      obscureText: !isPasswordVisible,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock, color: primaryColor),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            isPasswordVisible
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            color: primaryColor,
+                    _buildDialogField(
+                      label: 'Password *',
+                      child: TextFormField(
+                        controller: passwordCtrl,
+                        obscureText: !isPasswordVisible,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
+                        decoration: _buildDialogInputDecoration(
+                          'Password',
+                          Icons.lock_rounded,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              isPasswordVisible
+                                  ? Icons.visibility_rounded
+                                  : Icons.visibility_off_rounded,
+                              color: primaryColor,
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                isPasswordVisible = !isPasswordVisible;
+                              });
+                            },
                           ),
-                          onPressed: () {
-                            setDialogState(() {
-                              isPasswordVisible = !isPasswordVisible;
-                            });
-                          },
                         ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: designationCtrl,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Designation',
-                        prefixIcon: Icon(Icons.work, color: primaryColor),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    _buildDialogField(
+                      label: 'Designation *',
+                      child: TextFormField(
+                        controller: designationCtrl,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
+                        decoration: _buildDialogInputDecoration('Designation', Icons.badge_rounded),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: contactNoCtrl,
-                      keyboardType: TextInputType.phone,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Contact No',
-                        prefixIcon: Icon(Icons.phone, color: primaryColor),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
-                      ],
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Contact number is required';
-                        final clean = v.trim().replaceAll(RegExp(r'\D'), '');
-                        if (clean.length != 10) return 'Phone number must be exactly 10 digits';
-                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
-                          return 'Enter a valid 10-digit phone number (starts with 6-9)';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Email (Optional)',
-                        prefixIcon: Icon(Icons.email, color: primaryColor),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      validator: (v) {
-                        if (v != null && v.trim().isNotEmpty) {
-                          if (!RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v.trim())) {
-                            return 'Enter a valid email address (e.g. name@domain.com)';
+                    _buildDialogField(
+                      label: 'Contact No *',
+                      child: TextFormField(
+                        controller: contactNoCtrl,
+                        keyboardType: TextInputType.phone,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
+                        decoration: _buildDialogInputDecoration('Contact No', Icons.phone_rounded),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Contact number is required';
+                          final clean = v.trim().replaceAll(RegExp(r'\D'), '');
+                          if (clean.length != 10) return 'Phone number must be exactly 10 digits';
+                          if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                            return 'Enter a valid 10-digit phone number (starts with 6-9)';
                           }
-                        }
-                        return null;
-                      },
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDialogField(
+                      label: 'Email (Optional)',
+                      child: TextFormField(
+                        controller: emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w600),
+                        decoration: _buildDialogInputDecoration('Email (Optional)', Icons.email_rounded),
+                        validator: (v) {
+                          if (v != null && v.trim().isNotEmpty) {
+                            if (!RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v.trim())) {
+                              return 'Enter a valid email address (e.g. name@domain.com)';
+                            }
+                          }
+                          return null;
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -1255,6 +1259,84 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     );
   }
 
+  Widget _buildDialogField({required String label, required Widget child}) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: RichText(
+            text: TextSpan(
+              text: cleanText,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A183D),
+                letterSpacing: -0.1,
+              ),
+              children: isRequired
+                  ? const [
+                      TextSpan(
+                        text: ' *',
+                        style: TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+
+  InputDecoration _buildDialogInputDecoration(
+    String hintText,
+    IconData icon, {
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 12, right: 8),
+        child: Icon(icon, color: primaryColor, size: 18),
+      ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+      suffixIcon: suffixIcon,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: primaryColor, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+      ),
+    );
+  }
+
   Widget _buildTextField(
     String label,
     TextEditingController controller, {
@@ -1275,110 +1357,148 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     final hasError = errorText != null && errorText.isNotEmpty;
     final isSuccess = hasValue && !isChecking && !hasError && successText != null;
 
+    final activeBorderColor = hasError
+        ? const Color(0xFFEF4444)
+        : (isSuccess ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label + (isRequired ? ' *' : ''),
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: RichText(
+            text: TextSpan(
+              text: label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A183D),
+                letterSpacing: -0.1,
+              ),
+              children: isRequired
+                  ? const [
+                      TextSpan(
+                        text: ' *',
+                        style: TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ]
+                  : null,
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: hasError
-                  ? const Color(0xFFDC2626)
-                  : (isSuccess ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1)),
-              width: (hasError || isSuccess) ? 1.5 : 1.0,
-            ),
+        TextFormField(
+          controller: controller,
+          obscureText: isPassword ? !_isPasswordVisible : false,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          onChanged: onChanged,
+          textAlignVertical: TextAlignVertical.center,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-          child: TextFormField(
-            controller: controller,
-            obscureText: isPassword ? !_isPasswordVisible : false,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            onChanged: onChanged,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: 'Enter $label',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: 'Enter $label',
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: icon != null
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(
-                        icon,
-                        color: hasError
-                            ? const Color(0xFFDC2626)
-                            : (isSuccess ? const Color(0xFF16A34A) : brandIconColor),
-                        size: 20,
-                      ),
-                    )
-                  : null,
-              suffixIcon: isPassword
-                  ? IconButton(
-                      icon: Icon(
-                        _isPasswordVisible
-                            ? Icons.visibility_rounded
-                            : Icons.visibility_off_rounded,
-                        color: brandIconColor,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
-                    )
-                  : (isChecking
-                      ? const Padding(
-                          padding: EdgeInsets.all(12.0),
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF64748B)),
-                            ),
+            prefixIcon: icon != null
+                ? Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
+                      icon,
+                      color: hasError
+                          ? const Color(0xFFEF4444)
+                          : (isSuccess ? const Color(0xFF16A34A) : brandIconColor),
+                      size: 18,
+                    ),
+                  )
+                : null,
+            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+            suffixIcon: isPassword
+                ? IconButton(
+                    icon: Icon(
+                      _isPasswordVisible
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      color: brandIconColor,
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _isPasswordVisible = !_isPasswordVisible;
+                      });
+                    },
+                  )
+                : (isChecking
+                    ? const Padding(
+                        padding: EdgeInsets.all(11.0),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF64748B)),
                           ),
-                        )
-                      : (hasError
-                          ? const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 20)
-                          : (isSuccess
-                              ? const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20)
-                              : null))),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
+                        ),
+                      )
+                    : (hasError
+                        ? const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 18)
+                        : (isSuccess
+                            ? const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 18)
+                            : null))),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: activeBorderColor,
+                width: (hasError || isSuccess) ? 1.5 : 1.0,
               ),
             ),
-            validator: (value) {
-              if (isRequired && (value == null || value.trim().isEmpty)) {
-                return '$label is required';
-              }
-              if (customValidator != null) {
-                final customErr = customValidator(value);
-                if (customErr != null) return customErr;
-              }
-              if (errorText != null) {
-                return errorText;
-              }
-              return null;
-            },
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: hasError ? const Color(0xFFEF4444) : brandIconColor,
+                width: 1.5,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
+            errorStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFEF4444),
+            ),
           ),
+          validator: (value) {
+            if (isRequired && (value == null || value.trim().isEmpty)) {
+              return '$label is required';
+            }
+            if (customValidator != null) {
+              final customErr = customValidator(value);
+              if (customErr != null) return customErr;
+            }
+            if (errorText != null) {
+              return errorText;
+            }
+            return null;
+          },
         ),
         if (hasValue && (isChecking || hasError || isSuccess))
           Padding(
@@ -1404,14 +1524,14 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                     ),
                   ),
                 ] else if (hasError) ...[
-                  const Icon(Icons.error_outline_rounded, size: 13, color: Color(0xFFDC2626)),
+                  const Icon(Icons.error_outline_rounded, size: 13, color: Color(0xFFEF4444)),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       errorText,
                       style: const TextStyle(
                         fontSize: 11.5,
-                        color: Color(0xFFDC2626),
+                        color: Color(0xFFEF4444),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1461,7 +1581,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
         const Text(
           'Supervisor Photo',
           style: TextStyle(
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
           ),
@@ -1668,56 +1788,57 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
               const SizedBox(height: 10),
 
               // Live Search Bar
-              Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+              TextField(
+                onChanged: (val) {
+                  setState(() {
+                    _supervisorSearchQuery = val;
+                    _supervisorInfoCurrentPage = 1;
+                  });
+                },
+                textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0A183D),
                 ),
-                child: TextField(
-                  onChanged: (val) {
-                    setState(() {
-                      _supervisorSearchQuery = val;
-                      _supervisorInfoCurrentPage = 1;
-                    });
-                  },
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0A183D),
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintText: 'Search supervisors by name, ID, phone, designation...',
+                  hintStyle: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.w500,
                   ),
-                  decoration: InputDecoration(
-                    hintText: 'Search supervisors by name, ID, phone, designation...',
-                    hintStyle: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF94A3B8),
-                    ),
-                    prefixIcon: Icon(
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
                       Icons.search_rounded,
                       color: primaryColor,
-                      size: 20,
+                      size: 18,
                     ),
-                    suffixIcon: _supervisorSearchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
-                            onPressed: () {
-                              setState(() {
-                                _supervisorSearchQuery = '';
-                                _supervisorInfoCurrentPage = 1;
-                              });
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  suffixIcon: _supervisorSearchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                          onPressed: () {
+                            setState(() {
+                              _supervisorSearchQuery = '';
+                              _supervisorInfoCurrentPage = 1;
+                            });
+                          },
+                        )
+                      : null,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 1.5),
                   ),
                 ),
               ),

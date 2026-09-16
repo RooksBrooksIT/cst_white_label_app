@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -126,6 +126,37 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
     super.dispose();
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -242,201 +273,192 @@ class _MatlsSubCatState extends State<MatlsSubCat> {
                         const SizedBox(height: 22),
 
                         // Material Category Dropdown
-                        const Text(
-                          'Material Category',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                        _buildFieldLabel('Material Category *'),
+                        DropdownButtonFormField<DocumentSnapshot>(
+                          initialValue: _selectedCategory,
+                          isExpanded: true,
+                          borderRadius: BorderRadius.circular(12),
+                          dropdownColor: Colors.white,
+                          iconEnabledColor: const Color(0xFF0A183D),
+                          style: const TextStyle(
                             color: Color(0xFF0A183D),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: true,
+                            fillColor: Colors.white,
+                            hintText: 'Select category',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(
+                                Icons.category_rounded,
+                                color: Color(0xFF3B82F6),
+                                size: 18,
+                              ),
+                            ),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12.5,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: Color(0xFF3B82F6), width: 1.5),
+                            ),
                           ),
-                          child: DropdownButtonFormField<DocumentSnapshot>(
-                            initialValue: _selectedCategory,
-                            isExpanded: true,
-                            style: const TextStyle(
-                              color: Color(0xFF0A183D),
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Select category',
-                              hintStyle: const TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                          items: _categories.map((cat) {
+                            final data =
+                                cat.data()
+                                    as Map<String, dynamic>? ??
+                                {};
+                            final displayName =
+                                data['matCategory']?.toString() ??
+                                cat.id;
+                            return DropdownMenuItem(
+                              value: cat,
+                              child: Text(
+                                displayName,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              prefixIcon: const Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12.0,
-                                ),
-                                child: Icon(
-                                  Icons.category_rounded,
-                                  color: Color(0xFF3B82F6),
-                                  size: 20,
-                                ),
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                            ),
-                            items: _categories.map((cat) {
-                              final data =
-                                  cat.data()
-                                      as Map<String, dynamic>? ??
-                                  {};
-                              final displayName =
-                                  data['matCategory']?.toString() ??
-                                  cat.id;
-                              return DropdownMenuItem(
-                                value: cat,
-                                child: Text(
-                                  displayName,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) => setState(
-                              () => _selectedCategory = val,
-                            ),
+                            );
+                          }).toList(),
+                          onChanged: (val) => setState(
+                            () => _selectedCategory = val,
                           ),
                         ),
 
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
 
                         // Material Unit Dropdown
-                        const Text(
-                          'Material Unit',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                        _buildFieldLabel('Material Unit *'),
+                        DropdownButtonFormField<DocumentSnapshot>(
+                          initialValue: _selectedUnit,
+                          isExpanded: true,
+                          borderRadius: BorderRadius.circular(12),
+                          dropdownColor: Colors.white,
+                          iconEnabledColor: const Color(0xFF0A183D),
+                          style: const TextStyle(
                             color: Color(0xFF0A183D),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                          ),
-                          child: DropdownButtonFormField<DocumentSnapshot>(
-                            initialValue: _selectedUnit,
-                            isExpanded: true,
-                            style: const TextStyle(
-                              color: Color(0xFF0A183D),
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: true,
+                            fillColor: Colors.white,
+                            hintText: 'Select unit',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
                             ),
-                            decoration: InputDecoration(
-                              hintText: 'Select unit',
-                              hintStyle: const TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              prefixIcon: const Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12.0,
-                                ),
-                                child: Icon(
-                                  Icons.straighten_rounded,
-                                  color: Color(0xFF10B981),
-                                  size: 20,
-                                ),
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(
+                                Icons.straighten_rounded,
+                                color: Color(0xFF10B981),
+                                size: 18,
                               ),
                             ),
-                            items: _units.map((unit) {
-                              final data =
-                                  unit.data()
-                                      as Map<String, dynamic>? ??
-                                  {};
-                              final displayName =
-                                  data['matUnit']?.toString() ??
-                                  unit.id;
-                              return DropdownMenuItem(
-                                value: unit,
-                                child: Text(
-                                  displayName,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) =>
-                                setState(() => _selectedUnit = val),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12.5,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: Color(0xFF10B981), width: 1.5),
+                            ),
                           ),
+                          items: _units.map((unit) {
+                            final data =
+                                unit.data()
+                                    as Map<String, dynamic>? ??
+                                {};
+                            final displayName =
+                                data['matUnit']?.toString() ??
+                                unit.id;
+                            return DropdownMenuItem(
+                              value: unit,
+                              child: Text(
+                                displayName,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) =>
+                              setState(() => _selectedUnit = val),
                         ),
 
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
 
                         // Material Sub Category Text Field
-                        const Text(
-                          'Material Sub Category Name',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0A183D),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        const Text(
-                          'e.g. For Cement category → PPC Cement, OPC 53 Grade',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                          ),
-                          child: TextField(
-                            controller: _subCategoryController,
-                            style: const TextStyle(
-                              color: Color(0xFF0A183D),
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                        _buildFieldLabel('Material Sub Category Name *'),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            'e.g. For Cement category → PPC Cement, OPC 53 Grade',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
                             ),
-                            decoration: const InputDecoration(
-                              hintText:
-                                  'e.g. PPC Cement, OPC 53 Grade, 12mm TMT Bar',
-                              hintStyle: TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        TextField(
+                          controller: _subCategoryController,
+                          textAlignVertical: TextAlignVertical.center,
+                          style: const TextStyle(
+                            color: Color(0xFF0A183D),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            filled: true,
+                            fillColor: Colors.white,
+                            hintText:
+                                'e.g. PPC Cement, OPC 53 Grade, 12mm TMT Bar',
+                            hintStyle: TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            prefixIcon: Padding(
+                              padding: EdgeInsets.only(left: 12, right: 8),
+                              child: Icon(
+                                Icons.label_important_rounded,
+                                color: Color(0xFFF97316),
+                                size: 18,
                               ),
-                              prefixIcon: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12.0,
-                                ),
-                                child: Icon(
-                                  Icons.label_important_rounded,
-                                  color: Color(0xFFF97316),
-                                  size: 20,
-                                ),
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
+                            ),
+                            prefixIconConstraints: BoxConstraints(minWidth: 38, minHeight: 38),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12.5,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: Color(0xFFF97316), width: 1.5),
                             ),
                           ),
                         ),

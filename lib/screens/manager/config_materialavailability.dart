@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/material_inventory_service.dart';
@@ -956,7 +956,10 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                       icon: Icons.straighten_rounded,
                       hintText: 'Unit',
                       items: _availableUnits.map((u) {
-                        return DropdownMenuItem<String>(value: u, child: Text(u));
+                        return DropdownMenuItem<String>(
+                          value: u,
+                          child: Text(u, overflow: TextOverflow.ellipsis),
+                        );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) setState(() => _selectedUnit = val);
@@ -974,7 +977,7 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                   Expanded(
                     flex: 5,
                     child: _buildWhiteTextField(
-                      label: 'Unit Rate (₹ / $_selectedUnit) *',
+                      label: 'Unit Rate (₹) *',
                       icon: Icons.sell_rounded,
                       hintText: 'e.g. 500',
                       controller: _unitRateController,
@@ -1072,29 +1075,35 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
                 children: [
                   const Text(
                     'Allocation Date',
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0A183D),
+                      letterSpacing: -0.1,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 7),
                   InkWell(
                     onTap: _pickAllocationDate,
                     borderRadius: BorderRadius.circular(14),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.1),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 20),
-                          const SizedBox(width: 12),
+                          Icon(Icons.calendar_month_rounded, color: Theme.of(context).primaryColor, size: 18),
+                          const SizedBox(width: 10),
                           Text(
                             DateFormat('dd MMM yyyy').format(_allocationDate),
-                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
                           ),
                           const Spacer(),
-                          const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                          const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748B), size: 20),
                         ],
                       ),
                     ),
@@ -1246,13 +1255,39 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
               TextField(
                 controller: _searchController,
                 onChanged: (val) => setState(() => _searchQuery = val),
-                decoration: const InputDecoration(
-                  hintText: 'Search material, category, or site...',
-                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
-                  border: InputBorder.none,
+                textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(
+                  color: Color(0xFF0A183D),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  hintText: 'Search material, category, or site...',
+                  hintStyle: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(Icons.search_rounded, color: primaryColor, size: 18),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 1.5),
+                  ),
                 ),
               ),
             ],
@@ -1566,6 +1601,37 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
   // HELPER FORM WIDGETS
   // ---------------------------------------------------------------------------
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildWhiteTextField({
     required String label,
     required IconData icon,
@@ -1573,36 +1639,53 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     required TextEditingController controller,
     TextInputType? keyboardType,
     void Function(String)? onChanged,
+    int maxLines = 1,
   }) {
     final brandIconColor = Theme.of(context).primaryColor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+        _buildFieldLabel(label),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          onChanged: onChanged,
+          textAlignVertical: TextAlignVertical.center,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-          child: TextFormField(
-            controller: controller,
-            keyboardType: keyboardType,
-            onChanged: onChanged,
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5, fontWeight: FontWeight.w500),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Icon(icon, color: brandIconColor, size: 20),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: hintText,
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(icon, color: brandIconColor, size: 18),
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: brandIconColor, width: 1.5),
             ),
           ),
         ),
@@ -1622,36 +1705,53 @@ class _MaterialAvailabilityState extends State<MaterialAvailability> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF0A183D)),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+        _buildFieldLabel(label),
+        DropdownButtonFormField<String>(
+          key: ValueKey(value),
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          initialValue: (value != null && items.any((i) => i.value == value))
+              ? value
+              : null,
+          style: const TextStyle(
+            color: Color(0xFF0A183D),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-          child: DropdownButtonFormField<String>(
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            initialValue: (value != null && items.any((i) => i.value == value)) ? value : null,
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14, fontWeight: FontWeight.w700),
-            decoration: InputDecoration(
-              hintText: hintText ?? 'Select $label',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5, fontWeight: FontWeight.w500),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Icon(icon, color: brandIconColor, size: 20),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            hintText: hintText ?? 'Select $label',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            items: items,
-            onChanged: onChanged,
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(icon, color: brandIconColor, size: 18),
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: brandIconColor, width: 1.5),
+            ),
           ),
+          items: items,
+          onChanged: onChanged,
         ),
       ],
     );

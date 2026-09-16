@@ -975,38 +975,72 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     );
   }
 
-  Widget _buildModalFieldLabel(String text) {
+  Widget _buildFieldLabel(String text) {
+    final isRequired = text.contains('*');
+    final cleanText = text.replaceAll('*', '').trim();
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Color(0xFF0A183D),
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
         ),
       ),
     );
   }
 
+  Widget _buildModalFieldLabel(String text) {
+    return _buildFieldLabel(text);
+  }
+
   InputDecoration _getInputDecoration(String hint, IconData icon) {
     return InputDecoration(
+      isDense: true,
       hintText: hint,
-      prefixIcon: Icon(icon, color: primaryColor, size: 20),
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIconConstraints: const BoxConstraints(
+        minWidth: 38,
+        minHeight: 38,
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 12, right: 8),
+        child: Icon(icon, color: primaryColor, size: 18),
+      ),
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primaryColor, width: 1.8),
+        borderSide: BorderSide(color: primaryColor, width: 1.5),
       ),
     );
   }
@@ -1452,33 +1486,34 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 6),
+        _buildFieldLabel(label),
         TextFormField(
           controller: controller,
           obscureText: isPassword && !_isPasswordVisible,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           onChanged: onChanged,
+          textAlignVertical: TextAlignVertical.center,
           style: const TextStyle(
             color: Color(0xFF0A183D),
             fontWeight: FontWeight.w600,
             fontSize: 13.5,
           ),
           decoration: InputDecoration(
-            prefixIcon: Icon(
-              icon,
-              color: hasError
-                  ? const Color(0xFFDC2626)
-                  : (isSuccess ? const Color(0xFF16A34A) : primaryColor),
-              size: 20.0,
+            isDense: true,
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(
+                icon,
+                color: hasError
+                    ? const Color(0xFFDC2626)
+                    : (isSuccess ? const Color(0xFF16A34A) : primaryColor),
+                size: 18.0,
+              ),
             ),
             suffixIcon: isPassword
                 ? IconButton(
@@ -1487,6 +1522,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                           ? Icons.visibility_rounded
                           : Icons.visibility_off_rounded,
                       color: const Color(0xFF64748B),
+                      size: 18,
                     ),
                     onPressed: () => setState(
                       () => _isPasswordVisible = !_isPasswordVisible,
@@ -1505,23 +1541,24 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                         ),
                       )
                     : (hasError
-                        ? const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 20)
+                        ? const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 18)
                         : (isSuccess
-                            ? const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20)
+                            ? const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 18)
                             : null))),
             hintText: hint ?? 'Enter $label',
-            hintStyle: TextStyle(
-              color: Colors.grey.shade400,
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
               fontSize: 12.5,
-              fontWeight: FontWeight.w400,
+              fontWeight: FontWeight.w500,
             ),
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
                 color: hasError ? const Color(0xFFDC2626) : const Color(0xFFCBD5E1),
+                width: 1.0,
               ),
             ),
             enabledBorder: OutlineInputBorder(
@@ -1537,7 +1574,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
                 color: hasError ? const Color(0xFFDC2626) : primaryColor,
-                width: 1.8,
+                width: 1.5,
               ),
             ),
           ),
@@ -1629,19 +1666,12 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 6),
+        _buildFieldLabel(label),
         DropdownButtonFormField<String>(
           initialValue: items.contains(value) ? value : null,
           isExpanded: true,
           dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
           style: const TextStyle(
             color: Color(0xFF0A183D),
             fontWeight: FontWeight.w600,
@@ -1662,35 +1692,45 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               .toList(),
           onChanged: onChanged,
           decoration: InputDecoration(
-            prefixIcon: Icon(
-              icon,
-              color: primaryColor,
-              size: 20.0,
+            isDense: true,
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(
+                icon,
+                color: primaryColor,
+                size: 18.0,
+              ),
             ),
             filled: true,
             fillColor: Colors.white,
             hintText: 'Select $label',
-            hintStyle: TextStyle(
-              color: Colors.grey.shade400,
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
               fontSize: 12.5,
-              fontWeight: FontWeight.w400,
+              fontWeight: FontWeight.w500,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(
                 color: Color(0xFFCBD5E1),
+                width: 1.0,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(
                 color: Color(0xFFCBD5E1),
+                width: 1.0,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: primaryColor, width: 1.8),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
             ),
           ),
           validator: (val) => val == null ? 'Please select $label' : null,
@@ -1797,7 +1837,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: const Color(0xFFCBD5E1),
                 width: 1.0,
@@ -1812,19 +1852,28 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
             ),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.0, fontWeight: FontWeight.w600),
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13.0, fontWeight: FontWeight.w600),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'Search by name, ID, username, phone or email...',
-                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.0),
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 38,
+                  minHeight: 38,
+                ),
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.only(left: 12, right: 8),
+                  child: Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 18),
+                ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, color: Color(0xFF64748B)),
+                        icon: const Icon(Icons.clear_rounded, color: Color(0xFF64748B), size: 16),
                         onPressed: () => _searchController.clear(),
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
             ),
           ),

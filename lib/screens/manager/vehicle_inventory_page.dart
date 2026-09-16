@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:ebricks/screens/reports/vehicle_inventory_pdf.dart';
 import 'package:intl/intl.dart';
@@ -441,93 +441,155 @@ class _VehicleInventoryReportPageState
   Widget _buildFilterInput(Color primaryColor) {
     switch (_mode) {
       case ReportFilterMode.date:
-        return _buildCustomTextField(
-          label: 'Select Date *',
-          child: TextFormField(
-            readOnly: true,
-            onTap: _pickDate,
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            controller: TextEditingController(
-              text: _selectedDate == null ? '' : _formatDate(_selectedDate!),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildFieldLabel('Select Date *'),
+            TextFormField(
+              readOnly: true,
+              onTap: _pickDate,
+              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+              textAlignVertical: TextAlignVertical.center,
+              controller: TextEditingController(
+                text: _selectedDate == null ? '' : _formatDate(_selectedDate!),
+              ),
+              decoration: _buildInputDecoration(
+                primaryColor: primaryColor,
+                icon: Icons.calendar_today_rounded,
+                hintText: 'Choose date for report',
+              ),
+              validator: (_) => _selectedDate == null ? 'Please select a date' : null,
             ),
-            decoration: InputDecoration(
-              hintText: 'Choose date for report',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              prefixIcon: Icon(Icons.calendar_today_rounded, color: primaryColor, size: 20),
-            ),
-            validator: (_) => _selectedDate == null ? 'Please select a date' : null,
-          ),
+          ],
         );
 
       case ReportFilterMode.month:
-        return _buildCustomTextField(
-          label: 'Select Month *',
-          child: TextFormField(
-            readOnly: true,
-            onTap: _pickMonth,
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            controller: TextEditingController(
-              text: _selectedMonth == null ? '' : DateFormat('MMMM yyyy').format(_selectedMonth!),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildFieldLabel('Select Month *'),
+            TextFormField(
+              readOnly: true,
+              onTap: _pickMonth,
+              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+              textAlignVertical: TextAlignVertical.center,
+              controller: TextEditingController(
+                text: _selectedMonth == null ? '' : DateFormat('MMMM yyyy').format(_selectedMonth!),
+              ),
+              decoration: _buildInputDecoration(
+                primaryColor: primaryColor,
+                icon: Icons.calendar_month_rounded,
+                hintText: 'Choose month for report',
+              ),
+              validator: (_) => _selectedMonth == null ? 'Please select a month' : null,
             ),
-            decoration: InputDecoration(
-              hintText: 'Choose month for report',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              prefixIcon: Icon(Icons.calendar_month_rounded, color: primaryColor, size: 20),
-            ),
-            validator: (_) => _selectedMonth == null ? 'Please select a month' : null,
-          ),
+          ],
         );
 
       case ReportFilterMode.site:
-        return _buildCustomTextField(
-          label: 'Select Site *',
-          child: DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: _selectedSite,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            style: const TextStyle(color: Color(0xFF0A183D), fontSize: 14.5, fontWeight: FontWeight.w700),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              prefixIcon: Icon(Icons.location_on_rounded, color: primaryColor, size: 20),
-              hintText: _isLoadingSites ? 'Loading sites...' : 'Choose destination site',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildFieldLabel('Select Site *'),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _selectedSite,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              style: const TextStyle(color: Color(0xFF0A183D), fontSize: 13.5, fontWeight: FontWeight.w700),
+              decoration: _buildInputDecoration(
+                primaryColor: primaryColor,
+                icon: Icons.location_on_rounded,
+                hintText: _isLoadingSites ? 'Loading sites...' : 'Choose destination site',
+              ),
+              items: _sites.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              onChanged: (v) => setState(() => _selectedSite = v),
+              validator: (v) => v == null || v.isEmpty ? 'Please select a site' : null,
             ),
-            items: _sites.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-            onChanged: (v) => setState(() => _selectedSite = v),
-            validator: (v) => v == null || v.isEmpty ? 'Please select a site' : null,
-          ),
+          ],
         );
     }
   }
 
-  Widget _buildCustomTextField({required String label, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
           style: const TextStyle(
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
           ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
         ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: child,
-        ),
-      ],
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required Color primaryColor,
+    required IconData icon,
+    required String hintText,
+  }) {
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 12, right: 8),
+        child: Icon(icon, color: primaryColor, size: 18),
+      ),
+      prefixIconConstraints: const BoxConstraints(
+        minWidth: 38,
+        minHeight: 38,
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 12.5,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: primaryColor, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+      ),
+      errorStyle: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFFEF4444),
+      ),
     );
   }
 

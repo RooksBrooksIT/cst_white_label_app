@@ -1869,6 +1869,37 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -1880,56 +1911,58 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     IconData? icon,
   }) {
     final theme = Theme.of(context);
-    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
+    final primaryColor = theme.primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
+        _buildFieldLabel(label),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          onTap: onTap,
+          textAlignVertical: TextAlignVertical.center,
+          style: TextStyle(
+            color: enabled ? const Color(0xFF0A183D) : const Color(0xFF475569),
             fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: enabled ? Colors.white : const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: TextField(
-            controller: controller,
-            enabled: enabled,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            onTap: onTap,
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: enabled ? Colors.white : const Color(0xFFF8FAFC),
+            hintText: hint,
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w500,
-              ),
-              prefixIcon: icon != null
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(icon, color: brandIconColor, size: 20),
-                    )
-                  : null,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+            prefixIcon: icon != null
+                ? Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(icon, color: primaryColor, size: 18),
+                  )
+                : null,
+            prefixIconConstraints: icon != null
+                ? const BoxConstraints(minWidth: 38, minHeight: 38)
+                : null,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
             ),
           ),
         ),
@@ -1943,116 +1976,117 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     required String label,
   }) {
     final theme = Theme.of(context);
-    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
+    final primaryColor = theme.primaryColor;
     final hasSelected = sitesList.any((s) => s['siteId'] == selectedId);
     final currentVal = hasSelected ? selectedId : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: _isLoadingSites
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 12),
-                      Text(
-                        'Loading sites...',
-                        style: TextStyle(color: Color(0xFF94A3B8)),
-                      ),
-                    ],
-                  ),
-                )
-              : DropdownButtonFormField<String>(
-                  key: ValueKey('site_${currentVal}_${sitesList.length}'),
-                  initialValue: currentVal,
-                  isExpanded: true,
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  style: const TextStyle(
-                    color: Color(0xFF0A183D),
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Select Site',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(
-                        Icons.location_on_rounded,
-                        color: brandIconColor,
-                        size: 20,
-                      ),
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                  items: sitesList.map((site) {
-                    final siteIdVal = (site['siteId'] ?? '').toString().trim();
-                    String siteCode = (site['siteCode'] ?? '').toString().trim();
-                    String siteName = (site['siteName'] ?? '').toString().trim();
-
-                    if (siteCode.isEmpty && siteIdVal.isNotEmpty) {
-                      siteCode = siteIdVal.contains('_') ? siteIdVal.split('_').first : siteIdVal;
-                    } else if (siteCode.contains('_')) {
-                      siteCode = siteCode.split('_').first;
-                    }
-
-                    if (siteName.isEmpty && siteIdVal.contains('_')) {
-                      siteName = siteIdVal.substring(siteIdVal.indexOf('_') + 1);
-                    } else if (siteName.contains('_') && siteName.startsWith('${siteCode}_')) {
-                      siteName = siteName.substring(siteCode.length + 1);
-                    }
-
-                    final String displayText;
-                    if (siteCode.isNotEmpty && siteName.isNotEmpty && siteCode.toLowerCase() != siteName.toLowerCase()) {
-                      displayText = '$siteCode — $siteName';
-                    } else if (siteName.isNotEmpty) {
-                      displayText = siteName;
-                    } else {
-                      displayText = siteCode.isNotEmpty ? siteCode : siteIdVal;
-                    }
-
-                    return DropdownMenuItem<String>(
-                      value: site['siteId'],
-                      child: Text(
-                        displayText,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: onChanged,
+        _buildFieldLabel(label),
+        _isLoadingSites
+            ? Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
                 ),
-        ),
+                child: const Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Loading sites...',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              )
+            : DropdownButtonFormField<String>(
+                key: ValueKey('site_${currentVal}_${sitesList.length}'),
+                initialValue: currentVal,
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                style: const TextStyle(
+                  color: Color(0xFF0A183D),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintText: 'Select Site',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
+                      Icons.location_on_rounded,
+                      color: primaryColor,
+                      size: 18,
+                    ),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12.5,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 1.5),
+                  ),
+                ),
+                items: sitesList.map((site) {
+                  final siteIdVal = (site['siteId'] ?? '').toString().trim();
+                  String siteCode = (site['siteCode'] ?? '').toString().trim();
+                  String siteName = (site['siteName'] ?? '').toString().trim();
+
+                  if (siteCode.isEmpty && siteIdVal.isNotEmpty) {
+                    siteCode = siteIdVal.contains('_') ? siteIdVal.split('_').first : siteIdVal;
+                  } else if (siteCode.contains('_')) {
+                    siteCode = siteCode.split('_').first;
+                  }
+
+                  if (siteName.isEmpty && siteIdVal.contains('_')) {
+                    siteName = siteIdVal.substring(siteIdVal.indexOf('_') + 1);
+                  } else if (siteName.contains('_') && siteName.startsWith('${siteCode}_')) {
+                    siteName = siteName.substring(siteCode.length + 1);
+                  }
+
+                  final String displayText;
+                  if (siteCode.isNotEmpty && siteName.isNotEmpty && siteCode.toLowerCase() != siteName.toLowerCase()) {
+                    displayText = '$siteCode — $siteName';
+                  } else if (siteName.isNotEmpty) {
+                    displayText = siteName;
+                  } else {
+                    displayText = siteCode.isNotEmpty ? siteCode : siteIdVal;
+                  }
+
+                  return DropdownMenuItem<String>(
+                    value: site['siteId'],
+                    child: Text(
+                      displayText,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: onChanged,
+              ),
       ],
     );
   }
@@ -2074,7 +2108,7 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
 
   Widget _buildMaterialDropdown() {
     final theme = Theme.of(context);
-    final brandIconColor = AppTheme.getDarkAccent(theme.primaryColor);
+    final primaryColor = theme.primaryColor;
     final validList = _transferMode == 0 ? materialsList : siteMaterialsList;
     final hasSelected = validList.any(
       (m) =>
@@ -2086,127 +2120,128 @@ class _MaterialInfoScreenState extends State<MaterialInfoScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Material Name *',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: _isLoadingMaterials
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 12),
-                      Text(
-                        'Loading materials...',
-                        style: TextStyle(color: Color(0xFF94A3B8)),
-                      ),
-                    ],
-                  ),
-                )
-              : DropdownButtonFormField<String>(
-                  key: ValueKey('mat_${currentSelectedValue}_${validList.length}'),
-                  initialValue: currentSelectedValue,
-                  isExpanded: true,
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  style: const TextStyle(
-                    color: Color(0xFF0A183D),
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: validList.isEmpty
-                        ? (_transferMode != 0 && (_fromSiteId == null && _selectedSiteId == null)
-                            ? 'Select site first'
-                            : 'No materials available')
-                        : 'Select Material',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(
-                        Icons.inventory_2_rounded,
-                        color: brandIconColor,
-                        size: 20,
-                      ),
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                  items: validList.map((material) {
-                    final materialName =
-                        (material['materialName'] ?? '').toString().trim();
-                    final count = _parseCount(material['count']);
-
-                    return DropdownMenuItem<String>(
-                      value: materialName,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              materialName,
-                              style: const TextStyle(
-                                color: Color(0xFF0A183D),
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: (count > 0
-                                      ? const Color(0xFF10B981)
-                                      : const Color(0xFFEF4444))
-                                  .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Available: $count',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: count > 0
-                                    ? const Color(0xFF059669)
-                                    : const Color(0xFFDC2626),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: _onMaterialChanged,
+        _buildFieldLabel('Material Name *'),
+        _isLoadingMaterials
+            ? Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
                 ),
-        ),
+                child: const Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Loading materials...',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              )
+            : DropdownButtonFormField<String>(
+                key: ValueKey('mat_${currentSelectedValue}_${validList.length}'),
+                initialValue: currentSelectedValue,
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                style: const TextStyle(
+                  color: Color(0xFF0A183D),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintText: validList.isEmpty
+                      ? (_transferMode != 0 && (_fromSiteId == null && _selectedSiteId == null)
+                          ? 'Select site first'
+                          : 'No materials available')
+                      : 'Select Material',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
+                      Icons.inventory_2_rounded,
+                      color: primaryColor,
+                      size: 18,
+                    ),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12.5,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 1.5),
+                  ),
+                ),
+                items: validList.map((material) {
+                  final materialName =
+                      (material['materialName'] ?? '').toString().trim();
+                  final count = _parseCount(material['count']);
+
+                  return DropdownMenuItem<String>(
+                    value: materialName,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            materialName,
+                            style: const TextStyle(
+                              color: Color(0xFF0A183D),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13.5,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (count > 0
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFFEF4444))
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Available: $count',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: count > 0
+                                  ? const Color(0xFF059669)
+                                  : const Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: _onMaterialChanged,
+              ),
       ],
     );
   }

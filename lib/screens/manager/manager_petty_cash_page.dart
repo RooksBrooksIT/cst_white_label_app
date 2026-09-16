@@ -2111,9 +2111,26 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
               TextField(
                 controller: remarksController,
                 maxLines: 2,
+                textAlignVertical: TextAlignVertical.center,
                 decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
                   hintText: 'Manager verification remarks (optional)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                  ),
                 ),
               ),
             ],
@@ -2174,9 +2191,26 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
               TextField(
                 controller: reasonController,
                 maxLines: 2,
+                textAlignVertical: TextAlignVertical.center,
                 decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
                   hintText: 'Rejection reason (required)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                  ),
                 ),
               ),
             ],
@@ -2239,22 +2273,61 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
                 style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
               ),
               const SizedBox(height: 12),
-              const Text('Allocation Amount (₹)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
+              const Text('Allocation Amount (₹)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0A183D))),
+              const SizedBox(height: 6),
               TextField(
                 controller: amountController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                textAlignVertical: TextAlignVertical.center,
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintText: 'Enter allocation amount',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(Icons.currency_rupee_rounded, color: Color(0xFF10B981), size: 18),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: remarksController,
+                textAlignVertical: TextAlignVertical.center,
                 decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
                   hintText: 'Optional release remarks',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                  ),
                 ),
               ),
             ],
@@ -2552,25 +2625,21 @@ class _ManagerManualAllocationDialogState
                       const SizedBox(height: 12),
 
                       // 1. Supervisor Selection
-                      const Text(
-                        'Select Supervisor *',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
+                      _buildFieldLabel('Select Supervisor *'),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
                         initialValue: _selectedSupervisorId,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          prefixIcon: const Icon(Icons.person_rounded, size: 18, color: Color(0xFF64748B)),
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.person_rounded,
+                          hintText: 'Choose supervisor',
                         ),
                         items: _supervisors.map((s) {
                           return DropdownMenuItem<String>(
                             value: s['supervisorId'],
                             child: Text(
                               '${s['supervisorName']} (${s['supervisorId']})',
-                              style: const TextStyle(fontSize: 13),
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF0A183D), fontWeight: FontWeight.w500),
                               overflow: TextOverflow.ellipsis,
                             ),
                           );
@@ -2588,28 +2657,24 @@ class _ManagerManualAllocationDialogState
                         },
                         validator: (val) => val == null || val.isEmpty ? 'Supervisor is required' : null,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
                       // 2. Site Selection
-                      const Text(
-                        'Select Site *',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
+                      _buildFieldLabel('Select Site *'),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
                         initialValue: _selectedSiteId,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          prefixIcon: const Icon(Icons.location_city_rounded, size: 18, color: Color(0xFF64748B)),
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.location_city_rounded,
+                          hintText: 'Choose site',
                         ),
                         items: availableSites.map((s) {
                           return DropdownMenuItem<String>(
                             value: s['siteId'],
                             child: Text(
                               '${s['siteName']} (${s['siteId']})',
-                              style: const TextStyle(fontSize: 13),
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF0A183D), fontWeight: FontWeight.w500),
                               overflow: TextOverflow.ellipsis,
                             ),
                           );
@@ -2630,30 +2695,29 @@ class _ManagerManualAllocationDialogState
                       ),
                       if (_selectedProjectName != null && _selectedProjectName!.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(
-                          'Project: $_selectedProjectName',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 2),
+                          child: Text(
+                            'Project: $_selectedProjectName',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                          ),
                         ),
                       ],
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
                       // 3. Amount Input
-                      const Text(
-                        'Allocation Amount (₹) *',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
+                      _buildFieldLabel('Allocation Amount (₹) *'),
                       TextFormField(
                         controller: _amountController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        textAlignVertical: TextAlignVertical.center,
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                         ],
-                        decoration: InputDecoration(
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.currency_rupee_rounded,
                           hintText: 'e.g. 15000',
-                          prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) return 'Amount is required';
@@ -2662,41 +2726,36 @@ class _ManagerManualAllocationDialogState
                           return null;
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
                       // 4. Purpose / Reason
-                      const Text(
-                        'Purpose / Reason *',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
+                      _buildFieldLabel('Purpose / Reason *'),
                       TextFormField(
                         controller: _reasonController,
                         maxLines: 2,
-                        decoration: InputDecoration(
+                        textAlignVertical: TextAlignVertical.center,
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.description_rounded,
                           hintText: 'e.g. Site mobilization operational petty cash',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.all(12),
+                          isMultiLine: true,
                         ),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) return 'Purpose is required';
                           return null;
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
                       // 5. Remarks
-                      const Text(
-                        'Remarks (Optional)',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
+                      _buildFieldLabel('Remarks (Optional)'),
                       TextFormField(
                         controller: _remarksController,
-                        decoration: InputDecoration(
+                        textAlignVertical: TextAlignVertical.center,
+                        decoration: _buildInputDecoration(
+                          primaryColor: primaryColor,
+                          icon: Icons.edit_note_rounded,
                           hintText: 'Notes for Organization HQ approval',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.all(12),
                         ),
                       ),
                     ],
@@ -2787,5 +2846,90 @@ class _ManagerManualAllocationDialogState
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required Color primaryColor,
+    required IconData icon,
+    required String hintText,
+    Widget? suffixIcon,
+    bool isMultiLine = false,
+  }) {
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIcon: Padding(
+        padding: EdgeInsets.only(
+          left: 12,
+          right: 8,
+          top: isMultiLine ? 10 : 0,
+          bottom: isMultiLine ? 10 : 0,
+        ),
+        child: Icon(icon, color: primaryColor, size: 18),
+      ),
+      prefixIconConstraints: BoxConstraints(
+        minWidth: 38,
+        minHeight: isMultiLine ? 24 : 38,
+      ),
+      suffixIcon: suffixIcon,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: isMultiLine ? 12 : 12.5,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: primaryColor, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+      ),
+    );
   }
 }

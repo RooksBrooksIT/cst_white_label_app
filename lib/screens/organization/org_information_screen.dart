@@ -1456,7 +1456,7 @@ class _OrgInformationScreenState extends State<OrgInformationScreen>
       children: [
         Row(
           children: [
-            Icon(icon, size: 14, color: theme.primaryColor),
+            Icon(icon, size: 15, color: theme.primaryColor),
             const SizedBox(width: 6),
             Text(
               label,
@@ -1464,42 +1464,60 @@ class _OrgInformationScreenState extends State<OrgInformationScreen>
                 fontSize: 12.5,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF334155),
+                letterSpacing: -0.1,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: maxLines > 1 ? 10 : 11,
+        const SizedBox(height: 7),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          validator: validator,
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-          ),
-          child: TextFormField(
-            controller: controller,
-            maxLines: maxLines,
-            keyboardType: keyboardType,
-            inputFormatters: inputFormatters,
-            validator: validator,
-            style: const TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            hintText: hint,
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
             ),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: maxLines > 1 ? 12 : 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.primaryColor, width: 1.8),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.8),
+            ),
+            errorStyle: const TextStyle(
+              color: Color(0xFFDC2626),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),

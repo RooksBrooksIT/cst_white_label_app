@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -201,58 +201,62 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Search Bar Filter
-                  Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF0A183D).withValues(alpha: 0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim().toLowerCase();
+                      });
+                    },
+                    textAlignVertical: TextAlignVertical.center,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      color: Color(0xFF0A183D),
+                      fontWeight: FontWeight.w600,
                     ),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val.trim().toLowerCase();
-                        });
-                      },
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF0A183D),
-                        fontWeight: FontWeight.w600,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: 'Search categories or measurement units...',
+                      hintStyle: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w500,
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'Search categories or measurement units...',
-                        hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade500,
-                        ),
-                        prefixIcon: Icon(
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 8),
+                        child: Icon(
                           Icons.search_rounded,
                           color: primaryColor,
-                          size: 20,
+                          size: 18,
                         ),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(
-                                  Icons.clear_rounded,
-                                  color: Colors.grey.shade600,
-                                  size: 18,
-                                ),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _searchQuery = '');
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(
+                                Icons.clear_rounded,
+                                color: Color(0xFF64748B),
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12.5,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryColor, width: 1.5),
                       ),
                     ),
                   ),
@@ -376,40 +380,43 @@ class _ConfigMaterialsScreenState extends State<ConfigMaterialsScreen> {
           Row(
             children: [
               Expanded(
-                child: Container(
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                child: TextField(
+                  controller: controller,
+                  onSubmitted: (_) => onAdd(),
+                  textAlignVertical: TextAlignVertical.center,
+                  style: const TextStyle(
+                    color: Color(0xFF0A183D),
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: TextField(
-                    controller: controller,
-                    onSubmitted: (_) => onAdd(),
-                    style: const TextStyle(
-                      color: Color(0xFF0A183D),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    hintText: hintText,
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
                     ),
-                    decoration: InputDecoration(
-                      hintText: hintText,
-                      hintStyle: const TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12.5,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: accentColor, width: 1.5),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               SizedBox(
-                height: 46,
+                height: 44,
                 child: ElevatedButton.icon(
                   onPressed: isLoading ? null : onAdd,
                   style: ElevatedButton.styleFrom(

@@ -1963,6 +1963,37 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     );
   }
 
+  Widget _buildFieldLabel(String label, {bool isRequired = false}) {
+    final cleanText = label.replaceAll('*', '').trim();
+    final hasStar = isRequired || label.contains('*');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: hasStar
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildInputField({
     required TextEditingController controller,
     required String label,
@@ -1978,28 +2009,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: Color(0xFF334155),
-              ),
-            ),
-            if (isRequired)
-              const Text(
-                ' *',
-                style: TextStyle(
-                  color: Color(0xFFEF4444),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 7),
+        _buildFieldLabel(label, isRequired: isRequired),
         TextFormField(
           controller: controller,
           readOnly: readOnly,
@@ -2009,38 +2019,54 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF0F172A),
+            color: Color(0xFF0A183D),
           ),
+          textAlignVertical: maxLines == 1 ? TextAlignVertical.center : TextAlignVertical.top,
           decoration: InputDecoration(
-            hintText: hint,
+            isDense: true,
+            hintText: hint ?? 'Enter ${label.replaceAll('*', '').trim()}',
             hintStyle: const TextStyle(
-              fontSize: 13.5,
+              fontSize: 12.5,
               color: Color(0xFF94A3B8),
-              fontWeight: FontWeight.normal,
+              fontWeight: FontWeight.w500,
             ),
-            prefixIcon: Icon(icon, size: 20, color: primaryColor),
+            prefixIconConstraints: BoxConstraints(
+              minWidth: 38,
+              minHeight: maxLines == 1 ? 38 : 24,
+            ),
+            prefixIcon: Padding(
+              padding: EdgeInsets.only(
+                left: 12,
+                right: 8,
+                top: maxLines > 1 ? 12 : 0,
+              ),
+              child: Icon(icon, size: 18, color: primaryColor),
+            ),
             filled: true,
-            fillColor: readOnly ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: maxLines > 1 ? 12 : 12.5,
+            ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primaryColor, width: 1.8),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFEF4444)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
           ),
         ),
@@ -2053,19 +2079,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     DateTime? date,
     Function(DateTime) onSelected, {
     required Color primaryColor,
+    bool isRequired = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            color: Color(0xFF334155),
-          ),
-        ),
-        const SizedBox(height: 7),
+        _buildFieldLabel(label, isRequired: isRequired),
         InkWell(
           onTap: () async {
             final picked = await showDatePicker(
@@ -2089,22 +2108,24 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             );
             if (picked != null) onSelected(picked);
           },
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.calendar_today_rounded,
-                  size: 18,
-                  color: primaryColor,
+                Padding(
+                  padding: const EdgeInsets.only(left: 0, right: 8),
+                  child: Icon(
+                    Icons.calendar_today_rounded,
+                    size: 18,
+                    color: primaryColor,
+                  ),
                 ),
-                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     date == null
@@ -2113,10 +2134,10 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                     style: TextStyle(
                       color: date == null
                           ? const Color(0xFF94A3B8)
-                          : const Color(0xFF0F172A),
+                          : const Color(0xFF0A183D),
                       fontWeight:
-                          date != null ? FontWeight.w600 : FontWeight.normal,
-                      fontSize: 13.5,
+                          date != null ? FontWeight.w600 : FontWeight.w500,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -2136,81 +2157,85 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     List<String>? displayItems,
     bool isLoading = false,
     required Color primaryColor,
+    bool isRequired = false,
     String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
+        _buildFieldLabel(label, isRequired: isRequired),
+        DropdownButtonFormField<String>(
+          initialValue: (value != null && items.contains(value)) ? value : null,
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
           style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            color: Color(0xFF334155),
+            color: Color(0xFF0A183D),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        const SizedBox(height: 7),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: isLoading
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Select ${label.replaceAll('*', '').trim()}',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryColor, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
+            suffixIcon: isLoading
                 ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: primaryColor,
-                        ),
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: primaryColor,
                       ),
                     ),
                   )
-                : DropdownButton<String>(
-                    value: (value != null && items.contains(value)) ? value : null,
-                    isExpanded: true,
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    icon: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: Color(0xFF64748B),
-                    ),
-                    hint: Text(
-                      'Select $label',
-                      style: const TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                    items: List.generate(
-                      items.length,
-                      (i) => DropdownMenuItem(
-                        value: items[i],
-                        child: Text(
-                          displayItems != null ? displayItems[i] : items[i],
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            color: Color(0xFF0F172A),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    onChanged: onChanged,
-                    dropdownColor: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                : null,
           ),
+          items: List.generate(
+            items.length,
+            (i) => DropdownMenuItem(
+              value: items[i],
+              child: Text(
+                displayItems != null ? displayItems[i] : items[i],
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF0A183D),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          onChanged: isLoading ? null : onChanged,
+          validator: validator,
         ),
       ],
     );

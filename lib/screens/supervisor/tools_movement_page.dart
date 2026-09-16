@@ -1019,7 +1019,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
         behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
           decoration: BoxDecoration(
             color: isSelected ? primaryColor : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
@@ -1033,49 +1033,47 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                   ]
                 : null,
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        icon,
-                        size: 15,
-                        color: isSelected ? Colors.white : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.3,
-                          color: isSelected ? Colors.white : const Color(0xFF334155),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 2),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF94A3B8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 14,
+                      color: isSelected ? Colors.white : const Color(0xFF64748B),
                     ),
+                    const SizedBox(width: 4),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                        color: isSelected ? Colors.white : const Color(0xFF334155),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF94A3B8),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1137,13 +1135,17 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          isReturn ? 'Return Origin & Site Details' : 'Dispatch & Destination Site',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: darkAccent,
-                            letterSpacing: -0.3,
+                        Expanded(
+                          child: Text(
+                            isReturn ? 'Return Origin & Site Details' : 'Dispatch & Destination Site',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: darkAccent,
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1319,6 +1321,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                             fontWeight: FontWeight.w700,
                                             color: Color(0xFF0F172A),
                                           ),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
                                         ),
                                       ),
                                     ],
@@ -1354,36 +1358,39 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(9),
-                              decoration: BoxDecoration(
-                                color: primaryColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.handyman_rounded,
-                                color: primaryColor,
-                                size: 21,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Select Tools to Transfer',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: darkAccent,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ],
+                        Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.handyman_rounded,
+                            color: primaryColor,
+                            size: 21,
+                          ),
                         ),
-                        if (currentAvailable != null)
-                          _buildStockBadge(currentAvailable),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Select Tools to Transfer',
+                            style: TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w800,
+                              color: darkAccent,
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (currentAvailable != null) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: _buildStockBadge(currentAvailable),
+                          ),
+                        ],
                       ],
                     ),
                     const Padding(
@@ -1455,14 +1462,14 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Expanded(
-                          flex: 5,
+                          flex: 6,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildFieldLabel('Quantity Units *', Icons.pin_rounded),
                               Container(
                                 height: 48,
-                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(12),
@@ -1488,13 +1495,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                           }
                                         },
                                         child: Container(
-                                          width: 34,
-                                          height: 34,
+                                          width: 32,
+                                          height: 32,
                                           decoration: BoxDecoration(
                                             color: primaryColor.withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
-                                          child: Icon(Icons.remove_rounded, size: 18, color: primaryColor),
+                                          child: Icon(Icons.remove_rounded, size: 16, color: primaryColor),
                                         ),
                                       ),
                                     ),
@@ -1516,7 +1523,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                             keyboardType: TextInputType.number,
                                             textAlign: TextAlign.center,
                                             style: const TextStyle(
-                                              fontSize: 16,
+                                              fontSize: 15,
                                               fontWeight: FontWeight.w900,
                                               color: Color(0xFF0F172A),
                                             ),
@@ -1561,13 +1568,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                           });
                                         },
                                         child: Container(
-                                          width: 34,
-                                          height: 34,
+                                          width: 32,
+                                          height: 32,
                                           decoration: BoxDecoration(
                                             color: primaryColor.withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
-                                          child: Icon(Icons.add_rounded, size: 18, color: primaryColor),
+                                          child: Icon(Icons.add_rounded, size: 16, color: primaryColor),
                                         ),
                                       ),
                                     ),
@@ -1577,25 +1584,36 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             ],
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
-                          flex: 4,
+                          flex: 5,
                           child: SizedBox(
                             height: 48,
-                            child: ElevatedButton.icon(
+                            child: ElevatedButton(
                               onPressed: () => _addToolToStaging(isReturn),
-                              icon: const Icon(Icons.add_rounded, size: 18),
-                              label: const Text(
-                                'Add To List',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
                                 foregroundColor: Colors.white,
                                 elevation: 2,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
                                 shadowColor: primaryColor.withValues(alpha: 0.35),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add_rounded, size: 18),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Add To List',
+                                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -1630,16 +1648,21 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Staged Tools Tray (${currentAddedTools.length})',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: darkAccent,
+                          Expanded(
+                            child: Text(
+                              'Staged Tools Tray (${currentAddedTools.length})',
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                color: darkAccent,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: primaryColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
@@ -1647,7 +1670,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                             child: Text(
                               'TOTAL: ${currentAddedTools.fold<int>(0, (accumulator, item) => accumulator + ((item['count'] as int?) ?? 0))} UNITS',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 10.5,
                                 fontWeight: FontWeight.w900,
                                 color: primaryColor,
                               ),
@@ -1692,6 +1715,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                           fontWeight: FontWeight.w800,
                                           color: darkAccent,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       Text(
                                         item['toolCode'] ?? '',
@@ -1701,12 +1726,15 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                           color: Color(0xFF64748B),
                                           fontFamily: 'monospace',
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
                                 ),
+                                const SizedBox(width: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: primaryColor.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(8),
@@ -1715,13 +1743,13 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                   child: Text(
                                     '${item['count']} Units',
                                     style: TextStyle(
-                                      fontSize: 12.5,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.w900,
                                       color: primaryColor,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 IconButton(
                                   icon: const Icon(Icons.remove_circle_outline_rounded,
                                       color: Colors.redAccent, size: 20),
@@ -1748,9 +1776,9 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
               Row(
                 children: [
                   Expanded(
-                    flex: 3,
+                    flex: 7,
                     child: SizedBox(
-                      height: 52,
+                      height: 50,
                       child: ElevatedButton(
                         onPressed: isSubmitting
                             ? null
@@ -1758,6 +1786,7 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
                           foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -1773,44 +1802,55 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isReturn ? Icons.keyboard_return_rounded : Icons.local_shipping_rounded,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    isReturn ? 'CONFIRM RETURN TO ORG' : 'DISPATCH TOOLS TO SITE',
-                                    style: const TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
+                            : FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isReturn ? Icons.keyboard_return_rounded : Icons.local_shipping_rounded,
+                                      size: 19,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      isReturn ? 'CONFIRM RETURN TO ORG' : 'DISPATCH TOOLS TO SITE',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    height: 52,
-                    child: OutlinedButton(
-                      onPressed: () => _resetForm(isReturn),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: primaryColor,
-                        side: BorderSide(color: primaryColor.withValues(alpha: 0.35), width: 1.2),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 3,
+                    child: SizedBox(
+                      height: 50,
+                      child: OutlinedButton(
+                        onPressed: () => _resetForm(isReturn),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primaryColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          side: BorderSide(color: primaryColor.withValues(alpha: 0.35), width: 1.2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                      ),
-                      child: const Text(
-                        'RESET',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'RESET',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1938,6 +1978,8 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
@@ -2034,23 +2076,26 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Text(
-                        'Filter:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF64748B),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Filter:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildLogTypeChip('All'),
-                      const SizedBox(width: 6),
-                      _buildLogTypeChip('Dispatched'),
-                      const SizedBox(width: 6),
-                      _buildLogTypeChip('Returned'),
-                    ],
+                        const SizedBox(width: 8),
+                        _buildLogTypeChip('All'),
+                        const SizedBox(width: 6),
+                        _buildLogTypeChip('Dispatched'),
+                        const SizedBox(width: 6),
+                        _buildLogTypeChip('Returned'),
+                      ],
+                    ),
                   ),
                 ],
               ),

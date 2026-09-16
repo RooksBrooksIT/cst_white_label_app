@@ -308,13 +308,13 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                             // Search TextField Container
                             Expanded(
                               child: Container(
-                                height: 48,
+                                height: 46,
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.white,
-                                    width: 1.2,
+                                    color: const Color(0xFFCBD5E1),
+                                    width: 1.0,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
@@ -327,29 +327,38 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                                 child: TextField(
                                   controller: _searchController,
                                   onChanged: (val) => setState(() => _searchQuery = val),
+                                  textAlignVertical: TextAlignVertical.center,
                                   style: const TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF0F172A),
                                   ),
                                   decoration: InputDecoration(
+                                    isDense: true,
                                     hintText: 'Search by name, ID, supervisor...',
                                     hintStyle: const TextStyle(
-                                      fontSize: 13,
+                                      fontSize: 12.5,
                                       color: Color(0xFF94A3B8),
                                       fontWeight: FontWeight.w500,
                                     ),
-                                    prefixIcon: Icon(
-                                      Icons.search_rounded,
-                                      color: primaryColor.withValues(alpha: 0.75),
-                                      size: 20,
+                                    prefixIconConstraints: const BoxConstraints(
+                                      minWidth: 38,
+                                      minHeight: 38,
+                                    ),
+                                    prefixIcon: Padding(
+                                      padding: const EdgeInsets.only(left: 12, right: 8),
+                                      child: Icon(
+                                        Icons.search_rounded,
+                                        color: primaryColor,
+                                        size: 18,
+                                      ),
                                     ),
                                     suffixIcon: _searchQuery.isNotEmpty
                                         ? IconButton(
                                             icon: const Icon(
                                               Icons.close_rounded,
                                               color: Color(0xFF94A3B8),
-                                              size: 18,
+                                              size: 16,
                                             ),
                                             onPressed: () {
                                               _searchController.clear();
@@ -360,7 +369,7 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                                     border: InputBorder.none,
                                     contentPadding: const EdgeInsets.symmetric(
                                       vertical: 12,
-                                      horizontal: 8,
+                                      horizontal: 14,
                                     ),
                                   ),
                                 ),

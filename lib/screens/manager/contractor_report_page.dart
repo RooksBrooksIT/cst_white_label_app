@@ -417,6 +417,37 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget _buildDropdown({
     required String label,
     required List<String> items,
@@ -429,20 +460,11 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF64748B),
-            letterSpacing: 0.6,
-          ),
-        ),
-        const SizedBox(height: 7),
+        _buildFieldLabel(label),
         DropdownButtonFormField<String>(
           initialValue: (value != null && items.contains(value)) ? value : null,
           dropdownColor: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           icon: loading
               ? const SizedBox(
                   width: 18,
@@ -455,33 +477,41 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
                 ),
           style: const TextStyle(
             color: Color(0xFF0F172A),
-            fontSize: 14.5,
-            fontWeight: FontWeight.w700,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
           decoration: InputDecoration(
+            isDense: true,
             hintText: 'Select $label',
             hintStyle: const TextStyle(
               color: Color(0xFF94A3B8),
-              fontSize: 14,
+              fontSize: 12.5,
               fontWeight: FontWeight.w500,
             ),
-            prefixIcon: Icon(icon, color: primaryColor, size: 20),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
+              child: Icon(icon, color: primaryColor, size: 18),
+            ),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
-              vertical: 12,
+              vertical: 12.5,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: primaryColor, width: 1.5),
             ),
           ),

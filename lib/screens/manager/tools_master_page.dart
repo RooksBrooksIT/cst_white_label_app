@@ -426,6 +426,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                         autofocus: true,
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        textAlignVertical: TextAlignVertical.center,
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
                             return 'Please enter quantity';
@@ -442,24 +443,59 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                           });
                         },
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF0A183D),
                         ),
                         decoration: InputDecoration(
+                          isDense: true,
                           labelText: 'Additional Quantity Received *',
+                          labelStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0A183D),
+                          ),
                           hintText: 'e.g. 10',
-                          prefixIcon: Icon(
-                            Icons.add_circle_outline_rounded,
-                            color: primaryColor,
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.only(left: 12, right: 8),
+                            child: Icon(
+                              Icons.add_circle_outline_rounded,
+                              color: primaryColor,
+                              size: 18,
+                            ),
+                          ),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 38,
+                            minHeight: 38,
                           ),
                           filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFCBD5E1),
-                            ),
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: primaryColor, width: 1.5),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                          ),
+                          errorStyle: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFEF4444),
                           ),
                         ),
                       ),
@@ -712,23 +748,40 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                     // Tool Name
                     _buildFieldLabel('Tool Name *', Icons.build_rounded),
                     const SizedBox(height: 8),
-                    _buildInputContainer(
-                      child: TextField(
-                        controller: _toolNameController,
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
+                    TextField(
+                      controller: _toolNameController,
+                      textAlignVertical: TextAlignVertical.center,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0A183D),
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'e.g. Concrete Mixer, Power Drill, Shovel',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
                         ),
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. Concrete Mixer, Power Drill, Shovel',
-                          hintStyle: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(left: 12, right: 8),
+                          child: Icon(Icons.build_rounded, color: primaryColor, size: 18),
+                        ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 38,
+                          minHeight: 38,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 1.5),
                         ),
                       ),
                     ),
@@ -849,13 +902,13 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: Text(
                           _toolCode,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w800,
                             fontFamily: 'monospace',
                             color: primaryColor,
@@ -868,25 +921,42 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                     // Initial Tool Count
                     _buildFieldLabel('Availability Count *', Icons.numbers_rounded),
                     const SizedBox(height: 8),
-                    _buildInputContainer(
-                      child: TextField(
-                        controller: _toolCountController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
+                    TextField(
+                      controller: _toolCountController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      textAlignVertical: TextAlignVertical.center,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0A183D),
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Enter initial quantity',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
                         ),
-                        decoration: const InputDecoration(
-                          hintText: 'Enter initial quantity',
-                          hintStyle: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(left: 12, right: 8),
+                          child: Icon(Icons.numbers_rounded, color: primaryColor, size: 18),
+                        ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 38,
+                          minHeight: 38,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 1.5),
                         ),
                       ),
                     ),
@@ -895,24 +965,40 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                     // Description
                     _buildFieldLabel('Description / Specifications (Optional)', Icons.notes_rounded),
                     const SizedBox(height: 8),
-                    _buildInputContainer(
-                      child: TextField(
-                        controller: _descriptionController,
-                        maxLines: 2,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
+                    TextField(
+                      controller: _descriptionController,
+                      maxLines: 2,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0A183D),
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'e.g. Model, brand, power rating, storage location',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
                         ),
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. Model, brand, power rating, storage location',
-                          hintStyle: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(left: 12, right: 8, top: 10, bottom: 10),
+                          child: Icon(Icons.notes_rounded, color: primaryColor, size: 18),
+                        ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 38,
+                          minHeight: 24,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 1.5),
                         ),
                       ),
                     ),
@@ -1027,20 +1113,46 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                           child: TextField(
                             controller: _searchController,
                             onChanged: (val) => setState(() => _searchQuery = val),
-                            decoration: const InputDecoration(
-                              hintText: 'Search tool by name, code...',
-                              hintStyle: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF94A3B8),
-                              ),
-                              prefixIcon: Icon(
-                                Icons.search_rounded,
-                                color: Color(0xFF64748B),
-                                size: 20,
-                              ),
-                              border: InputBorder.none,
+                            textAlignVertical: TextAlignVertical.center,
+                            style: const TextStyle(
+                              color: Color(0xFF0A183D),
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            decoration: InputDecoration(
                               isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              hintText: 'Search tool by name, code...',
+                              hintStyle: const TextStyle(
+                                fontSize: 12.5,
+                                color: Color(0xFF94A3B8),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              prefixIcon: const Padding(
+                                padding: EdgeInsets.only(left: 10, right: 6),
+                                child: Icon(
+                                  Icons.search_rounded,
+                                  color: Color(0xFF64748B),
+                                  size: 18,
+                                ),
+                              ),
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 36,
+                                minHeight: 36,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: primaryColor, width: 1.5),
+                              ),
                             ),
                           ),
                         ),
@@ -1343,30 +1455,36 @@ class _ToolMasterPageState extends State<ToolMasterPage>
   // ---------------------------------------------------------------------------
 
   Widget _buildFieldLabel(String label, IconData icon) {
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
     return Row(
       children: [
-        Icon(icon, size: 16, color: const Color(0xFF64748B)),
+        Icon(icon, size: 16, color: primaryColor),
         const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF334155),
+        RichText(
+          text: TextSpan(
+            text: cleanText,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0A183D),
+              letterSpacing: -0.1,
+            ),
+            children: isRequired
+                ? const [
+                    TextSpan(
+                      text: ' *',
+                      style: TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ]
+                : null,
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildInputContainer({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
-      ),
-      child: child,
     );
   }
 }

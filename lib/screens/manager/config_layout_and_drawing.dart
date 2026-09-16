@@ -1424,13 +1424,12 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
 
                     // Site Selector
                     _buildFieldLabel('Select Site ID *', Icons.location_on_rounded),
-                    const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                       ),
                       child: _isLoadingSites
                           ? const Padding(
@@ -1484,13 +1483,12 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                     if (_existingConfigDocs.isNotEmpty) ...[
                       const SizedBox(height: 14),
                       _buildFieldLabel('Load Previous Configuration', Icons.history_rounded),
-                      const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
@@ -1531,7 +1529,6 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildFieldLabel('Project Name', Icons.business_rounded),
-                              const SizedBox(height: 6),
                               _buildReadOnlyBox(_projectNameController.text, 'Auto-filled project'),
                             ],
                           ),
@@ -1542,7 +1539,6 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildFieldLabel('Supervisor', Icons.person_rounded),
-                              const SizedBox(height: 6),
                               _buildReadOnlyBox(_supervisorNameController.text, 'Auto-filled supervisor'),
                             ],
                           ),
@@ -1552,7 +1548,6 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                     const SizedBox(height: 14),
 
                     _buildFieldLabel('Current Project Stage / Phase', Icons.timeline_rounded),
-                    const SizedBox(height: 6),
                     _buildReadOnlyBox(_projectPhaseController.text, 'Auto-filled stage'),
                   ],
                 ),
@@ -1622,37 +1617,70 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                     ],
 
                     _buildFieldLabel('Document Name / Title *', Icons.title_rounded),
-                    const SizedBox(height: 6),
-                    _buildInputContainer(
-                      child: TextField(
-                        controller: _docNameController,
-                        enabled: !_isUploadLockedForCurrentSite,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                        decoration: InputDecoration(
-                          hintText: _isUploadLockedForCurrentSite
-                              ? 'Upload locked (Quota reached for site)'
-                              : 'e.g. Structural Ground Floor Layout Plan',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          border: InputBorder.none,
+                    TextField(
+                      controller: _docNameController,
+                      enabled: !_isUploadLockedForCurrentSite,
+                      textAlignVertical: TextAlignVertical.center,
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: _isUploadLockedForCurrentSite
+                            ? 'Upload locked (Quota reached for site)'
+                            : 'e.g. Structural Ground Floor Layout Plan',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500),
+                        filled: true,
+                        fillColor: _isUploadLockedForCurrentSite ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 1.5),
                         ),
                       ),
                     ),
                     const SizedBox(height: 14),
 
                     _buildFieldLabel('Purpose / Description *', Icons.description_rounded),
-                    const SizedBox(height: 6),
-                    _buildInputContainer(
-                      child: TextField(
-                        controller: _purposeController,
-                        enabled: !_isUploadLockedForCurrentSite,
-                        maxLines: 2,
-                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                        decoration: InputDecoration(
-                          hintText: _isUploadLockedForCurrentSite
-                              ? 'Upload locked for this site'
-                              : 'e.g. For foundation reinforcement execution',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          border: InputBorder.none,
+                    TextField(
+                      controller: _purposeController,
+                      enabled: !_isUploadLockedForCurrentSite,
+                      maxLines: 2,
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: _isUploadLockedForCurrentSite
+                            ? 'Upload locked for this site'
+                            : 'e.g. For foundation reinforcement execution',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500),
+                        filled: true,
+                        fillColor: _isUploadLockedForCurrentSite ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                        ),
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 1.5),
                         ),
                       ),
                     ),
@@ -2053,14 +2081,23 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
               child: TextField(
                 controller: _drawingSearchController,
                 onChanged: (val) => setState(() => _drawingSearchQuery = val),
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                 decoration: InputDecoration(
+                  isDense: true,
                   hintText: 'Search site, project, document name...',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                  prefixIcon: Icon(Icons.search_rounded, color: primaryColor, size: 22),
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 38,
+                    minHeight: 38,
+                  ),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(Icons.search_rounded, color: primaryColor, size: 18),
+                  ),
                   suffixIcon: _drawingSearchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          icon: const Icon(Icons.clear_rounded, size: 16),
                           onPressed: () {
                             _drawingSearchController.clear();
                             setState(() => _drawingSearchQuery = '');
@@ -2069,14 +2106,14 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
                       : null,
                   filled: true,
                   fillColor: const Color(0xFFF8FAFC),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -2844,31 +2881,39 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
   // ---------------------------------------------------------------------------
 
   Widget _buildFieldLabel(String label, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 15, color: const Color(0xFF64748B)),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF334155),
+    final isRequired = label.contains('*');
+    final cleanText = label.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: const Color(0xFF64748B)),
+          const SizedBox(width: 6),
+          RichText(
+            text: TextSpan(
+              text: cleanText,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A183D),
+                letterSpacing: -0.1,
+              ),
+              children: isRequired
+                  ? const [
+                      TextSpan(
+                        text: ' *',
+                        style: TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ]
+                  : null,
+            ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInputContainer({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        ],
       ),
-      child: child,
     );
   }
 
@@ -2878,8 +2923,8 @@ class _LayoutAndDrawingsPageState extends State<LayoutAndDrawingsPage>
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
       ),
       child: Text(
         text.isNotEmpty ? text : placeholder,

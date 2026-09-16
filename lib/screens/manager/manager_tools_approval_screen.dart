@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/auth_service.dart';
@@ -111,6 +111,8 @@ class _ManagerToolsApprovalScreenState extends State<ManagerToolsApprovalScreen>
                     controller: _tabController,
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
                     tabs: const [
                       Tab(text: "1. MGR REVIEW"),
                       Tab(text: "2. ORG APPROVAL"),
@@ -139,22 +141,31 @@ class _ManagerToolsApprovalScreenState extends State<ManagerToolsApprovalScreen>
                     controller: _searchController,
                     onChanged: (v) =>
                         setState(() => _searchQuery = v.trim().toLowerCase()),
+                    textAlignVertical: TextAlignVertical.center,
                     style: const TextStyle(
                       color: Color(0xFF0F172A),
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
                     decoration: InputDecoration(
-                      hintText:
-                          'Search Tools Requests by ID, Site, Tool name, Supervisor...',
-                      hintStyle: TextStyle(
-                        color: Colors.grey.shade400,
+                      isDense: true,
+                      hintText: 'Search by Tool, Site, Supervisor, ID...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8),
                         fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
                       ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: Color(0xFFD97706),
-                        size: 18,
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 38,
+                        minHeight: 38,
+                      ),
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.only(left: 12, right: 8),
+                        child: Icon(
+                          Icons.search_rounded,
+                          color: Color(0xFFD97706),
+                          size: 18,
+                        ),
                       ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
@@ -169,21 +180,21 @@ class _ManagerToolsApprovalScreenState extends State<ManagerToolsApprovalScreen>
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                          horizontal: 14, vertical: 11),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide:
-                            const BorderSide(color: Color(0xFFE2E8F0)),
+                            const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide:
-                            const BorderSide(color: Color(0xFFE2E8F0)),
+                            const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
-                            color: Color(0xFFD97706), width: 1.6),
+                            color: Color(0xFFD97706), width: 1.5),
                       ),
                     ),
                   ),
@@ -338,43 +349,49 @@ class _ManagerToolsApprovalScreenState extends State<ManagerToolsApprovalScreen>
             children: [
               // Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFD97706).withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.construction_rounded,
-                            color: Color(0xFFD97706), size: 16),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Tool Req $reqId',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: _getStageColor(stage).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
                     ),
+                    child: const Icon(Icons.construction_rounded,
+                        color: Color(0xFFD97706), size: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      ApprovalWorkflowService.getStatusDisplayText(status),
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: _getStageColor(stage),
+                      'Tool Req $reqId',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 0,
+                    child: Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: _getStageColor(stage).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        ApprovalWorkflowService.getStatusDisplayText(status),
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: _getStageColor(stage),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
@@ -1161,9 +1178,34 @@ class _ManagerToolsApprovalScreenState extends State<ManagerToolsApprovalScreen>
             const SizedBox(height: 12),
             TextField(
               controller: remarksController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Tools available in warehouse; ready for allocation.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
@@ -1216,9 +1258,34 @@ class _ManagerToolsApprovalScreenState extends State<ManagerToolsApprovalScreen>
             const SizedBox(height: 12),
             TextField(
               controller: remarksController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Equipment allocation authorized by HQ.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
@@ -1278,9 +1345,34 @@ class _ManagerToolsApprovalScreenState extends State<ManagerToolsApprovalScreen>
             const SizedBox(height: 12),
             TextField(
               controller: remarksController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Tools loaded onto transport vehicle.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
@@ -1340,9 +1432,34 @@ class _ManagerToolsApprovalScreenState extends State<ManagerToolsApprovalScreen>
             const SizedBox(height: 12),
             TextField(
               controller: reasonController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
+                isDense: true,
                 hintText: 'e.g. Equipment currently under maintenance or in use at another site.',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+                ),
               ),
               maxLines: 2,
             ),
