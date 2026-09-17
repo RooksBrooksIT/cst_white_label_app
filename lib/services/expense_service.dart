@@ -99,93 +99,108 @@ class ExpenseService {
     }
   }
 
-  /// Formats canonical site document ID in the format: SiteCode_SiteName (e.g. ST001_AbineshHouse)
+  /// Formats canonical site document ID in the format: SiteCode_SiteName (e.g. ST001_Testing)
   static String formatCanonicalSiteDocId(String siteCode, String siteName) {
     var cleanCode = siteCode.trim();
+    var cleanName = siteName.trim();
+
+    // 1. Normalize project prefixes if any (PR -> ST)
     if (cleanCode.toUpperCase().startsWith('PR')) {
       cleanCode = 'ST${cleanCode.substring(2)}';
     }
-    final cleanName = siteName.trim().replaceAll(' ', '');
-    if (cleanCode.isNotEmpty && cleanName.isNotEmpty) {
-      if (cleanCode.contains('_') &&
-          cleanCode.toLowerCase().contains(cleanName.toLowerCase())) {
-        return cleanCode.replaceAll(' ', '');
+
+    // 2. Extract site code and name components if cleanCode has underscores
+    if (cleanCode.contains('_')) {
+      final parts = cleanCode.split('_').where((p) => p.trim().isNotEmpty).toList();
+      String? extractedCode;
+      final nameParts = <String>[];
+      for (final p in parts) {
+        final pNorm = p.toUpperCase().startsWith('PR') ? 'ST${p.substring(2)}' : p;
+        if (extractedCode == null && (pNorm.toUpperCase().startsWith('ST') || RegExp(r'^[A-Z]{2}\d+').hasMatch(pNorm))) {
+          extractedCode = pNorm;
+        } else if (pNorm != extractedCode) {
+          nameParts.add(p);
+        }
       }
-      return '${cleanCode}_$cleanName';
-    } else if (cleanCode.isNotEmpty && cleanCode.contains('_')) {
-      return cleanCode.replaceAll(' ', '');
-    } else if (cleanName.isNotEmpty && cleanName.contains('_')) {
-      return cleanName.replaceAll(' ', '');
+      if (extractedCode != null) {
+        cleanCode = extractedCode;
+      }
+      if (cleanName.isEmpty && nameParts.isNotEmpty) {
+        cleanName = nameParts.join('_');
+      }
     }
-    return cleanCode.isNotEmpty ? cleanCode : cleanName;
+
+    // 3. Extract site code and name components if cleanName has underscores
+    if (cleanName.contains('_')) {
+      final parts = cleanName.split('_').where((p) => p.trim().isNotEmpty).toList();
+      String? extractedCode;
+      final nameParts = <String>[];
+      for (final p in parts) {
+        final pNorm = p.toUpperCase().startsWith('PR') ? 'ST${p.substring(2)}' : p;
+        if (extractedCode == null && (pNorm.toUpperCase().startsWith('ST') || RegExp(r'^[A-Z]{2}\d+').hasMatch(pNorm))) {
+          extractedCode = pNorm;
+        } else if (pNorm != extractedCode && (cleanCode.isEmpty || pNorm.toLowerCase() != cleanCode.toLowerCase())) {
+          nameParts.add(p);
+        }
+      }
+      if (cleanCode.isEmpty && extractedCode != null) {
+        cleanCode = extractedCode;
+      }
+      if (nameParts.isNotEmpty) {
+        cleanName = nameParts.join('_');
+      } else if (extractedCode != null && cleanCode == extractedCode) {
+        cleanName = '';
+      }
+    }
+
+    // 4. Repeatedly strip cleanCode / ST... prefixes from cleanName
+    cleanCode = cleanCode.replaceAll(' ', '');
+    cleanName = cleanName.replaceAll(' ', '');
+
+    final codeLower = cleanCode.toLowerCase();
+    while (cleanName.isNotEmpty && cleanCode.isNotEmpty) {
+      final nameLower = cleanName.toLowerCase();
+      if (nameLower.startsWith('${codeLower}_')) {
+        cleanName = cleanName.substring(cleanCode.length + 1).trim();
+      } else if (nameLower == codeLower) {
+        cleanName = '';
+        break;
+      } else if (nameLower.startsWith(codeLower) && cleanName.length > cleanCode.length) {
+        cleanName = cleanName.substring(cleanCode.length).trim();
+        if (cleanName.startsWith('_')) cleanName = cleanName.substring(1).trim();
+      } else {
+        break;
+      }
+    }
+
+    if (cleanCode.isNotEmpty && cleanName.isNotEmpty && cleanCode.toLowerCase() != cleanName.toLowerCase()) {
+      return '${cleanCode}_$cleanName';
+    } else if (cleanCode.isNotEmpty) {
+      return cleanCode;
+    } else {
+      return cleanName;
+    }
   }
 
   /// Formats any combination of raw site ID, site code, and site name into the standardized
-  /// SiteCode_SiteName format (e.g. ST001_AbineshHouse).
+  /// SiteCode_SiteName format (e.g. ST001_Testing).
   static String formatCanonicalSiteId({
     required String rawId,
     String? siteCode,
     String? siteName,
   }) {
     final cleanRaw = rawId.trim();
-    var cleanCode = (siteCode ?? '').trim();
-    if (cleanCode.toUpperCase().startsWith('PR')) {
-      cleanCode = 'ST${cleanCode.substring(2)}';
-    }
+    final cleanCode = (siteCode ?? '').trim();
     final cleanName = (siteName ?? '').trim();
 
-    // 1. If cleanRaw already contains an underscore:
-    if (cleanRaw.contains('_')) {
-      final parts = cleanRaw.split('_');
-      // Format: PR001_ST001_ProjectName or similar multi-prefix patterns
-      if (parts.length >= 3) {
-        final stIdx = parts.indexWhere((p) => p.toUpperCase().startsWith('ST'));
-        if (stIdx != -1 && stIdx < parts.length - 1) {
-          final stCode = parts[stIdx].trim();
-          final namePart = parts.sublist(stIdx + 1).join('_').trim().replaceAll(' ', '');
-          if (stCode.isNotEmpty && namePart.isNotEmpty) {
-            final formattedName = namePart[0].toUpperCase() + namePart.substring(1);
-            return '${stCode}_$formattedName';
-          }
-        }
-      }
-
-      var code = parts.first.trim();
-      final namePart = parts.skip(1).join('_').trim().replaceAll(' ', '');
-      if (code.toUpperCase().startsWith('PR')) {
-        code = 'ST${code.substring(2)}';
-      }
-      if (code.isNotEmpty && namePart.isNotEmpty) {
-        final formattedName = namePart[0].toUpperCase() + namePart.substring(1);
-        return '${code}_$formattedName';
-      }
-      return cleanRaw.replaceAll(' ', '');
+    if (cleanCode.isNotEmpty || cleanName.isNotEmpty) {
+      return formatCanonicalSiteDocId(
+        cleanCode.isNotEmpty ? cleanCode : cleanRaw,
+        cleanName.isNotEmpty ? cleanName : cleanRaw,
+      );
     }
 
-    // 2. If separate code and name are supplied:
-    if (cleanCode.isNotEmpty && cleanName.isNotEmpty) {
-      return formatCanonicalSiteDocId(cleanCode, cleanName);
-    }
-
-    // 3. If rawId is a code and cleanName is name:
-    if (cleanRaw.isNotEmpty &&
-        cleanName.isNotEmpty &&
-        cleanRaw.toLowerCase() != cleanName.toLowerCase()) {
-      return formatCanonicalSiteDocId(cleanRaw, cleanName);
-    }
-
-    // 4. If cleanCode is code and cleanRaw is name:
-    if (cleanCode.isNotEmpty &&
-        cleanRaw.isNotEmpty &&
-        cleanCode.toLowerCase() != cleanRaw.toLowerCase()) {
-      return formatCanonicalSiteDocId(cleanCode, cleanRaw);
-    }
-
-    if (cleanRaw.toUpperCase().startsWith('PR')) {
-      return 'ST${cleanRaw.substring(2)}'.replaceAll(' ', '');
-    }
-
-    return cleanRaw.replaceAll(' ', '');
+    return formatCanonicalSiteDocId(cleanRaw, '');
   }
 
   /// Sanitizes a collection of site IDs by:
@@ -234,7 +249,7 @@ class ExpenseService {
   }
 
   /// Scans totalSiteExpensesPerDay and removes any legacy duplicate document
-  /// that uses site name alone or non-canonical doc ID, merging totals into the canonical document.
+  /// that uses site name alone, duplicated prefixes, or non-canonical doc ID, merging totals into the canonical document.
   static Future<void> cleanupDuplicateSiteExpenseDocs() async {
     try {
       final totalsCol =
@@ -242,21 +257,18 @@ class ExpenseService {
       final snap = await totalsCol.get();
       for (final doc in snap.docs) {
         final docId = doc.id;
-        // If document ID does not contain '_' or uses site name alone
-        if (!docId.contains('_')) {
-          final canonicalDocId = await resolveCanonicalSiteDocId(docId);
-          if (canonicalDocId != docId && canonicalDocId.contains('_')) {
-            print(
-              "🔄 Migrating legacy duplicate totalSiteExpensesPerDay/$docId -> $canonicalDocId",
-            );
-            final data = doc.data();
-            await totalsCol
-                .doc(canonicalDocId)
-                .set(data, SetOptions(merge: true));
-            await doc.reference.delete();
-            await recalcTotalsAndSyncProject(canonicalDocId);
-            print("✅ Purged legacy duplicate document: $docId");
-          }
+        final canonicalDocId = await resolveCanonicalSiteDocId(docId);
+        if (canonicalDocId.isNotEmpty && canonicalDocId != docId) {
+          print(
+            "🔄 Migrating legacy duplicate totalSiteExpensesPerDay/$docId -> $canonicalDocId",
+          );
+          final data = doc.data();
+          await totalsCol
+              .doc(canonicalDocId)
+              .set(data, SetOptions(merge: true));
+          await doc.reference.delete();
+          await recalcTotalsAndSyncProject(canonicalDocId);
+          print("✅ Purged legacy duplicate document: $docId");
         }
       }
     } catch (e) {
@@ -365,14 +377,20 @@ class ExpenseService {
         SetOptions(merge: true),
       );
 
-      // Clean up any legacy duplicate documents in totalSiteExpensesPerDay (e.g. 'Abinesh House')
+      // Clean up any legacy duplicate documents in totalSiteExpensesPerDay (e.g. 'Abinesh House', 'ST001_ST001_Testing', 'PR001_Testing', 'ST001')
       final candidateLegacyIds = <String>{
         if (details.siteName.isNotEmpty && details.siteName != canonicalDocId)
           details.siteName,
         if (siteId != canonicalDocId) siteId,
         if (details.siteCode.isNotEmpty && details.siteCode != canonicalDocId)
           details.siteCode,
+        '${details.siteCode}_$canonicalDocId',
+        '${details.siteCode}_${details.siteCode}_${details.siteName}',
+        if (canonicalDocId.startsWith('ST')) 'PR${canonicalDocId.substring(2)}',
+        if (details.siteCode.startsWith('ST')) 'PR${details.siteCode.substring(2)}_${details.siteName}',
       };
+      candidateLegacyIds.remove(canonicalDocId);
+      candidateLegacyIds.removeWhere((id) => id.trim().isEmpty);
 
       for (final legId in candidateLegacyIds) {
         try {
@@ -766,19 +784,15 @@ class ExpenseService {
       print("❌ Error in _resolveSiteDetails for $trimmed: $e");
     }
 
-    // Determine final canonical doc ID: SiteCode_SiteName (e.g. ST001_AbineshHouse)
-    String canonicalDocId;
-    if (resolvedDocId.isNotEmpty && resolvedDocId.contains('_')) {
-      canonicalDocId = resolvedDocId.replaceAll(' ', '');
-    } else if (resolvedCode.isNotEmpty && resolvedName.isNotEmpty) {
-      canonicalDocId = formatCanonicalSiteDocId(resolvedCode, resolvedName);
-    } else if (trimmed.contains('_')) {
-      canonicalDocId = trimmed.replaceAll(' ', '');
-    } else if (resolvedCode.isNotEmpty) {
-      canonicalDocId = '${resolvedCode}_${trimmed.replaceAll(' ', '')}';
-    } else {
-      canonicalDocId = trimmed.replaceAll(' ', '');
-    }
+    // Determine final canonical doc ID: SiteCode_SiteName (e.g. ST001_Testing)
+    String canonicalDocId = formatCanonicalSiteDocId(
+      resolvedCode.isNotEmpty
+          ? resolvedCode
+          : (resolvedDocId.isNotEmpty ? resolvedDocId : trimmed),
+      resolvedName.isNotEmpty
+          ? resolvedName
+          : (resolvedDocId.isNotEmpty ? resolvedDocId : trimmed),
+    );
 
     if (canonicalDocId.toUpperCase().startsWith('PR')) {
       canonicalDocId = 'ST${canonicalDocId.substring(2)}';
@@ -1249,20 +1263,39 @@ class ExpenseService {
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
       final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+      // 1. Transactions
       for (final key in siteKeys) {
         queryFutures.add(FirestoreService.pettyCashTransactions.where('siteId', isEqualTo: key).get());
         queryFutures.add(FirestoreService.pettyCashTransactions.where('siteName', isEqualTo: key).get());
       }
+      final txnCount = queryFutures.length;
+
+      // 2. Direct Petty Cash Expenses
+      for (final key in siteKeys) {
+        queryFutures.add(FirestoreService.pettyCashExpenses.where('siteId', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.pettyCashExpenses.where('siteName', isEqualTo: key).get());
+      }
+      final expCount = queryFutures.length - txnCount;
+
+      // Full snapshots for prefix matching
       queryFutures.add(FirestoreService.pettyCashTransactions.get());
+      queryFutures.add(FirestoreService.pettyCashExpenses.get());
 
       final results = await Future.wait(queryFutures);
-      for (int i = 0; i < results.length - 1; i++) {
-        for (final doc in results[i].docs) {
+      int idx = 0;
+      for (int i = 0; i < txnCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
           matchedDocs[doc.id] = doc.data();
         }
       }
 
-      final allTxnsSnap = results.last;
+      for (int i = 0; i < expCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
+          matchedDocs.putIfAbsent('exp_${doc.id}', () => doc.data());
+        }
+      }
+
+      final allTxnsSnap = results[idx++];
       for (final doc in allTxnsSnap.docs) {
         final data = doc.data();
         final sId = (data['siteId'] ?? '').toString().trim();
@@ -1278,11 +1311,56 @@ class ExpenseService {
         }
       }
 
-      for (final data in matchedDocs.values) {
-        final txnType = (data['transactionType'] ?? 'EXPENSE').toString().toUpperCase();
-        if (txnType == 'EXPENSE') {
-          final amount = _parseExpenseAmount(data['amount'], data);
-          total += amount;
+      final allExpSnap = results[idx++];
+      for (final doc in allExpSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim();
+        final sName = (data['siteName'] ?? '').toString().trim();
+        for (final key in siteKeys) {
+          if (sId == key ||
+              sName == key ||
+              (sId.isNotEmpty && sId.toLowerCase() == key.toLowerCase()) ||
+              (sName.isNotEmpty && sName.toLowerCase() == key.toLowerCase()) ||
+              doc.id.startsWith('${key}_')) {
+            matchedDocs.putIfAbsent('exp_${doc.id}', () => data);
+          }
+        }
+      }
+
+      final Set<String> processedExpenseIds = {};
+
+      for (final entry in matchedDocs.entries) {
+        final data = entry.value;
+        final docKey = entry.key;
+
+        // Check if this is a direct expense or transaction
+        if (docKey.startsWith('exp_')) {
+          final isApproved = data['status'] == 'EXPENSE_APPROVED' ||
+              data['status'] == 'approved' ||
+              data['status'] == 'APPROVED' ||
+              data['isApproved'] == true ||
+              data['postedToLedger'] == true;
+          if (isApproved) {
+            final expId = (data['expenseId'] ?? docKey.substring(4)).toString();
+            if (!processedExpenseIds.contains(expId)) {
+              processedExpenseIds.add(expId);
+              final amount = _parseExpenseAmount(data['amount'], data);
+              total += amount;
+            }
+          }
+        } else {
+          final txnType = (data['transactionType'] ?? 'EXPENSE').toString().toUpperCase();
+          if (txnType == 'EXPENSE' || txnType == 'EXPENSE_APPROVED' || txnType.contains('EXPENSE')) {
+            final refId = (data['referenceId'] ?? data['expenseId'] ?? '').toString();
+            if (refId.isNotEmpty && processedExpenseIds.contains(refId)) {
+              continue; // Already counted via direct expense
+            }
+            if (refId.isNotEmpty) {
+              processedExpenseIds.add(refId);
+            }
+            final amount = _parseExpenseAmount(data['amount'], data);
+            total += amount;
+          }
         }
       }
     } catch (e) {
@@ -1328,17 +1406,47 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
-        final isReceived = data['isReceived'] == true ||
+        final rawStatus = (data['status'] ?? '').toString().toLowerCase().trim();
+        final isReceivedOrAllocated = data['isReceived'] == true ||
             data['receivedAt'] != null ||
-            data['status'] == 'received';
-        if (isReceived) {
+            rawStatus == 'received' ||
+            rawStatus == 'awaiting_receipt_confirmation' ||
+            rawStatus == 'approved' ||
+            rawStatus == 'disbursed' ||
+            rawStatus == 'allocated' ||
+            rawStatus == 'active';
+        if (isReceivedOrAllocated) {
           final double approvedAmt = (data['approvedAmount'] is num && (data['approvedAmount'] as num) > 0)
               ? (data['approvedAmount'] as num).toDouble()
               : ((data['allocatedAmount'] is num && (data['allocatedAmount'] as num) > 0)
                   ? (data['allocatedAmount'] as num).toDouble()
-                  : ((data['requestedAmount'] is num) ? (data['requestedAmount'] as num).toDouble() : 0.0));
+                  : ((data['disbursedAmount'] is num && (data['disbursedAmount'] as num) > 0)
+                      ? (data['disbursedAmount'] as num).toDouble()
+                      : ((data['requestedAmount'] is num) ? (data['requestedAmount'] as num).toDouble() : 0.0)));
           total += approvedAmt;
         }
+      }
+
+      // Check site-based pettyCashAccounts for totalReceived / totalAllocated
+      final orgId = FirestoreService.currentOrgId;
+      for (final key in siteKeys) {
+        try {
+          final accDocId = orgId.isNotEmpty ? '${orgId}_$key' : key;
+          final accSnap = await FirestoreService.pettyCashAccounts.doc(accDocId).get();
+          if (accSnap.exists && accSnap.data() != null) {
+            final aData = accSnap.data()!;
+            final accAlloc = (aData['totalAllocated'] is num)
+                ? (aData['totalAllocated'] as num).toDouble()
+                : 0.0;
+            final accRecv = (aData['totalReceived'] is num)
+                ? (aData['totalReceived'] as num).toDouble()
+                : accAlloc;
+            final maxAcc = accRecv > accAlloc ? accRecv : accAlloc;
+            if (maxAcc > total) {
+              total = maxAcc;
+            }
+          }
+        } catch (_) {}
       }
     } catch (e) {
       print("❌ Error summing petty cash received for siteId=$siteId: $e");

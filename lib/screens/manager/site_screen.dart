@@ -1930,7 +1930,7 @@ class _SiteScreenState extends State<SiteScreen>
   }) async {
     // 1. Generate Site ID and deterministic Doc ID
     final nextSiteId = await _getNextSiteId(siteName);
-    final createdSiteDocId = '${nextSiteId}_${siteName.replaceAll(' ', '')}';
+    final createdSiteDocId = ExpenseService.formatCanonicalSiteDocId(nextSiteId, siteName);
 
     final double budget =
         double.tryParse(_projectBudgetController.text.replaceAll(',', '')) ?? 0.0;

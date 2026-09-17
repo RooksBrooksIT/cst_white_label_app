@@ -64,6 +64,9 @@ class ApprovalWorkflowService {
       return ApprovalStage.pendingManagerReview;
     }
     if (s == statusPendingOrgApproval ||
+        s == 'pending_organization_approval' ||
+        s == 'pending_org_approval' ||
+        s == 'pending_org' ||
         s == 'forwarded_to_org' ||
         s == 'pending org approval' ||
         s == 'manager_verified') {

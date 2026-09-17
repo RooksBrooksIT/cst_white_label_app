@@ -184,9 +184,14 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
               companyTotalRemaining += a.availableBalance;
             }
 
-            final pendingHqApprovals = requests
-                .where((r) => r.status == ApprovalWorkflowService.statusPendingOrgApproval)
-                .length;
+            final pendingHqApprovals = requests.where((r) =>
+                r.status == PettyCashStatus.pendingOrgApproval ||
+                r.status == ApprovalWorkflowService.statusPendingOrgApproval ||
+                r.status == 'PENDING_ORGANIZATION_APPROVAL' ||
+                r.status == 'pending_org_approval' ||
+                r.status == 'forwarded_to_org' ||
+                ApprovalWorkflowService.parseStatus(r.status) == ApprovalStage.pendingOrgApproval
+            ).length;
 
             return Container(
               color: Colors.white,
@@ -328,9 +333,14 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
         }
 
         final requests = snapshot.data ?? [];
-        final pendingHq = requests
-            .where((r) => r.status == ApprovalWorkflowService.statusPendingOrgApproval)
-            .toList();
+        final pendingHq = requests.where((r) =>
+            r.status == PettyCashStatus.pendingOrgApproval ||
+            r.status == ApprovalWorkflowService.statusPendingOrgApproval ||
+            r.status == 'PENDING_ORGANIZATION_APPROVAL' ||
+            r.status == 'pending_org_approval' ||
+            r.status == 'forwarded_to_org' ||
+            ApprovalWorkflowService.parseStatus(r.status) == ApprovalStage.pendingOrgApproval
+        ).toList();
 
         if (pendingHq.isEmpty) {
           return _buildEmptyState(

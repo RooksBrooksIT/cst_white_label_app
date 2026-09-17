@@ -362,6 +362,16 @@ class FirestoreService {
   static CollectionReference<Map<String, dynamic>>
   get pettyCashTransactions => getCollection('pettyCashTransactions');
   static CollectionReference<Map<String, dynamic>>
+  get pettyCashExpenses => getCollection('pettyCashExpenses');
+  static CollectionReference<Map<String, dynamic>>
+  get pettyCashReconciliations => getCollection('pettyCashReconciliations');
+  static CollectionReference<Map<String, dynamic>>
+  get pettyCashReturns => getCollection('pettyCashReturns');
+  static CollectionReference<Map<String, dynamic>>
+  get pettyCashIdempotency => getCollection('pettyCashIdempotency');
+  static CollectionReference<Map<String, dynamic>>
+  get sitePaymentClaims => getCollection('sitePaymentClaims');
+  static CollectionReference<Map<String, dynamic>>
   get pettyCashAuditLogs => getCollection('pettyCashAuditLogs');
 
   // Universal Tools & Equipment Collections
