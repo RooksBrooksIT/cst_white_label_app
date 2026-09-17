@@ -599,6 +599,9 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       (e) => (e['workerType'] ?? '').toString().toLowerCase() == type.toLowerCase(),
     );
 
+    final addedCount = _currentExtraCount;
+    final addedType = type;
+
     setState(() {
       if (existingIndex >= 0) {
         final current = (_extraWorkers[existingIndex]['count'] as num?)?.toInt() ?? 0;
@@ -615,12 +618,12 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       _currentExtraCount = 1;
       _customTypeController.clear();
       _isCustomType = false;
-      _selectedExtraWorkerType = 'Mason';
+      _selectedExtraWorkerType = _workerCategories.isNotEmpty ? _workerCategories.first : 'Mason';
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added $_currentExtraCount extra $type worker(s)'),
+        content: Text('Added $addedCount $addedType worker(s)'),
         backgroundColor: const Color(0xFF10B981),
         duration: const Duration(seconds: 2),
       ),
@@ -887,7 +890,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'Daily Attendance Management',
+          'Daily Attendance',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -921,19 +924,6 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: _isLoadingSites
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-            tooltip: 'Reload Sites',
-            onPressed: _isLoadingSites ? null : _fetchAssignedSitesAndLoad,
-          ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -1026,15 +1016,23 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   }
 
   Widget _buildTotalWorkforceSummaryRibbon(Color primaryColor) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(14),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : primaryColor.withValues(alpha: 0.22),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.2)
+                : const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
@@ -1042,52 +1040,72 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: primaryColor.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(8),
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? primaryColor.withValues(alpha: 0.25)
+                        : primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.groups_rounded,
+                    color: isDark ? Colors.white : primaryColor,
+                    size: 20,
+                  ),
                 ),
-                child: const Icon(Icons.groups_rounded, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'TOTAL WORKFORCE TODAY',
-                    style: TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'TOTAL WORKFORCE TODAY',
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFF94A3B8) : primaryColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$_totalWorkforcePresentCount Present on Site',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  Text(
-                    '$_totalWorkforcePresentCount Present on Site',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : primaryColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : primaryColor.withValues(alpha: 0.2),
+              ),
             ),
             child: Text(
-              '$_totalMappedPresentCount Mapped + $_totalExtraCount Extra',
-              style: const TextStyle(
-                color: Color(0xFF38BDF8),
-                fontSize: 11.5,
+              '$_totalMappedPresentCount Mapped + $_totalExtraCount Additional',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF38BDF8) : primaryColor,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1438,14 +1456,14 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                     child: const Icon(Icons.person_add_rounded, color: Color(0xFFD97706), size: 18),
                   ),
                   const SizedBox(width: 10),
-                  Column(
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Extra / Unregistered Workers',
+                      Text(
+                        'Additional Workers',
                         style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       ),
-                      const Text(
+                      Text(
                         'Count-based daily attendance by worker trade',
                         style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                       ),
@@ -1462,7 +1480,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                     border: Border.all(color: const Color(0xFFFDE68A)),
                   ),
                   child: Text(
-                    '$_totalExtraCount Extra',
+                    '$_totalExtraCount Additional',
                     style: const TextStyle(
                       color: Color(0xFFB45309),
                       fontWeight: FontWeight.bold,
@@ -1474,181 +1492,298 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
           ),
           const SizedBox(height: 14),
 
-          // Input Form: Category & Count Stepper
+          // Input Form Container
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // Worker Category Selector
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            child: _isCustomType
+                // Vertical Layout for "Other / Custom" Worker Entry
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. Full-width Worker Name / Trade Text Field
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Worker Type / Trade',
-                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                            'Worker Name / Trade *',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569),
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          if (!_isCustomType)
-                            DropdownButtonFormField<String>(
-                              key: ValueKey('extra_cat_${_selectedExtraWorkerType}_${_workerCategories.length}_$_isLoadingLabours'),
-                              initialValue: _workerCategories.contains(_selectedExtraWorkerType)
-                                  ? _selectedExtraWorkerType
-                                  : (_workerCategories.isNotEmpty ? _workerCategories.first : null),
-                              dropdownColor: Colors.white,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Colors.white,
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                suffixIcon: _isLoadingLabours
-                                    ? Container(
-                                        padding: const EdgeInsets.all(12),
-                                        width: 14,
-                                        height: 14,
-                                        child: const CircularProgressIndicator(strokeWidth: 2),
-                                      )
-                                    : null,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                                ),
-                              ),
-                              style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
-                              items: _workerCategories.map((cat) {
-                                return DropdownMenuItem(
-                                  value: cat,
-                                  child: Text(cat, overflow: TextOverflow.ellipsis),
-                                );
-                              }).toList(),
-                              onChanged: (v) {
-                                if (v == 'Other / Custom') {
-                                  setState(() {
-                                    _isCustomType = true;
-                                  });
-                                } else if (v != null) {
-                                  setState(() {
-                                    _selectedExtraWorkerType = v;
-                                  });
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _isCustomType = false;
+                                _customTypeController.clear();
+                                _selectedExtraWorkerType = _workerCategories.isNotEmpty
+                                    ? _workerCategories.first
+                                    : 'Mason';
+                              });
+                            },
+                            icon: const Icon(Icons.list_rounded, size: 15),
+                            label: const Text(
+                              'Standard Trades',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                            ),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                              foregroundColor: const Color(0xFFD97706),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _customTypeController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Enter worker name or trade (e.g. Scaffolder)',
+                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                          filled: true,
+                          fillColor: Colors.white,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          prefixIcon: const Icon(Icons.badge_outlined, size: 18, color: Color(0xFFD97706)),
+                          suffixIcon: _customTypeController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, size: 16),
+                                  onPressed: () => setState(() => _customTypeController.clear()),
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 2. Worker Count Field (Below Name/Trade)
+                      const Text(
+                        'Worker Count',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove_rounded, size: 18, color: Color(0xFF64748B)),
+                              onPressed: () {
+                                if (_currentExtraCount > 1) {
+                                  setState(() => _currentExtraCount--);
                                 }
                               },
-                            )
-                          else
-                            Row(
+                            ),
+                            Text(
+                              '$_currentExtraCount',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add_rounded, size: 18, color: Color(0xFF64748B)),
+                              onPressed: () {
+                                setState(() => _currentExtraCount++);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 3. Add Worker Button (Below Name & Count)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: ElevatedButton.icon(
+                          onPressed: _addExtraWorkers,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD97706),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.person_add_rounded, size: 18, color: Colors.white),
+                          label: const Text(
+                            'Add Worker',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                // Standard Selection Layout
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Worker Type / Trade',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        key: ValueKey('extra_cat_${_selectedExtraWorkerType}_${_workerCategories.length}_$_isLoadingLabours'),
+                        initialValue: _workerCategories.contains(_selectedExtraWorkerType)
+                            ? _selectedExtraWorkerType
+                            : (_workerCategories.isNotEmpty ? _workerCategories.first : null),
+                        dropdownColor: Colors.white,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                          prefixIcon: const Icon(Icons.handyman_outlined, size: 18, color: Color(0xFFD97706)),
+                          suffixIcon: _isLoadingLabours
+                              ? Container(
+                                  padding: const EdgeInsets.all(12),
+                                  width: 14,
+                                  height: 14,
+                                  child: const CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                        items: _workerCategories.map((cat) {
+                          return DropdownMenuItem(
+                            value: cat,
+                            child: Text(cat, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v == 'Other / Custom') {
+                            setState(() {
+                              _isCustomType = true;
+                              _customTypeController.clear();
+                            });
+                          } else if (v != null) {
+                            setState(() {
+                              _selectedExtraWorkerType = v;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 4,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _customTypeController,
-                                    decoration: InputDecoration(
-                                      hintText: 'Enter trade (e.g. Scaffolder)',
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                const Text(
+                                  'Worker Count',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      IconButton(
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        icon: const Icon(Icons.remove_rounded, size: 16, color: Color(0xFF64748B)),
+                                        onPressed: () {
+                                          if (_currentExtraCount > 1) {
+                                            setState(() => _currentExtraCount--);
+                                          }
+                                        },
                                       ),
-                                    ),
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                                      Text(
+                                        '$_currentExtraCount',
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                                      ),
+                                      IconButton(
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        icon: const Icon(Icons.add_rounded, size: 16, color: Color(0xFF64748B)),
+                                        onPressed: () {
+                                          setState(() => _currentExtraCount++);
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
-                                  onPressed: () => setState(() => _isCustomType = false),
-                                  tooltip: 'Back to standard list',
-                                ),
                               ],
                             ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-
-                    // Quantity Stepper
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Count',
-                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
                           ),
-                          const SizedBox(height: 4),
-                          Container(
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFCBD5E1)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 5,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                  icon: const Icon(Icons.remove_rounded, size: 16, color: Color(0xFF64748B)),
-                                  onPressed: () {
-                                    if (_currentExtraCount > 1) {
-                                      setState(() => _currentExtraCount--);
-                                    }
-                                  },
-                                ),
-                                Text(
-                                  '$_currentExtraCount',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                                ),
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                  icon: const Icon(Icons.add_rounded, size: 16, color: Color(0xFF64748B)),
-                                  onPressed: () {
-                                    setState(() => _currentExtraCount++);
-                                  },
+                                const SizedBox(height: 18),
+                                SizedBox(
+                                  height: 42,
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _addExtraWorkers,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD97706),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      elevation: 0,
+                                    ),
+                                    icon: const Icon(Icons.person_add_rounded, size: 16, color: Colors.white),
+                                    label: const Text('Add Worker', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Add Button
-                    SizedBox(
-                      height: 42,
-                      child: ElevatedButton(
-                        onPressed: _addExtraWorkers,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD97706),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('ADD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                    ],
+                  ),
           ),
 
           const SizedBox(height: 12),
@@ -1664,7 +1799,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
               ),
               child: const Center(
                 child: Text(
-                  'No extra workers added for today',
+                  'No additional workers added for today',
                   style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                 ),
               ),

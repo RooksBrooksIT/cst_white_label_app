@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
@@ -25,7 +25,7 @@ class SupervisorWorkersPage extends StatelessWidget {
 
         final items = [
           _MenuItemData(
-            title: 'Workers Attendance',
+            title: 'Daily Attendance',
             subtitle: 'Log daily worker check-ins, site labour attendance & shift hours',
             icon: Icons.people_rounded,
             accentColor: const Color(0xFF10B981),
@@ -43,7 +43,7 @@ class SupervisorWorkersPage extends StatelessWidget {
             },
           ),
           _MenuItemData(
-            title: 'Workers Availability',
+            title: 'Workforce Availability',
             subtitle: 'Site-wide workforce availability, allocations & daily roster',
             icon: Icons.event_available_rounded,
             accentColor: const Color(0xFFF57C00),
@@ -58,7 +58,7 @@ class SupervisorWorkersPage extends StatelessWidget {
             },
           ),
           _MenuItemData(
-            title: 'Worker Summary & Wages',
+            title: 'Summary & Wages',
             subtitle: 'Consolidated attendance summaries, salary breakdown & reports',
             icon: Icons.assignment_ind_rounded,
             accentColor: const Color(0xFF3B82F6),
@@ -81,7 +81,7 @@ class SupervisorWorkersPage extends StatelessWidget {
             appBar: AppBar(
               iconTheme: const IconThemeData(color: Colors.white),
               title: const Text(
-                'Workers & Attendance',
+                'Workforce',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
@@ -264,7 +264,7 @@ class SupervisorWorkersPage extends StatelessWidget {
           },
           borderRadius: BorderRadius.circular(18),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
@@ -286,11 +286,12 @@ class SupervisorWorkersPage extends StatelessWidget {
               ],
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Icon Badge
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -310,41 +311,45 @@ class SupervisorWorkersPage extends StatelessWidget {
                     child: Icon(
                       item.icon,
                       color: item.accentColor,
-                      size: 25,
+                      size: 24,
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
 
-                // Text Information
+                // Text Information & Badge (Flexible / Responsive Layout)
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          Flexible(
-                            child: Text(
-                              item.title,
-                              style: const TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0F172A),
-                                letterSpacing: -0.3,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.2,
+                              height: 1.2,
                             ),
                           ),
-                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
+                              horizontal: 7.5,
+                              vertical: 2.5,
                             ),
                             decoration: BoxDecoration(
                               color: item.accentColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: item.accentColor.withValues(alpha: 0.22),
+                                width: 0.9,
+                              ),
                             ),
                             child: Text(
                               item.badgeText,
@@ -352,6 +357,7 @@ class SupervisorWorkersPage extends StatelessWidget {
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
                                 color: item.accentColor,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ),
@@ -360,23 +366,22 @@ class SupervisorWorkersPage extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         item.subtitle,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12.5,
-                          color: Colors.grey.shade600,
-                          height: 1.3,
+                          color: Color(0xFF64748B),
+                          height: 1.35,
+                          fontWeight: FontWeight.w400,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
 
                 // Chevron Arrow Button
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
@@ -388,7 +393,7 @@ class SupervisorWorkersPage extends StatelessWidget {
                   child: const Center(
                     child: Icon(
                       Icons.arrow_forward_ios_rounded,
-                      size: 13,
+                      size: 12,
                       color: Color(0xFF94A3B8),
                     ),
                   ),

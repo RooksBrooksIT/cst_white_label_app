@@ -932,4 +932,91 @@ class ApprovalWorkflowService {
       requiredAction: 'Tools Arrived & Confirmed at Site',
     );
   }
+
+  // ===========================================================================
+  // SITE SUPERVISOR & MANAGER RESOLUTION HELPERS
+  // ===========================================================================
+
+  /// Retrieves the assigned Manager details from `siteSupervisorMap` or `projects` collection
+  static Future<Map<String, String>> getAssignedManagerForSite({
+    required String siteId,
+    String? supervisorName,
+    String? supervisorId,
+  }) async {
+    try {
+      final cleanSiteId = siteId.trim();
+      final cleanSupName = (supervisorName ?? '').trim().toLowerCase();
+      final cleanSupId = (supervisorId ?? '').trim().toLowerCase();
+
+      final mapSnap = await FirestoreService.siteSupervisorMap.get();
+      for (final doc in mapSnap.docs) {
+        final d = doc.data();
+        final docSite = (d['siteCode'] ?? d['siteId'] ?? d['site'] ?? d['siteDocId'] ?? doc.id).toString().trim();
+        final docSupName = (d['supervisorName'] ?? d['supervisor'] ?? '').toString().trim().toLowerCase();
+        final docSupId = (d['supervisorId'] ?? d['Supervisor ID'] ?? '').toString().trim().toLowerCase();
+
+        final isSiteMatch = docSite.toLowerCase() == cleanSiteId.toLowerCase() ||
+            docSite.toLowerCase().contains(cleanSiteId.toLowerCase()) ||
+            cleanSiteId.toLowerCase().contains(docSite.toLowerCase()) ||
+            doc.id.toLowerCase().contains(cleanSiteId.toLowerCase());
+
+        final isSupMatch = cleanSupName.isEmpty ||
+            docSupName == cleanSupName ||
+            docSupName.contains(cleanSupName) ||
+            cleanSupName.contains(docSupName) ||
+            (cleanSupId.isNotEmpty && (docSupId == cleanSupId || doc.id.toLowerCase().contains(cleanSupId)));
+
+        if (isSiteMatch && isSupMatch) {
+          final mgrName = (d['managerName'] ?? d['manager'] ?? d['Manager Name'] ?? '').toString().trim();
+          final mgrId = (d['managerId'] ?? d['Manager ID'] ?? '').toString().trim();
+          if (mgrName.isNotEmpty) {
+            return {
+              'managerName': mgrName,
+              'managerId': mgrId,
+            };
+          }
+        }
+      }
+
+      // Fallback: any matching site in siteSupervisorMap
+      for (final doc in mapSnap.docs) {
+        final d = doc.data();
+        final docSite = (d['siteCode'] ?? d['siteId'] ?? d['site'] ?? d['siteDocId'] ?? doc.id).toString().trim();
+        if (docSite.toLowerCase() == cleanSiteId.toLowerCase() ||
+            docSite.toLowerCase().contains(cleanSiteId.toLowerCase()) ||
+            doc.id.toLowerCase().contains(cleanSiteId.toLowerCase())) {
+          final mgrName = (d['managerName'] ?? d['manager'] ?? d['Manager Name'] ?? '').toString().trim();
+          final mgrId = (d['managerId'] ?? d['Manager ID'] ?? '').toString().trim();
+          if (mgrName.isNotEmpty) {
+            return {
+              'managerName': mgrName,
+              'managerId': mgrId,
+            };
+          }
+        }
+      }
+
+      // Fallback 2: check projects collection
+      final projSnap = await FirestoreService.projects.doc(cleanSiteId).get();
+      if (projSnap.exists) {
+        final pd = projSnap.data() ?? {};
+        final mgrName = (pd['managerName'] ?? pd['manager'] ?? pd['assignedManager'] ?? '').toString().trim();
+        final mgrId = (pd['managerId'] ?? '').toString().trim();
+        if (mgrName.isNotEmpty) {
+          return {
+            'managerName': mgrName,
+            'managerId': mgrId,
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting assigned manager for site: $e');
+    }
+
+    return {
+      'managerName': 'Manager',
+      'managerId': '',
+    };
+  }
 }
+

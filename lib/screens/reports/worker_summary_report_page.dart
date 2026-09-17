@@ -25,7 +25,6 @@ class _WorkerAttendanceSalaryPageState
   String? _selectedSite;
   String? _selectedMonth;
   List<String> _sites = [];
-  List<String> _months = [];
   bool _isLoading = true;
   String? _expandedWorkerId;
   double _overallAttendancePercentage = 0.0;
@@ -35,6 +34,8 @@ class _WorkerAttendanceSalaryPageState
   final TextEditingController _searchController = TextEditingController();
   Map<String, int> _extraWorkersSummary = {};
   int _totalExtraWorkersInMonth = 0;
+
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -55,22 +56,19 @@ class _WorkerAttendanceSalaryPageState
       ).get();
 
       final Set<String> uniqueSites = {};
-      final Set<String> uniqueMonths = {_currentMonth};
 
       for (var doc in attendanceSnapshot.docs) {
         final data = doc.data();
         final site = data['site']?.toString();
-        final month = data['month']?.toString();
 
         if (site != null && site.isNotEmpty) uniqueSites.add(site);
-        if (month != null && month.isNotEmpty) uniqueMonths.add(month);
       }
 
       if (!mounted) return;
       setState(() {
         _sites = uniqueSites.toList()..sort();
-        _months = uniqueMonths.toList()..sort((a, b) => b.compareTo(a));
         _selectedMonth = _currentMonth;
+        _selectedDate = DateTime.now();
         _isLoading = false;
       });
 
@@ -83,6 +81,37 @@ class _WorkerAttendanceSalaryPageState
         );
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _pickMonthDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+      helpText: 'Select Month & Year',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).primaryColor,
+              onPrimary: Colors.white,
+              onSurface: const Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final newMonth = DateFormat('yyyy-MM').format(picked);
+      setState(() {
+        _selectedDate = picked;
+        _selectedMonth = newMonth;
+      });
+      _loadWorkersData();
     }
   }
 
@@ -439,38 +468,30 @@ class _WorkerAttendanceSalaryPageState
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdownField(
-                  label: 'Site',
-                  icon: Icons.location_on_rounded,
-                  value: _selectedSite,
-                  items: [null, ..._sites],
-                  hint: 'All Sites',
-                  primaryColor: primaryColor,
-                  onChanged: (v) {
-                    setState(() => _selectedSite = v);
-                    _loadWorkersData();
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildDropdownField(
-                  label: 'Month',
-                  icon: Icons.calendar_month_rounded,
-                  value: _selectedMonth,
-                  items: _months,
-                  hint: 'Select Month',
-                  primaryColor: primaryColor,
-                  onChanged: (v) {
-                    setState(() => _selectedMonth = v);
-                    _loadWorkersData();
-                  },
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 360;
+              final siteField = _buildSiteField(primaryColor);
+              final dateField = _buildDateField(primaryColor);
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    siteField,
+                    const SizedBox(height: 10),
+                    dateField,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: siteField),
+                  const SizedBox(width: 10),
+                  Expanded(child: dateField),
+                ],
+              );
+            },
           ),
           if (_selectedMonth != null) ...[
             const SizedBox(height: 14),
@@ -579,23 +600,26 @@ class _WorkerAttendanceSalaryPageState
                     ),
                   ],
                   const SizedBox(height: 12),
-                  SizedBox(
+                  Container(
                     width: double.infinity,
-                    height: 44,
+                    constraints: const BoxConstraints(minHeight: 46),
                     child: ElevatedButton.icon(
                       onPressed: _onGenerateOverallReport,
-                      icon: const Icon(Icons.summarize_rounded, size: 18),
+                      icon: const Icon(Icons.download_rounded, size: 20, color: Colors.white),
                       label: const Text(
-                        'Download Overall Report (PDF)',
+                        'Download Overall Report',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
                           color: Colors.white,
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -612,126 +636,179 @@ class _WorkerAttendanceSalaryPageState
     );
   }
 
-  Widget _buildSearchBar(Color primaryColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0A183D).withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+  Widget _buildSiteField(Color primaryColor) {
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      initialValue: _selectedSite,
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0F172A), size: 24),
+      decoration: InputDecoration(
+        labelText: 'Site',
+        labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        filled: true,
+        fillColor: Colors.white,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        prefixIcon: Icon(Icons.location_on_rounded, color: primaryColor, size: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
         ),
-        child: TextField(
-          controller: _searchController,
-          onChanged: (val) {
-            setState(() {
-              _searchQuery = val;
-              _applySearchFilter();
-            });
-          },
-          style: const TextStyle(
-            color: Color(0xFF0A183D),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-          decoration: InputDecoration(
-            hintText: 'Search worker by name, role, or site...',
-            hintStyle: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 1.8),
+        ),
+      ),
+      style: const TextStyle(
+        color: Color(0xFF0F172A),
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
+      ),
+      selectedItemBuilder: (BuildContext context) {
+        return [null, ..._sites].map<Widget>((item) {
+          final displayText = item == null
+              ? 'All Sites'
+              : SiteDisplayHelper.formatSiteDisplay(siteId: item);
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              displayText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+              ),
             ),
-            prefixIcon: Icon(Icons.search_rounded, color: primaryColor, size: 20),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {
-                        _searchQuery = '';
-                        _applySearchFilter();
-                      });
-                    },
-                  )
-                : null,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 11),
+          );
+        }).toList();
+      },
+      items: [null, ..._sites].map((item) {
+        final displayText = item == null
+            ? 'All Sites'
+            : SiteDisplayHelper.formatSiteDisplay(siteId: item);
+        return DropdownMenuItem<String>(
+          value: item,
+          child: Text(
+            displayText,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        );
+      }).toList(),
+      onChanged: (v) {
+        setState(() => _selectedSite = v);
+        _loadWorkersData();
+      },
+    );
+  }
+
+  Widget _buildDateField(Color primaryColor) {
+    return InkWell(
+      onTap: _pickMonthDate,
+      borderRadius: BorderRadius.circular(12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Month / Date',
+          labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+          filled: true,
+          fillColor: Colors.white,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          prefixIcon: Icon(Icons.calendar_month_rounded, color: primaryColor, size: 20),
+          suffixIcon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0F172A), size: 24),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: primaryColor, width: 1.8),
+          ),
+        ),
+        child: Text(
+          DateFormat('MMMM yyyy').format(_selectedDate),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDropdownField({
-    required String label,
-    required IconData icon,
-    required String? value,
-    required List<String?> items,
-    required String hint,
-    required Color primaryColor,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
+  Widget _buildSearchBar(Color primaryColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) {
+          setState(() {
+            _searchQuery = val;
+            _applySearchFilter();
+          });
+        },
+        style: const TextStyle(
+          color: Color(0xFF0F172A),
+          fontSize: 13.5,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Search worker by name, role, or site...',
+          hintStyle: const TextStyle(
+            color: Color(0xFF94A3B8),
             fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A183D),
+            fontWeight: FontWeight.normal,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          prefixIcon: Icon(Icons.search_rounded, color: primaryColor, size: 20),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                      _applySearchFilter();
+                    });
+                  },
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: primaryColor, width: 1.8),
           ),
         ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: value,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            style: const TextStyle(
-              color: Color(0xFF0A183D),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              prefixIcon: Icon(icon, color: primaryColor, size: 18),
-              hintText: hint,
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w400),
-            ),
-            items: items.map((item) {
-              final displayText = item == null
-                  ? hint
-                  : (label == 'Site'
-                      ? SiteDisplayHelper.formatSiteDisplay(siteId: item)
-                      : item);
-              return DropdownMenuItem<String>(
-                value: item,
-                child: Text(
-                  displayText,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              );
-            }).toList(),
-            onChanged: onChanged,
-          ),
-        ),
-      ],
+      ),
     );
   }
 

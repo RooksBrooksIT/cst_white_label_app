@@ -182,23 +182,31 @@ class _NotificationPageState extends State<NotificationPage>
                 ),
                 tabs: const [
                   Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.notifications_active_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('Activity & Alerts'),
-                      ],
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.notifications_active_outlined, size: 15),
+                          SizedBox(width: 5),
+                          Text('Activity & Alerts'),
+                        ],
+                      ),
                     ),
                   ),
                   Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.playlist_add_check_rounded, size: 16),
-                        SizedBox(width: 6),
-                        Text('My Request Pipeline'),
-                      ],
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.playlist_add_check_rounded, size: 15),
+                          SizedBox(width: 5),
+                          Text('Request Pipeline'),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -677,7 +685,7 @@ class _NotificationPageState extends State<NotificationPage>
                                 children: [
                                   if (siteId.isNotEmpty || siteName.isNotEmpty)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFF1F5F9),
                                         borderRadius: BorderRadius.circular(6),
@@ -688,7 +696,8 @@ class _NotificationPageState extends State<NotificationPage>
                                         children: [
                                           const Icon(Icons.location_on_outlined, size: 11, color: Color(0xFF64748B)),
                                           const SizedBox(width: 3),
-                                          Flexible(
+                                          ConstrainedBox(
+                                            constraints: const BoxConstraints(maxWidth: 160),
                                             child: Text(
                                               siteName.isNotEmpty ? siteName : 'Site: $siteId',
                                               style: const TextStyle(
@@ -705,7 +714,7 @@ class _NotificationPageState extends State<NotificationPage>
                                     ),
                                   if (requiredAction.isNotEmpty)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFFFF7ED),
                                         borderRadius: BorderRadius.circular(6),
@@ -716,7 +725,8 @@ class _NotificationPageState extends State<NotificationPage>
                                         children: [
                                           const Icon(Icons.pending_actions_rounded, size: 11, color: Color(0xFFEA580C)),
                                           const SizedBox(width: 3),
-                                          Flexible(
+                                          ConstrainedBox(
+                                            constraints: const BoxConstraints(maxWidth: 160),
                                             child: Text(
                                               requiredAction,
                                               style: const TextStyle(
@@ -740,18 +750,25 @@ class _NotificationPageState extends State<NotificationPage>
                             Padding(
                               padding: const EdgeInsets.only(left: 46),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   if (timeStr.isNotEmpty)
-                                    Text(
-                                      timeStr,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Color(0xFF94A3B8),
-                                        fontWeight: FontWeight.w500,
+                                    Expanded(
+                                      child: Text(
+                                        timeStr,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF94A3B8),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
+                                    )
+                                  else
+                                    const Spacer(),
+                                  const SizedBox(width: 8),
                                   Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
                                         'View Details',

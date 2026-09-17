@@ -602,41 +602,6 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     }
   }
 
-  Future<void> _pickDate() async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Theme.of(context).primaryColor,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).primaryColor,
-              ),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        selectedDate = picked;
-      });
-      _fetchProjectPhases();
-      _fetchSupervisorData();
-      _fetchMaterialOptions();
-      _fetchLabourOptions();
-    }
-  }
-
   String _formatQty(num qty) {
     if (qty.truncateToDouble() == qty) {
       return qty.toInt().toString();
@@ -2047,20 +2012,6 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const Spacer(),
-                              TextButton.icon(
-                                onPressed: _pickDate,
-                                icon: const Icon(Icons.edit, size: 16),
-                                label: const Text(
-                                  'Change',
-                                  style: TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: Size.zero,
-                                ),
-                              ),
                             ],
                           ),
                         ],
@@ -2478,6 +2429,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           Row(
                             children: [
                               Expanded(
+                                flex: 3,
                                 child: Builder(
                                   builder: (context) {
                                     final poolItem = _currentPoolItem;
@@ -2494,7 +2446,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
 
                                     return GlassButton(
                                       label: 'Add Material Usage',
-                                      icon: Icons.add,
+                                      icon: Icons.add_circle_outline_rounded,
                                       onPressed: isDisabled ? null : _addMaterial,
                                     );
                                   },
@@ -2502,9 +2454,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
+                                flex: 2,
                                 child: GlassButton(
                                   label: _showCustomMaterialFields ? 'Hide Others' : 'Others',
-                                  icon: Icons.more_horiz,
+                                  icon: _showCustomMaterialFields ? Icons.close_rounded : Icons.more_horiz_rounded,
                                   onPressed: () {
                                     setState(() {
                                       _showCustomMaterialFields = !_showCustomMaterialFields;
@@ -2919,9 +2872,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           Row(
                             children: [
                               Expanded(
+                                flex: 3,
                                 child: GlassButton(
                                   label: 'Add Labour',
-                                  icon: Icons.person_add,
+                                  icon: Icons.person_add_rounded,
                                   onPressed: isLoadingLabours || labourOptions.isEmpty
                                       ? null
                                       : _addLabour,
@@ -2929,9 +2883,10 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
+                                flex: 2,
                                 child: GlassButton(
                                   label: _showCustomLabourFields ? 'Hide Others' : 'Others',
-                                  icon: Icons.more_horiz,
+                                  icon: _showCustomLabourFields ? Icons.close_rounded : Icons.more_horiz_rounded,
                                   onPressed: () {
                                     setState(() {
                                       _showCustomLabourFields = !_showCustomLabourFields;

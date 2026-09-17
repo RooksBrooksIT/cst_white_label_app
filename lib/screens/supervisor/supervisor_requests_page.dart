@@ -308,7 +308,7 @@ class SupervisorRequestsPage extends StatelessWidget {
           },
           borderRadius: BorderRadius.circular(18),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
@@ -330,11 +330,12 @@ class SupervisorRequestsPage extends StatelessWidget {
               ],
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Icon Badge
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -354,41 +355,45 @@ class SupervisorRequestsPage extends StatelessWidget {
                     child: Icon(
                       item.icon,
                       color: item.accentColor,
-                      size: 25,
+                      size: 24,
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
 
-                // Text Information
+                // Text Information & Badge (Flexible / Responsive Layout)
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          Flexible(
-                            child: Text(
-                              item.title,
-                              style: const TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0F172A),
-                                letterSpacing: -0.3,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.2,
+                              height: 1.2,
                             ),
                           ),
-                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
+                              horizontal: 7.5,
+                              vertical: 2.5,
                             ),
                             decoration: BoxDecoration(
                               color: item.accentColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: item.accentColor.withValues(alpha: 0.22),
+                                width: 0.9,
+                              ),
                             ),
                             child: Text(
                               item.badgeText,
@@ -396,6 +401,7 @@ class SupervisorRequestsPage extends StatelessWidget {
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
                                 color: item.accentColor,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ),
@@ -404,23 +410,22 @@ class SupervisorRequestsPage extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         item.subtitle,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12.5,
-                          color: Colors.grey.shade600,
-                          height: 1.3,
+                          color: Color(0xFF64748B),
+                          height: 1.35,
+                          fontWeight: FontWeight.w400,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
 
                 // Chevron Arrow Button
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
@@ -432,7 +437,7 @@ class SupervisorRequestsPage extends StatelessWidget {
                   child: const Center(
                     child: Icon(
                       Icons.arrow_forward_ios_rounded,
-                      size: 13,
+                      size: 12,
                       color: Color(0xFF94A3B8),
                     ),
                   ),

@@ -328,100 +328,138 @@ class _WorkersAvailabilityReportPageState
   Widget _buildSearchAndFilter(Color primaryColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(flex: 2, child: _buildSiteDropdown(primaryColor)),
-          const SizedBox(width: 10),
-          Expanded(
-            flex: 3,
-            child: Container(
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFCBD5E1)),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0A183D).withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (v) => setState(() => _searchQuery = v),
-                style: const TextStyle(
-                  color: Color(0xFF0A183D),
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search worker...',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    size: 18,
-                    color: primaryColor,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
-                ),
-              ),
-            ),
-          ),
+          _buildSiteDropdown(primaryColor),
+          const SizedBox(height: 8),
+          _buildSearchField(primaryColor),
         ],
       ),
     );
   }
 
   Widget _buildSiteDropdown(Color primaryColor) {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      initialValue: _siteMappings.any((m) => m['id'] == _selectedSiteId) ? _selectedSiteId : null,
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0F172A), size: 24),
+      decoration: InputDecoration(
+        labelText: 'Select Site',
+        labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        filled: true,
+        fillColor: Colors.white,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        prefixIcon: Icon(Icons.location_on_rounded, color: primaryColor, size: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 1.8),
+        ),
       ),
-      child: DropdownButtonFormField<String>(
-        isExpanded: true,
-        initialValue: _selectedSiteId,
-        dropdownColor: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0A183D)),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          prefixIcon: Icon(Icons.location_on_rounded, color: primaryColor, size: 18),
-        ),
-        hint: const Text(
-          'Select Site',
-          style: TextStyle(
-            fontSize: 13,
-            color: Color(0xFF94A3B8),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: const TextStyle(
-          color: Color(0xFF0A183D),
-          fontSize: 13.5,
-          fontWeight: FontWeight.w700,
-        ),
-        items: _siteMappings.map((m) {
+      style: const TextStyle(
+        color: Color(0xFF0F172A),
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
+      ),
+      selectedItemBuilder: (BuildContext context) {
+        return _siteMappings.map<Widget>((m) {
           final displayName = SiteDisplayHelper.formatSiteDisplay(
             siteId: m['siteId'] ?? m['id'],
             siteName: m['siteName'] ?? m['site'],
           );
-          return DropdownMenuItem<String>(
-            value: m['id'] as String?,
+          return Align(
+            alignment: Alignment.centerLeft,
             child: Text(
               displayName,
+              maxLines: 2,
+              softWrap: true,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13.5),
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+                height: 1.25,
+              ),
             ),
           );
-        }).toList(),
-        onChanged: (v) => setState(() => _selectedSiteId = v),
+        }).toList();
+      },
+      items: _siteMappings.map((m) {
+        final displayName = SiteDisplayHelper.formatSiteDisplay(
+          siteId: m['siteId'] ?? m['id'],
+          siteName: m['siteName'] ?? m['site'],
+        );
+        return DropdownMenuItem<String>(
+          value: m['id'] as String?,
+          child: Text(
+            displayName,
+            maxLines: 2,
+            softWrap: true,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        );
+      }).toList(),
+      onChanged: (v) => setState(() => _selectedSiteId = v),
+    );
+  }
+
+  Widget _buildSearchField(Color primaryColor) {
+    return TextField(
+      controller: _searchController,
+      onChanged: (v) => setState(() => _searchQuery = v),
+      style: const TextStyle(
+        color: Color(0xFF0F172A),
+        fontSize: 13.5,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        hintText: 'Search worker by name...',
+        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.normal),
+        filled: true,
+        fillColor: Colors.white,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          size: 20,
+          color: primaryColor,
+        ),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              )
+            : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 1.8),
+        ),
       ),
     );
   }
@@ -451,15 +489,18 @@ class _WorkersAvailabilityReportPageState
               color: Color(0xFF475569),
             ),
           ),
-          Text(
-            supervisor,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-              color: primaryColor,
+          Expanded(
+            child: Text(
+              supervisor,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: primaryColor,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
