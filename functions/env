@@ -24,6 +24,6 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_SECURE=false
 EMAIL_USER=support@rookstechnologies.com
-EMAIL_PASSWORD=pjuu-s7x1-myxs-vugi
+EMAIL_PASSWORD=l42e-qs7p-z8xi-w3ix
 EMAIL_FROM="Rooks & Brooks Support <support@rookstechnologies.com>"
 EMAIL_MOCK_MODE=false
