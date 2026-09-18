@@ -359,6 +359,12 @@ class PettyCashRequest {
   final String? projectName;
   final String? siteId;
   final String? siteName;
+  final String? siteCode;
+  final bool isSiteExpense;
+  final String? expenseType;
+  final String? expenseCategory;
+  final DateTime? requiredDate;
+  final String? documentUrl;
   final double requestedAmount;
   final double approvedAmount;
   final double disbursedAmount;
@@ -408,6 +414,12 @@ class PettyCashRequest {
     this.projectName,
     this.siteId,
     this.siteName,
+    this.siteCode,
+    this.isSiteExpense = true,
+    this.expenseType,
+    this.expenseCategory,
+    this.requiredDate,
+    this.documentUrl,
     required this.requestedAmount,
     this.approvedAmount = 0.0,
     this.disbursedAmount = 0.0,
@@ -446,6 +458,10 @@ class PettyCashRequest {
   });
 
   bool get isReplenishment => requestType == 'REPLENISHMENT';
+  bool get isOtherExpense =>
+      requestType == 'OTHER_EXPENSE' ||
+      !isSiteExpense ||
+      expenseType == 'other';
   bool get isManualManager =>
       requestSource == 'MANUAL_MANAGER' ||
       requestType == 'MANUAL_MANAGER' ||
@@ -520,6 +536,10 @@ class PettyCashRequest {
     final rawStatus = data['status']?.toString();
     final normStatus = PettyCashStatus.normalize(rawStatus);
 
+    final isSite = (data['isSiteExpense'] is bool)
+        ? (data['isSiteExpense'] as bool)
+        : (data['expenseType'] != 'other' && reqType != 'OTHER_EXPENSE');
+
     return PettyCashRequest(
       requestId: id,
       orgId: (data['orgId'] ?? data['organizationId'] ?? '').toString(),
@@ -529,10 +549,16 @@ class PettyCashRequest {
       supervisorName: (data['supervisorName'] ?? 'Supervisor').toString(),
       managerId: (data['managerId'] ?? '').toString(),
       managerName: (data['managerName'] ?? '').toString(),
-      projectId: data['projectId']?.toString(),
-      projectName: data['projectName']?.toString(),
-      siteId: data['siteId']?.toString(),
-      siteName: data['siteName']?.toString(),
+      projectId: isSite ? data['projectId']?.toString() : null,
+      projectName: isSite ? data['projectName']?.toString() : null,
+      siteId: isSite ? data['siteId']?.toString() : null,
+      siteName: isSite ? data['siteName']?.toString() : null,
+      siteCode: isSite ? (data['siteCode']?.toString() ?? data['SiteCode']?.toString()) : null,
+      isSiteExpense: isSite,
+      expenseType: data['expenseType']?.toString() ?? (isSite ? 'site' : 'other'),
+      expenseCategory: data['expenseCategory']?.toString() ?? data['category']?.toString(),
+      requiredDate: _parseDateTime(data['requiredDate']) ?? _parseDateTime(data['neededByDate']),
+      documentUrl: data['documentUrl']?.toString() ?? data['receiptUrl']?.toString() ?? data['attachmentUrl']?.toString(),
       requestedAmount: reqAmt,
       approvedAmount: appAmt,
       disbursedAmount: disbAmt,
@@ -586,6 +612,7 @@ class PettyCashRequest {
   }
 
   Map<String, dynamic> toMap() {
+    final bool isSite = isSiteExpense && !isOtherExpense;
     return {
       'requestId': requestId,
       'orgId': orgId,
@@ -596,10 +623,17 @@ class PettyCashRequest {
       'supervisorName': supervisorName,
       'managerId': managerId,
       'managerName': managerName,
-      if (projectId != null) 'projectId': projectId,
-      if (projectName != null) 'projectName': projectName,
-      if (siteId != null) 'siteId': siteId,
-      if (siteName != null) 'siteName': siteName,
+      'isSiteExpense': isSite,
+      'expenseType': isSite ? (expenseType ?? 'site') : 'other',
+      'projectId': isSite ? projectId : null,
+      'projectName': isSite ? projectName : null,
+      'siteId': isSite ? siteId : null,
+      'siteName': isSite ? siteName : null,
+      'siteCode': isSite ? siteCode : null,
+      if (expenseCategory != null) 'expenseCategory': expenseCategory,
+      if (requiredDate != null)
+        'requiredDate': Timestamp.fromDate(requiredDate!),
+      if (documentUrl != null) 'documentUrl': documentUrl,
       'requestedAmount': requestedAmount,
       'approvedAmount': approvedAmount,
       'disbursedAmount': disbursedAmount,
@@ -653,8 +687,10 @@ class PettyCashExpense {
   final String idempotencyKey;
   final String accountId;
   final String orgId;
-  final String siteId;
-  final String siteName;
+  final String? siteId;
+  final String? siteName;
+  final String? siteCode;
+  final String expenseType; // "site" | "other"
   final String? pettyCashId;
   final String submittedBy;
   final String submittedByName;
@@ -681,6 +717,7 @@ class PettyCashExpense {
   final bool postedToLedger;
   final String? transactionId;
   final DateTime transactionDate;
+  final bool? isSiteExpenseOverride;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -689,8 +726,10 @@ class PettyCashExpense {
     required this.idempotencyKey,
     required this.accountId,
     required this.orgId,
-    required this.siteId,
-    required this.siteName,
+    this.siteId,
+    this.siteName,
+    this.siteCode,
+    this.expenseType = 'site',
     this.pettyCashId,
     required this.submittedBy,
     required this.submittedByName,
@@ -717,6 +756,7 @@ class PettyCashExpense {
     this.postedToLedger = false,
     this.transactionId,
     required this.transactionDate,
+    this.isSiteExpenseOverride,
     this.createdAt,
     this.updatedAt,
   });
@@ -728,17 +768,42 @@ class PettyCashExpense {
   String get supervisorName => submittedByName;
   String get supervisorId => submittedBy;
   String get expenseCategory => category;
-  bool get isSiteExpense => siteId.isNotEmpty;
+  String get pettyCashAccountId => accountId;
+  String? get requestId => pettyCashId;
+  DateTime get expenseDate => transactionDate;
+
+  bool get isSiteExpense {
+    if (expenseType.toLowerCase() == 'other') return false;
+    if (isSiteExpenseOverride != null) return isSiteExpenseOverride!;
+    return siteId != null && siteId!.isNotEmpty && siteId != 'NON_SITE_EXPENSES';
+  }
+
+  bool get isOtherExpense => !isSiteExpense;
 
   factory PettyCashExpense.fromMap(String id, Map<String, dynamic> data) {
+    final rawSiteId = data['siteId']?.toString();
+    final rawIsSite = data['isSiteExpense'];
+    final rawExpenseType = data['expenseType']?.toString().toLowerCase();
+
+    String resolvedType = 'site';
+    if (rawExpenseType == 'other' || rawExpenseType == 'non_site' || rawIsSite == false) {
+      resolvedType = 'other';
+    } else if (rawExpenseType == 'site' || rawIsSite == true) {
+      resolvedType = 'site';
+    } else if (rawSiteId == null || rawSiteId.trim().isEmpty || rawSiteId.trim() == 'NON_SITE_EXPENSES') {
+      resolvedType = 'other';
+    }
+
     return PettyCashExpense(
       expenseId: id,
       idempotencyKey: (data['idempotencyKey'] ?? id).toString(),
-      accountId: (data['accountId'] ?? '').toString(),
+      accountId: (data['accountId'] ?? data['pettyCashAccountId'] ?? '').toString(),
       orgId: (data['orgId'] ?? data['organizationId'] ?? '').toString(),
-      siteId: (data['siteId'] ?? '').toString(),
-      siteName: (data['siteName'] ?? '').toString(),
-      pettyCashId: data['pettyCashId']?.toString(),
+      siteId: resolvedType == 'site' ? rawSiteId : null,
+      siteName: resolvedType == 'site' ? data['siteName']?.toString() : null,
+      siteCode: resolvedType == 'site' ? data['siteCode']?.toString() : null,
+      expenseType: resolvedType,
+      pettyCashId: (data['pettyCashId'] ?? data['requestId'])?.toString(),
       submittedBy: (data['submittedBy'] ?? data['supervisorId'] ?? '').toString(),
       submittedByName: (data['submittedByName'] ?? data['supervisorName'] ?? 'Supervisor').toString(),
       managerId: (data['managerId'] ?? '').toString(),
@@ -765,28 +830,38 @@ class PettyCashExpense {
       rejectionReason: data['rejectionReason']?.toString(),
       postedToLedger: data['postedToLedger'] == true,
       transactionId: data['transactionId']?.toString(),
-      transactionDate: _parseDateTime(data['transactionDate']) ?? DateTime.now(),
+      transactionDate: _parseDateTime(data['transactionDate'] ?? data['expenseDate']) ?? DateTime.now(),
+      isSiteExpenseOverride: data['isSiteExpense'] is bool ? data['isSiteExpense'] as bool : null,
       createdAt: _parseDateTime(data['createdAt']),
       updatedAt: _parseDateTime(data['updatedAt']),
     );
   }
 
   Map<String, dynamic> toMap() {
+    final isSite = isSiteExpense;
     return {
       'expenseId': expenseId,
       'idempotencyKey': idempotencyKey,
       'accountId': accountId,
+      'pettyCashAccountId': accountId,
       'orgId': orgId,
       'organizationId': orgId,
-      'siteId': siteId,
-      'siteName': siteName,
+      'expenseType': isSite ? 'site' : 'other',
+      'isSiteExpense': isSite,
+      'siteId': isSite ? (siteId?.isNotEmpty == true ? siteId : null) : null,
+      'siteName': isSite ? (siteName?.isNotEmpty == true ? siteName : null) : null,
+      'siteCode': isSite ? (siteCode?.isNotEmpty == true ? siteCode : null) : null,
       if (pettyCashId != null) 'pettyCashId': pettyCashId,
+      if (pettyCashId != null) 'requestId': pettyCashId,
       'submittedBy': submittedBy,
+      'supervisorId': submittedBy,
       'submittedByName': submittedByName,
+      'supervisorName': submittedByName,
       'managerId': managerId,
       'managerName': managerName,
       'amount': amount,
       'category': category,
+      'expenseCategory': category,
       'description': description,
       if (vendorName != null) 'vendorName': vendorName,
       if (receiptUrl != null) 'receiptUrl': receiptUrl,
@@ -808,6 +883,7 @@ class PettyCashExpense {
       'postedToLedger': postedToLedger,
       if (transactionId != null) 'transactionId': transactionId,
       'transactionDate': Timestamp.fromDate(transactionDate),
+      'expenseDate': Timestamp.fromDate(transactionDate),
       'createdAt': createdAt != null
           ? Timestamp.fromDate(createdAt!)
           : FieldValue.serverTimestamp(),
@@ -832,6 +908,8 @@ class PettyCashTransaction {
   final String? projectName;
   final String? siteId;
   final String? siteName;
+  final String? siteCode;
+  final String expenseType; // "site" | "other"
   final String? vendorName;
   final String? linkedSitePaymentId;
   final bool isSiteExpense;
@@ -864,6 +942,8 @@ class PettyCashTransaction {
     this.projectName,
     this.siteId,
     this.siteName,
+    this.siteCode,
+    this.expenseType = 'site',
     this.vendorName,
     this.linkedSitePaymentId,
     this.isSiteExpense = false,
@@ -891,16 +971,24 @@ class PettyCashTransaction {
       transactionType == 'REPLENISHMENT';
   bool get isReturn => transactionType == 'CASH_RETURN';
   bool get isOtherExpense =>
+      expenseType == 'other' ||
+      !isSiteExpense ||
       expenseCategory.toLowerCase() == 'other' ||
       expenseCategory.toLowerCase() == 'miscellaneous';
 
   factory PettyCashTransaction.fromMap(String id, Map<String, dynamic> data) {
+    final rawSiteId = data['siteId']?.toString();
+    final rawExpenseType = data['expenseType']?.toString().toLowerCase();
+    final isSite = data['isSiteExpense'] == true ||
+        rawExpenseType == 'site' ||
+        (rawExpenseType != 'other' && rawSiteId != null && rawSiteId.trim().isNotEmpty && rawSiteId.trim() != 'NON_SITE_EXPENSES');
+
     return PettyCashTransaction(
       transactionId: id,
       idempotencyKey: (data['idempotencyKey'] ?? id).toString(),
       pettyCashId: (data['pettyCashId'] ?? data['requestId'])?.toString(),
       referenceId: (data['referenceId'] ?? data['expenseId'] ?? data['pettyCashId'])?.toString(),
-      accountId: (data['accountId'] ?? '').toString(),
+      accountId: (data['accountId'] ?? data['pettyCashAccountId'] ?? '').toString(),
       orgId: (data['orgId'] ?? data['organizationId'] ?? '').toString(),
       supervisorId: (data['supervisorId'] ?? '').toString(),
       supervisorName: (data['supervisorName'] ?? 'Supervisor').toString(),
@@ -908,11 +996,13 @@ class PettyCashTransaction {
       managerName: (data['managerName'] ?? '').toString(),
       projectId: data['projectId']?.toString(),
       projectName: data['projectName']?.toString(),
-      siteId: data['siteId']?.toString(),
-      siteName: data['siteName']?.toString(),
+      siteId: isSite ? rawSiteId : null,
+      siteName: isSite ? data['siteName']?.toString() : null,
+      siteCode: isSite ? data['siteCode']?.toString() : null,
+      expenseType: isSite ? 'site' : 'other',
       vendorName: (data['vendorName'] ?? data['vendor'] ?? data['payee'])?.toString(),
       linkedSitePaymentId: data['linkedSitePaymentId']?.toString(),
-      isSiteExpense: data['isSiteExpense'] == true || (data['siteId']?.toString().isNotEmpty == true),
+      isSiteExpense: isSite,
       transactionType: (data['transactionType'] ?? 'EXPENSE_APPROVED').toString(),
       expenseCategory: (data['expenseCategory'] ?? data['category'] ?? 'Other').toString(),
       description: (data['description'] ?? '').toString(),
@@ -928,7 +1018,7 @@ class PettyCashTransaction {
       remarks: (data['remarks'] ?? '').toString(),
       attachmentUrl: (data['attachmentUrl'] ?? data['receiptUrl'])?.toString(),
       status: (data['status'] ?? 'POSTED').toString(),
-      transactionDate: _parseDateTime(data['transactionDate']) ?? DateTime.now(),
+      transactionDate: _parseDateTime(data['transactionDate'] ?? data['expenseDate']) ?? DateTime.now(),
       createdBy: (data['createdBy'] ?? '').toString(),
       createdRole: (data['createdRole'] ?? 'Supervisor').toString(),
       createdAt: _parseDateTime(data['createdAt']),
@@ -936,12 +1026,15 @@ class PettyCashTransaction {
   }
 
   Map<String, dynamic> toMap() {
+    final isSite = isSiteExpense && (siteId != null && siteId!.isNotEmpty && siteId != 'NON_SITE_EXPENSES');
     return {
       'transactionId': transactionId,
       'idempotencyKey': idempotencyKey,
       if (pettyCashId != null) 'pettyCashId': pettyCashId,
+      if (pettyCashId != null) 'requestId': pettyCashId,
       if (referenceId != null) 'referenceId': referenceId,
       'accountId': accountId,
+      'pettyCashAccountId': accountId,
       'orgId': orgId,
       'organizationId': orgId,
       'supervisorId': supervisorId,
@@ -950,14 +1043,17 @@ class PettyCashTransaction {
       'managerName': managerName,
       if (projectId != null) 'projectId': projectId,
       if (projectName != null) 'projectName': projectName,
-      'siteId': siteId ?? '',
-      'siteName': siteName ?? '',
+      'expenseType': isSite ? 'site' : 'other',
+      'siteId': isSite ? siteId : null,
+      'siteName': isSite ? siteName : null,
+      'siteCode': isSite ? siteCode : null,
       if (vendorName != null) 'vendorName': vendorName,
       if (linkedSitePaymentId != null)
         'linkedSitePaymentId': linkedSitePaymentId,
-      'isSiteExpense': isSiteExpense,
+      'isSiteExpense': isSite,
       'transactionType': transactionType,
       'expenseCategory': expenseCategory,
+      'category': expenseCategory,
       'description': description,
       'amount': amount,
       'previousBalance': previousBalance,
@@ -966,6 +1062,7 @@ class PettyCashTransaction {
       'attachmentUrl': attachmentUrl ?? '',
       'status': status,
       'transactionDate': Timestamp.fromDate(transactionDate),
+      'expenseDate': Timestamp.fromDate(transactionDate),
       'createdBy': createdBy,
       'createdRole': createdRole,
       'createdAt': createdAt != null

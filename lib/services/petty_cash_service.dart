@@ -466,18 +466,26 @@ class PettyCashService {
     String? managerId,
     String? managerName,
     bool isReplenishment = false,
+    bool isSiteExpense = true,
+    String? expenseType,
+    String? expenseCategory,
+    DateTime? requiredDate,
+    String? documentUrl,
     String? projectId,
     String? projectName,
-    required String siteId,
-    required String siteName,
+    String? siteId,
+    String? siteName,
+    String? siteCode,
     String? linkedSitePaymentId,
     String? linkedSitePaymentTitle,
   }) async {
     if (requestedAmount <= 0) {
       throw Exception('Requested amount must be greater than zero.');
     }
-    if (siteId.trim().isEmpty) {
-      throw Exception('Site selection is mandatory for petty cash requests.');
+
+    final bool isOther = !isSiteExpense || expenseType == 'other';
+    if (!isOther && (siteId == null || siteId.trim().isEmpty)) {
+      throw Exception('Site selection is mandatory for site-wise petty cash requests.');
     }
 
     final orgId = FirestoreService.currentOrgId;
@@ -515,21 +523,34 @@ class PettyCashService {
       } catch (_) {}
     }
 
-    final account = await getOrCreateSiteAccount(
-      siteId: siteId,
-      siteName: siteName,
-      supervisorId: supervisorId,
-      supervisorName: supervisorName,
-      managerId: resolvedManagerId,
-      managerName: resolvedManagerName,
-    );
+    final PettyCashAccount account = isOther
+        ? await getOrCreateAccount(
+            supervisorId: supervisorId,
+            supervisorName: supervisorName,
+            managerId: resolvedManagerId,
+            managerName: resolvedManagerName,
+          )
+        : await getOrCreateSiteAccount(
+            siteId: siteId!,
+            siteName: siteName ?? '',
+            supervisorId: supervisorId,
+            supervisorName: supervisorName,
+            managerId: resolvedManagerId,
+            managerName: resolvedManagerName,
+          );
 
     final reqDocId = 'PCR_${DateTime.now().millisecondsSinceEpoch}_${supervisorId.replaceAll(RegExp(r'\W'), '')}';
-    final requestType = isReplenishment ? 'REPLENISHMENT' : 'INITIAL_ALLOCATION';
+    final requestType = isOther
+        ? 'OTHER_EXPENSE'
+        : (isReplenishment ? 'REPLENISHMENT' : 'INITIAL_ALLOCATION');
 
     final auditEntry = ApprovalWorkflowService.createAuditEntry(
-      step: isReplenishment ? '1. Replenishment Request' : '1. Supervisor Submission',
-      action: isReplenishment ? 'Replenishment Requested' : 'Petty Cash Requested',
+      step: isOther
+          ? '1. Other Expense Request'
+          : (isReplenishment ? '1. Replenishment Request' : '1. Supervisor Submission'),
+      action: isOther
+          ? 'Other Expense Requested'
+          : (isReplenishment ? 'Replenishment Requested' : 'Petty Cash Requested'),
       actorRole: 'Supervisor',
       actorName: supervisorName,
       actorId: supervisorId,
@@ -546,10 +567,16 @@ class PettyCashService {
       supervisorName: supervisorName,
       managerId: resolvedManagerId.isNotEmpty ? resolvedManagerId : account.managerId,
       managerName: resolvedManagerName.isNotEmpty ? resolvedManagerName : account.managerName,
-      projectId: projectId,
-      projectName: projectName,
-      siteId: siteId,
-      siteName: siteName,
+      projectId: isOther ? null : projectId,
+      projectName: isOther ? null : projectName,
+      siteId: isOther ? null : siteId,
+      siteName: isOther ? null : siteName,
+      siteCode: isOther ? null : siteCode,
+      isSiteExpense: !isOther,
+      expenseType: isOther ? 'other' : (expenseType ?? 'site'),
+      expenseCategory: expenseCategory,
+      requiredDate: requiredDate,
+      documentUrl: documentUrl,
       requestedAmount: requestedAmount,
       approvedAmount: 0.0,
       disbursedAmount: 0.0,
@@ -565,8 +592,8 @@ class PettyCashService {
       currentBalanceAtRequest: account.availableBalance,
       totalAllocatedAtRequest: account.totalAllocated,
       totalUsedAtRequest: account.totalUsed,
-      linkedSitePaymentId: linkedSitePaymentId,
-      linkedSitePaymentTitle: linkedSitePaymentTitle,
+      linkedSitePaymentId: isOther ? null : linkedSitePaymentId,
+      linkedSitePaymentTitle: isOther ? null : linkedSitePaymentTitle,
       approvalHistory: [auditEntry],
       createdAt: now,
       updatedAt: now,
@@ -591,7 +618,9 @@ class PettyCashService {
     await FirestoreService.pettyCashRequests.doc(reqDocId).set(requestMap);
 
     await _writeAuditLog(
-      action: isReplenishment ? 'REPLENISHMENT_REQUESTED' : 'REQUEST_CREATED',
+      action: isOther
+          ? 'OTHER_EXPENSE_REQUESTED'
+          : (isReplenishment ? 'REPLENISHMENT_REQUESTED' : 'REQUEST_CREATED'),
       entityType: 'REQUEST',
       entityId: reqDocId,
       actorId: supervisorId,
@@ -1481,9 +1510,12 @@ class PettyCashService {
     required String supervisorName,
     String? siteId,
     String? siteName,
+    String? siteCode,
+    String? expenseType,
     String? projectId,
     String? projectName,
     String? pettyCashId,
+    String? requestId,
     String? managerId,
     String? managerName,
     String? category,
@@ -1497,6 +1529,7 @@ class PettyCashService {
     String? receiptFileName,
     String? noReceiptReason,
     DateTime? transactionDate,
+    DateTime? expenseDate,
     String? idempotencyKey,
   }) async {
     if (amount <= 0) {
@@ -1506,9 +1539,13 @@ class PettyCashService {
       throw Exception('Description is required for all petty cash expenses.');
     }
 
+    final resolvedExpenseType = (expenseType ?? ((isSiteExpense == false || (siteId == null || siteId.trim().isEmpty || siteId.trim() == 'NON_SITE_EXPENSES')) ? 'other' : 'site')).toLowerCase();
+    final bool isSite = resolvedExpenseType == 'site' && (isSiteExpense ?? true);
+
     final resolvedCategory = (category ?? expenseCategory ?? 'Office & Site Supplies').trim();
-    final resolvedSiteId = (siteId ?? '').trim();
-    final resolvedSiteName = (siteName ?? resolvedSiteId).trim();
+    final resolvedSiteId = isSite ? (siteId ?? '').trim() : '';
+    final resolvedSiteName = isSite ? (siteName ?? resolvedSiteId).trim() : '';
+    final resolvedSiteCode = isSite ? siteCode?.trim() : null;
 
     final bool receiptMandatory = amount >= defaultReceiptThreshold;
     if (receiptMandatory && (receiptUrl == null || receiptUrl.trim().isEmpty)) {
@@ -1521,22 +1558,76 @@ class PettyCashService {
     }
 
     final orgId = FirestoreService.currentOrgId;
-    final siteAccId = resolvedSiteId.isNotEmpty
-        ? formatSiteAccountId(orgId, resolvedSiteId)
-        : supervisorId.trim().toLowerCase();
-    final accountRef = FirestoreService.pettyCashAccounts.doc(siteAccId);
-    final accountSnap = await accountRef.get();
 
-    if (!accountSnap.exists || accountSnap.data() == null) {
-      throw Exception('No petty cash account found for site $resolvedSiteName. Please request fund allocation first.');
+    // Account resolution
+    DocumentReference<Map<String, dynamic>> accountRef;
+    PettyCashAccount? account;
+
+    if (isSite && resolvedSiteId.isNotEmpty) {
+      final siteAccId = formatSiteAccountId(orgId, resolvedSiteId);
+      accountRef = FirestoreService.pettyCashAccounts.doc(siteAccId);
+      final accountSnap = await accountRef.get();
+      if (accountSnap.exists && accountSnap.data() != null) {
+        account = PettyCashAccount.fromMap(accountSnap.id, accountSnap.data()!);
+      } else {
+        // Fallback: Check if supervisor has an account
+        final supAcc = await getOrCreateSiteAccount(
+          siteId: resolvedSiteId,
+          siteName: resolvedSiteName,
+          supervisorId: supervisorId,
+          supervisorName: supervisorName,
+          managerId: managerId,
+          managerName: managerName,
+        );
+        account = supAcc;
+      }
+    } else {
+      // Non-site / Supervisor personal expense
+      final cleanSupId = supervisorId.trim().toLowerCase();
+      final supDocRef = FirestoreService.pettyCashAccounts.doc(cleanSupId);
+      final supSnap = await supDocRef.get();
+      if (supSnap.exists && supSnap.data() != null) {
+        accountRef = supDocRef;
+        account = PettyCashAccount.fromMap(supSnap.id, supSnap.data()!);
+      } else {
+        // Check if there's any active account where supervisor is custodian
+        final allAccountsSnap = await FirestoreService.pettyCashAccounts.get();
+        DocumentSnapshot<Map<String, dynamic>>? bestDoc;
+        double maxSpendable = -1;
+
+        for (final doc in allAccountsSnap.docs) {
+          final data = doc.data();
+          final sId = (data['custodianSupervisorId'] ?? data['supervisorId'] ?? doc.id).toString().trim().toLowerCase();
+          if (sId == cleanSupId || doc.id.toLowerCase() == cleanSupId) {
+            final a = PettyCashAccount.fromMap(doc.id, data);
+            if (a.spendableBalance > maxSpendable) {
+              maxSpendable = a.spendableBalance;
+              bestDoc = doc;
+            }
+          }
+        }
+
+        if (bestDoc != null) {
+          accountRef = bestDoc.reference;
+          account = PettyCashAccount.fromMap(bestDoc.id, bestDoc.data()!);
+        } else {
+          accountRef = supDocRef;
+          account = await getOrCreateAccount(
+            supervisorId: supervisorId,
+            supervisorName: supervisorName,
+            managerId: managerId,
+            managerName: managerName,
+          );
+        }
+      }
     }
 
-    final account = PettyCashAccount.fromMap(accountSnap.id, accountSnap.data()!);
     if (amount > account.spendableBalance) {
+      final avail = formatCurrency(account.availableBalance);
+      final res = formatCurrency(account.reservedBalance);
+      final spend = formatCurrency(account.spendableBalance);
       throw Exception(
-        'Insufficient spendable balance. Available: ${formatCurrency(account.availableBalance)}, '
-        'Reserved: ${formatCurrency(account.reservedBalance)}, '
-        'Spendable: ${formatCurrency(account.spendableBalance)}.',
+        'Insufficient spendable balance. Available: $avail, Reserved: $res, Spendable: $spend. Please request fund replenishment first.',
       );
     }
 
@@ -1546,15 +1637,19 @@ class PettyCashService {
 
     final expDocId = 'EXP_${DateTime.now().millisecondsSinceEpoch}_${supervisorId.replaceAll(RegExp(r'\W'), '')}';
     final now = DateTime.now();
+    final effectiveDate = transactionDate ?? expenseDate ?? now;
+    final effectiveReqId = pettyCashId ?? requestId;
 
     final expense = PettyCashExpense(
       expenseId: expDocId,
       idempotencyKey: safeIdempotencyKey,
-      accountId: siteAccId,
+      accountId: accountRef.id,
       orgId: orgId,
-      siteId: resolvedSiteId,
-      siteName: resolvedSiteName,
-      pettyCashId: pettyCashId,
+      siteId: isSite && resolvedSiteId.isNotEmpty ? resolvedSiteId : null,
+      siteName: isSite && resolvedSiteName.isNotEmpty ? resolvedSiteName : null,
+      siteCode: isSite ? resolvedSiteCode : null,
+      expenseType: isSite ? 'site' : 'other',
+      pettyCashId: effectiveReqId,
       submittedBy: supervisorId,
       submittedByName: supervisorName,
       managerId: managerId ?? account.managerId,
@@ -1571,7 +1666,8 @@ class PettyCashService {
       receiptVerified: false,
       status: PettyCashStatus.pendingExpenseReview,
       postedToLedger: false,
-      transactionDate: transactionDate ?? now,
+      transactionDate: effectiveDate,
+      isSiteExpenseOverride: isSite,
       createdAt: now,
       updatedAt: now,
     );
@@ -1601,14 +1697,15 @@ class PettyCashService {
       actorName: supervisorName,
       actorRole: 'Supervisor',
       organizationId: orgId,
-      siteId: resolvedSiteId,
+      siteId: isSite ? resolvedSiteId : null,
       newState: expense.toMap(),
     );
 
     final formattedAmt = formatCurrency(amount);
+    final contextLabel = isSite ? 'on site $resolvedSiteName' : '(Non-Site / Personal Expense)';
     await NotificationService.notifyManager(
       title: '📋 Petty Cash Expense Awaiting Review',
-      body: 'Supervisor $supervisorName submitted $formattedAmt ($resolvedCategory) on site $resolvedSiteName. Manager review required.',
+      body: 'Supervisor $supervisorName submitted $formattedAmt ($resolvedCategory) $contextLabel. Manager review required.',
       forManagerName: expense.managerName,
       requestType: 'petty_cash_expense',
       requestId: expDocId,
@@ -1704,10 +1801,12 @@ class PettyCashService {
         supervisorName: expense.submittedByName,
         managerId: managerId,
         managerName: managerName,
-        siteId: expense.siteId,
-        siteName: expense.siteName,
+        siteId: expense.isSiteExpense ? expense.siteId : null,
+        siteName: expense.isSiteExpense ? expense.siteName : null,
+        siteCode: expense.isSiteExpense ? expense.siteCode : null,
+        expenseType: expense.expenseType,
         vendorName: expense.vendorName,
-        isSiteExpense: true,
+        isSiteExpense: expense.isSiteExpense,
         transactionType: 'EXPENSE_APPROVED',
         expenseCategory: expense.category,
         description: expense.description,
@@ -1764,7 +1863,7 @@ class PettyCashService {
         actorName: managerName,
         actorRole: 'Manager',
         organizationId: expense.orgId,
-        siteId: expense.siteId,
+        siteId: expense.isSiteExpense ? expense.siteId : null,
         previousState: {'status': expense.status, 'availableBalance': currentAvailable},
         newState: {'status': PettyCashStatus.expenseApproved, 'availableBalance': newBalance, 'txnId': txnId},
         timestamp: DateTime.now(),
@@ -1774,11 +1873,14 @@ class PettyCashService {
 
     // Post-Transaction Notifications & Sync
     final formattedAmt = formatCurrency(expense.amount);
+    final notifContext = expense.isSiteExpense
+        ? 'for site ${expense.siteName ?? expense.siteId}'
+        : 'for non-site expense';
     await NotificationService.notifySupervisor(
       supervisorName: expense.submittedByName,
       supervisorId: expense.submittedBy,
       title: '✅ Petty Cash Expense Approved',
-      body: 'Manager $managerName approved $formattedAmt (${expense.category}) for site ${expense.siteName}. Balance posted to ledger.',
+      body: 'Manager $managerName approved $formattedAmt (${expense.category}) $notifContext. Balance posted to ledger.',
       requestType: 'petty_cash_expense',
       requestId: expense.expenseId,
       docId: expense.expenseId,
@@ -1804,9 +1906,13 @@ class PettyCashService {
       );
     }
 
-    if (expense.siteId.trim().isNotEmpty) {
-      ExpenseService.recalcTotalsAndSyncProject(expense.siteId.trim()).catchError((e) {
+    if (expense.isSiteExpense && expense.siteId != null && expense.siteId!.trim().isNotEmpty && expense.siteId!.trim() != 'NON_SITE_EXPENSES') {
+      ExpenseService.recalcTotalsAndSyncProject(expense.siteId!.trim()).catchError((e) {
         debugPrint('Error syncing site project financial totals: $e');
+      });
+    } else {
+      ExpenseService.recalcNonSiteExpenses().catchError((e) {
+        debugPrint('Error syncing non-site expenses: $e');
       });
     }
   }
@@ -1880,7 +1986,7 @@ class PettyCashService {
         actorName: managerName,
         actorRole: 'Manager',
         organizationId: expense.orgId,
-        siteId: expense.siteId,
+        siteId: expense.isSiteExpense ? expense.siteId : null,
         previousState: {'status': expense.status},
         newState: {'status': PettyCashStatus.expenseRejected, 'rejectionReason': reason},
         timestamp: DateTime.now(),
@@ -2488,7 +2594,7 @@ class PettyCashService {
 
     for (final req in requests) {
       final rawSite = (req.siteId ?? '').trim();
-      if (rawSite.isEmpty) continue;
+      if (rawSite.isEmpty || rawSite == 'NON_SITE_EXPENSES') continue;
       final siteKey = ExpenseService.formatCanonicalSiteId(
         rawId: rawSite,
         siteName: req.siteName,
@@ -2533,8 +2639,9 @@ class PettyCashService {
     }
 
     for (final t in transactions) {
+      if (!t.isSiteExpense || t.expenseType == 'other') continue;
       final rawSite = (t.siteId ?? '').trim();
-      if (rawSite.isEmpty) continue;
+      if (rawSite.isEmpty || rawSite == 'NON_SITE_EXPENSES') continue;
       final siteKey = ExpenseService.formatCanonicalSiteId(
         rawId: rawSite,
         siteName: t.siteName,

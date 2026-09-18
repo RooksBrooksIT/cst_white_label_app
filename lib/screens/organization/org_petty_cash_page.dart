@@ -631,7 +631,7 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
         }
 
         final txns = snapshot.data ?? [];
-        final siteTxns = txns.where((t) => t.isSiteExpense && t.isExpense).toList();
+        final siteTxns = txns.where((t) => t.isExpense && (t.isSiteExpense && t.expenseType != 'other')).toList();
 
         final Map<String, List<PettyCashTransaction>> groupedBySite = {};
         for (final t in siteTxns) {
@@ -720,7 +720,7 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
   }
 
   // ---------------------------------------------------------------------------
-  // 5. TAB 4: OTHER EXPENSES (OVERHEADS & GENERAL)
+  // 5. TAB 4: OTHER EXPENSES (SUPERVISOR PERSONAL & OVERHEADS)
   // ---------------------------------------------------------------------------
 
   Widget _buildOtherExpensesTab() {
@@ -732,13 +732,13 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
         }
 
         final txns = snapshot.data ?? [];
-        final otherTxns = txns.where((t) => !t.isSiteExpense && t.isExpense).toList();
+        final otherTxns = txns.where((t) => t.isExpense && (!t.isSiteExpense || t.expenseType == 'other')).toList();
 
         if (otherTxns.isEmpty) {
           return _buildEmptyState(
             icon: Icons.miscellaneous_services_rounded,
-            title: 'No other / overhead expenses',
-            subtitle: 'Non-site operational expenses will appear here.',
+            title: 'No supervisor non-site expenses',
+            subtitle: 'Non-site & supervisor personal expenses will appear here.',
           );
         }
 
@@ -752,7 +752,7 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Total Overhead Expenses:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  const Text('Total Non-Site Expenses:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                   Text(
                     PettyCashService.formatCurrency(otherTotal),
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFFB45309)),
@@ -788,9 +788,25 @@ class _OrgPettyCashPageState extends State<OrgPettyCashPage>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Text('Supervisor: ${t.supervisorName} • Category: ${t.expenseCategory}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFFBEB),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'NON-SITE',
+                                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text('Supervisor: ${t.supervisorName} • ${t.expenseCategory}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ],
+                        ),
                         const SizedBox(height: 2),
                         Text(dateStr, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
                       ],

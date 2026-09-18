@@ -941,6 +941,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         // Skip manager or org entries recorded in supervisor collection, and any petty cash flagged entries
         if (data['isManagerEntry'] == true ||
             data['createdBy'] == 'manager' ||
@@ -1053,6 +1054,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         // Check if bills array exists and sum items
         final bills = data['bills'];
         if (bills is List && bills.isNotEmpty) {
@@ -1169,6 +1171,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         final bills = data['bills'];
         if (bills is List && bills.isNotEmpty) {
           double billsSum = 0.0;
@@ -1214,6 +1217,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         final amount = _parseExpenseAmount(data['totalAmount'] ?? data['amount'], data);
         total += amount;
       }
@@ -1244,6 +1248,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         final amount = _parseExpenseAmount(
           data['incentiveAmount'] ?? data['amount'] ?? data['totalAmount'],
         );
@@ -1333,6 +1338,9 @@ class ExpenseService {
         final data = entry.value;
         final docKey = entry.key;
 
+        // Skip non-site expenses from site-specific totals
+        if (data['isSiteExpense'] == false || data['expenseType'] == 'other' || data['siteId'] == null || data['siteId'].toString().trim().isEmpty || data['siteId'].toString().trim() == 'NON_SITE_EXPENSES') continue;
+
         // Check if this is a direct expense or transaction
         if (docKey.startsWith('exp_')) {
           final isApproved = data['status'] == 'EXPENSE_APPROVED' ||
@@ -1406,6 +1414,9 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false && (data['siteId'] == null || data['siteId'].toString().isEmpty)) {
+          continue;
+        }
         final rawStatus = (data['status'] ?? '').toString().toLowerCase().trim();
         final isReceivedOrAllocated = data['isReceived'] == true ||
             data['receivedAt'] != null ||
@@ -1427,7 +1438,7 @@ class ExpenseService {
         }
       }
 
-      // Check site-based pettyCashAccounts for totalReceived / totalAllocated
+      // Check site-based pettyCashAccounts for totalReceived / totalAllocated fallback
       final orgId = FirestoreService.currentOrgId;
       for (final key in siteKeys) {
         try {
@@ -1438,12 +1449,8 @@ class ExpenseService {
             final accAlloc = (aData['totalAllocated'] is num)
                 ? (aData['totalAllocated'] as num).toDouble()
                 : 0.0;
-            final accRecv = (aData['totalReceived'] is num)
-                ? (aData['totalReceived'] as num).toDouble()
-                : accAlloc;
-            final maxAcc = accRecv > accAlloc ? accRecv : accAlloc;
-            if (maxAcc > total) {
-              total = maxAcc;
+            if (accAlloc > 0 && total == 0) {
+              total = accAlloc;
             }
           }
         } catch (_) {}
@@ -1452,5 +1459,158 @@ class ExpenseService {
       print("❌ Error summing petty cash received for siteId=$siteId: $e");
     }
     return total;
+  }
+
+  // Recalculates and stores aggregate summary for all non-site & organization overhead expenses
+  static Future<void> recalcNonSiteExpenses() async {
+    try {
+      final effectiveOrgId = FirestoreService.currentOrgId;
+      double supervisorTotal = 0.0;
+      double managerTotal = 0.0;
+      double organizationTotal = 0.0;
+      double contractorTotal = 0.0;
+      double incentiveTotal = 0.0;
+      double pettyCashExpenseTotal = 0.0;
+      double pettyCashReceivedTotal = 0.0;
+
+      // 1. Petty Cash Expenses (non-site)
+      final expSnap = await FirestoreService.pettyCashExpenses.get();
+      final Set<String> processedExpIds = {};
+      for (final doc in expSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim();
+        final expType = (data['expenseType'] ?? '').toString().toLowerCase();
+        final isNonSite = expType == 'other' || data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        final isApproved = data['status'] == 'EXPENSE_APPROVED' ||
+            data['status'] == 'approved' ||
+            data['status'] == 'APPROVED' ||
+            data['isApproved'] == true ||
+            data['postedToLedger'] == true;
+        if (isApproved) {
+          final expId = (data['expenseId'] ?? doc.id).toString();
+          if (!processedExpIds.contains(expId)) {
+            processedExpIds.add(expId);
+            pettyCashExpenseTotal += _parseExpenseAmount(data['amount'], data);
+          }
+        }
+      }
+
+      // 2. Petty Cash Transactions (non-site)
+      final txnSnap = await FirestoreService.pettyCashTransactions.get();
+      for (final doc in txnSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim();
+        final expType = (data['expenseType'] ?? '').toString().toLowerCase();
+        final isNonSite = expType == 'other' || data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        final txnType = (data['transactionType'] ?? '').toString().toUpperCase();
+        if (txnType == 'EXPENSE' || txnType == 'EXPENSE_APPROVED' || txnType.contains('EXPENSE')) {
+          final refId = (data['referenceId'] ?? data['expenseId'] ?? '').toString();
+          if (refId.isNotEmpty && processedExpIds.contains(refId)) continue;
+          if (refId.isNotEmpty) processedExpIds.add(refId);
+          pettyCashExpenseTotal += _parseExpenseAmount(data['amount'], data);
+        } else if (txnType == 'INITIAL_FUND' || txnType == 'ALLOCATION' || txnType == 'REPLENISHMENT') {
+          pettyCashReceivedTotal += _parseExpenseAmount(data['amount'], data);
+        }
+      }
+
+      // 3. Supervisor Entries (non-site)
+      final supSnap = await FirestoreService.siteSupervisorEntries.get();
+      for (final doc in supSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? data['site'] ?? '').toString().trim();
+        final isNonSite = data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        if (data['isManagerEntry'] == true ||
+            data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true ||
+            data['createdBy'] == 'manager_org' ||
+            data['isPettyCash'] == true ||
+            data['isPettyCashExpense'] == true) {
+          continue;
+        }
+        supervisorTotal += _parseExpenseAmount(data['totalAmount'] ?? data['amount'], data);
+      }
+
+      // 4. Manager Entries & Expenses (non-site)
+      final mgrExpSnap = await FirestoreService.managerExpenses.get();
+      for (final doc in mgrExpSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? data['site'] ?? '').toString().trim();
+        final isNonSite = data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          double billsSum = 0.0;
+          for (final b in bills) {
+            if (b is Map) billsSum += _parseExpenseAmount(b['billAmount'] ?? b['amount']);
+          }
+          if (billsSum > 0) {
+            managerTotal += billsSum;
+            continue;
+          }
+        }
+        managerTotal += _parseExpenseAmount(data['mgrExpenseTotalAmount'] ?? data['totalAmount'] ?? data['amount'], data);
+      }
+
+      // 5. Organization Entries & Expenses (non-site)
+      final orgExpSnap = await FirestoreService.getCollection('organizationExpenses').get();
+      for (final doc in orgExpSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? data['site'] ?? '').toString().trim();
+        final isNonSite = data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          double billsSum = 0.0;
+          for (final b in bills) {
+            if (b is Map) billsSum += _parseExpenseAmount(b['billAmount'] ?? b['amount']);
+          }
+          if (billsSum > 0) {
+            organizationTotal += billsSum;
+            continue;
+          }
+        }
+        organizationTotal += _parseExpenseAmount(data['orgExpenseTotalAmount'] ?? data['totalAmount'] ?? data['amount'], data);
+      }
+
+      final double totalAllExpenses = supervisorTotal +
+          managerTotal +
+          organizationTotal +
+          contractorTotal +
+          incentiveTotal +
+          pettyCashExpenseTotal;
+
+      final docRef = FirestoreService.getCollection('totalSiteExpensesPerDay').doc('NON_SITE_EXPENSES');
+      await docRef.set({
+        'siteId': 'NON_SITE_EXPENSES',
+        'siteCode': 'NON_SITE',
+        'siteName': 'Non-Site & Organization Overhead',
+        'isNonSite': true,
+        'isSiteExpense': false,
+        'orgId': effectiveOrgId,
+        'totalSiteExpense': 0.0,
+        'totalSupervisorExpense': supervisorTotal,
+        'totalPettyCashExpense': pettyCashExpenseTotal,
+        'totalPettyCashReceived': pettyCashReceivedTotal,
+        'remainingPettyCash': (pettyCashReceivedTotal - pettyCashExpenseTotal),
+        'totalMgrExpense': managerTotal,
+        'totalOrgExpense': organizationTotal,
+        'totalContractorExpense': contractorTotal,
+        'totalIncentiveExpenses': incentiveTotal,
+        'totalAllExpenses': totalAllExpenses,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print("✅ Synced Non-Site expenses summary — Petty Cash: $pettyCashExpenseTotal, Total All: $totalAllExpenses");
+    } catch (e) {
+      print("❌ Error recalculating non-site expenses: $e");
+    }
   }
 }

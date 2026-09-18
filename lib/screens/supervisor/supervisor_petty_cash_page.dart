@@ -11,6 +11,26 @@ import '../../services/app_storage_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/approval_lifecycle_stepper.dart';
 
+String formatSiteDisplay({String? siteCode, String? siteName, String? siteId}) {
+  final code = (siteCode ?? '').trim();
+  final name = (siteName ?? '').trim();
+  final id = (siteId ?? '').trim();
+
+  if (code.isNotEmpty && name.isNotEmpty) {
+    if (name.toUpperCase().startsWith('${code.toUpperCase()}_')) {
+      return name;
+    }
+    return '${code}_$name';
+  }
+  if (name.isNotEmpty) {
+    return name;
+  }
+  if (id.isNotEmpty) {
+    return id;
+  }
+  return 'Unknown Site';
+}
+
 class SupervisorPettyCashPage extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
@@ -33,6 +53,8 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
   List<Map<String, String>> _assignedSites = [];
   bool _isLoadingSites = true;
   String _expenseFilter = 'All'; // 'All', 'Pending Review', 'Approved', 'Rejected'
+  String _expenseTypeFilter = 'All'; // 'All', 'Site Expenses', 'Other Expenses'
+  String _requestTypeFilter = 'All'; // 'All', 'Site Requests', 'Other Requests', 'Replenishments'
 
   Color get primaryColor => Theme.of(context).colorScheme.primary;
   bool _isConfirmingReceipt = false;
@@ -40,7 +62,7 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadAssignedSites();
   }
 
@@ -239,108 +261,141 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
         final availableBalance = account?.availableBalance ?? 0.0;
         final reservedBalance = account?.reservedBalance ?? 0.0;
         final spendableBalance = account?.spendableBalance ?? availableBalance;
+        final totalReturned = account?.totalReturned ?? 0.0;
         final isLowBalance = account?.isLowBalance ?? false;
 
-        return StreamBuilder<List<PettyCashRequest>>(
-          stream: _pettyCashService.streamSupervisorRequests(
-            widget.supervisorId,
-            supervisorName: widget.supervisorName,
-          ),
-          builder: (context, reqSnap) {
-            final requests = reqSnap.data ?? [];
-            final unconfirmedRequests =
-                requests.where((r) => r.isAwaitingConfirmation).toList();
+        return StreamBuilder<List<PettyCashExpense>>(
+          stream: _pettyCashService.streamSupervisorExpenses(widget.supervisorId),
+          builder: (context, expenseSnap) {
+            final allExpenses = expenseSnap.data ?? [];
+            final approvedExpenses = allExpenses.where((e) => e.status == PettyCashStatus.expenseApproved).toList();
+            final siteSpentTotal = approvedExpenses
+                .where((e) => e.isSiteExpense)
+                .fold<double>(0.0, (sum, e) => sum + e.amount);
+            final otherSpentTotal = approvedExpenses
+                .where((e) => !e.isSiteExpense)
+                .fold<double>(0.0, (sum, e) => sum + e.amount);
+            final totalSpent = siteSpentTotal + otherSpentTotal;
 
-            return Scaffold(
-              backgroundColor: const Color(0xFFF8FAFC),
-              appBar: AppBar(
-                iconTheme: const IconThemeData(color: Colors.white),
-                title: const Text(
-                  'Petty Cash',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                centerTitle: true,
-                elevation: 0,
-                flexibleSpace: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        darkAccent,
-                        Color.alphaBlend(
-                          primaryColor.withValues(alpha: 0.35),
-                          darkAccent,
-                        ),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                ),
-                bottom: TabBar(
-                  controller: _tabController,
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 3,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white70,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                  tabs: const [
-                    Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), text: 'Expenses'),
-                    Tab(icon: Icon(Icons.history_toggle_off_rounded, size: 18), text: 'Requests'),
-                    Tab(icon: Icon(Icons.account_balance_rounded, size: 18), text: 'Reconcile & Return'),
-                  ],
-                ),
+            final pendingReviewExpenses = allExpenses
+                .where((e) =>
+                    e.status == PettyCashStatus.pendingExpenseReview ||
+                    e.status == PettyCashStatus.pendingManagerReview)
+                .toList();
+            final pendingReviewTotal = pendingReviewExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+            final pendingReviewCount = pendingReviewExpenses.length;
+
+            return StreamBuilder<List<PettyCashRequest>>(
+              stream: _pettyCashService.streamSupervisorRequests(
+                widget.supervisorId,
+                supervisorName: widget.supervisorName,
               ),
-              body: SafeArea(
-                child: Column(
-                  children: [
-                    // 1. Live Balance Hero Section, Awaiting Confirmation Banner & Low-Balance Alert
-                    _buildHeroOverview(
-                      totalAllocated: totalAllocated,
-                      availableBalance: availableBalance,
-                      reservedBalance: reservedBalance,
-                      spendableBalance: spendableBalance,
-                      isLowBalance: isLowBalance,
-                      account: account,
-                      unconfirmedRequests: unconfirmedRequests,
-                    ),
+              builder: (context, reqSnap) {
+                final requests = reqSnap.data ?? [];
+                final unconfirmedRequests =
+                    requests.where((r) => r.isAwaitingConfirmation).toList();
 
-                    // 2. Tab Content (Expenses, Requests, Reconciliations/Returns)
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildExpensesTab(spendableBalance),
-                          _buildRequestsTab(
-                            account,
-                            requests: requests,
-                            isLoading: reqSnap.connectionState == ConnectionState.waiting,
-                          ),
-                          _buildReconciliationAndReturnsTab(account),
-                        ],
+                return Scaffold(
+                  backgroundColor: const Color(0xFFF8FAFC),
+                  appBar: AppBar(
+                    iconTheme: const IconThemeData(color: Colors.white),
+                    title: const Text(
+                      'Petty Cash',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                        letterSpacing: -0.3,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              floatingActionButton: FloatingActionButton.extended(
-                onPressed: () => _openRecordExpenseModal(
-                  context,
-                  spendableBalance: spendableBalance,
-                  unconfirmedRequests: unconfirmedRequests,
-                  account: account,
-                ),
-                backgroundColor: primaryColor,
-                icon: const Icon(Icons.add_rounded, color: Colors.white),
-                label: const Text(
-                  'Record Expense',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                ),
-              ),
+                    centerTitle: true,
+                    elevation: 0,
+                    flexibleSpace: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            darkAccent,
+                            Color.alphaBlend(
+                              primaryColor.withValues(alpha: 0.35),
+                              darkAccent,
+                            ),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                    ),
+                    bottom: TabBar(
+                      controller: _tabController,
+                      indicatorColor: Colors.white,
+                      indicatorWeight: 3,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white70,
+                      labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+                      tabs: const [
+                        Tab(icon: Icon(Icons.dashboard_outlined, size: 18), text: 'Overview'),
+                        Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), text: 'Expenses'),
+                        Tab(icon: Icon(Icons.history_toggle_off_rounded, size: 18), text: 'Requests'),
+                        Tab(icon: Icon(Icons.account_balance_rounded, size: 18), text: 'Reconcile & Return'),
+                      ],
+                    ),
+                  ),
+                  body: SafeArea(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        // 1. Overview Tab (Essential Balance -> Request Cash -> Record Expense -> Recent Expenses)
+                        _buildOverviewTab(
+                          spendableBalance: spendableBalance,
+                          totalSpent: totalSpent,
+                          reservedBalance: reservedBalance,
+                          isLowBalance: isLowBalance,
+                          account: account,
+                          unconfirmedRequests: unconfirmedRequests,
+                          allExpenses: allExpenses,
+                        ),
+
+                        // 2. Expenses Tab (Expense history, filters, and categories)
+                        _buildExpensesTab(spendableBalance),
+
+                        // 3. Requests Tab (Petty cash requests and statuses)
+                        _buildRequestsTab(
+                          account,
+                          requests: requests,
+                          isLoading: reqSnap.connectionState == ConnectionState.waiting,
+                        ),
+
+                        // 4. Reconcile & Return Tab (Reconciliation, returns, replenishment, and financial summary)
+                        _buildReconciliationAndReturnsTab(
+                          account: account,
+                          totalAllocated: totalAllocated,
+                          totalSpent: totalSpent,
+                          siteSpentTotal: siteSpentTotal,
+                          otherSpentTotal: otherSpentTotal,
+                          pendingReviewTotal: pendingReviewTotal,
+                          pendingReviewCount: pendingReviewCount,
+                          totalReturned: totalReturned,
+                          spendableBalance: spendableBalance,
+                        ),
+                      ],
+                    ),
+                  ),
+                  floatingActionButton: FloatingActionButton.extended(
+                    onPressed: () => _showRecordExpenseSelectionModal(
+                      context,
+                      spendableBalance: spendableBalance,
+                      unconfirmedRequests: unconfirmedRequests,
+                      account: account,
+                    ),
+                    backgroundColor: primaryColor,
+                    icon: const Icon(Icons.add_rounded, color: Colors.white),
+                    label: const Text(
+                      'Record Expense',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                );
+              },
             );
           },
         );
@@ -349,22 +404,25 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
   }
 
   // ---------------------------------------------------------------------------
-  // 1. HERO OVERVIEW CARDS, AWAITING CONFIRMATION & LOW BALANCE BANNER
+  // 1. TAB 1: SIMPLIFIED OVERVIEW (ESSENTIAL BALANCE -> ACTIONS -> RECENT EXPENSES)
   // ---------------------------------------------------------------------------
 
-  Widget _buildHeroOverview({
-    required double totalAllocated,
-    required double availableBalance,
-    required double reservedBalance,
+  Widget _buildOverviewTab({
     required double spendableBalance,
+    required double totalSpent,
+    required double reservedBalance,
     required bool isLowBalance,
     required PettyCashAccount? account,
     required List<PettyCashRequest> unconfirmedRequests,
+    required List<PettyCashExpense> allExpenses,
   }) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+    final recentExpenses = allExpenses.take(5).toList();
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Awaiting Physical Receipt Confirmation Banner
           if (unconfirmedRequests.isNotEmpty)
@@ -373,7 +431,7 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
           // Low Balance Alert Banner
           if (isLowBalance)
             Container(
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: const EdgeInsets.only(bottom: 14),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFFFEF2F2),
@@ -404,7 +462,7 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                           ),
                         ),
                         Text(
-                          'Spendable: ${PettyCashService.formatCurrency(spendableBalance)}. Request replenishment from your manager.',
+                          'Spendable: ${PettyCashService.formatCurrency(spendableBalance)}. Request top-up from manager.',
                           style: const TextStyle(fontSize: 11, color: Color(0xFFB91C1C)),
                         ),
                       ],
@@ -427,112 +485,809 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
               ),
             ),
 
-          // 4 Financial Metric Cards
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: _buildMetricCard(
-                  title: 'Spendable',
-                  amount: spendableBalance,
-                  icon: Icons.account_balance_wallet_rounded,
-                  color: isLowBalance ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                  bgColor: isLowBalance ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
-                  isPrimary: true,
-                ),
+          // Top Balance Card (Essential Balance Information - Light Theme)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isLowBalance ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
+                width: isLowBalance ? 1.5 : 1.0,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: _buildMetricCard(
-                  title: 'Available',
-                  amount: availableBalance,
-                  icon: Icons.savings_outlined,
-                  color: const Color(0xFF2563EB),
-                  bgColor: const Color(0xFFEFF6FF),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: _buildMetricCard(
-                  title: 'Under Review',
-                  amount: reservedBalance,
-                  icon: Icons.pending_actions_rounded,
-                  color: const Color(0xFFF59E0B),
-                  bgColor: const Color(0xFFFFFBEB),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Quick Actions Row (Request, Replenish, Reconcile, Return)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => _openRequestModal(context, isReplenishment: false, currentAccount: account),
-                  icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
-                  label: const Text('Request Cash'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: primaryColor,
-                    side: BorderSide(color: primaryColor.withValues(alpha: 0.4)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: isLowBalance ? const Color(0xFFFEF2F2) : const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: isLowBalance ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Available Balance',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (reservedBalance > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Text(
+                          'Reserved: ${PettyCashService.formatCurrency(reservedBalance)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  PettyCashService.formatCurrency(spendableBalance),
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: isLowBalance ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                    letterSpacing: -0.8,
                   ),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _openRequestModal(context, isReplenishment: true, currentAccount: account),
-                  icon: const Icon(Icons.autorenew_rounded, size: 15),
-                  label: const Text('Replenish'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF0F766E),
-                    side: const BorderSide(color: Color(0xFF99F6E4)),
-                    backgroundColor: const Color(0xFFF0FDFA),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _openReconcileModal(context, currentAccount: account),
-                  icon: const Icon(Icons.fact_check_outlined, size: 15),
-                  label: const Text('Reconcile'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF6366F1),
-                    side: const BorderSide(color: Color(0xFFC7D2FE)),
-                    backgroundColor: const Color(0xFFEEF2FF),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _openReturnModal(context, spendableBalance: spendableBalance),
-                  icon: const Icon(Icons.currency_exchange_rounded, size: 15),
-                  label: const Text('Return Cash'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFD97706),
-                    side: const BorderSide(color: Color(0xFFFDE68A)),
-                    backgroundColor: const Color(0xFFFFFBEB),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.trending_up_rounded, size: 16, color: Color(0xFF64748B)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Total Spent',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        PettyCashService.formatCurrency(totalSpent),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Primary Actions: Request Cash & Record Expense
+          Row(
+            children: [
+              // Primary Action 1: Request Cash
+              Expanded(
+                child: InkWell(
+                  onTap: () => _showRequestPettyCashSelectionModal(context, account),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFEFF6FF), Color(0xFFDBEAFE)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF93C5FD), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2563EB),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.add_card_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Request Cash',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF1E3A8A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Site or other funds',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF2563EB),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Primary Action 2: Record Expense
+              Expanded(
+                child: InkWell(
+                  onTap: () => _showRecordExpenseSelectionModal(
+                    context,
+                    spendableBalance: spendableBalance,
+                    unconfirmedRequests: unconfirmedRequests,
+                    account: account,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFFCD34D), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD97706).withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Record Expense',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF92400E),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Log spent money',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFB45309),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Recent Expenses Section
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Recent Expenses',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              if (recentExpenses.isNotEmpty)
+                TextButton(
+                  onPressed: () => _tabController.animateTo(1),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(50, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All (${allExpenses.length})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.chevron_right_rounded, size: 16, color: primaryColor),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          if (recentExpenses.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.receipt_long_outlined, size: 40, color: Colors.grey.shade400),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No expenses recorded yet',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap "Record Expense" above to submit your first expense.',
+                    style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: recentExpenses.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final exp = recentExpenses[index];
+                return _buildExpenseCard(exp);
+              },
+            ),
         ],
       ),
     );
   }
+
+  Widget _buildWorkflowStepPill({
+    required String step,
+    required String label,
+    required String subLabel,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    step,
+                    style: const TextStyle(fontSize: 8.5, color: Colors.white, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 3),
+              Text(
+                label,
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          const SizedBox(height: 1),
+          Text(
+            subLabel,
+            style: const TextStyle(fontSize: 8.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // SELECTION MODAL: REQUEST PETTY CASH (SITE VS OTHER REQUEST)
+  // ---------------------------------------------------------------------------
+  void _showRequestPettyCashSelectionModal(BuildContext context, PettyCashAccount? account) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Request Petty Cash',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'What do you need petty cash for?',
+                        style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              // Option 1: Site Request
+              _buildSelectionCard(
+                icon: Icons.apartment_rounded,
+                iconColor: const Color(0xFF2563EB),
+                iconBgColor: const Color(0xFFEFF6FF),
+                title: 'Site Request',
+                description: 'Request petty cash for a specific construction site.',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openRequestModal(context, isReplenishment: false, currentAccount: account);
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Option 2: Other Request
+              _buildSelectionCard(
+                icon: Icons.work_outline_rounded,
+                iconColor: const Color(0xFFD97706),
+                iconBgColor: const Color(0xFFFFFBEB),
+                title: 'Other Request',
+                description: 'Request petty cash for approved non-site operational expenses.',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openOtherExpenseRequestModal(context, currentAccount: account);
+                },
+              ),
+              const SizedBox(height: 16),
+
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // SELECTION MODAL: RECORD EXPENSE (SITE VS OTHER EXPENSE)
+  // ---------------------------------------------------------------------------
+  void _showRecordExpenseSelectionModal(
+    BuildContext context, {
+    required double spendableBalance,
+    required List<PettyCashRequest> unconfirmedRequests,
+    required PettyCashAccount? account,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Record Expense',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'What type of expense do you have?',
+                        style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              // Option 1: Site Expense
+              _buildSelectionCard(
+                icon: Icons.apartment_rounded,
+                iconColor: const Color(0xFF2563EB),
+                iconBgColor: const Color(0xFFEFF6FF),
+                title: 'Site Expense',
+                description: 'Record an expense related to a construction site.',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openRecordExpenseModal(
+                    context,
+                    spendableBalance: spendableBalance,
+                    unconfirmedRequests: unconfirmedRequests,
+                    account: account,
+                    initialIsSiteExpense: true,
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Option 2: Other Expense
+              _buildSelectionCard(
+                icon: Icons.work_outline_rounded,
+                iconColor: const Color(0xFFD97706),
+                iconBgColor: const Color(0xFFFFFBEB),
+                title: 'Other Expense',
+                description: 'Record an approved operational expense not linked to a site.',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openRecordExpenseModal(
+                    context,
+                    spendableBalance: spendableBalance,
+                    unconfirmedRequests: unconfirmedRequests,
+                    account: account,
+                    initialIsSiteExpense: false,
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSelectionCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBgColor,
+    required String title,
+    required String description,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpentMetricCard({
+    required double totalSpent,
+    required double siteSpent,
+    required double otherSpent,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long_rounded, color: Color(0xFF475569), size: 14),
+              const Spacer(),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: const BoxDecoration(color: Color(0xFF475569), shape: BoxShape.circle),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            PettyCashService.formatCurrency(totalSpent),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.4,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 1),
+          const Text(
+            'Total Spent',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF475569),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Site: ${PettyCashService.formatCurrency(siteSpent)} | Other: ${PettyCashService.formatCurrency(otherSpent)}',
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String title,
+    required double amount,
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+    String? subText,
+    bool isPrimary = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: isPrimary ? 0.35 : 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 14),
+              const Spacer(),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            PettyCashService.formatCurrency(amount),
+            style: TextStyle(
+              fontSize: isPrimary ? 15.5 : 14,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF0F172A),
+              letterSpacing: -0.4,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 1),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: color.withValues(alpha: 0.9),
+            ),
+          ),
+          if (subText != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              subText,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: color.withValues(alpha: 0.75),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildAwaitingConfirmationBanner(List<PettyCashRequest> unconfirmedRequests) {
     return Column(
@@ -695,61 +1450,6 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
     );
   }
 
-  Widget _buildMetricCard({
-    required String title,
-    required double amount,
-    required IconData icon,
-    required Color color,
-    required Color bgColor,
-    bool isPrimary = false,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: isPrimary ? 0.35 : 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 15),
-              const Spacer(),
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            PettyCashService.formatCurrency(amount),
-            style: TextStyle(
-              fontSize: isPrimary ? 15.5 : 13.5,
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFF0F172A),
-              letterSpacing: -0.4,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-              color: color.withValues(alpha: 0.9),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // 2. TAB 1: EXPENSES LIST (TWO-STAGE EXPENSE WORKFLOW)
   // ---------------------------------------------------------------------------
@@ -765,6 +1465,15 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
         final allExpenses = snapshot.data ?? [];
 
         final filtered = allExpenses.where((e) {
+          // 1. Type Filter
+          if (_expenseTypeFilter == 'Site Expenses' && !e.isSiteExpense) {
+            return false;
+          }
+          if (_expenseTypeFilter == 'Other Expenses' && e.isSiteExpense) {
+            return false;
+          }
+
+          // 2. Status Filter
           if (_expenseFilter == 'Pending Review') {
             return e.status == PettyCashStatus.pendingExpenseReview ||
                 e.status == PettyCashStatus.pendingManagerReview;
@@ -778,35 +1487,63 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
           return true;
         }).toList();
 
+        final siteExpensesCount = allExpenses.where((e) => e.isSiteExpense).length;
+        final otherExpensesCount = allExpenses.where((e) => !e.isSiteExpense).length;
+
         return Column(
           children: [
-            // Filter Chips
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildFilterChip('All', allExpenses.length),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Pending Review',
-                      allExpenses.where((e) =>
-                          e.status == PettyCashStatus.pendingExpenseReview ||
-                          e.status == PettyCashStatus.pendingManagerReview).length,
+            // Filter Strip
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row 1: Type Filter Pills (All / Site / Other)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildTypeFilterChip('All Types', allExpenses.length, 'All'),
+                        const SizedBox(width: 8),
+                        _buildTypeFilterChip('Site Expenses', siteExpensesCount, 'Site Expenses', icon: Icons.location_city_rounded),
+                        const SizedBox(width: 8),
+                        _buildTypeFilterChip('Other / Non-Site', otherExpensesCount, 'Other Expenses', icon: Icons.miscellaneous_services_rounded),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Approved',
-                      allExpenses.where((e) => e.status == PettyCashStatus.expenseApproved).length,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Row 2: Status Filter Pills (All / Pending / Approved / Rejected)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildStatusFilterChip('All Statuses', allExpenses.length, 'All'),
+                        const SizedBox(width: 8),
+                        _buildStatusFilterChip(
+                          'Pending Review',
+                          allExpenses.where((e) =>
+                              e.status == PettyCashStatus.pendingExpenseReview ||
+                              e.status == PettyCashStatus.pendingManagerReview).length,
+                          'Pending Review',
+                        ),
+                        const SizedBox(width: 8),
+                        _buildStatusFilterChip(
+                          'Approved',
+                          allExpenses.where((e) => e.status == PettyCashStatus.expenseApproved).length,
+                          'Approved',
+                        ),
+                        const SizedBox(width: 8),
+                        _buildStatusFilterChip(
+                          'Rejected',
+                          allExpenses.where((e) => e.status == PettyCashStatus.expenseRejected).length,
+                          'Rejected',
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Rejected',
-                      allExpenses.where((e) => e.status == PettyCashStatus.expenseRejected).length,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
@@ -829,7 +1566,7 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Tap "Record Expense" below to submit a new petty cash expense.',
+                            'Tap "Record Expense" below to submit a new site or other expense.',
                             style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                             textAlign: TextAlign.center,
                           ),
@@ -852,13 +1589,45 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
     );
   }
 
-  Widget _buildFilterChip(String filterKey, int count) {
+  Widget _buildTypeFilterChip(String label, int count, String typeKey, {IconData? icon}) {
+    final isSelected = _expenseTypeFilter == typeKey;
+    return InkWell(
+      onTap: () => setState(() => _expenseTypeFilter = typeKey),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: isSelected ? Colors.white : const Color(0xFF64748B)),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              '$label ($count)',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? Colors.white : const Color(0xFF475569),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusFilterChip(String label, int count, String filterKey) {
     final isSelected = _expenseFilter == filterKey;
     return InkWell(
       onTap: () => setState(() => _expenseFilter = filterKey),
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected ? primaryColor : Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -867,9 +1636,9 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
           ),
         ),
         child: Text(
-          '$filterKey ($count)',
+          '$label ($count)',
           style: TextStyle(
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
             color: isSelected ? Colors.white : const Color(0xFF64748B),
           ),
@@ -956,7 +1725,9 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -974,22 +1745,53 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                           ),
                         ),
                         if (exp.isSiteExpense) ...[
-                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFFEFF6FF),
                               borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
                             ),
-                            child: Text(
-                              exp.siteName.isNotEmpty
-                                  ? exp.siteName
-                                  : (exp.siteId.isNotEmpty ? exp.siteId : 'Site'),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF2563EB),
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.location_city_rounded, size: 10, color: Color(0xFF2563EB)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  exp.siteName?.isNotEmpty == true
+                                      ? exp.siteName!
+                                      : (exp.siteId?.isNotEmpty == true ? exp.siteId! : 'Site Expense'),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF2563EB),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFAF5FF),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE9D5FF)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.miscellaneous_services_rounded, size: 10, color: Color(0xFF7E22CE)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'Personal / Non-Site Expense',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF7E22CE),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -1126,42 +1928,131 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (requests.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.assignment_outlined, size: 54, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            Text(
-              'No petty cash requests found',
-              style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ElevatedButton(
-              onPressed: () => _openRequestModal(context, isReplenishment: false, currentAccount: account),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Create New Request'),
-            ),
-          ],
-        ),
-      );
-    }
+    final filteredRequests = requests.where((r) {
+      if (_requestTypeFilter == 'site') {
+        return !r.isOtherExpense && !r.isReplenishment;
+      } else if (_requestTypeFilter == 'other') {
+        return r.isOtherExpense;
+      } else if (_requestTypeFilter == 'replenishment') {
+        return r.isReplenishment;
+      }
+      return true;
+    }).toList();
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
-      itemCount: requests.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final req = requests[index];
-        return _buildRequestStatusCard(req);
+    return Column(
+      children: [
+        // Filter Pills Row
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _buildRequestTypeFilterChip('All Requests', 'All'),
+                const SizedBox(width: 8),
+                _buildRequestTypeFilterChip('Site Requests', 'site'),
+                const SizedBox(width: 8),
+                _buildRequestTypeFilterChip('Other / Non-Site', 'other'),
+                const SizedBox(width: 8),
+                _buildRequestTypeFilterChip('Replenishments', 'replenishment'),
+              ],
+            ),
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+        Expanded(
+          child: filteredRequests.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.assignment_outlined, size: 54, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      Text(
+                        _requestTypeFilter == 'All'
+                            ? 'No petty cash requests found'
+                            : 'No ${_requestTypeFilter == 'other' ? 'other expense' : (_requestTypeFilter == 'site' ? 'site' : 'replenishment')} requests found',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () => _openRequestModal(context, isReplenishment: false, currentAccount: account),
+                            icon: const Icon(Icons.apartment_rounded, size: 16),
+                            label: const Text('Site Request'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () => _openOtherExpenseRequestModal(context, currentAccount: account),
+                            icon: const Icon(Icons.work_outline_rounded, size: 16),
+                            label: const Text('Other Request'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD97706),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+                  itemCount: filteredRequests.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final req = filteredRequests[index];
+                    return _buildRequestStatusCard(req);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRequestTypeFilterChip(String label, String value) {
+    final isSelected = _requestTypeFilter == value;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+          color: isSelected ? Colors.white : const Color(0xFF475569),
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: primaryColor,
+      backgroundColor: const Color(0xFFF1F5F9),
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? primaryColor : const Color(0xFFCBD5E1),
+        ),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _requestTypeFilter = value;
+          });
+        }
       },
     );
   }
@@ -1194,33 +2085,60 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: req.isManualManager
-                      ? const Color(0xFFFAF5FF)
-                      : (req.isReplenishment
-                          ? const Color(0xFFF0FDFA)
-                          : const Color(0xFFEFF6FF)),
+                  color: req.isOtherExpense
+                      ? const Color(0xFFFFFBEB)
+                      : (req.isManualManager
+                          ? const Color(0xFFFAF5FF)
+                          : (req.isReplenishment
+                              ? const Color(0xFFF0FDFA)
+                              : const Color(0xFFEFF6FF))),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: req.isManualManager
-                        ? const Color(0xFFE9D5FF)
-                        : (req.isReplenishment
-                            ? const Color(0xFF99F6E4)
-                            : const Color(0xFFBFDBFE)),
+                    color: req.isOtherExpense
+                        ? const Color(0xFFFDE68A)
+                        : (req.isManualManager
+                            ? const Color(0xFFE9D5FF)
+                            : (req.isReplenishment
+                                ? const Color(0xFF99F6E4)
+                                : const Color(0xFFBFDBFE))),
                   ),
                 ),
-                child: Text(
-                  req.isManualManager
-                      ? 'MANAGER ALLOCATION'
-                      : (req.isReplenishment ? 'REPLENISHMENT' : 'SUPERVISOR REQUEST'),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: req.isManualManager
-                        ? const Color(0xFF7E22CE)
-                        : (req.isReplenishment
-                            ? const Color(0xFF0F766E)
-                            : const Color(0xFF1D4ED8)),
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      req.isOtherExpense
+                          ? Icons.work_outline_rounded
+                          : (req.isReplenishment ? Icons.autorenew_rounded : Icons.apartment_rounded),
+                      size: 12,
+                      color: req.isOtherExpense
+                          ? const Color(0xFFB45309)
+                          : (req.isManualManager
+                              ? const Color(0xFF7E22CE)
+                              : (req.isReplenishment
+                                  ? const Color(0xFF0F766E)
+                                  : const Color(0xFF1D4ED8))),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      req.isOtherExpense
+                          ? 'OTHER EXPENSE REQUEST'
+                          : (req.isManualManager
+                              ? 'MANAGER ALLOCATION'
+                              : (req.isReplenishment ? 'REPLENISHMENT' : 'SITE REQUEST')),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: req.isOtherExpense
+                            ? const Color(0xFFB45309)
+                            : (req.isManualManager
+                                ? const Color(0xFF7E22CE)
+                                : (req.isReplenishment
+                                    ? const Color(0xFF0F766E)
+                                    : const Color(0xFF1D4ED8))),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Text(
@@ -1243,7 +2161,55 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
               color: Color(0xFF334155),
             ),
           ),
-          if (req.siteName != null || req.siteId != null) ...[
+          if (req.isOtherExpense) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (req.expenseCategory != null && req.expenseCategory!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.category_outlined, size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          req.expenseCategory!,
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (req.requiredDate != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_today_rounded, size: 11, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Needed by: ${DateFormat('dd MMM yyyy').format(req.requiredDate!)}',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF1D4ED8)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ] else if (req.siteName != null || req.siteId != null) ...[
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1362,19 +2328,112 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
   // 4. TAB 3: RECONCILIATIONS & RETURNS TAB
   // ---------------------------------------------------------------------------
 
-  Widget _buildReconciliationAndReturnsTab(PettyCashAccount? account) {
+  Widget _buildReconciliationAndReturnsTab({
+    required PettyCashAccount? account,
+    required double totalAllocated,
+    required double totalSpent,
+    required double siteSpentTotal,
+    required double otherSpentTotal,
+    required double pendingReviewTotal,
+    required int pendingReviewCount,
+    required double totalReturned,
+    required double spendableBalance,
+  }) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Reconciliation summary box
+          // Section 1: Detailed Financial Summary
+          const Text(
+            'Financial Summary',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              // 1. Total Allocated
+              Expanded(
+                child: _buildMetricCard(
+                  title: 'Total Allocated',
+                  amount: totalAllocated,
+                  icon: Icons.account_balance_wallet_outlined,
+                  color: const Color(0xFF2563EB),
+                  bgColor: const Color(0xFFEFF6FF),
+                  subText: 'Total funds disbursed',
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 2. Total Funds Disbursed / Spent
+              Expanded(
+                child: _buildSpentMetricCard(
+                  totalSpent: totalSpent,
+                  siteSpent: siteSpentTotal,
+                  otherSpent: otherSpentTotal,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              // 3. Pending Review
+              Expanded(
+                child: _buildMetricCard(
+                  title: 'Pending Review',
+                  amount: pendingReviewTotal,
+                  icon: Icons.pending_actions_rounded,
+                  color: const Color(0xFFD97706),
+                  bgColor: const Color(0xFFFFFBEB),
+                  subText: '$pendingReviewCount items awaiting manager',
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 4. Total Returned
+              Expanded(
+                child: _buildMetricCard(
+                  title: 'Total Returned',
+                  amount: totalReturned,
+                  icon: Icons.currency_exchange_rounded,
+                  color: const Color(0xFF059669),
+                  bgColor: const Color(0xFFECFDF5),
+                  subText: 'Returned to manager',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Section 2: Account Actions (Reconcile, Return, Replenish)
+          const Text(
+            'Account Actions',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Action 1: Cash Reconciliation
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1382,20 +2441,34 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Cash Reconciliation',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.fact_check_outlined, color: Color(0xFF6366F1), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Cash Reconciliation',
+                          style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                      ],
                     ),
                     ElevatedButton.icon(
                       onPressed: () => _openReconcileModal(context, currentAccount: account),
-                      icon: const Icon(Icons.fact_check_outlined, size: 15),
+                      icon: const Icon(Icons.fact_check_outlined, size: 14),
                       label: const Text('New Count'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6366F1),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
                       ),
                     ),
                   ],
@@ -1408,15 +2481,22 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Cash Returns box
+          // Action 2: Return Cash
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1424,23 +2504,37 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Cash Returns',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.currency_exchange_rounded, color: Color(0xFFD97706), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Cash Returns',
+                          style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                      ],
                     ),
                     ElevatedButton.icon(
                       onPressed: () => _openReturnModal(
                         context,
-                        spendableBalance: account?.spendableBalance ?? 0.0,
+                        spendableBalance: spendableBalance,
                       ),
-                      icon: const Icon(Icons.currency_exchange_rounded, size: 15),
+                      icon: const Icon(Icons.currency_exchange_rounded, size: 14),
                       label: const Text('Return Cash'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFD97706),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
                       ),
                     ),
                   ],
@@ -1453,11 +2547,145 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
               ],
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Action 3: Replenishment
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDFA),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.autorenew_rounded, color: Color(0xFF0F766E), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Replenishment',
+                          style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _openRequestModal(context, isReplenishment: true, currentAccount: account),
+                      icon: const Icon(Icons.autorenew_rounded, size: 14),
+                      label: const Text('Request Top-Up'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Request additional petty cash funds to top up your balance when running low.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Section 3: How Petty Cash Works
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.lightbulb_outline_rounded, size: 16, color: Color(0xFF475569)),
+                    SizedBox(width: 6),
+                    Text(
+                      'How Petty Cash Works',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildWorkflowStepPill(
+                        step: '1',
+                        label: 'Request',
+                        subLabel: 'Site or other',
+                        color: const Color(0xFF2563EB),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFF94A3B8)),
+                    Expanded(
+                      child: _buildWorkflowStepPill(
+                        step: '2',
+                        label: 'Approval',
+                        subLabel: 'Manager review',
+                        color: const Color(0xFF7C3AED),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFF94A3B8)),
+                    Expanded(
+                      child: _buildWorkflowStepPill(
+                        step: '3',
+                        label: 'Spend',
+                        subLabel: 'Record expense',
+                        color: const Color(0xFFD97706),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFF94A3B8)),
+                    Expanded(
+                      child: _buildWorkflowStepPill(
+                        step: '4',
+                        label: 'Track',
+                        subLabel: 'Live ledger',
+                        color: const Color(0xFF059669),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
+  // ---------------------------------------------------------------------------
   // ---------------------------------------------------------------------------
   // 5. MODAL: RECORD EXPENSE (TWO-STAGE FLOW)
   // ---------------------------------------------------------------------------
@@ -1467,6 +2695,7 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
     required double spendableBalance,
     required List<PettyCashRequest> unconfirmedRequests,
     required PettyCashAccount? account,
+    bool initialIsSiteExpense = true,
   }) {
     showModalBottomSheet(
       context: context,
@@ -1481,6 +2710,7 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
           unconfirmedRequests: unconfirmedRequests,
           spendableBalance: spendableBalance,
           account: account,
+          initialIsSiteExpense: initialIsSiteExpense,
           onExpenseRecorded: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -1561,6 +2791,35 @@ class _SupervisorPettyCashPageState extends State<SupervisorPettyCashPage>
       },
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // 9. MODAL: CREATE OTHER EXPENSE REQUEST (NON-SITE / PERSONAL EXPENSE)
+  // ---------------------------------------------------------------------------
+
+  void _openOtherExpenseRequestModal(
+    BuildContext context, {
+    PettyCashAccount? currentAccount,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return _CreateOtherExpenseRequestDialog(
+          supervisorId: widget.supervisorId,
+          supervisorName: widget.supervisorName,
+          currentAccount: currentAccount,
+          onRequestSubmitted: (reqId) {
+            _tabController.animateTo(1);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Other expense request submitted to manager!'),
+                backgroundColor: Color(0xFF10B981),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 // =============================================================================
@@ -1575,6 +2834,7 @@ class _RecordExpenseBottomSheet extends StatefulWidget {
   final List<PettyCashRequest> unconfirmedRequests;
   final double spendableBalance;
   final PettyCashAccount? account;
+  final bool initialIsSiteExpense;
   final VoidCallback onExpenseRecorded;
 
   const _RecordExpenseBottomSheet({
@@ -1585,6 +2845,7 @@ class _RecordExpenseBottomSheet extends StatefulWidget {
     required this.unconfirmedRequests,
     required this.spendableBalance,
     this.account,
+    this.initialIsSiteExpense = true,
     required this.onExpenseRecorded,
   });
 
@@ -1603,6 +2864,7 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
   bool _isSiteExpense = true;
   String? _selectedSiteId;
   String? _selectedSiteName;
+  String? _selectedSiteCode;
   String? _selectedProjectId;
   String? _selectedProjectName;
   String _selectedCategory = 'Office & Site Supplies';
@@ -1631,13 +2893,17 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
   @override
   void initState() {
     super.initState();
-    if (widget.assignedSites.isNotEmpty) {
+    _isSiteExpense = widget.initialIsSiteExpense;
+    if (_isSiteExpense && widget.assignedSites.isNotEmpty) {
       final first = widget.assignedSites.first;
       _selectedSiteId = first['siteId'];
       _selectedSiteName = first['siteName'];
+      _selectedSiteCode = first['siteCode'] ?? first['SiteCode'];
       _selectedProjectId = first['projectId'];
       _selectedProjectName = first['projectName'];
       _fetchSiteAccount(_selectedSiteId);
+    } else if (!_isSiteExpense) {
+      _selectedCategory = 'Other / Miscellaneous';
     }
   }
 
@@ -1681,8 +2947,11 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
     if (_isSiteExpense && _siteAccount != null) {
       return _siteAccount!.spendableBalance;
     }
-    if (widget.account != null) {
+    if (widget.account != null && widget.account!.spendableBalance > 0) {
       return widget.account!.spendableBalance;
+    }
+    if (_siteAccount != null && _siteAccount!.spendableBalance > 0) {
+      return _siteAccount!.spendableBalance;
     }
     return widget.spendableBalance;
   }
@@ -1854,7 +3123,7 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
 
               // Expense Type Toggle
               const Text(
-                'Expense Type',
+                'Expense Type *',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
               ),
               const SizedBox(height: 6),
@@ -1868,6 +3137,15 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
                       onTap: () => setState(() {
                         _isSiteExpense = true;
                         _errorMessage = null;
+                        if (widget.assignedSites.isNotEmpty && (_selectedSiteId == null || _selectedSiteId!.isEmpty)) {
+                          final first = widget.assignedSites.first;
+                          _selectedSiteId = first['siteId'];
+                          _selectedSiteName = first['siteName'];
+                          _selectedSiteCode = first['siteCode'] ?? first['SiteCode'];
+                          _selectedProjectId = first['projectId'];
+                          _selectedProjectName = first['projectName'];
+                          _fetchSiteAccount(_selectedSiteId);
+                        }
                         if (_selectedCategory == 'Other / Miscellaneous') {
                           _selectedCategory = 'Office & Site Supplies';
                         }
@@ -1883,6 +3161,12 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
                       onTap: () => setState(() {
                         _isSiteExpense = false;
                         _errorMessage = null;
+                        _selectedSiteId = null;
+                        _selectedSiteName = null;
+                        _selectedSiteCode = null;
+                        _selectedProjectId = null;
+                        _selectedProjectName = null;
+                        _fetchSiteAccount(null);
                         _selectedCategory = 'Other / Miscellaneous';
                       }),
                     ),
@@ -1891,10 +3175,10 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
               ),
               const SizedBox(height: 14),
 
-              // Site Dropdown
+              // Site Dropdown (Visible only for Site Expenses)
               if (_isSiteExpense) ...[
                 const Text(
-                  'Assigned Site *',
+                  'Assigned Construction Site *',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
                 ),
                 const SizedBox(height: 6),
@@ -1905,10 +3189,15 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
                         isExpanded: true,
                         decoration: _buildInputDecoration(hint: 'Select Site', icon: Icons.domain_rounded),
                         items: widget.assignedSites.map((s) {
+                          final display = formatSiteDisplay(
+                            siteCode: s['siteCode'] ?? s['SiteCode'],
+                            siteName: s['siteName'],
+                            siteId: s['siteId'],
+                          );
                           return DropdownMenuItem<String>(
                             value: s['siteId'],
                             child: Text(
-                              '${s['siteName']} (${s['siteId']})',
+                              display,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                             ),
@@ -1923,6 +3212,7 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
                               orElse: () => {'siteId': val ?? '', 'siteName': val ?? ''},
                             );
                             _selectedSiteName = found['siteName'];
+                            _selectedSiteCode = found['siteCode'] ?? found['SiteCode'];
                             _selectedProjectId = found['projectId'];
                             _selectedProjectName = found['projectName'];
                           });
@@ -1962,15 +3252,17 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
               const SizedBox(height: 14),
 
               // Description
-              const Text(
-                'Description *',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+              Text(
+                _isSiteExpense ? 'Description / Purpose *' : 'Non-Site Purpose & Details *',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
               ),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _descController,
                 decoration: _buildInputDecoration(
-                  hint: 'e.g. Nails, Binding wire, Travel to site, Fuel',
+                  hint: _isSiteExpense
+                      ? 'e.g. Nails, Binding wire, Travel to site, Emergency cement'
+                      : 'e.g. Personal travel allowance, Office courier, Vehicle fuel',
                   icon: Icons.description_outlined,
                 ),
                 onChanged: (_) {
@@ -2222,7 +3514,7 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
 
     if (_isSiteExpense && (_selectedSiteId == null || _selectedSiteId!.trim().isEmpty)) {
       setState(() {
-        _errorMessage = 'Please select an assigned site before recording an expense.';
+        _errorMessage = 'Please select an assigned site before recording a site expense.';
       });
       return;
     }
@@ -2274,10 +3566,12 @@ class _RecordExpenseBottomSheetState extends State<_RecordExpenseBottomSheet> {
         supervisorName: widget.supervisorName,
         managerId: managerId,
         managerName: managerName,
-        siteId: _selectedSiteId,
-        siteName: _selectedSiteName,
-        projectId: _selectedProjectId,
-        projectName: _selectedProjectName,
+        expenseType: _isSiteExpense ? 'site' : 'other',
+        siteId: _isSiteExpense ? _selectedSiteId : null,
+        siteName: _isSiteExpense ? _selectedSiteName : null,
+        siteCode: _isSiteExpense ? _selectedSiteCode : null,
+        projectId: _isSiteExpense ? _selectedProjectId : null,
+        projectName: _isSiteExpense ? _selectedProjectName : null,
         vendorName: _vendorController.text.trim().isNotEmpty ? _vendorController.text.trim() : null,
         isSiteExpense: _isSiteExpense,
         expenseCategory: _selectedCategory,
@@ -2385,9 +3679,12 @@ class _ReconcileCashDialogState extends State<_ReconcileCashDialog> {
     final hasDiscrepancy = diff.abs() > 0.01 && _physicalCashController.text.trim().isNotEmpty;
 
     return AlertDialog(
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('Physical Cash Reconciliation', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900)),
-      content: SingleChildScrollView(
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width,
         child: Form(
           key: _formKey,
           child: Column(
@@ -2601,9 +3898,12 @@ class _ReturnCashDialogState extends State<_ReturnCashDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('Return Petty Cash to Manager', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900)),
-      content: SingleChildScrollView(
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width,
         child: Form(
           key: _formKey,
           child: Column(
@@ -2761,10 +4061,6 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
   String? _selectedSiteName;
   String? _selectedProjectId;
   String? _selectedProjectName;
-  List<Map<String, dynamic>> _pendingSitePayments = [];
-  bool _isLoadingSitePayments = false;
-  String? _selectedSitePaymentId;
-  String? _selectedSitePaymentTitle;
   bool _isSubmitting = false;
 
   @override
@@ -2776,25 +4072,6 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
       _selectedSiteName = first['siteName'];
       _selectedProjectId = first['projectId'];
       _selectedProjectName = first['projectName'];
-      _fetchPendingSitePayments();
-    }
-  }
-
-  Future<void> _fetchPendingSitePayments() async {
-    setState(() => _isLoadingSitePayments = true);
-    try {
-      final payments = await PettyCashService().fetchPendingSitePaymentsForSupervisor(
-        supervisorId: widget.supervisorId,
-        siteId: _selectedSiteId,
-      );
-      if (mounted) {
-        setState(() {
-          _pendingSitePayments = payments;
-          _isLoadingSitePayments = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingSitePayments = false);
     }
   }
 
@@ -2813,6 +4090,8 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
     final totalAlloc = widget.currentAccount?.totalAllocated ?? 0.0;
 
     return AlertDialog(
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text(
         widget.isReplenishment
@@ -2822,239 +4101,142 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
       ),
       content: SizedBox(
         width: MediaQuery.of(context).size.width,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (widget.isReplenishment) ...[
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Spendable: ${PettyCashService.formatCurrency(spendable)}',
-                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Allocated: ${PettyCashService.formatCurrency(totalAlloc)}',
-                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                        ),
-                      ],
-                    ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.isReplenishment) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 12),
-                ],
-
-                const Text('Associated Site *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: _selectedSiteId,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Padding(
-                      padding: EdgeInsets.only(left: 10, right: 6),
-                      child: Icon(Icons.location_city_rounded, size: 18, color: Color(0xFF64748B)),
-                    ),
-                  ),
-                  items: widget.assignedSites.map((s) {
-                    return DropdownMenuItem<String>(
-                      value: s['siteId'],
-                      child: Text(
-                        '${s['siteName']} (${s['siteId']})',
-                        style: const TextStyle(fontSize: 13),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Spendable: ${PettyCashService.formatCurrency(spendable)}',
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedSiteId = val;
-                      final found = widget.assignedSites.firstWhere(
-                        (s) => s['siteId'] == val,
-                        orElse: () => {'siteId': '', 'siteName': ''},
-                      );
-                      _selectedSiteName = found['siteName']?.isNotEmpty == true ? found['siteName'] : null;
-                      _selectedProjectId = found['projectId'];
-                      _selectedProjectName = found['projectName'];
-                      _selectedSitePaymentId = null;
-                      _selectedSitePaymentTitle = null;
-                    });
-                    _fetchPendingSitePayments();
-                  },
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'Please select an assigned site';
-                    return null;
-                  },
+                      const SizedBox(width: 8),
+                      Text(
+                        'Allocated: ${PettyCashService.formatCurrency(totalAlloc)}',
+                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
-
-                if (_isLoadingSitePayments) ...[
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ] else if (_pendingSitePayments.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: const [
-                            Icon(Icons.link_rounded, size: 16, color: Color(0xFF2563EB)),
-                            SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                'Connect to Pending Site Payment',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF1E40AF),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          initialValue: _selectedSitePaymentId,
-                          decoration: InputDecoration(
-                            hintText: 'Select Site Payment Requisition',
-                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text(
-                                'None (Standalone Request)',
-                                style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                            ..._pendingSitePayments.map((payment) {
-                              return DropdownMenuItem<String>(
-                                value: payment['id'].toString(),
-                                child: Text(
-                                  payment['title'].toString(),
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              );
-                            }),
-                          ],
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedSitePaymentId = val;
-                              if (val != null) {
-                                final p = _pendingSitePayments.firstWhere(
-                                  (item) => item['id'].toString() == val,
-                                  orElse: () => {},
-                                );
-                                if (p.isNotEmpty) {
-                                  _selectedSitePaymentTitle = p['title']?.toString();
-                                  if (p['amount'] != null && (p['amount'] as num) > 0) {
-                                    _amountController.text = (p['amount'] as num).toStringAsFixed(0);
-                                  }
-                                  _reasonController.text = 'Fund site payment: ${p['title']}';
-                                }
-                              } else {
-                                _selectedSitePaymentTitle = null;
-                              }
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                const Text('Requested Amount (₹) *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _amountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                  decoration: InputDecoration(
-                    hintText: 'e.g. 10000',
-                    prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'Amount is required';
-                    final n = double.tryParse(val.trim());
-                    if (n == null || n <= 0) return 'Enter a valid amount > 0';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                const Text('Reason / Justification *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _reasonController,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    hintText: widget.isReplenishment
-                        ? 'e.g. Daily site expenses, fuel and urgent hardware supplies'
-                        : 'e.g. Initial operational petty cash for site management',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'Reason is required';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                const Text('Remarks (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _remarksController,
-                  decoration: InputDecoration(
-                    hintText: 'Any additional notes for manager',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                ),
               ],
-            ),
+
+              const Text('Associated Site *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _selectedSiteId,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(left: 10, right: 6),
+                    child: Icon(Icons.location_city_rounded, size: 18, color: Color(0xFF64748B)),
+                  ),
+                ),
+                items: widget.assignedSites.map((s) {
+                  final display = formatSiteDisplay(
+                    siteCode: s['siteCode'] ?? s['SiteCode'],
+                    siteName: s['siteName'],
+                    siteId: s['siteId'],
+                  );
+                  return DropdownMenuItem<String>(
+                    value: s['siteId'],
+                    child: Text(
+                      display,
+                      style: const TextStyle(fontSize: 13),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    _selectedSiteId = val;
+                    final found = widget.assignedSites.firstWhere(
+                      (s) => s['siteId'] == val,
+                      orElse: () => {'siteId': '', 'siteName': ''},
+                    );
+                    _selectedSiteName = found['siteName']?.isNotEmpty == true ? found['siteName'] : null;
+                    _selectedProjectId = found['projectId'];
+                    _selectedProjectName = found['projectName'];
+                  });
+                },
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Please select an assigned site';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              const Text('Requested Amount (₹) *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                decoration: InputDecoration(
+                  hintText: 'e.g. 10000',
+                  prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Amount is required';
+                  final n = double.tryParse(val.trim());
+                  if (n == null || n <= 0) return 'Enter a valid amount > 0';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              const Text('Reason / Justification *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _reasonController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: widget.isReplenishment
+                      ? 'e.g. Daily site expenses, fuel and urgent hardware supplies'
+                      : 'e.g. Initial operational petty cash for site management',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Reason is required';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              const Text('Remarks (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _remarksController,
+                decoration: InputDecoration(
+                  hintText: 'Any additional notes for manager',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -3102,8 +4284,416 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
         projectName: _selectedProjectName,
         siteId: _selectedSiteId ?? '',
         siteName: _selectedSiteName ?? '',
-        linkedSitePaymentId: _selectedSitePaymentId,
-        linkedSitePaymentTitle: _selectedSitePaymentTitle,
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onRequestSubmitted(reqId);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+}
+
+// =============================================================================
+// CREATE OTHER EXPENSE REQUEST DIALOG (NON-SITE / PERSONAL EXPENSE)
+// =============================================================================
+
+class _CreateOtherExpenseRequestDialog extends StatefulWidget {
+  final String supervisorId;
+  final String supervisorName;
+  final PettyCashAccount? currentAccount;
+  final ValueChanged<String> onRequestSubmitted;
+
+  const _CreateOtherExpenseRequestDialog({
+    required this.supervisorId,
+    required this.supervisorName,
+    this.currentAccount,
+    required this.onRequestSubmitted,
+  });
+
+  @override
+  State<_CreateOtherExpenseRequestDialog> createState() => _CreateOtherExpenseRequestDialogState();
+}
+
+class _CreateOtherExpenseRequestDialogState extends State<_CreateOtherExpenseRequestDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _reasonController = TextEditingController();
+  final TextEditingController _remarksController = TextEditingController();
+
+  String _selectedCategory = 'Travel & Conveyance';
+  DateTime? _requiredDate;
+  File? _docFile;
+  String? _uploadedDocUrl;
+  bool _isUploadingDoc = false;
+  bool _isSubmitting = false;
+
+  final List<String> _categories = [
+    'Travel & Conveyance',
+    'Food & Meals',
+    'Office Stationery & Supplies',
+    'Mobile & Internet Recharge',
+    'Emergency Operational Expenses',
+    'Accommodation & Lodging',
+    'Training / Certification',
+    'Other / Miscellaneous',
+  ];
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _reasonController.dispose();
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDocumentImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked != null) {
+      setState(() {
+        _docFile = File(picked.path);
+        _isUploadingDoc = true;
+      });
+
+      try {
+        final res = await AppStorageService.uploadFile(
+          category: 'petty_cash_documents',
+          fileName: 'doc_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          file: _docFile,
+        );
+        if (mounted) {
+          setState(() {
+            _uploadedDocUrl = res?.downloadUrl;
+            _isUploadingDoc = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isUploadingDoc = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to upload document: $e'), backgroundColor: const Color(0xFFEF4444)),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _pickRequiredDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _requiredDate ?? now.add(const Duration(days: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 90)),
+    );
+    if (picked != null) {
+      setState(() => _requiredDate = picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: const Icon(Icons.work_outline_rounded, size: 20, color: Color(0xFFB45309)),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Other Expense Request',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                ),
+                Text(
+                  'Personal or Non-Site Petty Cash',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width,
+        child: Form(
+          key: _formKey,
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Info banner explaining non-site nature
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFB45309)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This request is for non-site or supervisor operational expenses. It will not be linked to any construction site ledger.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF92400E), height: 1.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                const Text('Expense Category *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: _selectedCategory,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    prefixIcon: const Icon(Icons.category_outlined, size: 18, color: Color(0xFF64748B)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  items: _categories.map((cat) {
+                    return DropdownMenuItem<String>(
+                      value: cat,
+                      child: Text(cat, style: const TextStyle(fontSize: 13)),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedCategory = val);
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                const Text('Requested Amount (₹) *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                  ],
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 2500',
+                    prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Amount is required';
+                    final n = double.tryParse(val.trim());
+                    if (n == null || n <= 0) return 'Enter a valid amount > 0';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                const Text('Required By Date (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                InkWell(
+                  onTap: _pickRequiredDate,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFF64748B)),
+                            const SizedBox(width: 8),
+                            Text(
+                              _requiredDate != null
+                                  ? DateFormat('dd MMM yyyy').format(_requiredDate!)
+                                  : 'Select needed date (optional)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _requiredDate != null ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                fontWeight: _requiredDate != null ? FontWeight.w600 : FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_requiredDate != null)
+                          GestureDetector(
+                            onTap: () => setState(() => _requiredDate = null),
+                            child: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF94A3B8)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                const Text('Purpose / Reason *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _reasonController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Travel expenses for supplier meeting, internet pack recharge',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Purpose is required';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                const Text('Remarks (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _remarksController,
+                  decoration: InputDecoration(
+                    hintText: 'Any extra details or manager reference notes',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Supporting Document / Quotation Upload
+                const Text('Supporting Quotation / Document (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                InkWell(
+                  onTap: _isUploadingDoc ? null : _pickDocumentImage,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: _isUploadingDoc
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.attach_file_rounded, size: 18, color: Color(0xFF2563EB)),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _uploadedDocUrl != null
+                                ? 'Document Attached ✓'
+                                : (_isUploadingDoc ? 'Uploading document...' : 'Attach estimate / document'),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: _uploadedDocUrl != null ? FontWeight.w700 : FontWeight.w500,
+                              color: _uploadedDocUrl != null ? const Color(0xFF059669) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        if (_uploadedDocUrl != null)
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
+                            onPressed: () {
+                              setState(() {
+                                _uploadedDocUrl = null;
+                                _docFile = null;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFD97706),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: _isSubmitting
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : const Text('Submit Other Request'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final user = AuthService().userData;
+      final managerId = (user['managerId'] ?? user['supervisorManagerId'] ?? '').toString();
+      final managerName = (user['managerName'] ?? '').toString();
+
+      final reqId = await PettyCashService().submitRequest(
+        supervisorId: widget.supervisorId,
+        supervisorName: widget.supervisorName,
+        requestedAmount: amount,
+        reason: _reasonController.text.trim(),
+        remarks: _remarksController.text.trim(),
+        managerId: managerId,
+        managerName: managerName,
+        isReplenishment: false,
+        isSiteExpense: false,
+        expenseType: 'other',
+        expenseCategory: _selectedCategory,
+        requiredDate: _requiredDate,
+        documentUrl: _uploadedDocUrl,
+        siteId: null,
+        siteName: null,
+        projectId: null,
+        projectName: null,
       );
 
       if (mounted) {

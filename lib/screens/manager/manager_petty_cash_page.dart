@@ -24,6 +24,9 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
   String _searchQuery = '';
   String _reportPeriod = 'This Month';
 
+  // Expense Approvals Filter State
+  String _expenseApprovalTypeFilter = 'All'; // 'All', 'site', 'other'
+
   // Site-Wise Filter States
   String _siteSearchQuery = '';
   String _selectedSiteFilter = 'All';
@@ -648,25 +651,91 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
             .where((e) =>
                 e.status == PettyCashStatus.pendingExpenseReview ||
                 e.status == PettyCashStatus.pendingManagerReview)
+            .where((e) {
+              if (_expenseApprovalTypeFilter == 'site') {
+                return e.isSiteExpense && e.expenseType != 'other';
+              } else if (_expenseApprovalTypeFilter == 'other') {
+                return !e.isSiteExpense || e.expenseType == 'other';
+              }
+              return true;
+            })
             .toList();
 
-        if (pendingExpenses.isEmpty) {
-          return _buildEmptyState(
-            icon: Icons.receipt_long_rounded,
-            title: 'No pending expense approvals',
-            subtitle: 'Expenses submitted by supervisors for verification and ledger posting will appear here.',
-          );
-        }
+        return Column(
+          children: [
+            // Filter Pills Row
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _buildExpenseTypeFilterChip('All Types', 'All'),
+                    const SizedBox(width: 8),
+                    _buildExpenseTypeFilterChip('Site Expenses', 'site'),
+                    const SizedBox(width: 8),
+                    _buildExpenseTypeFilterChip('Supervisor Non-Site', 'other'),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: pendingExpenses.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final exp = pendingExpenses[index];
-            return _buildExpenseApprovalCard(exp);
-          },
+            Expanded(
+              child: pendingExpenses.isEmpty
+                  ? _buildEmptyState(
+                      icon: Icons.receipt_long_rounded,
+                      title: 'No pending expense approvals',
+                      subtitle: _expenseApprovalTypeFilter == 'All'
+                          ? 'Expenses submitted by supervisors for verification and ledger posting will appear here.'
+                          : 'No pending ${_expenseApprovalTypeFilter == 'site' ? 'site' : 'non-site'} expenses found.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: pendingExpenses.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final exp = pendingExpenses[index];
+                        return _buildExpenseApprovalCard(exp);
+                      },
+                    ),
+            ),
+          ],
         );
+      },
+    );
+  }
+
+  Widget _buildExpenseTypeFilterChip(String label, String value) {
+    final isSelected = _expenseApprovalTypeFilter == value;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+          color: isSelected ? Colors.white : const Color(0xFF475569),
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: primaryColor,
+      backgroundColor: const Color(0xFFF1F5F9),
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? primaryColor : const Color(0xFFCBD5E1),
+        ),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _expenseApprovalTypeFilter = value;
+          });
+        }
       },
     );
   }
@@ -674,6 +743,7 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
   Widget _buildExpenseApprovalCard(PettyCashExpense exp) {
     final dateStr = DateFormat('dd MMM yyyy • hh:mm a').format(exp.transactionDate);
     final hasReceipt = exp.receiptUrl != null && exp.receiptUrl!.isNotEmpty;
+    final isSite = exp.isSiteExpense && exp.expenseType != 'other';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -701,10 +771,13 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
                   children: [
                     CircleAvatar(
                       radius: 16,
-                      backgroundColor: const Color(0xFFEFF6FF),
+                      backgroundColor: isSite ? const Color(0xFFEFF6FF) : const Color(0xFFFFFBEB),
                       child: Text(
                         exp.supervisorName.isNotEmpty ? exp.supervisorName[0].toUpperCase() : 'S',
-                        style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2563EB)),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: isSite ? const Color(0xFF2563EB) : const Color(0xFFD97706),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -718,14 +791,40 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          Text(
-                            exp.siteName.isNotEmpty
-                                ? exp.siteName
-                                : (exp.siteId.isNotEmpty ? exp.siteId : 'Overhead / Other'),
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          const SizedBox(height: 2),
+                          if (isSite) ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on_rounded, size: 12, color: Color(0xFF2563EB)),
+                                const SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(
+                                    (exp.siteName != null && exp.siteName!.isNotEmpty)
+                                        ? exp.siteName!
+                                        : ((exp.siteId != null && exp.siteId!.isNotEmpty) ? exp.siteId! : 'Site Expense'),
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB), fontWeight: FontWeight.w700),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else ...[
+                            Row(
+                              children: const [
+                                Icon(Icons.person_rounded, size: 12, color: Color(0xFFD97706)),
+                                SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(
+                                    'Supervisor Personal / Non-Site',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.w700),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -764,6 +863,22 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
           const SizedBox(height: 4),
           Row(
             children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSite ? const Color(0xFFEFF6FF) : const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isSite ? 'SITE EXPENSE' : 'NON-SITE EXPENSE',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: isSite ? const Color(0xFF1D4ED8) : const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
