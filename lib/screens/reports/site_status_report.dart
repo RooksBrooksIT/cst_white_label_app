@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/screens/reports/site_status_report_page.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -29,26 +30,38 @@ class _SiteStatusReportScreenState extends State<SiteStatusReportScreen> {
 
   Future<void> _fetchProjectData() async {
     try {
-      final projectsSnapshot = await FirestoreService.getCollection(
-        'projects',
-      ).get();
+      final results = await Future.wait([
+        FirestoreService.getCollection('projects').get(),
+        FirestoreService.getCollection('Site').get(),
+      ]);
+
+      final projectsSnapshot = results[0];
+      final sitesSnapshot = results[1];
 
       Set<String> uniqueStatuses = {};
       double totalBudget = 0.0;
       double totalSpent = 0.0;
 
-      for (var doc in projectsSnapshot.docs) {
+      final seenDocIds = <String>{};
+      final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+      for (var doc in [...projectsSnapshot.docs, ...sitesSnapshot.docs]) {
+        if (seenDocIds.add(doc.id)) {
+          allDocs.add(doc);
+        }
+      }
+
+      for (var doc in allDocs) {
         final data = doc.data();
 
-        final statusVal = (data['currentStatus'] ?? data['status'])?.toString();
+        final statusVal = (data['currentStatus'] ?? data['status'] ?? data['siteStatus'])?.toString();
         if (statusVal != null && statusVal.trim().isNotEmpty) {
           uniqueStatuses.add(statusVal.trim());
         }
 
         final budget =
-            double.tryParse(data['projectBudget']?.toString() ?? '0') ?? 0.0;
+            double.tryParse(data['projectBudget']?.toString() ?? data['budget']?.toString() ?? '0') ?? 0.0;
         final spent =
-            double.tryParse(data['amountSpent']?.toString() ?? '0') ?? 0.0;
+            double.tryParse(data['amountSpent']?.toString() ?? data['spent']?.toString() ?? '0') ?? 0.0;
 
         totalBudget += budget;
         totalSpent += spent;

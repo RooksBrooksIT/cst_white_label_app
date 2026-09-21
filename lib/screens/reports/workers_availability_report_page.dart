@@ -40,14 +40,140 @@ class _WorkersAvailabilityReportPageState
       final Map<String, Map<String, dynamic>> sitesMap = {};
       final Set<String> uniqueWorkerNames = {};
 
+      // 0. Build a comprehensive site lookup cache from projects, Site, and siteSupervisorMap
+      final Map<String, Map<String, String>> siteLookup = {};
+
+      void registerSiteLookup(String? rawId, String? rawName, String? sup) {
+        final cleanId = SiteDisplayHelper.extractSiteId(rawId ?? '');
+        final cleanName = SiteDisplayHelper.extractSiteName(
+          rawName ?? '',
+          siteId: cleanId.isNotEmpty ? cleanId : null,
+        );
+        final supervisor = (sup ?? '').trim();
+
+        final info = {
+          'siteId': cleanId,
+          'siteName': cleanName,
+          if (supervisor.isNotEmpty) 'supervisor': supervisor,
+        };
+
+        if (cleanId.isNotEmpty) {
+          siteLookup[cleanId.toLowerCase()] = info;
+          siteLookup[cleanId.toLowerCase().replaceAll(' ', '')] = info;
+        }
+        if (cleanName.isNotEmpty) {
+          siteLookup[cleanName.toLowerCase()] = info;
+          siteLookup[cleanName.toLowerCase().replaceAll(' ', '')] = info;
+        }
+        if (rawId != null && rawId.isNotEmpty) {
+          siteLookup[rawId.toLowerCase()] = info;
+        }
+        if (cleanId.isNotEmpty && cleanName.isNotEmpty) {
+          siteLookup['${cleanId}_$cleanName'.toLowerCase()] = info;
+        }
+      }
+
+      try {
+        final projSnap = await FirestoreService.projects.get();
+        for (final doc in projSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['id'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['projectName'] ?? d['name'] ?? '').toString();
+          final sup = (d['assignedSupervisor'] ?? d['supervisor'] ?? d['supervisorName'] ?? '').toString();
+          registerSiteLookup(sId, sName, sup);
+          registerSiteLookup(doc.id, sName, sup);
+        }
+      } catch (e) {
+        debugPrint('Error pre-loading projects for site lookup: $e');
+      }
+
+      try {
+        final siteSnap = await FirestoreService.sites.get();
+        for (final doc in siteSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['siteCode'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['name'] ?? '').toString();
+          final sup = (d['assignedSupervisor'] ?? d['supervisor'] ?? '').toString();
+          registerSiteLookup(sId, sName, sup);
+          registerSiteLookup(doc.id, sName, sup);
+        }
+      } catch (e) {
+        debugPrint('Error pre-loading sites for site lookup: $e');
+      }
+
+      try {
+        final mapSnap = await FirestoreService.siteSupervisorMap.get();
+        for (final doc in mapSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['site'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['projectName'] ?? d['site_name'] ?? '').toString();
+          final sup = (d['supervisor'] ?? d['supervisorName'] ?? '').toString();
+          registerSiteLookup(sId, sName, sup);
+        }
+      } catch (e) {
+        debugPrint('Error pre-loading siteSupervisorMap for site lookup: $e');
+      }
+
+      Map<String, String> resolveCanonicalSite(String rawId, [String? rawName]) {
+        String cleanId = SiteDisplayHelper.extractSiteId(rawId);
+        String cleanName = SiteDisplayHelper.extractSiteName(
+          rawName ?? rawId,
+          siteId: cleanId.isNotEmpty ? cleanId : null,
+        );
+        String supervisor = '';
+
+        final lookupMatch = siteLookup[rawId.toLowerCase()] ??
+            (cleanId.isNotEmpty ? siteLookup[cleanId.toLowerCase()] : null) ??
+            (cleanName.isNotEmpty ? siteLookup[cleanName.toLowerCase()] : null);
+
+        if (lookupMatch != null) {
+          if (cleanId.isEmpty && (lookupMatch['siteId'] ?? '').isNotEmpty) {
+            cleanId = lookupMatch['siteId']!;
+          }
+          if (cleanName.isEmpty && (lookupMatch['siteName'] ?? '').isNotEmpty) {
+            cleanName = lookupMatch['siteName']!;
+          }
+          if ((lookupMatch['supervisor'] ?? '').isNotEmpty) {
+            supervisor = lookupMatch['supervisor']!;
+          }
+        }
+
+        final formattedDisplay = SiteDisplayHelper.formatSiteDisplay(
+          siteId: cleanId,
+          siteName: cleanName,
+          rawCombined: rawId,
+        );
+
+        final canonicalId = formattedDisplay.isNotEmpty
+            ? formattedDisplay
+            : (cleanId.isNotEmpty ? cleanId : rawId);
+
+        return {
+          'canonicalId': canonicalId,
+          'siteId': cleanId.isNotEmpty ? cleanId : (lookupMatch?['siteId'] ?? rawId),
+          'siteName': cleanName.isNotEmpty ? cleanName : (lookupMatch?['siteName'] ?? (cleanId.isNotEmpty ? cleanId : rawId)),
+          'displayName': formattedDisplay.isNotEmpty ? formattedDisplay : rawId,
+          'supervisor': supervisor,
+        };
+      }
+
       // 1. Fetch active worker mappings
       try {
         final mappingSnap = await FirestoreService.getCollection('workerSiteMapping').get();
         for (final doc in mappingSnap.docs) {
           final data = doc.data();
-          final siteId = doc.id;
-          final siteName = (data['siteName'] ?? data['site'] ?? siteId).toString();
-          final supervisor = (data['supervisor'] ?? 'Assigned').toString();
+          final rawSiteId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
+          final rawSiteName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+          final resolved = resolveCanonicalSite(
+            rawSiteId,
+            rawSiteName.isNotEmpty ? rawSiteName : null,
+          );
+          final canonicalKey = resolved['canonicalId']!;
+          final siteId = resolved['siteId']!;
+          final siteName = resolved['siteName']!;
+          final displayName = resolved['displayName']!;
+          final supervisor = (data['supervisor'] ??
+              (resolved['supervisor']!.isNotEmpty ? resolved['supervisor']! : 'Assigned')).toString();
           final workersList = data['workers'] as List<dynamic>? ?? [];
 
           final List<Map<String, dynamic>> formattedWorkers = [];
@@ -69,16 +195,32 @@ class _WorkersAvailabilityReportPageState
             }
           }
 
-          sitesMap[siteId] = {
-            'id': siteId,
-            'site': siteName,
-            'siteId': siteId,
-            'siteName': siteName,
-            'projectName': siteName,
-            'supervisor': supervisor,
-            'workers': formattedWorkers,
-            'extraWorkers': <Map<String, dynamic>>[],
-          };
+          if (!sitesMap.containsKey(canonicalKey)) {
+            sitesMap[canonicalKey] = {
+              'id': canonicalKey,
+              'site': displayName,
+              'siteId': siteId,
+              'siteName': siteName,
+              'displayName': displayName,
+              'projectName': siteName,
+              'supervisor': supervisor,
+              'workers': formattedWorkers,
+              'extraWorkers': <Map<String, dynamic>>[],
+            };
+          } else {
+            final existingWorkers = sitesMap[canonicalKey]!['workers'] as List<Map<String, dynamic>>;
+            for (final fw in formattedWorkers) {
+              final exists = existingWorkers.any((w) =>
+                  w['workerId'] == fw['workerId'] ||
+                  w['workerName'].toString().toLowerCase() == fw['workerName'].toString().toLowerCase());
+              if (!exists) {
+                existingWorkers.add(fw);
+              }
+            }
+            if (supervisor.isNotEmpty && supervisor != 'Assigned' && sitesMap[canonicalKey]!['supervisor'] == 'Assigned') {
+              sitesMap[canonicalKey]!['supervisor'] = supervisor;
+            }
+          }
         }
       } catch (e) {
         debugPrint('Error loading workerSiteMapping in report: $e');
@@ -92,27 +234,37 @@ class _WorkersAvailabilityReportPageState
 
         for (var doc in attendanceSnap.docs) {
           final data = doc.data();
-          final siteId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
-          final siteName = (data['siteName'] ?? data['site'] ?? siteId).toString();
+          final rawSiteId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
+          final rawSiteName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+          final resolved = resolveCanonicalSite(
+            rawSiteId,
+            rawSiteName.isNotEmpty ? rawSiteName : null,
+          );
+          final canonicalKey = resolved['canonicalId']!;
+          final siteId = resolved['siteId']!;
+          final siteName = resolved['siteName']!;
+          final displayName = resolved['displayName']!;
           final workersData = data['workers'] as Map<String, dynamic>? ?? {};
           final extraList = data['extraWorkers'] as List<dynamic>? ?? [];
 
-          if (!sitesMap.containsKey(siteId)) {
-            sitesMap[siteId] = {
-              'id': siteId,
-              'site': siteName,
+          if (!sitesMap.containsKey(canonicalKey)) {
+            sitesMap[canonicalKey] = {
+              'id': canonicalKey,
+              'site': displayName,
               'siteId': siteId,
               'siteName': siteName,
+              'displayName': displayName,
               'projectName': siteName,
-              'supervisor': data['supervisor'] ?? 'Various',
+              'supervisor': data['supervisor'] ??
+                  (resolved['supervisor']!.isNotEmpty ? resolved['supervisor']! : 'Various'),
               'workers': <Map<String, dynamic>>[],
               'extraWorkers': extraList,
             };
-          } else if ((sitesMap[siteId]!['extraWorkers'] as List).isEmpty && extraList.isNotEmpty) {
-            sitesMap[siteId]!['extraWorkers'] = extraList;
+          } else if ((sitesMap[canonicalKey]!['extraWorkers'] as List).isEmpty && extraList.isNotEmpty) {
+            sitesMap[canonicalKey]!['extraWorkers'] = extraList;
           }
 
-          final currentWorkers = sitesMap[siteId]!['workers'] as List<Map<String, dynamic>>;
+          final currentWorkers = sitesMap[canonicalKey]!['workers'] as List<Map<String, dynamic>>;
 
           workersData.forEach((workerName, workerInfo) {
             if (workerInfo is! Map) return;
@@ -142,6 +294,11 @@ class _WorkersAvailabilityReportPageState
       }
 
       final mappings = sitesMap.values.toList();
+      mappings.sort((a, b) {
+        final nameA = (a['displayName'] ?? a['site'] ?? '').toString().toLowerCase();
+        final nameB = (b['displayName'] ?? b['site'] ?? '').toString().toLowerCase();
+        return nameA.compareTo(nameB);
+      });
       final totalWorkers = uniqueWorkerNames.length;
 
       if (!mounted) return;
@@ -149,7 +306,7 @@ class _WorkersAvailabilityReportPageState
         _siteMappings = mappings;
         _totalWorkersCount = totalWorkers;
         _isLoading = false;
-        if (_siteMappings.isNotEmpty && _selectedSiteId == null) {
+        if (_siteMappings.isNotEmpty && (_selectedSiteId == null || !_siteMappings.any((m) => m['id'] == _selectedSiteId))) {
           _selectedSiteId = _siteMappings.first['id'];
         }
       });
@@ -373,10 +530,12 @@ class _WorkersAvailabilityReportPageState
       ),
       selectedItemBuilder: (BuildContext context) {
         return _siteMappings.map<Widget>((m) {
-          final displayName = SiteDisplayHelper.formatSiteDisplay(
-            siteId: m['siteId'] ?? m['id'],
-            siteName: m['siteName'] ?? m['site'],
-          );
+          final displayName = (m['displayName'] ??
+                  SiteDisplayHelper.formatSiteDisplay(
+                    siteId: m['siteId'] ?? m['id'],
+                    siteName: m['siteName'] ?? m['site'],
+                  ))
+              .toString();
           return Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -395,10 +554,12 @@ class _WorkersAvailabilityReportPageState
         }).toList();
       },
       items: _siteMappings.map((m) {
-        final displayName = SiteDisplayHelper.formatSiteDisplay(
-          siteId: m['siteId'] ?? m['id'],
-          siteName: m['siteName'] ?? m['site'],
-        );
+        final displayName = (m['displayName'] ??
+                SiteDisplayHelper.formatSiteDisplay(
+                  siteId: m['siteId'] ?? m['id'],
+                  siteName: m['siteName'] ?? m['site'],
+                ))
+            .toString();
         return DropdownMenuItem<String>(
           value: m['id'] as String?,
           child: Text(

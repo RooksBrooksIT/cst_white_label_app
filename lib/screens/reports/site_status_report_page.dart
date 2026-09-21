@@ -59,7 +59,7 @@ class _SiteStatusReportPageState extends State<SiteStatusReportPage> {
   }
 
   bool _matchesStatus(Map<String, dynamic> data) {
-    final rawStatus = (data['currentStatus'] ?? data['status'] ?? '')
+    final rawStatus = (data['currentStatus'] ?? data['status'] ?? data['siteStatus'] ?? data['projectState'] ?? '')
         .toString()
         .trim()
         .toLowerCase();

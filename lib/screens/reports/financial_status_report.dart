@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import '/utils/pdf_templates.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import '/widgets/glass_card.dart';
@@ -42,39 +43,23 @@ class _FinancialStatusReportPageState extends State<FinancialStatusReportPage> {
 
   Future<void> _fetchProjectData() async {
     try {
-      final col = FirestoreService.getCollection('projects');
-      // Try 1: query projects by siteId field
-      QuerySnapshot<Map<String, dynamic>> query = await col
-          .where('siteId', isEqualTo: widget.siteId)
-          .limit(1)
-          .get();
-      // Try 2: query by site field
-      if (query.docs.isEmpty) {
-        query = await col
-            .where('site', isEqualTo: widget.siteId)
-            .limit(1)
-            .get();
+      final projectDoc = await ExpenseService.findLinkedProjectDoc(widget.siteId);
+      final siteDoc = await ExpenseService.findLinkedSiteDoc(widget.siteId);
+
+      Map<String, dynamic> data = {};
+      if (projectDoc != null && projectDoc.exists) {
+        data.addAll(projectDoc.data() as Map<String, dynamic>);
       }
-      // Try 3: query by siteName from Site collection
-      if (query.docs.isEmpty) {
-        final siteDoc = await FirestoreService.getCollection(
-          'Site',
-        ).doc(widget.siteId).get();
-        if (siteDoc.exists) {
-          final siteData = siteDoc.data()!;
-          final sName = siteData['siteName']?.toString();
-          if (sName != null && sName.isNotEmpty && sName != widget.siteId) {
-            query = await col
-                .where('siteName', isEqualTo: sName)
-                .limit(1)
-                .get();
-          }
+      if (siteDoc != null && siteDoc.exists) {
+        final siteData = siteDoc.data() as Map<String, dynamic>;
+        for (var entry in siteData.entries) {
+          data.putIfAbsent(entry.key, () => entry.value);
         }
       }
 
-      if (query.docs.isNotEmpty) {
+      if (data.isNotEmpty) {
         setState(() {
-          projectData = query.docs.first.data();
+          projectData = data;
           isLoading = false;
         });
       } else {

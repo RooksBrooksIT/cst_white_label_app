@@ -39,20 +39,27 @@ class _ProjectFinancialStatusReportPageState
 
   Future<void> _fetchSiteIds() async {
     try {
-      final snapshot = await FirestoreService.getCollection('projects').get();
-      final rawIds = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            final rawSiteId = data['siteId']?.toString().trim();
-            final rawSiteName = data['siteName']?.toString().trim() ?? data['projectName']?.toString().trim();
-            return ExpenseService.formatCanonicalSiteId(
-              rawId: doc.id,
-              siteCode: rawSiteId,
-              siteName: rawSiteName,
-            );
-          })
-          .where((v) => v.isNotEmpty)
-          .toSet();
+      final results = await Future.wait([
+        FirestoreService.getCollection('projects').get(),
+        FirestoreService.getCollection('Site').get(),
+      ]);
+
+      final rawIds = <String>{};
+      for (var snap in results) {
+        for (var doc in snap.docs) {
+          final data = doc.data();
+          final rawSiteId = data['siteId']?.toString().trim();
+          final rawSiteName = data['siteName']?.toString().trim() ?? data['projectName']?.toString().trim() ?? data['name']?.toString().trim();
+          final formatted = ExpenseService.formatCanonicalSiteId(
+            rawId: doc.id,
+            siteCode: rawSiteId,
+            siteName: rawSiteName,
+          );
+          if (formatted.isNotEmpty) {
+            rawIds.add(formatted);
+          }
+        }
+      }
 
       final validIds = ExpenseService.sanitizeSiteIds(rawIds);
       final ids = validIds.toList()..sort();

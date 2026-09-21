@@ -73,11 +73,13 @@ class _MaterialInventoryDetailsPageState
         MaterialInventoryService.fetchMaterialInventory(widget.materialName),
         FirestoreService.getCollection('Site').get(),
         FirestoreService.projects.get(),
+        FirestoreService.siteMaterialPool.get(),
       ]);
 
       final item = results[0] as MaterialInventoryItem?;
       final sitesSnap = (results[1] as QuerySnapshot<Map<String, dynamic>>).docs;
       final projectsSnap = (results[2] as QuerySnapshot<Map<String, dynamic>>).docs;
+      final poolDocs = (results[3] as QuerySnapshot<Map<String, dynamic>>).docs;
 
       final sNameMap = <String, String>{};
       final sProjMap = <String, String>{};
@@ -87,18 +89,39 @@ class _MaterialInventoryDetailsPageState
         final sId = (data['siteId'] ?? d.id).toString().trim();
         final sName = (data['siteName'] ?? data['projectName'] ?? sId).toString().trim();
         final pName = (data['projectName'] ?? '').toString().trim();
-        sNameMap[sId.toLowerCase()] = sName;
-        if (pName.isNotEmpty) sProjMap[sId.toLowerCase()] = pName;
+        if (sId.isNotEmpty) {
+          sNameMap[sId.toLowerCase()] = sName;
+          if (pName.isNotEmpty) sProjMap[sId.toLowerCase()] = pName;
+        }
       }
 
       for (var d in projectsSnap) {
         final data = d.data();
         final sId = (data['siteId'] ?? d.id).toString().trim();
         final pName = (data['projectName'] ?? '').toString().trim();
-        if (!sNameMap.containsKey(sId.toLowerCase()) || sNameMap[sId.toLowerCase()] == sId) {
-          sNameMap[sId.toLowerCase()] = pName.isNotEmpty ? pName : sId;
+        if (sId.isNotEmpty) {
+          if (!sNameMap.containsKey(sId.toLowerCase()) || sNameMap[sId.toLowerCase()] == sId) {
+            sNameMap[sId.toLowerCase()] = pName.isNotEmpty ? pName : sId;
+          }
+          if (pName.isNotEmpty) sProjMap[sId.toLowerCase()] = pName;
         }
-        if (pName.isNotEmpty) sProjMap[sId.toLowerCase()] = pName;
+      }
+
+      final targetLow = widget.materialName.trim().toLowerCase();
+      final targetDocKey = MaterialInventoryService.getMaterialDocId(widget.materialName);
+
+      // Collect matching pool docs for this material
+      final poolMap = <String, Map<String, dynamic>>{};
+      for (var d in poolDocs) {
+        final data = d.data();
+        final mName = (data['materialName'] ?? data['name'] ?? '').toString().trim().toLowerCase();
+        final mDocKey = MaterialInventoryService.getMaterialDocId(mName);
+        if (mName == targetLow || mDocKey == targetDocKey || d.id.toLowerCase().contains(targetDocKey)) {
+          final sId = (data['siteId'] ?? '').toString().toLowerCase().trim();
+          if (sId.isNotEmpty) {
+            poolMap[sId] = data;
+          }
+        }
       }
 
       if (item != null) {
@@ -125,40 +148,27 @@ class _MaterialInventoryDetailsPageState
           }
         }
 
-        // Fetch siteMaterialPool for enhanced allocation/consumption tracking
-        try {
-          final poolSnap = await FirestoreService.siteMaterialPool
-              .where('materialName', isEqualTo: widget.materialName)
-              .get();
-          final poolMap = <String, Map<String, dynamic>>{};
-          for (var d in poolSnap.docs) {
-            final data = d.data();
-            final sId = (data['siteId'] ?? '').toString().toLowerCase().trim();
-            if (sId.isNotEmpty) {
-              poolMap[sId] = data;
-            }
+        for (var b in breakdown) {
+          final sId = (b['siteId'] ?? '').toString().toLowerCase().trim();
+          if (poolMap.containsKey(sId)) {
+            final pData = poolMap[sId]!;
+            b['allocatedQty'] = (pData['totalAllocatedQty'] as num?)?.toDouble() ?? (b['quantity'] as double);
+            b['consumedQty'] = (pData['consumedQty'] as num?)?.toDouble() ?? 0.0;
+            b['remainingQty'] = (pData['remainingQty'] as num?)?.toDouble() ?? (b['quantity'] as double);
+            b['effectiveUnitRate'] = (pData['effectiveUnitRate'] as num?)?.toDouble() ?? 0.0;
+            b['allocatedAmount'] = (pData['totalAllocatedAmount'] as num?)?.toDouble() ?? 0.0;
+            b['consumedAmount'] = (pData['consumedAmount'] as num?)?.toDouble() ?? 0.0;
+            b['remainingAmount'] = (pData['remainingAmount'] as num?)?.toDouble() ?? 0.0;
           }
+        }
 
-          for (var b in breakdown) {
-            final sId = (b['siteId'] ?? '').toString().toLowerCase().trim();
-            if (poolMap.containsKey(sId)) {
-              final pData = poolMap[sId]!;
-              b['allocatedQty'] = (pData['totalAllocatedQty'] as num?)?.toDouble() ?? (b['quantity'] as double);
-              b['consumedQty'] = (pData['consumedQty'] as num?)?.toDouble() ?? 0.0;
-              b['remainingQty'] = (pData['remainingQty'] as num?)?.toDouble() ?? (b['quantity'] as double);
-              b['effectiveUnitRate'] = (pData['effectiveUnitRate'] as num?)?.toDouble() ?? 0.0;
-              b['allocatedAmount'] = (pData['totalAllocatedAmount'] as num?)?.toDouble() ?? 0.0;
-              b['consumedAmount'] = (pData['consumedAmount'] as num?)?.toDouble() ?? 0.0;
-              b['remainingAmount'] = (pData['remainingAmount'] as num?)?.toDouble() ?? 0.0;
-            }
-          }
-
-          for (var entry in poolMap.entries) {
-            final sId = entry.key;
-            final pData = entry.value;
-            if (!breakdown.any((b) => (b['siteId'] ?? '').toString().toLowerCase().trim() == sId)) {
-              final sName = (pData['siteName'] ?? sNameMap[sId] ?? pData['siteId'] ?? sId).toString();
-              final remQty = (pData['remainingQty'] as num?)?.toDouble() ?? 0.0;
+        for (var entry in poolMap.entries) {
+          final sId = entry.key;
+          final pData = entry.value;
+          if (!breakdown.any((b) => (b['siteId'] ?? '').toString().toLowerCase().trim() == sId)) {
+            final sName = (pData['siteName'] ?? sNameMap[sId] ?? pData['siteId'] ?? sId).toString();
+            final remQty = (pData['remainingQty'] as num?)?.toDouble() ?? 0.0;
+            if (remQty > 0) {
               breakdown.add({
                 'siteId': pData['siteId'] ?? sId,
                 'siteName': sName,
@@ -175,8 +185,6 @@ class _MaterialInventoryDetailsPageState
               });
             }
           }
-        } catch (e) {
-          debugPrint('Error merging site material pool: $e');
         }
 
         // Fetch audit trail records
@@ -200,11 +208,45 @@ class _MaterialInventoryDetailsPageState
           });
         }
       } else {
+        // Fallback when item is not yet in availability collection
+        final List<Map<String, dynamic>> breakdown = [];
+        for (var entry in poolMap.entries) {
+          final sId = entry.key;
+          final pData = entry.value;
+          final sName = (pData['siteName'] ?? sNameMap[sId] ?? pData['siteId'] ?? sId).toString();
+          final remQty = (pData['remainingQty'] as num?)?.toDouble() ?? 0.0;
+          if (remQty > 0) {
+            breakdown.add({
+              'siteId': pData['siteId'] ?? sId,
+              'siteName': sName,
+              'projectName': pData['projectName'] ?? sProjMap[sId] ?? 'Site Project',
+              'quantity': remQty,
+              'lastUpdated': _formatDateStr(pData['updatedAt']),
+              'allocatedQty': (pData['totalAllocatedQty'] as num?)?.toDouble() ?? remQty,
+              'consumedQty': (pData['consumedQty'] as num?)?.toDouble() ?? 0.0,
+              'remainingQty': remQty,
+              'effectiveUnitRate': (pData['effectiveUnitRate'] as num?)?.toDouble() ?? 0.0,
+              'allocatedAmount': (pData['totalAllocatedAmount'] as num?)?.toDouble() ?? 0.0,
+              'consumedAmount': (pData['consumedAmount'] as num?)?.toDouble() ?? 0.0,
+              'remainingAmount': (pData['remainingAmount'] as num?)?.toDouble() ?? 0.0,
+            });
+          }
+        }
+
+        List<MaterialTransactionRecord> auditRecords = [];
+        try {
+          auditRecords = await MaterialInventoryService.fetchMaterialAuditTrail(
+            materialName: widget.materialName,
+          );
+        } catch (e) {
+          debugPrint('Error fetching audit records: $e');
+        }
+
         if (mounted) {
           setState(() {
             _companyQty = 0.0;
-            _siteBreakdown = [];
-            _auditRecords = [];
+            _siteBreakdown = breakdown;
+            _auditRecords = auditRecords;
             _isLoading = false;
           });
         }
@@ -814,7 +856,7 @@ class _MaterialInventoryDetailsPageState
                                                 ),
                                               ),
                                               Text(
-                                                widget.unit,
+                                                dispUnit,
                                                 style: const TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w800,

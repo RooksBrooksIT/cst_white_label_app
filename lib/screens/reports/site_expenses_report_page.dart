@@ -49,35 +49,79 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
   /// Fetches supervisor, manager, organization, contractor, and incentive entries for each date in range.
   Future<List<Map<String, dynamic>>> _fetchEntriesForRange() async {
     final List<Map<String, dynamic>> entries = [];
-    final DateFormat docIdDateFormat = DateFormat('ddMMyyyy');
     final DateFormat displayDateFormat = DateFormat('dd-MM-yy');
 
     final siteKeys =
         (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
     final keysToQuery = siteKeys.take(10).toList();
 
+    if (keysToQuery.isEmpty) return entries;
+
+    // 1. Fetch all collections in parallel up front for high performance
+    final fetchResults = await Future.wait([
+      // 0, 1: Supervisor entries
+      FirestoreService.getCollection('siteSupervisorEntries').where('siteId', whereIn: keysToQuery).get(),
+      FirestoreService.getCollection('siteSupervisorEntries').where('site', whereIn: keysToQuery).get(),
+      // 2, 3: Manager expenses & entries
+      FirestoreService.getCollection('managerExpenses').where('siteId', whereIn: keysToQuery).get(),
+      FirestoreService.getCollection('managerEntries').where('siteId', whereIn: keysToQuery).get(),
+      // 4, 5: Organization entries & expenses
+      FirestoreService.getCollection('organizationEntries').where('siteId', whereIn: keysToQuery).get(),
+      FirestoreService.getCollection('organizationExpenses').where('siteId', whereIn: keysToQuery).get(),
+      // 6: Contractor entries
+      FirestoreService.getCollection('contractorEntries').where('siteId', whereIn: keysToQuery).get(),
+      // 7, 8: Incentives & Totals
+      FirestoreService.siteSupervisorIncentives.where('siteId', whereIn: keysToQuery).get(),
+      FirestoreService.getCollection('totalSiteExpensesPerDay').where('siteId', whereIn: keysToQuery).get(),
+    ]);
+
+    final allSupDocs = {...fetchResults[0].docs, ...fetchResults[1].docs};
+    final allMgrDocs = {...fetchResults[2].docs, ...fetchResults[3].docs};
+    final allOrgDocs = {...fetchResults[4].docs, ...fetchResults[5].docs};
+    final allContractorDocs = fetchResults[6].docs;
+    final allIncentiveDocs = {...fetchResults[7].docs, ...fetchResults[8].docs};
+
     DateTime current = widget.fromDate;
     while (!current.isAfter(widget.toDate)) {
-      final dateStr = docIdDateFormat.format(current);
+      final docIdDateCompact = DateFormat('ddMMyyyy').format(current);
 
-      // 1. Supervisor entry across siteKeys
+      // 1. Match supervisor entry for current date
       Map<String, dynamic>? supervisorData;
-      for (final k in siteKeys) {
-        final docId = '${k}_$dateStr';
-        final supervisorDoc = await FirestoreService.getCollection(
-          'siteSupervisorEntries',
-        ).doc(docId).get();
-        if (supervisorDoc.exists) {
-          final data = supervisorDoc.data();
-          // Skip manager or org flagged entries to avoid duplicate counting
-          if (data?['isManagerEntry'] != true &&
-              data?['createdBy'] != 'manager' &&
-              data?['isOrgEntry'] != true &&
-              data?['createdBy'] != 'manager_org') {
+      // First check doc ID matches (e.g. ST001_19092026)
+      for (final doc in allSupDocs) {
+        final data = doc.data();
+        if (data['isManagerEntry'] == true || data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+          continue;
+        }
+        for (final k in siteKeys) {
+          if (doc.id == '${k}_$docIdDateCompact' || doc.id.toLowerCase() == '${k.toLowerCase()}_$docIdDateCompact') {
             if (widget.projectStage != null) {
-              final docStage = (data?['projectStage'] ?? data?['projectField'])
-                  ?.toString()
-                  .trim();
+              final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
+              if (docStage == widget.projectStage?.trim()) {
+                supervisorData = data;
+                break;
+              }
+            } else {
+              supervisorData = data;
+              break;
+            }
+          }
+        }
+        if (supervisorData != null) break;
+      }
+
+      // If not matched by doc ID, match by date field
+      if (supervisorData == null) {
+        for (final doc in allSupDocs) {
+          final data = doc.data();
+          if (data['isManagerEntry'] == true || data['createdBy'] == 'manager' ||
+              data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+            continue;
+          }
+          if (ExpenseService.isSameDay(data['date'] ?? data['createdAt'], current)) {
+            if (widget.projectStage != null) {
+              final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
               if (docStage == widget.projectStage?.trim()) {
                 supervisorData = data;
                 break;
@@ -90,78 +134,52 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         }
       }
 
-      // 2. Manager bills for this date
-      final managerQuery = await FirestoreService.getCollection(
-        'managerExpenses',
-      ).where('siteId', whereIn: keysToQuery).get();
-      List<Map<String, dynamic>> managerBills = [];
-      for (final doc in managerQuery.docs) {
+      // 2. Match Manager bills for current date
+      final List<Map<String, dynamic>> managerBills = [];
+      for (final doc in allMgrDocs) {
         final data = doc.data();
         if (widget.projectStage != null) {
-          final docStage = (data['projectStage'] ?? data['projectField'])
-              ?.toString()
-              .trim();
+          final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
           if (docStage != widget.projectStage?.trim()) continue;
         }
 
-        if (data['bills'] != null) {
-          for (final bill in data['bills']) {
-            DateTime? billDateObj;
-            if (bill['billDate'] is String) {
-              billDateObj = DateTime.tryParse(bill['billDate']);
-            } else if (bill['billDate'] is Timestamp) {
-              billDateObj = bill['billDate'].toDate();
-            }
-            if (billDateObj != null &&
-                billDateObj.year == current.year &&
-                billDateObj.month == current.month &&
-                billDateObj.day == current.day) {
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          for (final bill in bills) {
+            if (bill is Map && ExpenseService.isSameDay(bill['billDate'] ?? bill['date'], current)) {
               managerBills.add(Map<String, dynamic>.from(bill));
             }
+          }
+        } else if (data['totalAmount'] != null || data['amount'] != null) {
+          if (ExpenseService.isSameDay(data['date'] ?? data['entryDate'] ?? data['createdAt'], current)) {
+            managerBills.add({
+              'billNo': data['billNo'] ?? data['entryId'] ?? 'MGR-${managerBills.length + 1}',
+              'billVendor': data['vendorName'] ?? data['vendor'] ?? 'Direct Manager',
+              'billAmount': data['totalAmount'] ?? data['amount'] ?? 0,
+              'billDate': data['date'] ?? current.toIso8601String(),
+            });
           }
         }
       }
 
-      // 3. Organization bills for this date
-      final orgQuery = await FirestoreService.getCollection(
-        'organizationEntries',
-      ).where('siteId', whereIn: keysToQuery).get();
-      List<Map<String, dynamic>> orgBills = [];
-      for (final doc in orgQuery.docs) {
+      // 3. Match Organization bills for current date
+      final List<Map<String, dynamic>> orgBills = [];
+      for (final doc in allOrgDocs) {
         final data = doc.data();
         if (widget.projectStage != null) {
-          final docStage = (data['projectStage'] ?? data['projectField'])
-              ?.toString()
-              .trim();
+          final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
           if (docStage != widget.projectStage?.trim()) continue;
         }
 
-        if (data['bills'] != null) {
-          for (final bill in data['bills']) {
-            DateTime? billDateObj;
-            if (bill['billDate'] is String) {
-              billDateObj = DateTime.tryParse(bill['billDate']);
-            } else if (bill['billDate'] is Timestamp) {
-              billDateObj = bill['billDate'].toDate();
-            }
-            if (billDateObj != null &&
-                billDateObj.year == current.year &&
-                billDateObj.month == current.month &&
-                billDateObj.day == current.day) {
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          for (final bill in bills) {
+            if (bill is Map && ExpenseService.isSameDay(bill['billDate'] ?? bill['date'], current)) {
               orgBills.add(Map<String, dynamic>.from(bill));
             }
           }
         } else if (data['totalAmount'] != null || data['amount'] != null) {
-          DateTime? entryDate;
-          if (data['date'] is String) {
-            entryDate = DateTime.tryParse(data['date']);
-          } else if (data['createdAt'] is Timestamp) {
-            entryDate = (data['createdAt'] as Timestamp).toDate();
-          }
-          if (entryDate != null &&
-              entryDate.year == current.year &&
-              entryDate.month == current.month &&
-              entryDate.day == current.day) {
+          if (ExpenseService.isSameDay(data['date'] ?? data['entryDate'] ?? data['createdAt'], current)) {
             orgBills.add({
               'billNo': data['billNo'] ?? data['entryId'] ?? 'ORG-${orgBills.length + 1}',
               'billVendor': data['vendorName'] ?? data['vendor'] ?? 'Direct Organization',
@@ -172,58 +190,29 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         }
       }
 
-      // 4. Contractor expenses for this date
-      final contractorSnapshot = await FirestoreService.getCollection(
-        'contractorEntries',
-      ).where('siteId', whereIn: keysToQuery).get();
-      List<Map<String, dynamic>> contractorEntries = [];
-      for (final doc in contractorSnapshot.docs) {
+      // 4. Match Contractor expenses for current date
+      final List<Map<String, dynamic>> contractorEntries = [];
+      for (final doc in allContractorDocs) {
         final data = doc.data();
-        DateTime? cDate;
-        if (data['date'] is String) {
-          cDate = DateTime.tryParse(data['date']);
-        } else if (data['createdAt'] is Timestamp) {
-          cDate = (data['createdAt'] as Timestamp).toDate();
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'] ?? data['workStage'])?.toString().trim();
+          if (docStage != widget.projectStage?.trim()) continue;
         }
-        if (cDate != null &&
-            cDate.year == current.year &&
-            cDate.month == current.month &&
-            cDate.day == current.day) {
-          if (widget.projectStage != null) {
-            final docStage = (data['projectStage'] ?? data['projectField'] ?? data['workStage'])
-                ?.toString()
-                .trim();
-            if (docStage != widget.projectStage?.trim()) continue;
-          }
+        if (ExpenseService.isSameDay(data['date'] ?? data['createdAt'], current)) {
           contractorEntries.add(data);
         }
       }
 
-      // 5. Supervisor / Worker Incentives for this date
-      final incentiveQuery = await FirestoreService.siteSupervisorIncentives
-          .where('siteId', whereIn: keysToQuery)
-          .get();
-      List<Map<String, dynamic>> incentiveEntries = [];
-      for (final doc in incentiveQuery.docs) {
+      // 5. Match Incentive Entries for current date
+      final List<Map<String, dynamic>> incentiveEntries = [];
+      for (final doc in allIncentiveDocs) {
         final data = doc.data();
-        DateTime? iDate;
-        if (data['date'] is String) {
-          iDate = DateTime.tryParse(data['date']);
-        } else if (data['createdAt'] is Timestamp) {
-          iDate = (data['createdAt'] as Timestamp).toDate();
-        } else if (data['timestamp'] is Timestamp) {
-          iDate = (data['timestamp'] as Timestamp).toDate();
-        }
-        if (iDate != null &&
-            iDate.year == current.year &&
-            iDate.month == current.month &&
-            iDate.day == current.day) {
+        if (ExpenseService.isSameDay(data['date'] ?? data['updatedAt'] ?? data['createdAt'] ?? data['timestamp'], current)) {
           incentiveEntries.add(data);
         }
       }
 
-      final hasSupervisor =
-          supervisorData != null && (supervisorData['totalAmount'] ?? 0) != 0;
+      final hasSupervisor = supervisorData != null && (supervisorData['totalAmount'] ?? 0) != 0;
       final hasManager = managerBills.isNotEmpty;
       final hasOrg = orgBills.isNotEmpty;
       final hasContractor = contractorEntries.isNotEmpty;

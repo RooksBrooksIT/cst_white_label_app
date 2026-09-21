@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/site_display_helper.dart';
 import 'package:ebricks/widgets/glass_card.dart';
 
 class WorkerCalendarAvailabilityPage extends StatefulWidget {
@@ -261,7 +262,7 @@ class _WorkerCalendarAvailabilityPageState
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'Site: ${widget.siteId}',
+                    'Site: ${SiteDisplayHelper.formatSiteDisplay(rawCombined: widget.siteId)}',
                     style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ),

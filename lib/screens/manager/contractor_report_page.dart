@@ -9,6 +9,8 @@ import 'package:printing/printing.dart';
 import 'package:ebricks/utils/pdf_templates.dart';
 import 'package:ebricks/services/firestore_service.dart';
 
+import 'package:ebricks/services/expense_service.dart';
+
 class ContractorReportPage extends StatefulWidget {
   const ContractorReportPage({super.key});
 
@@ -105,7 +107,7 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
     try {
       debugPrint('ContractorReportPage: Fetching site IDs for $contractorName');
 
-      final Set<String> allSiteIds = {};
+      final Set<String> rawSiteIds = {};
 
       // 1. Fetch from projects collection
       Query<Map<String, dynamic>> projectQuery = FirestoreService.projects
@@ -118,8 +120,15 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
 
       final projectSnapshot = await projectQuery.limit(500).get();
       for (var doc in projectSnapshot.docs) {
-        final sid = doc.data()['siteId']?.toString().trim();
-        if (sid != null && sid.isNotEmpty) allSiteIds.add(sid);
+        final data = doc.data();
+        final sid = data['siteId']?.toString().trim();
+        final sname = data['siteName']?.toString().trim() ?? data['projectName']?.toString().trim();
+        final formatted = ExpenseService.formatCanonicalSiteId(
+          rawId: doc.id,
+          siteCode: sid,
+          siteName: sname,
+        );
+        if (formatted.isNotEmpty) rawSiteIds.add(formatted);
       }
 
       // 2. Fetch from contractorEntries to ensure we have all sites with data
@@ -132,12 +141,19 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
 
       final entriesSnapshot = await entriesQuery.limit(500).get();
       for (var doc in entriesSnapshot.docs) {
-        final sid = doc.data()['siteId']?.toString().trim();
-        if (sid != null && sid.isNotEmpty) allSiteIds.add(sid);
+        final data = doc.data();
+        final sid = data['siteId']?.toString().trim() ?? data['site']?.toString().trim();
+        final sname = data['siteName']?.toString().trim();
+        final formatted = ExpenseService.formatCanonicalSiteId(
+          rawId: doc.id,
+          siteCode: sid,
+          siteName: sname,
+        );
+        if (formatted.isNotEmpty) rawSiteIds.add(formatted);
       }
 
-      final sortedIds = allSiteIds.toList();
-      sortedIds.sort();
+      final validIds = ExpenseService.sanitizeSiteIds(rawSiteIds);
+      final sortedIds = validIds.toList()..sort();
 
       debugPrint('ContractorReportPage: Found ${sortedIds.length} site IDs');
       if (mounted) {
@@ -172,23 +188,39 @@ class _ContractorReportPageState extends State<ContractorReportPage> {
         'ContractorReportPage: Fetching expenses for $selectedContractor at $selectedSiteId',
       );
 
-      final querySnapshot = await FirestoreService.contractorEntries
-          .where('contractorName', isEqualTo: selectedContractor)
-          .where('siteId', isEqualTo: selectedSiteId)
-          .limit(1000)
-          .get();
+      final siteKeys = (await ExpenseService.resolveSiteKeys(selectedSiteId!)).toList();
+      final keysToQuery = siteKeys.take(10).toList();
+
+      final results = await Future.wait([
+        FirestoreService.contractorEntries
+            .where('contractorName', isEqualTo: selectedContractor)
+            .where('siteId', whereIn: keysToQuery)
+            .limit(1000)
+            .get(),
+        FirestoreService.contractorEntries
+            .where('contractorName', isEqualTo: selectedContractor)
+            .where('site', whereIn: keysToQuery)
+            .limit(1000)
+            .get(),
+      ]);
 
       if (!mounted) return;
       double sum = 0.0;
       final List<Map<String, dynamic>> fetched = [];
-      for (var doc in querySnapshot.docs) {
-        final data = doc.data();
-        final amt = data['totalAmount'] ?? data['amount'] ?? 0;
-        sum += (amt is num)
-            ? amt.toDouble()
-            : (double.tryParse(amt.toString()) ?? 0.0);
-        fetched.add(data);
+      final Set<String> seenDocIds = {};
+
+      for (var snap in results) {
+        for (var doc in snap.docs) {
+          if (!seenDocIds.add(doc.id)) continue;
+          final data = doc.data();
+          final amt = data['totalAmount'] ?? data['amount'] ?? 0;
+          sum += (amt is num)
+              ? amt.toDouble()
+              : (double.tryParse(amt.toString()) ?? 0.0);
+          fetched.add(data);
+        }
       }
+
       debugPrint(
         'ContractorReportPage: Found ${fetched.length} entries, total: $sum',
       );

@@ -855,6 +855,53 @@ class ExpenseService {
     return details.allKeys;
   }
 
+  /// Find the Firestore DocumentSnapshot in `projects` matching any alias of [siteId]
+  static Future<DocumentSnapshot<Map<String, dynamic>>?> findLinkedProjectDoc(String siteId) async {
+    final keys = (await resolveSiteKeys(siteId)).toList();
+    for (final key in keys) {
+      try {
+        final doc = await FirestoreService.getCollection('projects').doc(key).get();
+        if (doc.exists) return doc;
+      } catch (_) {}
+    }
+    final keysToQuery = keys.take(10).toList();
+    try {
+      final results = await Future.wait([
+        FirestoreService.getCollection('projects').where('siteId', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('projects').where('site', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('projects').where('siteName', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('projects').where('projectName', whereIn: keysToQuery).limit(1).get(),
+      ]);
+      for (final snap in results) {
+        if (snap.docs.isNotEmpty) return snap.docs.first;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Find the Firestore DocumentSnapshot in `Site` matching any alias of [siteId]
+  static Future<DocumentSnapshot<Map<String, dynamic>>?> findLinkedSiteDoc(String siteId) async {
+    final keys = (await resolveSiteKeys(siteId)).toList();
+    for (final key in keys) {
+      try {
+        final doc = await FirestoreService.getCollection('Site').doc(key).get();
+        if (doc.exists) return doc;
+      } catch (_) {}
+    }
+    final keysToQuery = keys.take(10).toList();
+    try {
+      final results = await Future.wait([
+        FirestoreService.getCollection('Site').where('siteId', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('Site').where('site', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('Site').where('siteName', whereIn: keysToQuery).limit(1).get(),
+      ]);
+      for (final snap in results) {
+        if (snap.docs.isNotEmpty) return snap.docs.first;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // Helper to parse numeric amount from any dynamic field or sub-structure
   static double _parseExpenseAmount(dynamic val, [Map<String, dynamic>? data]) {
     if (val != null) {
@@ -1612,5 +1659,100 @@ class ExpenseService {
     } catch (e) {
       print("❌ Error recalculating non-site expenses: $e");
     }
+  }
+
+  /// Universally parses date from various input formats:
+  /// - DateTime, Timestamp, int (epoch milliseconds or seconds)
+  /// - ISO Strings (yyyy-MM-dd, yyyy-MM-ddTHH:mm:ss...)
+  /// - Delimited date strings (dd/MM/yyyy, dd-MM-yyyy, yyyy/MM/dd, yyyy-MM-dd)
+  /// - Compact 8-digit date strings (ddMMyyyy or yyyyMMdd)
+  static DateTime? parseDate(dynamic input) {
+    if (input == null) return null;
+    if (input is DateTime) return input;
+    if (input is Timestamp) return input.toDate();
+
+    if (input is int) {
+      if (input > 100000000000) {
+        return DateTime.fromMillisecondsSinceEpoch(input);
+      } else if (input > 1000000000) {
+        return DateTime.fromMillisecondsSinceEpoch(input * 1000);
+      }
+    }
+
+    final str = input.toString().trim();
+    if (str.isEmpty || str.toLowerCase() == 'null') return null;
+
+    // 1. Try standard ISO-8601 DateTime.tryParse
+    final isoParsed = DateTime.tryParse(str);
+    if (isoParsed != null) return isoParsed;
+
+    // 2. Try dd/MM/yyyy or dd-MM-yyyy (e.g. 19/09/2026, 19-09-2026)
+    final dmyRegex = RegExp(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$');
+    final dmyMatch = dmyRegex.firstMatch(str);
+    if (dmyMatch != null) {
+      final day = int.tryParse(dmyMatch.group(1)!);
+      final month = int.tryParse(dmyMatch.group(2)!);
+      final year = int.tryParse(dmyMatch.group(3)!);
+      final hour = dmyMatch.group(4) != null ? int.tryParse(dmyMatch.group(4)!) ?? 0 : 0;
+      final minute = dmyMatch.group(5) != null ? int.tryParse(dmyMatch.group(5)!) ?? 0 : 0;
+      final second = dmyMatch.group(6) != null ? int.tryParse(dmyMatch.group(6)!) ?? 0 : 0;
+      if (day != null && month != null && year != null && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day, hour, minute, second);
+      }
+    }
+
+    // 3. Try yyyy/MM/dd or yyyy-MM-dd
+    final ymdRegex = RegExp(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$');
+    final ymdMatch = ymdRegex.firstMatch(str);
+    if (ymdMatch != null) {
+      final year = int.tryParse(ymdMatch.group(1)!);
+      final month = int.tryParse(ymdMatch.group(2)!);
+      final day = int.tryParse(ymdMatch.group(3)!);
+      final hour = ymdMatch.group(4) != null ? int.tryParse(ymdMatch.group(4)!) ?? 0 : 0;
+      final minute = ymdMatch.group(5) != null ? int.tryParse(ymdMatch.group(5)!) ?? 0 : 0;
+      final second = ymdMatch.group(6) != null ? int.tryParse(ymdMatch.group(6)!) ?? 0 : 0;
+      if (day != null && month != null && year != null && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day, hour, minute, second);
+      }
+    }
+
+    // 4. Try 8-digit compact string: ddMMyyyy (e.g. 19092026) or yyyyMMdd (e.g. 20260919)
+    if (RegExp(r'^\d{8}$').hasMatch(str)) {
+      // Check ddMMyyyy first
+      final d1 = int.tryParse(str.substring(0, 2)) ?? 0;
+      final m1 = int.tryParse(str.substring(2, 4)) ?? 0;
+      final y1 = int.tryParse(str.substring(4, 8)) ?? 0;
+      if (y1 >= 2000 && y1 <= 2100 && m1 >= 1 && m1 <= 12 && d1 >= 1 && d1 <= 31) {
+        return DateTime(y1, m1, d1);
+      }
+
+      // Check yyyyMMdd
+      final y2 = int.tryParse(str.substring(0, 4)) ?? 0;
+      final m2 = int.tryParse(str.substring(4, 6)) ?? 0;
+      final d2 = int.tryParse(str.substring(6, 8)) ?? 0;
+      if (y2 >= 2000 && y2 <= 2100 && m2 >= 1 && m2 <= 12 && d2 >= 1 && d2 <= 31) {
+        return DateTime(y2, m2, d2);
+      }
+    }
+
+    return null;
+  }
+
+  /// Checks if two dates/timestamps/strings represent the exact same calendar day (ignoring time)
+  static bool isSameDay(dynamic a, dynamic b) {
+    final da = parseDate(a);
+    final db = parseDate(b);
+    if (da == null || db == null) return false;
+    return da.year == db.year && da.month == db.month && da.day == db.day;
+  }
+
+  /// Checks if a date falls inclusively between start and end calendar days
+  static bool isDateInRange(dynamic input, DateTime start, DateTime end) {
+    final d = parseDate(input);
+    if (d == null) return false;
+    final dateDay = DateTime(d.year, d.month, d.day);
+    final startDay = DateTime(start.year, start.month, start.day);
+    final endDay = DateTime(end.year, end.month, end.day);
+    return !dateDay.isBefore(startDay) && !dateDay.isAfter(endDay);
   }
 }

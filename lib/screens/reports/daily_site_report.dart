@@ -39,140 +39,204 @@ class _DailySiteExpensesReportPageState
   }
 
   Future<Map<String, dynamic>> _fetchAllReports() async {
-    final supervisorDoc = await FirestoreService.getCollection(
-      'siteSupervisorEntries',
-    ).doc(_documentId).get();
+    final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId ?? '')).toList();
+    final keysToQuery = siteKeys.take(10).toList();
+    final ddMMyyyy = DateFormat('ddMMyyyy').format(widget.date);
+    final yyyyMMdd = DateFormat('yyyyMMdd').format(widget.date);
+    final yyyy_MM_dd = DateFormat('yyyy-MM-dd').format(widget.date);
+    final dd_MM_yyyy = DateFormat('dd-MM-yyyy').format(widget.date);
+    final dd_slash_MM = DateFormat('dd/MM/yyyy').format(widget.date);
 
-    // Check if supervisor entry matches projectStage if provided
+    // 1. Fetch Supervisor Entry
     DocumentSnapshot? filteredSupervisorDoc;
-    if (supervisorDoc.exists) {
-      if (widget.projectStage != null) {
-        final data = supervisorDoc.data();
-        final docStage = (data?['projectStage'] ?? data?['projectField'])
-            ?.toString()
-            .trim();
-        if (docStage == widget.projectStage?.trim()) {
-          filteredSupervisorDoc = supervisorDoc;
+    // Try candidate document IDs
+    for (final k in siteKeys) {
+      final candidateIds = [
+        '${k}_$ddMMyyyy',
+        '${k}_$yyyyMMdd',
+        '${k}_$yyyy_MM_dd',
+        '${k}_$dd_MM_yyyy',
+        '${k}_$dd_slash_MM',
+      ];
+      for (final docId in candidateIds) {
+        final doc = await FirestoreService.getCollection('siteSupervisorEntries').doc(docId).get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          if (data['isManagerEntry'] == true || data['createdBy'] == 'manager' ||
+              data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+            continue;
+          }
+          if (widget.projectStage != null) {
+            final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
+            if (docStage == widget.projectStage?.trim()) {
+              filteredSupervisorDoc = doc;
+              break;
+            }
+          } else {
+            filteredSupervisorDoc = doc;
+            break;
+          }
         }
-      } else {
-        filteredSupervisorDoc = supervisorDoc;
+      }
+      if (filteredSupervisorDoc != null) break;
+    }
+
+    // Fallback query by siteId / site if not found by doc ID
+    if (filteredSupervisorDoc == null && keysToQuery.isNotEmpty) {
+      final results = await Future.wait([
+        FirestoreService.getCollection('siteSupervisorEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('siteSupervisorEntries').where('site', whereIn: keysToQuery).get(),
+      ]);
+      final allDocs = {...results[0].docs, ...results[1].docs};
+      for (final doc in allDocs) {
+        final data = doc.data();
+        if (data['isManagerEntry'] == true || data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+          continue;
+        }
+        if (ExpenseService.isSameDay(data['date'] ?? data['createdAt'], widget.date)) {
+          if (widget.projectStage != null) {
+            final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
+            if (docStage == widget.projectStage?.trim()) {
+              filteredSupervisorDoc = doc;
+              break;
+            }
+          } else {
+            filteredSupervisorDoc = doc;
+            break;
+          }
+        }
       }
     }
 
-    final managerDoc = await FirestoreService.getCollection(
-      'managerExpenses',
-    ).doc(_documentId).get();
-
-    // Check if manager entry matches projectStage if provided
-    DocumentSnapshot? filteredManagerDoc;
-    if (managerDoc.exists) {
-      if (widget.projectStage != null) {
-        final data = managerDoc.data();
-        final docStage = (data?['projectStage'] ?? data?['projectField'])
-            ?.toString()
-            .trim();
-        if (docStage == widget.projectStage?.trim()) {
-          filteredManagerDoc = managerDoc;
+    // 2. Fetch Manager Entries / Expenses
+    final List<DocumentSnapshot> filteredManagerDocs = [];
+    if (keysToQuery.isNotEmpty) {
+      final results = await Future.wait([
+        FirestoreService.getCollection('managerExpenses').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('managerExpenses').where('site', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('managerEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('managerEntries').where('site', whereIn: keysToQuery).get(),
+      ]);
+      final allMgrDocs = {...results[0].docs, ...results[1].docs, ...results[2].docs, ...results[3].docs};
+      for (final doc in allMgrDocs) {
+        final data = doc.data();
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
+          if (docStage != widget.projectStage?.trim()) continue;
         }
-      } else {
-        filteredManagerDoc = managerDoc;
+
+        // Check if bills array has items on widget.date
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          bool hasMatchingBill = false;
+          for (final b in bills) {
+            if (b is Map && ExpenseService.isSameDay(b['billDate'] ?? b['date'], widget.date)) {
+              hasMatchingBill = true;
+              break;
+            }
+          }
+          if (hasMatchingBill) {
+            filteredManagerDocs.add(doc);
+            continue;
+          }
+        }
+
+        // Check top-level date
+        if (ExpenseService.isSameDay(data['date'] ?? data['entryDate'] ?? data['createdAt'], widget.date)) {
+          filteredManagerDocs.add(doc);
+        }
       }
     }
 
-    Query<Map<String, dynamic>> orgQuery = FirestoreService.getCollection(
-      'organizationExpenses',
-    ).where('siteId', isEqualTo: widget.siteId);
-
-    if (widget.projectStage != null) {
-      // organizationEntries often use projectField or projectStage
-      // We'll fetch and filter in memory to be safe, or use multiple where if possible
-    }
-
-    final orgSnapshot = await orgQuery.limit(50).get();
-    List<DocumentSnapshot> filteredOrgEntries = orgSnapshot.docs;
-    if (widget.projectStage != null) {
-      filteredOrgEntries = orgSnapshot.docs.where((doc) {
+    // 3. Fetch Organization Entries / Expenses
+    final List<DocumentSnapshot> filteredOrgDocs = [];
+    if (keysToQuery.isNotEmpty) {
+      final results = await Future.wait([
+        FirestoreService.getCollection('organizationExpenses').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('organizationExpenses').where('site', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('organizationEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('organizationEntries').where('site', whereIn: keysToQuery).get(),
+      ]);
+      final allOrgDocs = {...results[0].docs, ...results[1].docs, ...results[2].docs, ...results[3].docs};
+      for (final doc in allOrgDocs) {
         final data = doc.data();
-        final docStage = (data['projectStage'] ?? data['projectField'])
-            ?.toString()
-            .trim();
-        return docStage == widget.projectStage?.trim();
-      }).toList();
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
+
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          bool hasMatchingBill = false;
+          for (final b in bills) {
+            if (b is Map && ExpenseService.isSameDay(b['billDate'] ?? b['date'], widget.date)) {
+              hasMatchingBill = true;
+              break;
+            }
+          }
+          if (hasMatchingBill) {
+            filteredOrgDocs.add(doc);
+            continue;
+          }
+        }
+
+        if (ExpenseService.isSameDay(data['date'] ?? data['entryDate'] ?? data['createdAt'], widget.date)) {
+          filteredOrgDocs.add(doc);
+        }
+      }
     }
 
-    Query<Map<String, dynamic>> contractorQuery =
-        FirestoreService.getCollection('contractorEntries')
-            .where('siteId', isEqualTo: widget.siteId)
-            .where(
-              'date',
-              isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
-            );
-
-    final contractorSnapshot = await contractorQuery.limit(50).get();
-    List<DocumentSnapshot> filteredContractorEntries = contractorSnapshot.docs;
-    if (widget.projectStage != null) {
-      filteredContractorEntries = contractorSnapshot.docs.where((doc) {
+    // 4. Fetch Contractor Entries
+    final List<DocumentSnapshot> filteredContractorDocs = [];
+    if (keysToQuery.isNotEmpty) {
+      final results = await Future.wait([
+        FirestoreService.getCollection('contractorEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('contractorEntries').where('site', whereIn: keysToQuery).get(),
+      ]);
+      final allContractorDocs = {...results[0].docs, ...results[1].docs};
+      for (final doc in allContractorDocs) {
         final data = doc.data();
-        final docStage = (data['projectStage'] ?? data['projectField'])
-            ?.toString()
-            .trim();
-        return docStage == widget.projectStage?.trim();
-      }).toList();
+        if (widget.projectStage != null) {
+          final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
+          if (docStage != widget.projectStage?.trim()) continue;
+        }
+        if (ExpenseService.isSameDay(data['date'] ?? data['createdAt'], widget.date)) {
+          filteredContractorDocs.add(doc);
+        }
+      }
     }
 
-    String effectiveSiteId = widget.siteId ?? '';
-    if (widget.siteId != null && widget.siteId!.isNotEmpty) {
-      effectiveSiteId =
-          await ExpenseService.resolveCanonicalSiteDocId(widget.siteId!);
-    }
-
-    var incentiveQuery =
-        await FirestoreService.getCollection('totalSiteExpensesPerDay')
-            .where('siteId', isEqualTo: effectiveSiteId)
-            .where(
-              'date',
-              isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
-            )
-            .limit(1)
-            .get();
-
-    if (incentiveQuery.docs.isEmpty &&
-        widget.siteId != null &&
-        widget.siteId != effectiveSiteId) {
-      incentiveQuery =
-          await FirestoreService.getCollection('totalSiteExpensesPerDay')
-              .where('siteId', isEqualTo: widget.siteId)
-              .where(
-                'date',
-                isEqualTo: DateFormat('yyyy-MM-dd').format(widget.date),
-              )
-              .limit(1)
-              .get();
-    }
-
+    // 5. Fetch Incentive Entries
     DocumentSnapshot? filteredIncentiveDoc;
-    if (incentiveQuery.docs.isNotEmpty) {
-      final doc = incentiveQuery.docs.first;
-      if (widget.projectStage != null) {
+    if (keysToQuery.isNotEmpty) {
+      final results = await Future.wait([
+        FirestoreService.getCollection('totalSiteExpensesPerDay').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.siteSupervisorIncentives.where('siteId', whereIn: keysToQuery).get(),
+      ]);
+      final allIncDocs = {...results[0].docs, ...results[1].docs};
+      for (final doc in allIncDocs) {
         final data = doc.data();
-        final docStage = (data['projectStage'] ?? data['projectField'])
-            ?.toString()
-            .trim();
-        if (docStage == widget.projectStage?.trim()) {
-          filteredIncentiveDoc = doc;
+        if (ExpenseService.isSameDay(data['date'] ?? data['updatedAt'] ?? data['createdAt'], widget.date)) {
+          if (widget.projectStage != null) {
+            final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
+            if (docStage == widget.projectStage?.trim()) {
+              filteredIncentiveDoc = doc;
+              break;
+            }
+          } else {
+            filteredIncentiveDoc = doc;
+            break;
+          }
         }
-      } else {
-        filteredIncentiveDoc = doc;
       }
     }
 
     return {
       'supervisor': filteredSupervisorDoc,
-      'managerEntries': filteredManagerDoc != null
-          ? <DocumentSnapshot>[filteredManagerDoc]
-          : <DocumentSnapshot>[],
-      'organizationEntries': filteredOrgEntries,
-      'contractorEntries': filteredContractorEntries,
+      'managerEntries': filteredManagerDocs,
+      'organizationEntries': filteredOrgDocs,
+      'contractorEntries': filteredContractorDocs,
       'incentiveDoc': filteredIncentiveDoc,
     };
   }

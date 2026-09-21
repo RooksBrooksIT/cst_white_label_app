@@ -764,20 +764,19 @@ class _MaterialReportPageState extends State<MaterialReportPage> {
                               // Progress bar representing Company vs Site allocation
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
-                                child: SizedBox(
+                                child: Container(
                                   height: 6,
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        flex: (companyRatio * 100).round().clamp(0, 100),
-                                        child: Container(color: const Color(0xFF0EA5E9)),
-                                      ),
-                                      Expanded(
-                                        flex: ((1.0 - companyRatio) * 100).round().clamp(0, 100),
-                                        child: Container(color: const Color(0xFF10B981)),
-                                      ),
-                                    ],
-                                  ),
+                                  width: double.infinity,
+                                  color: total > 0 && item.atSite > 0
+                                      ? const Color(0xFF10B981)
+                                      : (total > 0 ? const Color(0xFF0EA5E9) : const Color(0xFFE2E8F0)),
+                                  child: total > 0 && item.atCompany > 0
+                                      ? FractionallySizedBox(
+                                          alignment: Alignment.centerLeft,
+                                          widthFactor: companyRatio.clamp(0.0, 1.0),
+                                          child: Container(color: const Color(0xFF0EA5E9)),
+                                        )
+                                      : const SizedBox.shrink(),
                                 ),
                               ),
                               const SizedBox(height: 10),

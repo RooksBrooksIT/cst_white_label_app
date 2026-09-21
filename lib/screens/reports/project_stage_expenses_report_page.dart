@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
 import 'package:ebricks/services/expense_service.dart';
 import 'package:intl/intl.dart';
@@ -88,52 +87,40 @@ class _ProjectStageExpensesReportPageState
 
     final allDocs = {...results[0].docs, ...results[1].docs};
 
+    final targetStage = widget.projectStage.trim().toLowerCase();
+
     for (var doc in allDocs) {
       final data = doc.data();
 
       // Filter by stage manually
-      final docStage = (data['projectStage'] ?? data['projectField'])
+      final docStage = (data['projectStage'] ?? data['projectField'] ?? data['stage'])
           ?.toString()
-          .trim();
-      if (docStage != widget.projectStage.trim()) continue;
+          .trim()
+          .toLowerCase();
+      if (docStage != null && targetStage.isNotEmpty && docStage != targetStage) {
+        continue;
+      }
 
       if (data.containsKey('bills') && data['bills'] is List) {
         final bills = data['bills'] as List;
         for (var bill in bills) {
           if (bill is Map) {
-            DateTime? billDate;
-            final rawDate = bill['billDate'];
-            if (rawDate is Timestamp) {
-              billDate = rawDate.toDate();
-            } else if (rawDate is String) {
-              billDate = DateTime.tryParse(rawDate);
-            }
-
+            final billDate = ExpenseService.parseDate(bill['billDate'] ?? bill['date']);
             if (billDate != null &&
-                billDate.isAfter(
-                  widget.fromDate.subtract(const Duration(days: 1)),
-                ) &&
-                billDate.isBefore(widget.toDate.add(const Duration(days: 1)))) {
-              total += _toDouble(bill['billAmount'] ?? bill['amount']);
+                ExpenseService.isDateInRange(billDate, widget.fromDate, widget.toDate)) {
+              total += _toDouble(bill['billAmount'] ?? bill['amount'] ?? bill['totalAmount']);
             }
           }
         }
       } else {
-        DateTime? entryDate;
-        final rawDate = data[dateField];
-        if (rawDate is Timestamp) {
-          entryDate = rawDate.toDate();
-        } else if (rawDate is String) {
-          entryDate = DateTime.tryParse(rawDate);
-        }
+        final entryDate = ExpenseService.parseDate(
+          data[dateField] ?? data['entryDate'] ?? data['date'] ?? data['updatedAt'] ?? data['createdAt'],
+        );
 
         if (entryDate != null &&
-            entryDate.isAfter(
-              widget.fromDate.subtract(const Duration(days: 1)),
-            ) &&
-            entryDate.isBefore(widget.toDate.add(const Duration(days: 1)))) {
+            ExpenseService.isDateInRange(entryDate, widget.fromDate, widget.toDate)) {
           total += _toDouble(
-            data[amountField] ?? data['amount'] ?? data['totalAmount'],
+            data[amountField] ?? data['amount'] ?? data['totalAmount'] ?? data['incentiveAmount'],
           );
         }
       }

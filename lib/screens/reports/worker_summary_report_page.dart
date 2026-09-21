@@ -51,24 +51,72 @@ class _WorkerAttendanceSalaryPageState
 
   Future<void> _loadInitialData() async {
     try {
-      final attendanceSnapshot = await FirestoreService.getCollection(
-        'workersAttendance',
-      ).get();
+      final Map<String, String> siteMap = {};
 
-      final Set<String> uniqueSites = {};
-
-      for (var doc in attendanceSnapshot.docs) {
-        final data = doc.data();
-        final site = data['site']?.toString();
-
-        if (site != null && site.isNotEmpty) uniqueSites.add(site);
+      // 1. Preload from projects
+      try {
+        final projSnap = await FirestoreService.projects.get();
+        for (final doc in projSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['id'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['projectName'] ?? '').toString();
+          final display = SiteDisplayHelper.formatSiteDisplay(siteId: sId, siteName: sName);
+          if (display.isNotEmpty) siteMap[display] = display;
+        }
+      } catch (e) {
+        debugPrint('Error loading projects for sites in summary: $e');
       }
+
+      // 2. Preload from Site collection
+      try {
+        final siteSnap = await FirestoreService.sites.get();
+        for (final doc in siteSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['siteCode'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['name'] ?? '').toString();
+          final display = SiteDisplayHelper.formatSiteDisplay(siteId: sId, siteName: sName);
+          if (display.isNotEmpty) siteMap[display] = display;
+        }
+      } catch (e) {
+        debugPrint('Error loading Site collection for sites in summary: $e');
+      }
+
+      // 3. Preload from workerSiteMapping
+      try {
+        final mappingSnap = await FirestoreService.getCollection('workerSiteMapping').get();
+        for (final doc in mappingSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['site'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['projectName'] ?? '').toString();
+          final display = SiteDisplayHelper.formatSiteDisplay(siteId: sId, siteName: sName);
+          if (display.isNotEmpty) siteMap[display] = display;
+        }
+      } catch (e) {
+        debugPrint('Error loading workerSiteMapping for sites in summary: $e');
+      }
+
+      // 4. Preload from workersAttendance
+      try {
+        final attendanceSnapshot = await FirestoreService.getCollection(
+          'workersAttendance',
+        ).get();
+        for (var doc in attendanceSnapshot.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['site'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['projectName'] ?? '').toString();
+          final display = SiteDisplayHelper.formatSiteDisplay(siteId: sId, siteName: sName);
+          if (display.isNotEmpty) siteMap[display] = display;
+        }
+      } catch (e) {
+        debugPrint('Error loading workersAttendance for sites in summary: $e');
+      }
+
+      final sortedSites = siteMap.values.toList()..sort();
 
       if (!mounted) return;
       setState(() {
-        _sites = uniqueSites.toList()..sort();
-        _selectedMonth = _currentMonth;
-        _selectedDate = DateTime.now();
+        _sites = sortedSites;
+        _selectedMonth = DateFormat('yyyy-MM').format(_selectedDate);
         _isLoading = false;
       });
 
@@ -120,47 +168,263 @@ class _WorkerAttendanceSalaryPageState
     setState(() => _isLoading = true);
 
     try {
-      final String month = _selectedMonth ?? _currentMonth;
+      final targetYear = _selectedDate.year;
+      final targetMonth = _selectedDate.month;
+      final monthStrMonthYear = DateFormat('MM-yyyy').format(_selectedDate);
+      final monthStrYearMonth = DateFormat('yyyy-MM').format(_selectedDate);
+      final monthStrShortMonthYear = '$targetMonth-$targetYear';
+      final monthStrYearShortMonth = '$targetYear-$targetMonth';
 
-      Query<Map<String, dynamic>> attQuery = FirestoreService.getCollection(
-        'workersAttendance',
-      ).where('month', isEqualTo: month);
+      final targetMonthKeys = {
+        monthStrMonthYear.toLowerCase(),
+        monthStrYearMonth.toLowerCase(),
+        monthStrShortMonthYear.toLowerCase(),
+        monthStrYearShortMonth.toLowerCase(),
+      };
 
-      if (_selectedSite != null) {
-        attQuery = attQuery.where('site', isEqualTo: _selectedSite);
+      final selectedSiteCleanId = _selectedSite != null ? SiteDisplayHelper.extractSiteId(_selectedSite!).toLowerCase() : '';
+      final selectedSiteCleanName = _selectedSite != null ? SiteDisplayHelper.extractSiteName(_selectedSite!).toLowerCase() : '';
+      final selectedSiteRaw = _selectedSite?.toLowerCase() ?? '';
+
+      bool matchesSelectedSite(String? siteId, String? siteName, String? siteCombined, String? docId) {
+        if (_selectedSite == null || _selectedSite!.isEmpty) return true;
+        final sId = (siteId ?? '').trim().toLowerCase();
+        final sName = (siteName ?? '').trim().toLowerCase();
+        final sComb = (siteCombined ?? '').trim().toLowerCase();
+        final dId = (docId ?? '').trim().toLowerCase();
+
+        if (selectedSiteCleanId.isNotEmpty && (sId == selectedSiteCleanId || dId.contains(selectedSiteCleanId) || sComb.contains(selectedSiteCleanId))) {
+          return true;
+        }
+        if (selectedSiteCleanName.isNotEmpty && (sName == selectedSiteCleanName || dId.contains(selectedSiteCleanName) || sComb.contains(selectedSiteCleanName))) {
+          return true;
+        }
+        if (selectedSiteRaw.isNotEmpty && (sId == selectedSiteRaw || sName == selectedSiteRaw || sComb == selectedSiteRaw || dId == selectedSiteRaw)) {
+          return true;
+        }
+        return false;
       }
 
-      final snapshot = await attQuery.get();
+      bool matchesTargetMonth(dynamic monthVal, dynamic dateVal, dynamic dayVal, dynamic updatedAtVal, String docId) {
+        if (monthVal != null) {
+          final mStr = monthVal.toString().trim().toLowerCase();
+          if (targetMonthKeys.contains(mStr)) return true;
+          if (mStr.contains('$targetYear') && (mStr.contains(targetMonth.toString().padLeft(2, '0')) || mStr.contains('$targetMonth'))) {
+            return true;
+          }
+        }
+
+        final dateStr = (dateVal ?? dayVal ?? '').toString().trim();
+        if (dateStr.contains('/')) {
+          final parts = dateStr.split('/');
+          if (parts.length == 3) {
+            final dMonth = int.tryParse(parts[1]);
+            final dYear = int.tryParse(parts[2]);
+            if (dMonth == targetMonth && dYear == targetYear) return true;
+          }
+        } else if (dateStr.contains('-')) {
+          final parts = dateStr.split('-');
+          if (parts.length == 3) {
+            final dYear = int.tryParse(parts[0]);
+            final dMonth = int.tryParse(parts[1]);
+            if (dMonth == targetMonth && dYear == targetYear) return true;
+          }
+        }
+
+        if (docId.contains('${targetMonth.toString().padLeft(2, '0')}_$targetYear') ||
+            docId.contains('${targetMonth.toString().padLeft(2, '0')}-$targetYear') ||
+            docId.contains('$targetYear-${targetMonth.toString().padLeft(2, '0')}') ||
+            docId.contains('${targetYear}_${targetMonth.toString().padLeft(2, '0')}')) {
+          return true;
+        }
+
+        if (updatedAtVal is Timestamp) {
+          final dt = updatedAtVal.toDate();
+          if (dt.month == targetMonth && dt.year == targetYear) return true;
+        }
+
+        return false;
+      }
 
       final Map<String, Map<String, dynamic>> workerAggregates = {};
       double totalPoints = 0;
       int totalDaysDetected = 0;
-
       final Map<String, int> extraMap = {};
       int totalExtraCount = 0;
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
-        final extraList = data['extraWorkers'] as List<dynamic>? ?? [];
+      // 1. Load active worker mappings for baseline worker information
+      try {
+        final mappingSnap = await FirestoreService.getCollection('workerSiteMapping').get();
+        for (final doc in mappingSnap.docs) {
+          final data = doc.data();
+          final sId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
+          final sName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+          final sDisplay = SiteDisplayHelper.formatSiteDisplay(siteId: sId, siteName: sName);
 
-        for (final e in extraList) {
-          if (e is Map) {
-            final type = (e['workerType'] ?? 'General Labour').toString();
-            final count = (e['count'] as num?)?.toInt() ?? 0;
-            extraMap[type] = (extraMap[type] ?? 0) + count;
-            totalExtraCount += count;
+          if (!matchesSelectedSite(sId, sName, sDisplay, doc.id)) continue;
+
+          final rawWorkers = (data['workers'] ?? data['mappedWorkers']) as List<dynamic>? ?? [];
+          for (final item in rawWorkers) {
+            if (item is Map) {
+              final wName = (item['workerName'] ?? item['name'] ?? '').toString().trim();
+              final wId = (item['workerId'] ?? item['id'] ?? wName).toString().trim();
+              if (wName.isNotEmpty) {
+                final key = wName.toLowerCase();
+                if (!workerAggregates.containsKey(key)) {
+                  workerAggregates[key] = {
+                    'id': wId,
+                    'name': wName,
+                    'designation': (item['workerDesignation'] ?? item['designation'] ?? 'Worker').toString(),
+                    'site': sDisplay.isNotEmpty ? sDisplay : sId,
+                    'presentCount': 0,
+                    'absentCount': 0,
+                    'overtimeCount': 0,
+                    'halfDayCount': 0,
+                    'notMarkedCount': 0,
+                    'totalSalary': 0.0,
+                    'attendanceData': <String, dynamic>{},
+                    'month': monthStrYearMonth,
+                    'baseSalary': (item['workerSalary'] ?? item['salary'] ?? '0').toString(),
+                  };
+                }
+              }
+            }
           }
         }
+      } catch (e) {
+        debugPrint('Error loading workerSiteMapping baseline in summary: $e');
+      }
 
-        workersMap.forEach((name, details) {
-          if (details is! Map) return;
+      // 2. Fetch and aggregate attendance from workersAttendance
+      try {
+        final attSnap = await FirestoreService.getCollection('workersAttendance').get();
+        for (final doc in attSnap.docs) {
+          final data = doc.data();
+          final sId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
+          final sName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+          final sDisplay = SiteDisplayHelper.formatSiteDisplay(siteId: sId, siteName: sName);
+          final docId = doc.id.trim();
 
-          if (!workerAggregates.containsKey(name)) {
-            workerAggregates[name] = {
-              'name': name,
-              'designation': details['designation'] ?? 'Worker',
-              'site': data['site'] ?? 'Unknown',
+          if (!matchesSelectedSite(sId, sName, sDisplay, docId)) continue;
+          if (!matchesTargetMonth(data['month'], data['Day'] ?? data['date'], data['day'], data['updatedAt'], docId)) {
+            continue;
+          }
+
+          final extraList = (data['extraWorkers'] ?? data['extra_workers']) as List<dynamic>? ?? [];
+          for (final e in extraList) {
+            if (e is Map) {
+              final type = (e['workerType'] ?? e['type'] ?? 'General Labour').toString();
+              final count = (e['count'] as num?)?.toInt() ?? int.tryParse(e['count']?.toString() ?? '0') ?? 0;
+              if (count > 0) {
+                extraMap[type] = (extraMap[type] ?? 0) + count;
+                totalExtraCount += count;
+              }
+            }
+          }
+
+          String dateStr = (data['Day'] ?? data['date'] ?? '').toString();
+          if (dateStr.isEmpty && data['day'] != null) {
+            dateStr = '${data['day']}/${data['month'] ?? monthStrMonthYear}';
+          }
+          if (dateStr.isEmpty && data['updatedAt'] is Timestamp) {
+            dateStr = DateFormat('dd/MM/yyyy').format((data['updatedAt'] as Timestamp).toDate());
+          }
+          if (dateStr.isEmpty) {
+            dateStr = docId;
+          }
+
+          final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
+          workersMap.forEach((nameOrId, details) {
+            if (details is! Map) return;
+
+            final wName = (details['workerName'] ?? details['name'] ?? nameOrId).toString().trim();
+            if (wName.isEmpty) return;
+            final key = wName.toLowerCase();
+            final wId = (details['workerId'] ?? details['id'] ?? wName).toString().trim();
+            final designation = (details['designation'] ?? details['workerDesignation'] ?? 'Worker').toString();
+            final salaryStr = (details['salary'] ?? details['workerSalary'] ?? details['salaryPerDay'] ?? '0').toString();
+            final daySalary = double.tryParse(salaryStr) ?? 0.0;
+            final status = (details['attendance'] ?? details['status'] ?? '').toString().trim().toLowerCase();
+
+            if (!workerAggregates.containsKey(key)) {
+              workerAggregates[key] = {
+                'id': wId,
+                'name': wName,
+                'designation': designation,
+                'site': sDisplay.isNotEmpty ? sDisplay : (data['site'] ?? 'Unknown'),
+                'presentCount': 0,
+                'absentCount': 0,
+                'overtimeCount': 0,
+                'halfDayCount': 0,
+                'notMarkedCount': 0,
+                'totalSalary': 0.0,
+                'attendanceData': <String, dynamic>{},
+                'month': monthStrYearMonth,
+                'baseSalary': salaryStr,
+              };
+            }
+
+            final stats = workerAggregates[key]!;
+            final existingEntry = stats['attendanceData'][dateStr];
+            if (existingEntry == null) {
+              stats['attendanceData'][dateStr] = details;
+              totalDaysDetected++;
+
+              if (status == 'present' || status == 'p') {
+                stats['presentCount']++;
+                totalPoints += 1.0;
+                stats['totalSalary'] += daySalary;
+              } else if (status == 'absent' || status == 'a') {
+                stats['absentCount']++;
+              } else if (status == 'overtime' || status == 'ot') {
+                stats['overtimeCount']++;
+                totalPoints += 1.0;
+                stats['totalSalary'] += daySalary;
+              } else if (status == 'half day' || status == 'half-day' || status == 'halfday' || status == 'h') {
+                stats['halfDayCount']++;
+                totalPoints += 0.5;
+                stats['totalSalary'] += (daySalary / 2.0);
+              } else {
+                stats['notMarkedCount']++;
+              }
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading workersAttendance in summary: $e');
+      }
+
+      // 3. Aggregate from WorkerMonthlyAttendance
+      try {
+        final monthlySnap = await FirestoreService.getCollection('WorkerMonthlyAttendance').get();
+        for (final doc in monthlySnap.docs) {
+          final data = doc.data();
+          final sId = (data['siteId'] ?? data['site'] ?? '').toString();
+          final sName = (data['siteName'] ?? '').toString();
+          final sDisplay = SiteDisplayHelper.formatSiteDisplay(siteId: sId, siteName: sName);
+          final docMonth = (data['month'] ?? '').toString().trim().toLowerCase();
+
+          if (!matchesSelectedSite(sId, sName, sDisplay, doc.id)) continue;
+          if (!targetMonthKeys.contains(docMonth) &&
+              !doc.id.contains(monthStrMonthYear) &&
+              !doc.id.contains(monthStrYearMonth)) {
+            continue;
+          }
+
+          final wName = (data['workerName'] ?? data['name'] ?? '').toString().trim();
+          if (wName.isEmpty) continue;
+          final key = wName.toLowerCase();
+          final wId = (data['workerId'] ?? doc.id).toString().trim();
+          final designation = (data['designation'] ?? 'Worker').toString();
+          final salaryStr = (data['baseSalary'] ?? data['salary'] ?? '0').toString();
+          final attendanceData = data['attendanceData'] as Map<String, dynamic>? ?? {};
+
+          if (!workerAggregates.containsKey(key)) {
+            workerAggregates[key] = {
+              'id': wId,
+              'name': wName,
+              'designation': designation,
+              'site': sDisplay.isNotEmpty ? sDisplay : (data['site'] ?? 'Unknown'),
               'presentCount': 0,
               'absentCount': 0,
               'overtimeCount': 0,
@@ -168,53 +432,52 @@ class _WorkerAttendanceSalaryPageState
               'notMarkedCount': 0,
               'totalSalary': 0.0,
               'attendanceData': <String, dynamic>{},
-              'month': month,
-              'baseSalary': details['salary'] ?? '0',
+              'month': monthStrYearMonth,
+              'baseSalary': salaryStr,
             };
           }
 
-          final stats = workerAggregates[name]!;
-          final String status =
-              details['attendance']?.toString().toLowerCase() ?? '';
-          final String dateStr = data['Day'] ?? 'Unknown Date';
+          final stats = workerAggregates[key]!;
+          attendanceData.forEach((dateKey, entry) {
+            if (entry is Map && !stats['attendanceData'].containsKey(dateKey)) {
+              stats['attendanceData'][dateKey] = entry;
+              totalDaysDetected++;
+              final status = (entry['status'] ?? entry['attendance'] ?? '').toString().toLowerCase();
+              final daySalary = (entry['salaryPerDay'] as num?)?.toDouble() ??
+                  double.tryParse(entry['salaryPerDay']?.toString() ?? salaryStr) ??
+                  0.0;
 
-          stats['attendanceData'][dateStr] = details;
-          totalDaysDetected++;
-
-          if (status == 'present') {
-            stats['presentCount']++;
-            totalPoints += 1.0;
-          } else if (status == 'absent') {
-            stats['absentCount']++;
-          } else if (status == 'overtime') {
-            stats['overtimeCount']++;
-            totalPoints += 1.0;
-          } else if (status == 'half day') {
-            stats['halfDayCount']++;
-            totalPoints += 0.5;
-          } else if (status == '' || status == 'not marked') {
-            stats['notMarkedCount']++;
-          }
-
-          final double daySalary =
-              double.tryParse(details['salary']?.toString() ?? '0') ?? 0.0;
-          if (status == 'present' || status == 'overtime') {
-            stats['totalSalary'] += daySalary;
-          } else if (status == 'half day') {
-            stats['totalSalary'] += (daySalary / 2.0);
-          }
-        });
+              if (status == 'present' || status == 'p') {
+                stats['presentCount']++;
+                totalPoints += 1.0;
+                stats['totalSalary'] += daySalary;
+              } else if (status == 'absent' || status == 'a') {
+                stats['absentCount']++;
+              } else if (status == 'overtime' || status == 'ot') {
+                stats['overtimeCount']++;
+                totalPoints += 1.0;
+                stats['totalSalary'] += daySalary;
+              } else if (status == 'half day' || status == 'half-day' || status == 'halfday' || status == 'h') {
+                stats['halfDayCount']++;
+                totalPoints += 0.5;
+                stats['totalSalary'] += (daySalary / 2.0);
+              } else {
+                stats['notMarkedCount']++;
+              }
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading WorkerMonthlyAttendance in summary: $e');
       }
 
       final double overallPercent = totalDaysDetected > 0
           ? (totalPoints / totalDaysDetected) * 100
           : 0.0;
 
-      final List<Map<String, dynamic>> results = workerAggregates.values.map((
-        v,
-      ) {
+      final List<Map<String, dynamic>> results = workerAggregates.values.map((v) {
         return {
-          'id': v['name'],
+          'id': v['id'] ?? v['name'],
           'name': v['name'],
           'designation': v['designation'],
           'site': v['site'],
@@ -229,6 +492,8 @@ class _WorkerAttendanceSalaryPageState
           'attendanceData': v['attendanceData'],
         };
       }).toList();
+
+      results.sort((a, b) => (a['name'] as String).toLowerCase().compareTo((b['name'] as String).toLowerCase()));
 
       if (mounted) {
         setState(() {
@@ -673,7 +938,7 @@ class _WorkerAttendanceSalaryPageState
         return [null, ..._sites].map<Widget>((item) {
           final displayText = item == null
               ? 'All Sites'
-              : SiteDisplayHelper.formatSiteDisplay(siteId: item);
+              : SiteDisplayHelper.formatSiteDisplay(rawCombined: item);
           return Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -692,7 +957,7 @@ class _WorkerAttendanceSalaryPageState
       items: [null, ..._sites].map((item) {
         final displayText = item == null
             ? 'All Sites'
-            : SiteDisplayHelper.formatSiteDisplay(siteId: item);
+            : SiteDisplayHelper.formatSiteDisplay(rawCombined: item);
         return DropdownMenuItem<String>(
           value: item,
           child: Text(
