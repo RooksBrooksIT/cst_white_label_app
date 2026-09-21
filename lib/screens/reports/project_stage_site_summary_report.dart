@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:pdf/pdf.dart';
 import '/widgets/glass_card.dart';
 import '/utils/responsive.dart';
@@ -56,57 +57,19 @@ class _ProjectstageSiteSummaryReportState
 
   Future<Map<String, dynamic>?> _fetchProjectInfo() async {
     try {
-      // Try 1: query projects by siteId field
-      var snap = await FirestoreService.getCollection(
-        'projects',
-      ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
+      final projectDoc = await ExpenseService.findLinkedProjectDoc(widget.siteId);
+      final siteDoc = await ExpenseService.findLinkedSiteDoc(widget.siteId);
 
-      // Try 2: query by site field
-      if (snap.docs.isEmpty) {
-        snap = await FirestoreService.getCollection(
-          'projects',
-        ).where('site', isEqualTo: widget.siteId).limit(1).get();
+      Map<String, dynamic> data = {};
+      if (projectDoc != null && projectDoc.exists) {
+        data.addAll(projectDoc.data() as Map<String, dynamic>);
       }
-
-      // Try 3: query by siteName from Site collection
-      if (snap.docs.isEmpty) {
-        final siteDoc = await FirestoreService.getCollection(
-          'Site',
-        ).doc(widget.siteId).get();
-        if (siteDoc.exists) {
-          final siteData = siteDoc.data()!;
-          final sName = siteData['siteName']?.toString();
-          if (sName != null && sName.isNotEmpty && sName != widget.siteId) {
-            snap = await FirestoreService.getCollection(
-              'projects',
-            ).where('siteName', isEqualTo: sName).limit(1).get();
-          }
-        }
+      if (siteDoc != null && siteDoc.exists) {
+        final siteData = siteDoc.data() as Map<String, dynamic>;
+        data['siteName'] = data['siteName'] ?? siteData['siteName'] ?? siteData['name'];
+        data['siteLocation'] = data['siteLocation'] ?? data['location'] ?? siteData['location'] ?? siteData['siteLocation'];
       }
-
-      Map<String, dynamic>? data = snap.docs.isNotEmpty
-          ? snap.docs.first.data()
-          : null;
-
-      // Fallback to fetch from 'Site' collection if project data is missing or has no location
-      if (data == null ||
-          (data['siteLocation'] == null && data['location'] == null)) {
-        final siteDoc = await FirestoreService.getCollection(
-          'Site',
-        ).doc(widget.siteId).get();
-        if (siteDoc.exists) {
-          final siteData = siteDoc.data()!;
-          if (data == null) {
-            data = siteData;
-          } else {
-            // Merge missing location info into project data
-            data['siteLocation'] =
-                siteData['location'] ?? siteData['siteLocation'];
-            data['siteName'] = data['siteName'] ?? siteData['siteName'];
-          }
-        }
-      }
-      return data;
+      return data.isNotEmpty ? data : null;
     } catch (e) {
       debugPrint('Error fetching project info: $e');
       return null;
@@ -114,6 +77,7 @@ class _ProjectstageSiteSummaryReportState
   }
 
   Future<Map<String, num>> _fetchExpenseTotals() async {
+    final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
     final collections = [
       'siteSupervisorEntries',
       'managerExpenses',
@@ -123,7 +87,7 @@ class _ProjectstageSiteSummaryReportState
       'organizationEntries',
     ];
 
-    final futures = collections.map((c) => _fetchCollectionBySite(c)).toList();
+    final futures = collections.map((c) => _fetchCollectionBySite(c, siteKeys)).toList();
     final results = await Future.wait(futures);
 
     final supervisorDocs = results[0];
@@ -133,7 +97,7 @@ class _ProjectstageSiteSummaryReportState
     final managerEntryDocs = results[4];
     final orgEntryDocs = results[5];
 
-    final targetStage = widget.projectStage.trim();
+    final targetStage = widget.projectStage.trim().toLowerCase();
 
     num food = 0, fuel = 0, transport = 0, labours = 0, materials = 0;
     num managerTotal = 0, organizationTotal = 0, contractorTotal = 0;
@@ -151,13 +115,19 @@ class _ProjectstageSiteSummaryReportState
       return _toNum(data['totalAmount'] ?? data['amount']);
     }
 
+    bool matchesStage(Map<String, dynamic> data) {
+      final docStage = (data['projectStage'] ?? data['projectField'] ?? data['stage'])
+          ?.toString()
+          .trim()
+          .toLowerCase();
+      if (targetStage.isEmpty) return true;
+      return docStage == targetStage;
+    }
+
     void processManager(List<DocumentSnapshot> docs) {
       for (var doc in docs) {
         final data = doc.data() as Map<String, dynamic>;
-        final docStage = (data['projectStage'] ?? data['projectField'])
-            ?.toString()
-            .trim();
-        if (docStage != targetStage) continue;
+        if (!matchesStage(data)) continue;
         managerTotal += getDocTotal(data);
       }
     }
@@ -165,10 +135,7 @@ class _ProjectstageSiteSummaryReportState
     void processOrg(List<DocumentSnapshot> docs) {
       for (var doc in docs) {
         final data = doc.data() as Map<String, dynamic>;
-        final docStage = (data['projectStage'] ?? data['projectField'])
-            ?.toString()
-            .trim();
-        if (docStage != targetStage) continue;
+        if (!matchesStage(data)) continue;
         organizationTotal += getDocTotal(data);
       }
     }
@@ -176,10 +143,7 @@ class _ProjectstageSiteSummaryReportState
     // 1. Supervisor
     for (var doc in supervisorDocs) {
       final data = doc.data() as Map<String, dynamic>;
-      final docStage = (data['projectStage'] ?? data['projectField'])
-          ?.toString()
-          .trim();
-      if (docStage != targetStage) continue;
+      if (!matchesStage(data)) continue;
 
       food += _toNum(data['food']);
       fuel += _toNum(data['fuel']);
@@ -187,12 +151,12 @@ class _ProjectstageSiteSummaryReportState
 
       if (data['labours'] is List) {
         for (var l in data['labours']) {
-          labours += _toNum(l['amount']);
+          if (l is Map) labours += _toNum(l['amount']);
         }
       }
       if (data['materials'] is List) {
         for (var m in data['materials']) {
-          materials += _toNum(m['amount']);
+          if (m is Map) materials += _toNum(m['amount']);
         }
       }
     }
@@ -208,11 +172,8 @@ class _ProjectstageSiteSummaryReportState
     // 4. Contractor
     for (var doc in contractorDocs) {
       final data = doc.data() as Map<String, dynamic>;
-      final docStage = (data['projectStage'] ?? data['projectField'])
-          ?.toString()
-          .trim();
-      if (docStage != targetStage) continue;
-      contractorTotal += _toNum(data['totalAmount']);
+      if (!matchesStage(data)) continue;
+      contractorTotal += _toNum(data['totalAmount'] ?? data['amount']);
     }
 
     return {
@@ -229,16 +190,25 @@ class _ProjectstageSiteSummaryReportState
 
   Future<List<DocumentSnapshot>> _fetchCollectionBySite(
     String collection,
+    List<String> siteKeys,
   ) async {
+    final keysToQuery = siteKeys.take(10).toList();
     final snapshots = await Future.wait([
       FirestoreService.getCollection(
         collection,
-      ).where('siteId', isEqualTo: widget.siteId).get(),
+      ).where('siteId', whereIn: keysToQuery).get(),
       FirestoreService.getCollection(
         collection,
-      ).where('site', isEqualTo: widget.siteId).get(),
+      ).where('site', whereIn: keysToQuery).get(),
     ]);
-    return [...snapshots[0].docs, ...snapshots[1].docs];
+    final seen = <String>{};
+    final docs = <DocumentSnapshot>[];
+    for (var doc in [...snapshots[0].docs, ...snapshots[1].docs]) {
+      if (seen.add(doc.id)) {
+        docs.add(doc);
+      }
+    }
+    return docs;
   }
 
   num _toNum(dynamic v) {

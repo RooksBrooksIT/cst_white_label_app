@@ -643,334 +643,22 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
   }
 
   void _showEditManagerModal(Map<String, dynamic> data, String docId) {
-    final editFullNameController = TextEditingController(text: data['FullName'] ?? '');
-    final editUserNameController = TextEditingController(
-      text: (data['UserName'] ?? data['username'] ?? '').toString(),
-    );
-    final editContactNoController = TextEditingController(text: data['ContactNo'] ?? '');
-    final editEmailController = TextEditingController(text: data['Email'] ?? '');
-    String? editDesignation = data['Designation'];
-    String? editDepartment = data['Department'];
-    String editStatus = data['Status'] ?? 'Active';
-    final editFormKey = GlobalKey<FormState>();
-    bool isSaving = false;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.85,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 16,
-                    offset: Offset(0, -4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(24),
-              child: SingleChildScrollView(
-                child: Form(
-                  key: editFormKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Edit Manager Profile',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0A183D),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'ID: ${data['ManagerId'] ?? docId}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ],
-                      ),
-                      const Divider(color: Color(0xFFE2E8F0), height: 24),
-                      
-                      // Full Name
-                      _buildModalFieldLabel('Full Name *'),
-                      TextFormField(
-                        controller: editFullNameController,
-                        style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
-                        decoration: _getInputDecoration('Full Name', Icons.person),
-                        validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Username
-                      _buildModalFieldLabel('User Name *'),
-                      TextFormField(
-                        controller: editUserNameController,
-                        style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
-                        decoration: _getInputDecoration('User Name', Icons.alternate_email),
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) return 'Username is required';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Designation
-                      _buildModalFieldLabel('Designation *'),
-                      DropdownButtonFormField<String>(
-                        initialValue: _designationList.contains(editDesignation) ? editDesignation : null,
-                        dropdownColor: Colors.white,
-                        style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
-                        decoration: _getInputDecoration('Select Designation', Icons.badge),
-                        items: _designationList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        onChanged: (val) => setModalState(() => editDesignation = val),
-                        validator: (val) => val == null ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Department
-                      _buildModalFieldLabel('Department *'),
-                      DropdownButtonFormField<String>(
-                        initialValue: _departmentList.contains(editDepartment) ? editDepartment : null,
-                        dropdownColor: Colors.white,
-                        style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
-                        decoration: _getInputDecoration('Select Department', Icons.business),
-                        items: _departmentList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        onChanged: (val) => setModalState(() => editDepartment = val),
-                        validator: (val) => val == null ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Contact No
-                      _buildModalFieldLabel('Contact Number *'),
-                      TextFormField(
-                        controller: editContactNoController,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(10),
-                        ],
-                        style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
-                        decoration: _getInputDecoration('Contact Number', Icons.phone),
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) return 'Contact number is required';
-                          final clean = val.trim();
-                          if (clean.length != 10) return 'Phone number must be exactly 10 digits';
-                          if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
-                            return 'Enter a valid 10-digit phone number (starts with 6-9)';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Email
-                      _buildModalFieldLabel('Email Address'),
-                      TextFormField(
-                        controller: editEmailController,
-                        keyboardType: TextInputType.emailAddress,
-                        style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
-                        decoration: _getInputDecoration('Email Address', Icons.email),
-                        validator: (val) {
-                          if (val != null && val.trim().isNotEmpty) {
-                            final clean = val.trim();
-                            if (!RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(clean)) {
-                              return 'Enter a valid email address (e.g. name@domain.com)';
-                            }
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Status Switch
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Account Status',
-                            style: TextStyle(
-                              color: Color(0xFF0A183D),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: editStatus == 'Active'
-                                   ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                                  : const Color(0xFFEF4444).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  editStatus,
-                                  style: TextStyle(
-                                    color: editStatus == 'Active'
-                                        ? const Color(0xFF10B981)
-                                        : const Color(0xFFEF4444),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Switch(
-                                  value: editStatus == 'Active',
-                                  activeTrackColor: const Color(0xFF10B981),
-                                  onChanged: (val) {
-                                    setModalState(() {
-                                      editStatus = val ? 'Active' : 'Inactive';
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Save Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          onPressed: isSaving
-                              ? null
-                              : () async {
-                                  if (!editFormKey.currentState!.validate()) return;
-                                  setModalState(() => isSaving = true);
-                                  try {
-                                    final editContact = editContactNoController.text.trim().replaceAll(RegExp(r'\D'), '');
-                                    final editEmail = editEmailController.text.trim();
-                                    final editName = editFullNameController.text.trim();
-                                    final editUsername = editUserNameController.text.trim();
-
-                                    if (editUsername.isEmpty) {
-                                      setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Username is required.');
-                                      return;
-                                    }
-
-                                    if (!(await _isUsernameUnique(editUsername, excludeDocId: docId))) {
-                                      setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Username already exists. Please choose another username.');
-                                      return;
-                                    }
-
-                                    if (editContact.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(editContact)) {
-                                      setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Please enter a valid 10-digit phone number (starts with 6-9).');
-                                      return;
-                                    }
-
-                                    if (editEmail.isNotEmpty && !RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(editEmail)) {
-                                      setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Please enter a valid email address (e.g. name@domain.com).');
-                                      return;
-                                    }
-
-                                    if (editName.isNotEmpty && !(await _isFullNameUnique(editName, excludeDocId: docId))) {
-                                      setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Full name "$editName" already exists. Please use a unique name.');
-                                      return;
-                                    }
-
-                                    if (!(await _isContactNoUnique(editContact, excludeDocId: docId))) {
-                                      setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Phone number already registered. Please use another number.');
-                                      return;
-                                    }
-
-                                    if (editEmail.isNotEmpty && !(await _isEmailUnique(editEmail, excludeDocId: docId))) {
-                                      setModalState(() => isSaving = false);
-                                      _showErrorSnackBar('Email address already registered. Please use another email address.');
-                                      return;
-                                    }
-
-                                    await FirestoreService.getCollection('manager').doc(docId).update({
-                                      'FullName': editName,
-                                      'UserName': editUsername,
-                                      'Designation': editDesignation,
-                                      'Department': editDepartment,
-                                      'ContactNo': editContact,
-                                      'Email': editEmail,
-                                      'Status': editStatus,
-                                    });
-                                    if (context.mounted) {
-                                      Navigator.pop(context);
-                                      _showSuccessSnackBar('Manager profile updated successfully.');
-                                    }
-                                  } catch (e) {
-                                    setModalState(() => isSaving = false);
-                                    _showErrorSnackBar('Failed to update manager: $e');
-                                  }
-                                },
-                          child: isSaving
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text(
-                                  'Save Changes',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+      builder: (context) => _EditManagerModalSheet(
+        data: data,
+        docId: docId,
+        designationList: _designationList,
+        departmentList: _departmentList,
+        primaryColor: primaryColor,
+        isUsernameUnique: _isUsernameUnique,
+        isFullNameUnique: _isFullNameUnique,
+        isContactNoUnique: _isContactNoUnique,
+        isEmailUnique: _isEmailUnique,
+        onSuccess: _showSuccessSnackBar,
+        onError: _showErrorSnackBar,
       ),
     );
   }
@@ -1002,45 +690,6 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
                 ]
               : null,
         ),
-      ),
-    );
-  }
-
-  Widget _buildModalFieldLabel(String text) {
-    return _buildFieldLabel(text);
-  }
-
-  InputDecoration _getInputDecoration(String hint, IconData icon) {
-    return InputDecoration(
-      isDense: true,
-      hintText: hint,
-      hintStyle: const TextStyle(
-        color: Color(0xFF94A3B8),
-        fontSize: 12.5,
-        fontWeight: FontWeight.w500,
-      ),
-      prefixIconConstraints: const BoxConstraints(
-        minWidth: 38,
-        minHeight: 38,
-      ),
-      prefixIcon: Padding(
-        padding: const EdgeInsets.only(left: 12, right: 8),
-        child: Icon(icon, color: primaryColor, size: 18),
-      ),
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primaryColor, width: 1.5),
       ),
     );
   }
@@ -2444,6 +2093,631 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
             tooltip: 'Last Page',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EditManagerModalSheet extends StatefulWidget {
+  final Map<String, dynamic> data;
+  final String docId;
+  final List<String> designationList;
+  final List<String> departmentList;
+  final Color primaryColor;
+  final Future<bool> Function(String username, {String? excludeDocId}) isUsernameUnique;
+  final Future<bool> Function(String fullName, {String? excludeDocId}) isFullNameUnique;
+  final Future<bool> Function(String contactNo, {String? excludeDocId}) isContactNoUnique;
+  final Future<bool> Function(String email, {String? excludeDocId}) isEmailUnique;
+  final void Function(String message) onSuccess;
+  final void Function(String message) onError;
+
+  const _EditManagerModalSheet({
+    required this.data,
+    required this.docId,
+    required this.designationList,
+    required this.departmentList,
+    required this.primaryColor,
+    required this.isUsernameUnique,
+    required this.isFullNameUnique,
+    required this.isContactNoUnique,
+    required this.isEmailUnique,
+    required this.onSuccess,
+    required this.onError,
+  });
+
+  @override
+  State<_EditManagerModalSheet> createState() => _EditManagerModalSheetState();
+}
+
+class _EditManagerModalSheetState extends State<_EditManagerModalSheet> {
+  late final TextEditingController _fullNameController;
+  late final TextEditingController _userNameController;
+  late final TextEditingController _contactNoController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
+  late String _initialPassword;
+
+  String? _selectedDesignation;
+  String? _selectedDepartment;
+  late String _selectedStatus;
+  final _formKey = GlobalKey<FormState>();
+
+  bool _isPasswordVisible = false;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fullNameController = TextEditingController(text: widget.data['FullName'] ?? '');
+    _userNameController = TextEditingController(
+      text: (widget.data['UserName'] ?? widget.data['username'] ?? '').toString(),
+    );
+    _contactNoController = TextEditingController(text: widget.data['ContactNo'] ?? '');
+    _emailController = TextEditingController(text: widget.data['Email'] ?? '');
+    _initialPassword = (widget.data['Password'] ?? widget.data['password'] ?? '').toString();
+    _passwordController = TextEditingController(text: _initialPassword);
+
+    _selectedDesignation = widget.data['Designation'];
+    _selectedDepartment = widget.data['Department'];
+    _selectedStatus = widget.data['Status'] ?? 'Active';
+
+    // Fetch latest fresh Firestore snapshot once on modal open
+    FirestoreService.getCollection('manager').doc(widget.docId).get().then((docSnap) {
+      if (docSnap.exists && docSnap.data() != null && mounted) {
+        final fresh = docSnap.data()!;
+        setState(() {
+          if (_fullNameController.text == (widget.data['FullName'] ?? '')) {
+            _fullNameController.text = fresh['FullName'] ?? _fullNameController.text;
+          }
+          if (_userNameController.text == (widget.data['UserName'] ?? widget.data['username'] ?? '').toString()) {
+            _userNameController.text = (fresh['UserName'] ?? fresh['username'] ?? _userNameController.text).toString();
+          }
+          if (_contactNoController.text == (widget.data['ContactNo'] ?? '')) {
+            _contactNoController.text = fresh['ContactNo'] ?? _contactNoController.text;
+          }
+          if (_emailController.text == (widget.data['Email'] ?? '')) {
+            _emailController.text = fresh['Email'] ?? _emailController.text;
+          }
+          final freshPassword = (fresh['Password'] ?? fresh['password'] ?? '').toString();
+          if (freshPassword.isNotEmpty &&
+              (_passwordController.text == _initialPassword || _passwordController.text.isEmpty)) {
+            _passwordController.text = freshPassword;
+          }
+          if (fresh['Designation'] != null && _selectedDesignation == widget.data['Designation']) {
+            _selectedDesignation = fresh['Designation'];
+          }
+          if (fresh['Department'] != null && _selectedDepartment == widget.data['Department']) {
+            _selectedDepartment = fresh['Department'];
+          }
+          if (fresh['Status'] != null && _selectedStatus == (widget.data['Status'] ?? 'Active')) {
+            _selectedStatus = fresh['Status'];
+          }
+        });
+      }
+    }).catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _userNameController.dispose();
+    _contactNoController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildModalFieldLabel(String text) {
+    final isRequired = text.contains('*');
+    final cleanText = text.replaceAll('*', '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          text: cleanText,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0A183D),
+            letterSpacing: -0.1,
+          ),
+          children: isRequired
+              ? const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _getInputDecoration(String hint, IconData icon) {
+    return InputDecoration(
+      isDense: true,
+      hintText: hint,
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIconConstraints: const BoxConstraints(
+        minWidth: 38,
+        minHeight: 38,
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 12, right: 8),
+        child: Icon(icon, color: widget.primaryColor, size: 18),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: widget.primaryColor, width: 1.5),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentDesigList = [
+      ...widget.designationList,
+      if (_selectedDesignation != null &&
+          _selectedDesignation!.isNotEmpty &&
+          !widget.designationList.contains(_selectedDesignation))
+        _selectedDesignation!,
+    ];
+
+    final currentDeptList = [
+      ...widget.departmentList,
+      if (_selectedDepartment != null &&
+          _selectedDepartment!.isNotEmpty &&
+          !widget.departmentList.contains(_selectedDepartment))
+        _selectedDepartment!,
+    ];
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 16,
+              offset: Offset(0, -4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Edit Manager Profile',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0A183D),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ID: ${widget.data['ManagerId'] ?? widget.docId}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const Divider(color: Color(0xFFE2E8F0), height: 24),
+
+                // Full Name
+                _buildModalFieldLabel('Full Name *'),
+                TextFormField(
+                  controller: _fullNameController,
+                  style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
+                  decoration: _getInputDecoration('Full Name', Icons.person),
+                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 14),
+
+                // Username
+                _buildModalFieldLabel('User Name *'),
+                TextFormField(
+                  controller: _userNameController,
+                  style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
+                  decoration: _getInputDecoration('User Name', Icons.alternate_email),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Username is required';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+
+                // Designation
+                _buildModalFieldLabel('Designation *'),
+                DropdownButtonFormField<String>(
+                  initialValue: currentDesigList.contains(_selectedDesignation) ? _selectedDesignation : null,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
+                  decoration: _getInputDecoration('Select Designation', Icons.badge),
+                  items: currentDesigList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (val) => setState(() => _selectedDesignation = val),
+                  validator: (val) => val == null ? 'Required' : null,
+                ),
+                const SizedBox(height: 14),
+
+                // Department
+                _buildModalFieldLabel('Department *'),
+                DropdownButtonFormField<String>(
+                  initialValue: currentDeptList.contains(_selectedDepartment) ? _selectedDepartment : null,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
+                  decoration: _getInputDecoration('Select Department', Icons.business),
+                  items: currentDeptList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (val) => setState(() => _selectedDepartment = val),
+                  validator: (val) => val == null ? 'Required' : null,
+                ),
+                const SizedBox(height: 14),
+
+                // Contact No
+                _buildModalFieldLabel('Contact Number *'),
+                TextFormField(
+                  controller: _contactNoController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
+                  decoration: _getInputDecoration('Contact Number', Icons.phone),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Contact number is required';
+                    final clean = val.trim();
+                    if (clean.length != 10) return 'Phone number must be exactly 10 digits';
+                    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                      return 'Enter a valid 10-digit phone number (starts with 6-9)';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+
+                // Email
+                _buildModalFieldLabel('Email Address'),
+                TextFormField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Color(0xFF0A183D), fontWeight: FontWeight.bold),
+                  decoration: _getInputDecoration('Email Address', Icons.email),
+                  validator: (val) {
+                    if (val != null && val.trim().isNotEmpty) {
+                      final clean = val.trim();
+                      if (!RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(clean)) {
+                        return 'Enter a valid email address (e.g. name@domain.com)';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+
+                // Account Status Switch
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Account Status',
+                      style: TextStyle(
+                        color: Color(0xFF0A183D),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _selectedStatus == 'Active'
+                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                            : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            _selectedStatus,
+                            style: TextStyle(
+                              color: _selectedStatus == 'Active'
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFEF4444),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Switch(
+                            value: _selectedStatus == 'Active',
+                            activeTrackColor: const Color(0xFF10B981),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedStatus = val ? 'Active' : 'Inactive';
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // ── LOGIN PASSWORD & SECURITY SECTION ─────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: widget.primaryColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.lock_reset_rounded,
+                              color: widget.primaryColor,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'Login Password & Security',
+                                  style: TextStyle(
+                                    fontSize: 14.0,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                                Text(
+                                  'Current manager password populated. Toggle eye icon to view or edit.',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const Divider(color: Color(0xFFE2E8F0), height: 1),
+                      const SizedBox(height: 14),
+
+                      // New Password Field populated with existing manager password
+                      _buildModalFieldLabel('New Password *'),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: !_isPasswordVisible,
+                        style: const TextStyle(
+                          color: Color(0xFF0A183D),
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: _getInputDecoration(
+                          'Enter password (min. 6 characters)',
+                          Icons.lock_outline_rounded,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordVisible
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                              color: const Color(0xFF64748B),
+                              size: 20,
+                            ),
+                            onPressed: () => setState(
+                              () => _isPasswordVisible = !_isPasswordVisible,
+                            ),
+                          ),
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Password is required';
+                          }
+                          if (val.trim().length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Save Changes Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: widget.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: _isSaving
+                        ? null
+                        : () async {
+                            if (!_formKey.currentState!.validate()) return;
+                            setState(() => _isSaving = true);
+                            try {
+                              final editContact = _contactNoController.text.trim().replaceAll(RegExp(r'\D'), '');
+                              final editEmail = _emailController.text.trim();
+                              final editName = _fullNameController.text.trim();
+                              final editUsername = _userNameController.text.trim();
+                              final editPassword = _passwordController.text.trim();
+
+                              if (editUsername.isEmpty) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Username is required.');
+                                return;
+                              }
+
+                              if (!(await widget.isUsernameUnique(editUsername, excludeDocId: widget.docId))) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Username already exists. Please choose another username.');
+                                return;
+                              }
+
+                              if (editContact.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(editContact)) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Please enter a valid 10-digit phone number (starts with 6-9).');
+                                return;
+                              }
+
+                              if (editEmail.isNotEmpty && !RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(editEmail)) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Please enter a valid email address (e.g. name@domain.com).');
+                                return;
+                              }
+
+                              if (editName.isNotEmpty && !(await widget.isFullNameUnique(editName, excludeDocId: widget.docId))) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Full name "$editName" already exists. Please use a unique name.');
+                                return;
+                              }
+
+                              if (!(await widget.isContactNoUnique(editContact, excludeDocId: widget.docId))) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Phone number already registered. Please use another number.');
+                                return;
+                              }
+
+                              if (editEmail.isNotEmpty && !(await widget.isEmailUnique(editEmail, excludeDocId: widget.docId))) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Email address already registered. Please use another email address.');
+                                return;
+                              }
+
+                              if (editPassword.isEmpty) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Password is required.');
+                                return;
+                              }
+
+                              if (editPassword.length < 6) {
+                                setState(() => _isSaving = false);
+                                widget.onError('Password must be at least 6 characters.');
+                                return;
+                              }
+
+                              final Map<String, dynamic> updatePayload = {
+                                'FullName': editName,
+                                'UserName': editUsername,
+                                'Designation': _selectedDesignation,
+                                'Department': _selectedDepartment,
+                                'ContactNo': editContact,
+                                'Email': editEmail,
+                                'Status': _selectedStatus,
+                                'Password': editPassword,
+                              };
+
+                              await FirestoreService.getCollection('manager').doc(widget.docId).update(updatePayload);
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                final isPasswordChanged = editPassword != _initialPassword;
+                                widget.onSuccess(
+                                  isPasswordChanged
+                                      ? 'Manager profile and password updated successfully.'
+                                      : 'Manager profile updated successfully.',
+                                );
+                              }
+                            } catch (e) {
+                              setState(() => _isSaving = false);
+                              widget.onError('Failed to update manager: $e');
+                            }
+                          },
+                    child: _isSaving
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Save Changes',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

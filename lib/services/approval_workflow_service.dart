@@ -64,6 +64,9 @@ class ApprovalWorkflowService {
       return ApprovalStage.pendingManagerReview;
     }
     if (s == statusPendingOrgApproval ||
+        s == 'pending_organization_approval' ||
+        s == 'pending_org_approval' ||
+        s == 'pending_org' ||
         s == 'forwarded_to_org' ||
         s == 'pending org approval' ||
         s == 'manager_verified') {
@@ -213,15 +216,38 @@ class ApprovalWorkflowService {
 
     await FirestoreService.getCollection(collectionName).doc(docId).set(payload, SetOptions(merge: true));
 
-    // Real-time notification to Manager(s)
+    // Real-time notification to Manager(s) and Organization
     final siteId = (baseData['siteId'] ?? 'N/A').toString();
-    final reqId = (baseData['matReqId'] ?? baseData['toolReqId'] ?? baseData['wsReqId'] ?? baseData['paymentReqId'] ?? docId).toString();
+    final reqId = (baseData['matReqId'] ??
+            baseData['toolReqId'] ??
+            baseData['wsReqId'] ??
+            baseData['paymentReqId'] ??
+            docId)
+        .toString();
     final reqType = getRequestType(collectionName);
     final reqTypeName = getRequestTypeDisplayName(reqType);
 
+    // Resolve assigned manager for the site so the relevant manager receives the notification
+    final assignedManager = await getAssignedManagerForSite(
+      siteId: siteId,
+      supervisorName: supervisorName,
+      supervisorId: supervisorId,
+    );
+    final targetMgrName = (baseData['managerName'] ??
+            assignedManager['managerName'] ??
+            '')
+        .toString()
+        .trim();
+    final targetMgrId = (baseData['managerId'] ??
+            assignedManager['managerId'] ??
+            '')
+        .toString()
+        .trim();
+
     await NotificationService.notifyManagerAndOrganisation(
       title: '📋 New $reqTypeName Submitted',
-      body: '$supervisorName (Site: $siteId) submitted $reqTypeName #$reqId for review and authorization.',
+      body:
+          '$supervisorName (Site: $siteId) submitted $reqTypeName #$reqId for review and authorization.',
       requestType: reqType,
       requestId: reqId,
       docId: docId,
@@ -229,6 +255,10 @@ class ApprovalWorkflowService {
       status: statusPendingManagerReview,
       senderRole: 'Supervisor',
       senderName: supervisorName,
+      forSupervisorName: supervisorName,
+      forSupervisorId: supervisorId,
+      forManagerName: targetMgrName.isNotEmpty ? targetMgrName : null,
+      forManagerId: targetMgrId.isNotEmpty ? targetMgrId : null,
       remarks: initialRemarks,
       requiredAction: 'Action Required: Manager Review & Verification',
     );
@@ -274,6 +304,20 @@ class ApprovalWorkflowService {
     final reqType = getRequestType(collectionName);
     final reqTypeName = getRequestTypeDisplayName(reqType);
 
+    // Resolve supervisor details from document if not provided
+    String targetSupervisor = '';
+    String targetSupervisorId = '';
+    String resolvedSiteId = siteId ?? '';
+    try {
+      final docSnap = await FirestoreService.getCollection(collectionName).doc(docId).get();
+      final docData = docSnap.data() ?? {};
+      targetSupervisor = (docData['supervisorName'] ?? docData['supervisor'] ?? '').toString().trim();
+      targetSupervisorId = (docData['supervisorId'] ?? '').toString().trim();
+      if (resolvedSiteId.isEmpty) {
+        resolvedSiteId = (docData['siteId'] ?? '').toString().trim();
+      }
+    } catch (_) {}
+
     // Real-time notification to Organization
     await NotificationService.notifyOrganisation(
       title: '🏢 $reqTypeName Forwarded for HQ Approval',
@@ -281,13 +325,31 @@ class ApprovalWorkflowService {
       requestType: reqType,
       requestId: docId,
       docId: docId,
-      siteId: siteId,
+      siteId: resolvedSiteId,
       status: statusPendingOrgApproval,
       senderRole: 'Manager',
       senderName: managerName,
       remarks: remarks,
       requiredAction: 'Action Required: HQ Authorization',
     );
+
+    // Real-time notification to Supervisor that Manager verified & forwarded to HQ
+    if (targetSupervisor.isNotEmpty) {
+      await NotificationService.notifySupervisor(
+        supervisorName: targetSupervisor,
+        supervisorId: targetSupervisorId.isNotEmpty ? targetSupervisorId : null,
+        title: '📋 $reqTypeName Verified by Manager',
+        body: 'Manager $managerName verified your $reqTypeName #$docId and forwarded it for Organization HQ approval.',
+        requestType: reqType,
+        requestId: docId,
+        docId: docId,
+        siteId: resolvedSiteId,
+        status: statusPendingOrgApproval,
+        senderRole: 'Manager',
+        senderName: managerName,
+        remarks: remarks,
+      );
+    }
   }
 
   /// Call when a Manager rejects the request during initial review.
@@ -325,16 +387,33 @@ class ApprovalWorkflowService {
     final reqType = getRequestType(collectionName);
     final reqTypeName = getRequestTypeDisplayName(reqType);
 
+    // Resolve supervisor details from document if not provided
+    String targetSupervisor = (supervisorName ?? '').trim();
+    String targetSupervisorId = '';
+    String resolvedSiteId = siteId ?? '';
+    if (targetSupervisor.isEmpty) {
+      try {
+        final docSnap = await FirestoreService.getCollection(collectionName).doc(docId).get();
+        final docData = docSnap.data() ?? {};
+        targetSupervisor = (docData['supervisorName'] ?? docData['supervisor'] ?? '').toString().trim();
+        targetSupervisorId = (docData['supervisorId'] ?? '').toString().trim();
+        if (resolvedSiteId.isEmpty) {
+          resolvedSiteId = (docData['siteId'] ?? '').toString().trim();
+        }
+      } catch (_) {}
+    }
+
     // Real-time notification to Supervisor
-    if (supervisorName != null && supervisorName.isNotEmpty) {
+    if (targetSupervisor.isNotEmpty) {
       await NotificationService.notifySupervisor(
-        supervisorName: supervisorName,
+        supervisorName: targetSupervisor,
+        supervisorId: targetSupervisorId.isNotEmpty ? targetSupervisorId : null,
         title: '❌ $reqTypeName Declined by Manager',
         body: 'Your $reqTypeName #$docId was declined by Manager $managerName. Reason: $reason',
         requestType: reqType,
         requestId: docId,
         docId: docId,
-        siteId: siteId,
+        siteId: resolvedSiteId,
         status: statusRejectedByManager,
         senderRole: 'Manager',
         senderName: managerName,
@@ -384,6 +463,28 @@ class ApprovalWorkflowService {
     final reqType = getRequestType(collectionName);
     final reqTypeName = getRequestTypeDisplayName(reqType);
 
+    // Resolve manager and supervisor details from doc if not passed
+    String targetManager = (managerName ?? '').trim();
+    String targetSupervisor = (supervisorName ?? '').trim();
+    String resolvedSiteId = siteId ?? '';
+    try {
+      final docSnap = await FirestoreService.getCollection(collectionName).doc(docId).get();
+      final docData = docSnap.data() ?? {};
+      if (targetManager.isEmpty) {
+        targetManager = (docData['managerName'] ?? docData['manager'] ?? '').toString().trim();
+      }
+      if (targetSupervisor.isEmpty) {
+        targetSupervisor = (docData['supervisorName'] ?? docData['supervisor'] ?? '').toString().trim();
+      }
+      if (resolvedSiteId.isEmpty) {
+        resolvedSiteId = (docData['siteId'] ?? '').toString().trim();
+      }
+      if (targetManager.isEmpty && resolvedSiteId.isNotEmpty) {
+        final mgr = await getAssignedManagerForSite(siteId: resolvedSiteId);
+        targetManager = (mgr['managerName'] ?? '').trim();
+      }
+    } catch (_) {}
+
     // Real-time notification to Manager that Org has authorized
     await NotificationService.notifyManager(
       title: '✅ $reqTypeName Authorized by HQ',
@@ -391,14 +492,31 @@ class ApprovalWorkflowService {
       requestType: reqType,
       requestId: docId,
       docId: docId,
-      siteId: siteId,
+      siteId: resolvedSiteId,
       status: statusPendingManagerClearance,
       senderRole: 'Organization',
       senderName: orgUserName,
       remarks: remarks,
       requiredAction: 'Action Required: Final Clearance & Dispatch',
-      forManagerName: managerName,
+      forManagerName: targetManager.isNotEmpty ? targetManager : null,
     );
+
+    // Real-time notification to Supervisor that HQ authorized and clearance is in progress
+    if (targetSupervisor.isNotEmpty) {
+      await NotificationService.notifySupervisor(
+        supervisorName: targetSupervisor,
+        title: '🏢 $reqTypeName Authorized by HQ',
+        body: 'HQ ($orgUserName) authorized your $reqTypeName #$docId. Awaiting final clearance and release from Manager ${targetManager.isNotEmpty ? targetManager : "Manager"}.',
+        requestType: reqType,
+        requestId: docId,
+        docId: docId,
+        siteId: resolvedSiteId,
+        status: statusPendingManagerClearance,
+        senderRole: 'Organization',
+        senderName: orgUserName,
+        remarks: remarks,
+      );
+    }
   }
 
   /// Call when Organization Admin rejects the request.
@@ -436,16 +554,36 @@ class ApprovalWorkflowService {
     final reqType = getRequestType(collectionName);
     final reqTypeName = getRequestTypeDisplayName(reqType);
 
+    // Resolve supervisor and manager details from doc if not passed
+    String targetSupervisor = (supervisorName ?? '').trim();
+    String targetManager = '';
+    String resolvedSiteId = siteId ?? '';
+    try {
+      final docSnap = await FirestoreService.getCollection(collectionName).doc(docId).get();
+      final docData = docSnap.data() ?? {};
+      if (targetSupervisor.isEmpty) {
+        targetSupervisor = (docData['supervisorName'] ?? docData['supervisor'] ?? '').toString().trim();
+      }
+      targetManager = (docData['managerName'] ?? docData['manager'] ?? '').toString().trim();
+      if (resolvedSiteId.isEmpty) {
+        resolvedSiteId = (docData['siteId'] ?? '').toString().trim();
+      }
+      if (targetManager.isEmpty && resolvedSiteId.isNotEmpty) {
+        final mgr = await getAssignedManagerForSite(siteId: resolvedSiteId);
+        targetManager = (mgr['managerName'] ?? '').trim();
+      }
+    } catch (_) {}
+
     // Real-time notification to Supervisor
-    if (supervisorName != null && supervisorName.isNotEmpty) {
+    if (targetSupervisor.isNotEmpty) {
       await NotificationService.notifySupervisor(
-        supervisorName: supervisorName,
+        supervisorName: targetSupervisor,
         title: '❌ $reqTypeName Declined by HQ',
         body: 'Your $reqTypeName #$docId was declined by Organization HQ. Reason: $reason',
         requestType: reqType,
         requestId: docId,
         docId: docId,
-        siteId: siteId,
+        siteId: resolvedSiteId,
         status: statusRejectedByOrg,
         senderRole: 'Organization',
         senderName: orgUserName,
@@ -460,11 +598,12 @@ class ApprovalWorkflowService {
       requestType: reqType,
       requestId: docId,
       docId: docId,
-      siteId: siteId,
+      siteId: resolvedSiteId,
       status: statusRejectedByOrg,
       senderRole: 'Organization',
       senderName: orgUserName,
       remarks: reason,
+      forManagerName: targetManager.isNotEmpty ? targetManager : null,
     );
   }
 
@@ -581,9 +720,9 @@ class ApprovalWorkflowService {
     final isTool = reqType == 'tools';
 
     // Real-time notification to Supervisor confirming final release!
-    if (supervisorName != null && supervisorName.isNotEmpty) {
+    if (targetSupervisor.isNotEmpty) {
       await NotificationService.notifySupervisor(
-        supervisorName: supervisorName,
+        supervisorName: targetSupervisor,
         title: isTool
             ? '🚚 Tools Requisition Approved & Dispatched!'
             : '🎉 $reqTypeName Approved & Released!',
@@ -593,7 +732,7 @@ class ApprovalWorkflowService {
         requestType: reqType,
         requestId: docId,
         docId: docId,
-        siteId: siteId,
+        siteId: targetSiteId,
         status: statusApproved,
         senderRole: 'Manager',
         senderName: managerName,
@@ -772,7 +911,11 @@ class ApprovalWorkflowService {
         : (reqData['siteId'] ?? '').toString();
     final targetSiteName = (reqData['siteName'] ?? reqData['projectName'] ?? targetSiteId).toString();
     final targetProjectName = (reqData['projectName'] ?? '').toString();
-    final targetManagerName = (reqData['finalApprovedBy'] ?? reqData['managerName'] ?? '').toString();
+    String targetManagerName = (reqData['finalApprovedBy'] ?? reqData['managerName'] ?? '').toString().trim();
+    if (targetManagerName.isEmpty && targetSiteId.isNotEmpty) {
+      final mgr = await getAssignedManagerForSite(siteId: targetSiteId);
+      targetManagerName = (mgr['managerName'] ?? '').trim();
+    }
 
     // Idempotent safeguard: If not previously transferred during clearance, transfer each item now
     if (!isAlreadyTransferred &&
@@ -838,6 +981,9 @@ class ApprovalWorkflowService {
       status: statusApproved,
       senderRole: 'Supervisor',
       senderName: supervisorName,
+      forSupervisorName: supervisorName,
+      forSupervisorId: supervisorId,
+      forManagerName: targetManagerName.isNotEmpty ? targetManagerName : null,
       remarks: remarks,
       requiredAction: 'Stock Arrived & Confirmed at Site',
     );
@@ -880,7 +1026,11 @@ class ApprovalWorkflowService {
         ? siteId
         : (reqData['siteId'] ?? '').toString();
     final targetProjectName = (reqData['projectName'] ?? '').toString();
-    final targetManagerName = (reqData['finalApprovedBy'] ?? reqData['managerName'] ?? '').toString();
+    String targetManagerName = (reqData['finalApprovedBy'] ?? reqData['managerName'] ?? '').toString().trim();
+    if (targetManagerName.isEmpty && targetSiteId.isNotEmpty) {
+      final mgr = await getAssignedManagerForSite(siteId: targetSiteId);
+      targetManagerName = (mgr['managerName'] ?? '').trim();
+    }
     final displayReqId = (toolReqId != null && toolReqId.isNotEmpty)
         ? toolReqId
         : (reqData['toolReqId'] ?? docId).toString();
@@ -928,8 +1078,98 @@ class ApprovalWorkflowService {
       status: statusApproved,
       senderRole: 'Supervisor',
       senderName: supervisorName,
+      forSupervisorName: supervisorName,
+      forSupervisorId: supervisorId,
+      forManagerName: targetManagerName.isNotEmpty ? targetManagerName : null,
       remarks: remarks,
       requiredAction: 'Tools Arrived & Confirmed at Site',
     );
   }
+
+  // ===========================================================================
+  // SITE SUPERVISOR & MANAGER RESOLUTION HELPERS
+  // ===========================================================================
+
+  /// Retrieves the assigned Manager details from `siteSupervisorMap` or `projects` collection
+  static Future<Map<String, String>> getAssignedManagerForSite({
+    required String siteId,
+    String? supervisorName,
+    String? supervisorId,
+  }) async {
+    try {
+      final cleanSiteId = siteId.trim();
+      final cleanSupName = (supervisorName ?? '').trim().toLowerCase();
+      final cleanSupId = (supervisorId ?? '').trim().toLowerCase();
+
+      final mapSnap = await FirestoreService.siteSupervisorMap.get();
+      for (final doc in mapSnap.docs) {
+        final d = doc.data();
+        final docSite = (d['siteCode'] ?? d['siteId'] ?? d['site'] ?? d['siteDocId'] ?? doc.id).toString().trim();
+        final docSupName = (d['supervisorName'] ?? d['supervisor'] ?? '').toString().trim().toLowerCase();
+        final docSupId = (d['supervisorId'] ?? d['Supervisor ID'] ?? '').toString().trim().toLowerCase();
+
+        final isSiteMatch = docSite.toLowerCase() == cleanSiteId.toLowerCase() ||
+            docSite.toLowerCase().contains(cleanSiteId.toLowerCase()) ||
+            cleanSiteId.toLowerCase().contains(docSite.toLowerCase()) ||
+            doc.id.toLowerCase().contains(cleanSiteId.toLowerCase());
+
+        final isSupMatch = cleanSupName.isEmpty ||
+            docSupName == cleanSupName ||
+            docSupName.contains(cleanSupName) ||
+            cleanSupName.contains(docSupName) ||
+            (cleanSupId.isNotEmpty && (docSupId == cleanSupId || doc.id.toLowerCase().contains(cleanSupId)));
+
+        if (isSiteMatch && isSupMatch) {
+          final mgrName = (d['managerName'] ?? d['manager'] ?? d['Manager Name'] ?? '').toString().trim();
+          final mgrId = (d['managerId'] ?? d['Manager ID'] ?? '').toString().trim();
+          if (mgrName.isNotEmpty) {
+            return {
+              'managerName': mgrName,
+              'managerId': mgrId,
+            };
+          }
+        }
+      }
+
+      // Fallback: any matching site in siteSupervisorMap
+      for (final doc in mapSnap.docs) {
+        final d = doc.data();
+        final docSite = (d['siteCode'] ?? d['siteId'] ?? d['site'] ?? d['siteDocId'] ?? doc.id).toString().trim();
+        if (docSite.toLowerCase() == cleanSiteId.toLowerCase() ||
+            docSite.toLowerCase().contains(cleanSiteId.toLowerCase()) ||
+            doc.id.toLowerCase().contains(cleanSiteId.toLowerCase())) {
+          final mgrName = (d['managerName'] ?? d['manager'] ?? d['Manager Name'] ?? '').toString().trim();
+          final mgrId = (d['managerId'] ?? d['Manager ID'] ?? '').toString().trim();
+          if (mgrName.isNotEmpty) {
+            return {
+              'managerName': mgrName,
+              'managerId': mgrId,
+            };
+          }
+        }
+      }
+
+      // Fallback 2: check projects collection
+      final projSnap = await FirestoreService.projects.doc(cleanSiteId).get();
+      if (projSnap.exists) {
+        final pd = projSnap.data() ?? {};
+        final mgrName = (pd['managerName'] ?? pd['manager'] ?? pd['assignedManager'] ?? '').toString().trim();
+        final mgrId = (pd['managerId'] ?? '').toString().trim();
+        if (mgrName.isNotEmpty) {
+          return {
+            'managerName': mgrName,
+            'managerId': mgrId,
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting assigned manager for site: $e');
+    }
+
+    return {
+      'managerName': 'Manager',
+      'managerId': '',
+    };
+  }
 }
+

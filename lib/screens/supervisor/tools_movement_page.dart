@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/auth_service.dart';
 import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/dialog_utils.dart';
 
@@ -777,6 +778,20 @@ class _ToolsMovementPageState extends State<ToolsMovementPage>
       }
 
       await FirestoreService.getCollection('toolsMovement').doc(docId).set(data);
+
+      // Notify assigned supervisor for this site
+      final toolNamesList = toolsList.map((t) => '${t['toolName']} (${t['toolCount']})').toList();
+      final totalToolCount = toolsList.fold<int>(0, (total, t) => total + ((t['toolCount'] as num?)?.toInt() ?? 0));
+      NotificationService.notifyToolAssignment(
+        siteId: _selectedSiteId!,
+        siteName: _siteDetailsMap[_selectedSiteId]?['projectName'] ?? _selectedSiteId!,
+        toolCount: totalToolCount,
+        toolNames: toolNamesList,
+        managerName: _managerNameController.text.trim(),
+        supervisorName: _supervisorNameController.text.trim(),
+        projectName: _projectNameController.text.trim(),
+        tmId: tmId,
+      );
 
       if (mounted) {
         await DialogUtils.showSuccessDialog(

@@ -293,6 +293,9 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     final primaryColor = theme.primaryColor;
     final darkAccent = AppTheme.getDarkAccent(primaryColor);
     final isMobile = MediaQuery.of(context).size.width < 600;
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final showMetrics = !isKeyboardOpen || screenHeight > 850;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -329,12 +332,18 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Mode Switcher Tabs
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Mode Switcher Tabs
+              Container(
+                margin: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: isKeyboardOpen ? 6 : 12,
+                ),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -413,7 +422,14 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
             ),
 
             // Metrics Strip
-            _buildSummaryMetricsStrip(primaryColor),
+            AnimatedCrossFade(
+              firstChild: _buildSummaryMetricsStrip(primaryColor),
+              secondChild: const SizedBox.shrink(),
+              crossFadeState: showMetrics
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              duration: const Duration(milliseconds: 200),
+            ),
 
             // Tab View
             Expanded(
@@ -424,8 +440,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      _buildCreateWorkerTab(primaryColor),
-                      _buildWorkersListTab(primaryColor),
+                      _buildCreateWorkerTab(primaryColor, isKeyboardOpen: isKeyboardOpen),
+                      _buildWorkersListTab(primaryColor, isKeyboardOpen: isKeyboardOpen),
                     ],
                   ),
                 ),
@@ -434,7 +450,8 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildSummaryMetricsStrip(Color primaryColor) {
@@ -547,10 +564,14 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     );
   }
 
-  Widget _buildCreateWorkerTab(Color primaryColor) {
+  Widget _buildCreateWorkerTab(Color primaryColor, {bool isKeyboardOpen = false}) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: isKeyboardOpen ? 8 : 12,
+      ),
       physics: const BouncingScrollPhysics(),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -661,7 +682,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                     ),
                   ),
                 ),
-          const SizedBox(height: 80),
+          SizedBox(height: isKeyboardOpen ? 30 : 80),
         ],
       ),
     );
@@ -953,11 +974,14 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
     );
   }
 
-  Widget _buildWorkersListTab(Color primaryColor) {
+  Widget _buildWorkersListTab(Color primaryColor, {bool isKeyboardOpen = false}) {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: isKeyboardOpen ? 4 : 8,
+          ),
           child: Column(
             children: [
               // Search Input Box
@@ -1025,7 +1049,7 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: isKeyboardOpen ? 6 : 10),
               // Designation Filter Chips
               SizedBox(
                 height: 36,
@@ -1090,53 +1114,69 @@ class _WorkersConfigPageState extends State<WorkersConfigPage>
               }).toList();
 
               if (filteredWorkers.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.people_outline_rounded,
-                            size: 48,
-                            color: primaryColor,
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                              vertical: isKeyboardOpen ? 14.0 : 32.0,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(isKeyboardOpen ? 12 : 16),
+                                  decoration: BoxDecoration(
+                                    color: primaryColor.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.people_outline_rounded,
+                                    size: isKeyboardOpen ? 38 : 48,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                                SizedBox(height: isKeyboardOpen ? 10 : 16),
+                                const Text(
+                                  'No Workers Found',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0A183D),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _searchQuery.isNotEmpty
+                                      ? 'No registered workers match "$_searchQuery"'
+                                      : 'Click REGISTER WORKER to add worker profiles.',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No Workers Found',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0A183D),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _searchQuery.isNotEmpty
-                              ? 'No registered workers match "$_searchQuery"'
-                              : 'Click REGISTER WORKER to add worker profiles.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 );
               }
 
               return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 80),
+                padding: EdgeInsets.fromLTRB(20, 4, 20, isKeyboardOpen ? 20 : 80),
                 physics: const BouncingScrollPhysics(),
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 itemCount: filteredWorkers.length,
                 itemBuilder: (context, index) {
                   final doc = filteredWorkers[index];

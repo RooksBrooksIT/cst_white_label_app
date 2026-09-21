@@ -99,93 +99,108 @@ class ExpenseService {
     }
   }
 
-  /// Formats canonical site document ID in the format: SiteCode_SiteName (e.g. ST001_AbineshHouse)
+  /// Formats canonical site document ID in the format: SiteCode_SiteName (e.g. ST001_Testing)
   static String formatCanonicalSiteDocId(String siteCode, String siteName) {
     var cleanCode = siteCode.trim();
+    var cleanName = siteName.trim();
+
+    // 1. Normalize project prefixes if any (PR -> ST)
     if (cleanCode.toUpperCase().startsWith('PR')) {
       cleanCode = 'ST${cleanCode.substring(2)}';
     }
-    final cleanName = siteName.trim().replaceAll(' ', '');
-    if (cleanCode.isNotEmpty && cleanName.isNotEmpty) {
-      if (cleanCode.contains('_') &&
-          cleanCode.toLowerCase().contains(cleanName.toLowerCase())) {
-        return cleanCode.replaceAll(' ', '');
+
+    // 2. Extract site code and name components if cleanCode has underscores
+    if (cleanCode.contains('_')) {
+      final parts = cleanCode.split('_').where((p) => p.trim().isNotEmpty).toList();
+      String? extractedCode;
+      final nameParts = <String>[];
+      for (final p in parts) {
+        final pNorm = p.toUpperCase().startsWith('PR') ? 'ST${p.substring(2)}' : p;
+        if (extractedCode == null && (pNorm.toUpperCase().startsWith('ST') || RegExp(r'^[A-Z]{2}\d+').hasMatch(pNorm))) {
+          extractedCode = pNorm;
+        } else if (pNorm != extractedCode) {
+          nameParts.add(p);
+        }
       }
-      return '${cleanCode}_$cleanName';
-    } else if (cleanCode.isNotEmpty && cleanCode.contains('_')) {
-      return cleanCode.replaceAll(' ', '');
-    } else if (cleanName.isNotEmpty && cleanName.contains('_')) {
-      return cleanName.replaceAll(' ', '');
+      if (extractedCode != null) {
+        cleanCode = extractedCode;
+      }
+      if (cleanName.isEmpty && nameParts.isNotEmpty) {
+        cleanName = nameParts.join('_');
+      }
     }
-    return cleanCode.isNotEmpty ? cleanCode : cleanName;
+
+    // 3. Extract site code and name components if cleanName has underscores
+    if (cleanName.contains('_')) {
+      final parts = cleanName.split('_').where((p) => p.trim().isNotEmpty).toList();
+      String? extractedCode;
+      final nameParts = <String>[];
+      for (final p in parts) {
+        final pNorm = p.toUpperCase().startsWith('PR') ? 'ST${p.substring(2)}' : p;
+        if (extractedCode == null && (pNorm.toUpperCase().startsWith('ST') || RegExp(r'^[A-Z]{2}\d+').hasMatch(pNorm))) {
+          extractedCode = pNorm;
+        } else if (pNorm != extractedCode && (cleanCode.isEmpty || pNorm.toLowerCase() != cleanCode.toLowerCase())) {
+          nameParts.add(p);
+        }
+      }
+      if (cleanCode.isEmpty && extractedCode != null) {
+        cleanCode = extractedCode;
+      }
+      if (nameParts.isNotEmpty) {
+        cleanName = nameParts.join('_');
+      } else if (extractedCode != null && cleanCode == extractedCode) {
+        cleanName = '';
+      }
+    }
+
+    // 4. Repeatedly strip cleanCode / ST... prefixes from cleanName
+    cleanCode = cleanCode.replaceAll(' ', '');
+    cleanName = cleanName.replaceAll(' ', '');
+
+    final codeLower = cleanCode.toLowerCase();
+    while (cleanName.isNotEmpty && cleanCode.isNotEmpty) {
+      final nameLower = cleanName.toLowerCase();
+      if (nameLower.startsWith('${codeLower}_')) {
+        cleanName = cleanName.substring(cleanCode.length + 1).trim();
+      } else if (nameLower == codeLower) {
+        cleanName = '';
+        break;
+      } else if (nameLower.startsWith(codeLower) && cleanName.length > cleanCode.length) {
+        cleanName = cleanName.substring(cleanCode.length).trim();
+        if (cleanName.startsWith('_')) cleanName = cleanName.substring(1).trim();
+      } else {
+        break;
+      }
+    }
+
+    if (cleanCode.isNotEmpty && cleanName.isNotEmpty && cleanCode.toLowerCase() != cleanName.toLowerCase()) {
+      return '${cleanCode}_$cleanName';
+    } else if (cleanCode.isNotEmpty) {
+      return cleanCode;
+    } else {
+      return cleanName;
+    }
   }
 
   /// Formats any combination of raw site ID, site code, and site name into the standardized
-  /// SiteCode_SiteName format (e.g. ST001_AbineshHouse).
+  /// SiteCode_SiteName format (e.g. ST001_Testing).
   static String formatCanonicalSiteId({
     required String rawId,
     String? siteCode,
     String? siteName,
   }) {
     final cleanRaw = rawId.trim();
-    var cleanCode = (siteCode ?? '').trim();
-    if (cleanCode.toUpperCase().startsWith('PR')) {
-      cleanCode = 'ST${cleanCode.substring(2)}';
-    }
+    final cleanCode = (siteCode ?? '').trim();
     final cleanName = (siteName ?? '').trim();
 
-    // 1. If cleanRaw already contains an underscore:
-    if (cleanRaw.contains('_')) {
-      final parts = cleanRaw.split('_');
-      // Format: PR001_ST001_ProjectName or similar multi-prefix patterns
-      if (parts.length >= 3) {
-        final stIdx = parts.indexWhere((p) => p.toUpperCase().startsWith('ST'));
-        if (stIdx != -1 && stIdx < parts.length - 1) {
-          final stCode = parts[stIdx].trim();
-          final namePart = parts.sublist(stIdx + 1).join('_').trim().replaceAll(' ', '');
-          if (stCode.isNotEmpty && namePart.isNotEmpty) {
-            final formattedName = namePart[0].toUpperCase() + namePart.substring(1);
-            return '${stCode}_$formattedName';
-          }
-        }
-      }
-
-      var code = parts.first.trim();
-      final namePart = parts.skip(1).join('_').trim().replaceAll(' ', '');
-      if (code.toUpperCase().startsWith('PR')) {
-        code = 'ST${code.substring(2)}';
-      }
-      if (code.isNotEmpty && namePart.isNotEmpty) {
-        final formattedName = namePart[0].toUpperCase() + namePart.substring(1);
-        return '${code}_$formattedName';
-      }
-      return cleanRaw.replaceAll(' ', '');
+    if (cleanCode.isNotEmpty || cleanName.isNotEmpty) {
+      return formatCanonicalSiteDocId(
+        cleanCode.isNotEmpty ? cleanCode : cleanRaw,
+        cleanName.isNotEmpty ? cleanName : cleanRaw,
+      );
     }
 
-    // 2. If separate code and name are supplied:
-    if (cleanCode.isNotEmpty && cleanName.isNotEmpty) {
-      return formatCanonicalSiteDocId(cleanCode, cleanName);
-    }
-
-    // 3. If rawId is a code and cleanName is name:
-    if (cleanRaw.isNotEmpty &&
-        cleanName.isNotEmpty &&
-        cleanRaw.toLowerCase() != cleanName.toLowerCase()) {
-      return formatCanonicalSiteDocId(cleanRaw, cleanName);
-    }
-
-    // 4. If cleanCode is code and cleanRaw is name:
-    if (cleanCode.isNotEmpty &&
-        cleanRaw.isNotEmpty &&
-        cleanCode.toLowerCase() != cleanRaw.toLowerCase()) {
-      return formatCanonicalSiteDocId(cleanCode, cleanRaw);
-    }
-
-    if (cleanRaw.toUpperCase().startsWith('PR')) {
-      return 'ST${cleanRaw.substring(2)}'.replaceAll(' ', '');
-    }
-
-    return cleanRaw.replaceAll(' ', '');
+    return formatCanonicalSiteDocId(cleanRaw, '');
   }
 
   /// Sanitizes a collection of site IDs by:
@@ -234,7 +249,7 @@ class ExpenseService {
   }
 
   /// Scans totalSiteExpensesPerDay and removes any legacy duplicate document
-  /// that uses site name alone or non-canonical doc ID, merging totals into the canonical document.
+  /// that uses site name alone, duplicated prefixes, or non-canonical doc ID, merging totals into the canonical document.
   static Future<void> cleanupDuplicateSiteExpenseDocs() async {
     try {
       final totalsCol =
@@ -242,21 +257,18 @@ class ExpenseService {
       final snap = await totalsCol.get();
       for (final doc in snap.docs) {
         final docId = doc.id;
-        // If document ID does not contain '_' or uses site name alone
-        if (!docId.contains('_')) {
-          final canonicalDocId = await resolveCanonicalSiteDocId(docId);
-          if (canonicalDocId != docId && canonicalDocId.contains('_')) {
-            print(
-              "🔄 Migrating legacy duplicate totalSiteExpensesPerDay/$docId -> $canonicalDocId",
-            );
-            final data = doc.data();
-            await totalsCol
-                .doc(canonicalDocId)
-                .set(data, SetOptions(merge: true));
-            await doc.reference.delete();
-            await recalcTotalsAndSyncProject(canonicalDocId);
-            print("✅ Purged legacy duplicate document: $docId");
-          }
+        final canonicalDocId = await resolveCanonicalSiteDocId(docId);
+        if (canonicalDocId.isNotEmpty && canonicalDocId != docId) {
+          print(
+            "🔄 Migrating legacy duplicate totalSiteExpensesPerDay/$docId -> $canonicalDocId",
+          );
+          final data = doc.data();
+          await totalsCol
+              .doc(canonicalDocId)
+              .set(data, SetOptions(merge: true));
+          await doc.reference.delete();
+          await recalcTotalsAndSyncProject(canonicalDocId);
+          print("✅ Purged legacy duplicate document: $docId");
         }
       }
     } catch (e) {
@@ -365,14 +377,20 @@ class ExpenseService {
         SetOptions(merge: true),
       );
 
-      // Clean up any legacy duplicate documents in totalSiteExpensesPerDay (e.g. 'Abinesh House')
+      // Clean up any legacy duplicate documents in totalSiteExpensesPerDay (e.g. 'Abinesh House', 'ST001_ST001_Testing', 'PR001_Testing', 'ST001')
       final candidateLegacyIds = <String>{
         if (details.siteName.isNotEmpty && details.siteName != canonicalDocId)
           details.siteName,
         if (siteId != canonicalDocId) siteId,
         if (details.siteCode.isNotEmpty && details.siteCode != canonicalDocId)
           details.siteCode,
+        '${details.siteCode}_$canonicalDocId',
+        '${details.siteCode}_${details.siteCode}_${details.siteName}',
+        if (canonicalDocId.startsWith('ST')) 'PR${canonicalDocId.substring(2)}',
+        if (details.siteCode.startsWith('ST')) 'PR${details.siteCode.substring(2)}_${details.siteName}',
       };
+      candidateLegacyIds.remove(canonicalDocId);
+      candidateLegacyIds.removeWhere((id) => id.trim().isEmpty);
 
       for (final legId in candidateLegacyIds) {
         try {
@@ -766,19 +784,15 @@ class ExpenseService {
       print("❌ Error in _resolveSiteDetails for $trimmed: $e");
     }
 
-    // Determine final canonical doc ID: SiteCode_SiteName (e.g. ST001_AbineshHouse)
-    String canonicalDocId;
-    if (resolvedDocId.isNotEmpty && resolvedDocId.contains('_')) {
-      canonicalDocId = resolvedDocId.replaceAll(' ', '');
-    } else if (resolvedCode.isNotEmpty && resolvedName.isNotEmpty) {
-      canonicalDocId = formatCanonicalSiteDocId(resolvedCode, resolvedName);
-    } else if (trimmed.contains('_')) {
-      canonicalDocId = trimmed.replaceAll(' ', '');
-    } else if (resolvedCode.isNotEmpty) {
-      canonicalDocId = '${resolvedCode}_${trimmed.replaceAll(' ', '')}';
-    } else {
-      canonicalDocId = trimmed.replaceAll(' ', '');
-    }
+    // Determine final canonical doc ID: SiteCode_SiteName (e.g. ST001_Testing)
+    String canonicalDocId = formatCanonicalSiteDocId(
+      resolvedCode.isNotEmpty
+          ? resolvedCode
+          : (resolvedDocId.isNotEmpty ? resolvedDocId : trimmed),
+      resolvedName.isNotEmpty
+          ? resolvedName
+          : (resolvedDocId.isNotEmpty ? resolvedDocId : trimmed),
+    );
 
     if (canonicalDocId.toUpperCase().startsWith('PR')) {
       canonicalDocId = 'ST${canonicalDocId.substring(2)}';
@@ -839,6 +853,53 @@ class ExpenseService {
   static Future<Set<String>> resolveSiteKeys(String siteId) async {
     final details = await resolveSiteDetails(siteId);
     return details.allKeys;
+  }
+
+  /// Find the Firestore DocumentSnapshot in `projects` matching any alias of [siteId]
+  static Future<DocumentSnapshot<Map<String, dynamic>>?> findLinkedProjectDoc(String siteId) async {
+    final keys = (await resolveSiteKeys(siteId)).toList();
+    for (final key in keys) {
+      try {
+        final doc = await FirestoreService.getCollection('projects').doc(key).get();
+        if (doc.exists) return doc;
+      } catch (_) {}
+    }
+    final keysToQuery = keys.take(10).toList();
+    try {
+      final results = await Future.wait([
+        FirestoreService.getCollection('projects').where('siteId', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('projects').where('site', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('projects').where('siteName', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('projects').where('projectName', whereIn: keysToQuery).limit(1).get(),
+      ]);
+      for (final snap in results) {
+        if (snap.docs.isNotEmpty) return snap.docs.first;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Find the Firestore DocumentSnapshot in `Site` matching any alias of [siteId]
+  static Future<DocumentSnapshot<Map<String, dynamic>>?> findLinkedSiteDoc(String siteId) async {
+    final keys = (await resolveSiteKeys(siteId)).toList();
+    for (final key in keys) {
+      try {
+        final doc = await FirestoreService.getCollection('Site').doc(key).get();
+        if (doc.exists) return doc;
+      } catch (_) {}
+    }
+    final keysToQuery = keys.take(10).toList();
+    try {
+      final results = await Future.wait([
+        FirestoreService.getCollection('Site').where('siteId', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('Site').where('site', whereIn: keysToQuery).limit(1).get(),
+        FirestoreService.getCollection('Site').where('siteName', whereIn: keysToQuery).limit(1).get(),
+      ]);
+      for (final snap in results) {
+        if (snap.docs.isNotEmpty) return snap.docs.first;
+      }
+    } catch (_) {}
+    return null;
   }
 
   // Helper to parse numeric amount from any dynamic field or sub-structure
@@ -927,6 +988,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         // Skip manager or org entries recorded in supervisor collection, and any petty cash flagged entries
         if (data['isManagerEntry'] == true ||
             data['createdBy'] == 'manager' ||
@@ -1039,6 +1101,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         // Check if bills array exists and sum items
         final bills = data['bills'];
         if (bills is List && bills.isNotEmpty) {
@@ -1155,6 +1218,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         final bills = data['bills'];
         if (bills is List && bills.isNotEmpty) {
           double billsSum = 0.0;
@@ -1200,6 +1264,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         final amount = _parseExpenseAmount(data['totalAmount'] ?? data['amount'], data);
         total += amount;
       }
@@ -1230,6 +1295,7 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
+        if (data['isSiteExpense'] == false) continue;
         final amount = _parseExpenseAmount(
           data['incentiveAmount'] ?? data['amount'] ?? data['totalAmount'],
         );
@@ -1249,20 +1315,39 @@ class ExpenseService {
       final Map<String, Map<String, dynamic>> matchedDocs = {};
 
       final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+      // 1. Transactions
       for (final key in siteKeys) {
         queryFutures.add(FirestoreService.pettyCashTransactions.where('siteId', isEqualTo: key).get());
         queryFutures.add(FirestoreService.pettyCashTransactions.where('siteName', isEqualTo: key).get());
       }
+      final txnCount = queryFutures.length;
+
+      // 2. Direct Petty Cash Expenses
+      for (final key in siteKeys) {
+        queryFutures.add(FirestoreService.pettyCashExpenses.where('siteId', isEqualTo: key).get());
+        queryFutures.add(FirestoreService.pettyCashExpenses.where('siteName', isEqualTo: key).get());
+      }
+      final expCount = queryFutures.length - txnCount;
+
+      // Full snapshots for prefix matching
       queryFutures.add(FirestoreService.pettyCashTransactions.get());
+      queryFutures.add(FirestoreService.pettyCashExpenses.get());
 
       final results = await Future.wait(queryFutures);
-      for (int i = 0; i < results.length - 1; i++) {
-        for (final doc in results[i].docs) {
+      int idx = 0;
+      for (int i = 0; i < txnCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
           matchedDocs[doc.id] = doc.data();
         }
       }
 
-      final allTxnsSnap = results.last;
+      for (int i = 0; i < expCount; i++, idx++) {
+        for (final doc in results[idx].docs) {
+          matchedDocs.putIfAbsent('exp_${doc.id}', () => doc.data());
+        }
+      }
+
+      final allTxnsSnap = results[idx++];
       for (final doc in allTxnsSnap.docs) {
         final data = doc.data();
         final sId = (data['siteId'] ?? '').toString().trim();
@@ -1278,11 +1363,59 @@ class ExpenseService {
         }
       }
 
-      for (final data in matchedDocs.values) {
-        final txnType = (data['transactionType'] ?? 'EXPENSE').toString().toUpperCase();
-        if (txnType == 'EXPENSE') {
-          final amount = _parseExpenseAmount(data['amount'], data);
-          total += amount;
+      final allExpSnap = results[idx++];
+      for (final doc in allExpSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim();
+        final sName = (data['siteName'] ?? '').toString().trim();
+        for (final key in siteKeys) {
+          if (sId == key ||
+              sName == key ||
+              (sId.isNotEmpty && sId.toLowerCase() == key.toLowerCase()) ||
+              (sName.isNotEmpty && sName.toLowerCase() == key.toLowerCase()) ||
+              doc.id.startsWith('${key}_')) {
+            matchedDocs.putIfAbsent('exp_${doc.id}', () => data);
+          }
+        }
+      }
+
+      final Set<String> processedExpenseIds = {};
+
+      for (final entry in matchedDocs.entries) {
+        final data = entry.value;
+        final docKey = entry.key;
+
+        // Skip non-site expenses from site-specific totals
+        if (data['isSiteExpense'] == false || data['expenseType'] == 'other' || data['siteId'] == null || data['siteId'].toString().trim().isEmpty || data['siteId'].toString().trim() == 'NON_SITE_EXPENSES') continue;
+
+        // Check if this is a direct expense or transaction
+        if (docKey.startsWith('exp_')) {
+          final isApproved = data['status'] == 'EXPENSE_APPROVED' ||
+              data['status'] == 'approved' ||
+              data['status'] == 'APPROVED' ||
+              data['isApproved'] == true ||
+              data['postedToLedger'] == true;
+          if (isApproved) {
+            final expId = (data['expenseId'] ?? docKey.substring(4)).toString();
+            if (!processedExpenseIds.contains(expId)) {
+              processedExpenseIds.add(expId);
+              final amount = _parseExpenseAmount(data['amount'], data);
+              total += amount;
+            }
+          }
+        } else {
+          final txnType = (data['transactionType'] ?? 'EXPENSE').toString().toUpperCase();
+          if (txnType == 'EXPENSE' || txnType == 'EXPENSE_APPROVED' || txnType.contains('EXPENSE')) {
+            final refId = (data['referenceId'] ?? data['expenseId'] ?? '').toString();
+            if (refId.isNotEmpty && processedExpenseIds.contains(refId)) {
+              continue; // Already counted via direct expense
+            }
+            if (refId.isNotEmpty) {
+              processedExpenseIds.add(refId);
+            }
+            final amount = _parseExpenseAmount(data['amount'], data);
+            total += amount;
+          }
         }
       }
     } catch (e) {
@@ -1328,21 +1461,298 @@ class ExpenseService {
       }
 
       for (final data in matchedDocs.values) {
-        final isReceived = data['isReceived'] == true ||
+        if (data['isSiteExpense'] == false && (data['siteId'] == null || data['siteId'].toString().isEmpty)) {
+          continue;
+        }
+        final rawStatus = (data['status'] ?? '').toString().toLowerCase().trim();
+        final isReceivedOrAllocated = data['isReceived'] == true ||
             data['receivedAt'] != null ||
-            data['status'] == 'received';
-        if (isReceived) {
+            rawStatus == 'received' ||
+            rawStatus == 'awaiting_receipt_confirmation' ||
+            rawStatus == 'approved' ||
+            rawStatus == 'disbursed' ||
+            rawStatus == 'allocated' ||
+            rawStatus == 'active';
+        if (isReceivedOrAllocated) {
           final double approvedAmt = (data['approvedAmount'] is num && (data['approvedAmount'] as num) > 0)
               ? (data['approvedAmount'] as num).toDouble()
               : ((data['allocatedAmount'] is num && (data['allocatedAmount'] as num) > 0)
                   ? (data['allocatedAmount'] as num).toDouble()
-                  : ((data['requestedAmount'] is num) ? (data['requestedAmount'] as num).toDouble() : 0.0));
+                  : ((data['disbursedAmount'] is num && (data['disbursedAmount'] as num) > 0)
+                      ? (data['disbursedAmount'] as num).toDouble()
+                      : ((data['requestedAmount'] is num) ? (data['requestedAmount'] as num).toDouble() : 0.0)));
           total += approvedAmt;
         }
+      }
+
+      // Check site-based pettyCashAccounts for totalReceived / totalAllocated fallback
+      final orgId = FirestoreService.currentOrgId;
+      for (final key in siteKeys) {
+        try {
+          final accDocId = orgId.isNotEmpty ? '${orgId}_$key' : key;
+          final accSnap = await FirestoreService.pettyCashAccounts.doc(accDocId).get();
+          if (accSnap.exists && accSnap.data() != null) {
+            final aData = accSnap.data()!;
+            final accAlloc = (aData['totalAllocated'] is num)
+                ? (aData['totalAllocated'] as num).toDouble()
+                : 0.0;
+            if (accAlloc > 0 && total == 0) {
+              total = accAlloc;
+            }
+          }
+        } catch (_) {}
       }
     } catch (e) {
       print("❌ Error summing petty cash received for siteId=$siteId: $e");
     }
     return total;
+  }
+
+  // Recalculates and stores aggregate summary for all non-site & organization overhead expenses
+  static Future<void> recalcNonSiteExpenses() async {
+    try {
+      final effectiveOrgId = FirestoreService.currentOrgId;
+      double supervisorTotal = 0.0;
+      double managerTotal = 0.0;
+      double organizationTotal = 0.0;
+      double contractorTotal = 0.0;
+      double incentiveTotal = 0.0;
+      double pettyCashExpenseTotal = 0.0;
+      double pettyCashReceivedTotal = 0.0;
+
+      // 1. Petty Cash Expenses (non-site)
+      final expSnap = await FirestoreService.pettyCashExpenses.get();
+      final Set<String> processedExpIds = {};
+      for (final doc in expSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim();
+        final expType = (data['expenseType'] ?? '').toString().toLowerCase();
+        final isNonSite = expType == 'other' || data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        final isApproved = data['status'] == 'EXPENSE_APPROVED' ||
+            data['status'] == 'approved' ||
+            data['status'] == 'APPROVED' ||
+            data['isApproved'] == true ||
+            data['postedToLedger'] == true;
+        if (isApproved) {
+          final expId = (data['expenseId'] ?? doc.id).toString();
+          if (!processedExpIds.contains(expId)) {
+            processedExpIds.add(expId);
+            pettyCashExpenseTotal += _parseExpenseAmount(data['amount'], data);
+          }
+        }
+      }
+
+      // 2. Petty Cash Transactions (non-site)
+      final txnSnap = await FirestoreService.pettyCashTransactions.get();
+      for (final doc in txnSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? '').toString().trim();
+        final expType = (data['expenseType'] ?? '').toString().toLowerCase();
+        final isNonSite = expType == 'other' || data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        final txnType = (data['transactionType'] ?? '').toString().toUpperCase();
+        if (txnType == 'EXPENSE' || txnType == 'EXPENSE_APPROVED' || txnType.contains('EXPENSE')) {
+          final refId = (data['referenceId'] ?? data['expenseId'] ?? '').toString();
+          if (refId.isNotEmpty && processedExpIds.contains(refId)) continue;
+          if (refId.isNotEmpty) processedExpIds.add(refId);
+          pettyCashExpenseTotal += _parseExpenseAmount(data['amount'], data);
+        } else if (txnType == 'INITIAL_FUND' || txnType == 'ALLOCATION' || txnType == 'REPLENISHMENT') {
+          pettyCashReceivedTotal += _parseExpenseAmount(data['amount'], data);
+        }
+      }
+
+      // 3. Supervisor Entries (non-site)
+      final supSnap = await FirestoreService.siteSupervisorEntries.get();
+      for (final doc in supSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? data['site'] ?? '').toString().trim();
+        final isNonSite = data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        if (data['isManagerEntry'] == true ||
+            data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true ||
+            data['createdBy'] == 'manager_org' ||
+            data['isPettyCash'] == true ||
+            data['isPettyCashExpense'] == true) {
+          continue;
+        }
+        supervisorTotal += _parseExpenseAmount(data['totalAmount'] ?? data['amount'], data);
+      }
+
+      // 4. Manager Entries & Expenses (non-site)
+      final mgrExpSnap = await FirestoreService.managerExpenses.get();
+      for (final doc in mgrExpSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? data['site'] ?? '').toString().trim();
+        final isNonSite = data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          double billsSum = 0.0;
+          for (final b in bills) {
+            if (b is Map) billsSum += _parseExpenseAmount(b['billAmount'] ?? b['amount']);
+          }
+          if (billsSum > 0) {
+            managerTotal += billsSum;
+            continue;
+          }
+        }
+        managerTotal += _parseExpenseAmount(data['mgrExpenseTotalAmount'] ?? data['totalAmount'] ?? data['amount'], data);
+      }
+
+      // 5. Organization Entries & Expenses (non-site)
+      final orgExpSnap = await FirestoreService.getCollection('organizationExpenses').get();
+      for (final doc in orgExpSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? data['site'] ?? '').toString().trim();
+        final isNonSite = data['isSiteExpense'] == false || sId.isEmpty || sId == 'NON_SITE_EXPENSES';
+        if (!isNonSite) continue;
+
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          double billsSum = 0.0;
+          for (final b in bills) {
+            if (b is Map) billsSum += _parseExpenseAmount(b['billAmount'] ?? b['amount']);
+          }
+          if (billsSum > 0) {
+            organizationTotal += billsSum;
+            continue;
+          }
+        }
+        organizationTotal += _parseExpenseAmount(data['orgExpenseTotalAmount'] ?? data['totalAmount'] ?? data['amount'], data);
+      }
+
+      final double totalAllExpenses = supervisorTotal +
+          managerTotal +
+          organizationTotal +
+          contractorTotal +
+          incentiveTotal +
+          pettyCashExpenseTotal;
+
+      final docRef = FirestoreService.getCollection('totalSiteExpensesPerDay').doc('NON_SITE_EXPENSES');
+      await docRef.set({
+        'siteId': 'NON_SITE_EXPENSES',
+        'siteCode': 'NON_SITE',
+        'siteName': 'Non-Site & Organization Overhead',
+        'isNonSite': true,
+        'isSiteExpense': false,
+        'orgId': effectiveOrgId,
+        'totalSiteExpense': 0.0,
+        'totalSupervisorExpense': supervisorTotal,
+        'totalPettyCashExpense': pettyCashExpenseTotal,
+        'totalPettyCashReceived': pettyCashReceivedTotal,
+        'remainingPettyCash': (pettyCashReceivedTotal - pettyCashExpenseTotal),
+        'totalMgrExpense': managerTotal,
+        'totalOrgExpense': organizationTotal,
+        'totalContractorExpense': contractorTotal,
+        'totalIncentiveExpenses': incentiveTotal,
+        'totalAllExpenses': totalAllExpenses,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print("✅ Synced Non-Site expenses summary — Petty Cash: $pettyCashExpenseTotal, Total All: $totalAllExpenses");
+    } catch (e) {
+      print("❌ Error recalculating non-site expenses: $e");
+    }
+  }
+
+  /// Universally parses date from various input formats:
+  /// - DateTime, Timestamp, int (epoch milliseconds or seconds)
+  /// - ISO Strings (yyyy-MM-dd, yyyy-MM-ddTHH:mm:ss...)
+  /// - Delimited date strings (dd/MM/yyyy, dd-MM-yyyy, yyyy/MM/dd, yyyy-MM-dd)
+  /// - Compact 8-digit date strings (ddMMyyyy or yyyyMMdd)
+  static DateTime? parseDate(dynamic input) {
+    if (input == null) return null;
+    if (input is DateTime) return input;
+    if (input is Timestamp) return input.toDate();
+
+    if (input is int) {
+      if (input > 100000000000) {
+        return DateTime.fromMillisecondsSinceEpoch(input);
+      } else if (input > 1000000000) {
+        return DateTime.fromMillisecondsSinceEpoch(input * 1000);
+      }
+    }
+
+    final str = input.toString().trim();
+    if (str.isEmpty || str.toLowerCase() == 'null') return null;
+
+    // 1. Try standard ISO-8601 DateTime.tryParse
+    final isoParsed = DateTime.tryParse(str);
+    if (isoParsed != null) return isoParsed;
+
+    // 2. Try dd/MM/yyyy or dd-MM-yyyy (e.g. 19/09/2026, 19-09-2026)
+    final dmyRegex = RegExp(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$');
+    final dmyMatch = dmyRegex.firstMatch(str);
+    if (dmyMatch != null) {
+      final day = int.tryParse(dmyMatch.group(1)!);
+      final month = int.tryParse(dmyMatch.group(2)!);
+      final year = int.tryParse(dmyMatch.group(3)!);
+      final hour = dmyMatch.group(4) != null ? int.tryParse(dmyMatch.group(4)!) ?? 0 : 0;
+      final minute = dmyMatch.group(5) != null ? int.tryParse(dmyMatch.group(5)!) ?? 0 : 0;
+      final second = dmyMatch.group(6) != null ? int.tryParse(dmyMatch.group(6)!) ?? 0 : 0;
+      if (day != null && month != null && year != null && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day, hour, minute, second);
+      }
+    }
+
+    // 3. Try yyyy/MM/dd or yyyy-MM-dd
+    final ymdRegex = RegExp(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$');
+    final ymdMatch = ymdRegex.firstMatch(str);
+    if (ymdMatch != null) {
+      final year = int.tryParse(ymdMatch.group(1)!);
+      final month = int.tryParse(ymdMatch.group(2)!);
+      final day = int.tryParse(ymdMatch.group(3)!);
+      final hour = ymdMatch.group(4) != null ? int.tryParse(ymdMatch.group(4)!) ?? 0 : 0;
+      final minute = ymdMatch.group(5) != null ? int.tryParse(ymdMatch.group(5)!) ?? 0 : 0;
+      final second = ymdMatch.group(6) != null ? int.tryParse(ymdMatch.group(6)!) ?? 0 : 0;
+      if (day != null && month != null && year != null && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day, hour, minute, second);
+      }
+    }
+
+    // 4. Try 8-digit compact string: ddMMyyyy (e.g. 19092026) or yyyyMMdd (e.g. 20260919)
+    if (RegExp(r'^\d{8}$').hasMatch(str)) {
+      // Check ddMMyyyy first
+      final d1 = int.tryParse(str.substring(0, 2)) ?? 0;
+      final m1 = int.tryParse(str.substring(2, 4)) ?? 0;
+      final y1 = int.tryParse(str.substring(4, 8)) ?? 0;
+      if (y1 >= 2000 && y1 <= 2100 && m1 >= 1 && m1 <= 12 && d1 >= 1 && d1 <= 31) {
+        return DateTime(y1, m1, d1);
+      }
+
+      // Check yyyyMMdd
+      final y2 = int.tryParse(str.substring(0, 4)) ?? 0;
+      final m2 = int.tryParse(str.substring(4, 6)) ?? 0;
+      final d2 = int.tryParse(str.substring(6, 8)) ?? 0;
+      if (y2 >= 2000 && y2 <= 2100 && m2 >= 1 && m2 <= 12 && d2 >= 1 && d2 <= 31) {
+        return DateTime(y2, m2, d2);
+      }
+    }
+
+    return null;
+  }
+
+  /// Checks if two dates/timestamps/strings represent the exact same calendar day (ignoring time)
+  static bool isSameDay(dynamic a, dynamic b) {
+    final da = parseDate(a);
+    final db = parseDate(b);
+    if (da == null || db == null) return false;
+    return da.year == db.year && da.month == db.month && da.day == db.day;
+  }
+
+  /// Checks if a date falls inclusively between start and end calendar days
+  static bool isDateInRange(dynamic input, DateTime start, DateTime end) {
+    final d = parseDate(input);
+    if (d == null) return false;
+    final dateDay = DateTime(d.year, d.month, d.day);
+    final startDay = DateTime(start.year, start.month, start.day);
+    final endDay = DateTime(end.year, end.month, end.day);
+    return !dateDay.isBefore(startDay) && !dateDay.isAfter(endDay);
   }
 }

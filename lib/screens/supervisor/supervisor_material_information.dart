@@ -246,6 +246,125 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
   }
 
+  // Helper to resolve manager name for a site
+  Future<String> _fetchManagerForSite(String siteId, [String? projectName, String? siteName]) async {
+    try {
+      final cleanSiteId = siteId.trim().toLowerCase();
+      final cleanProjName = (projectName ?? '').trim().toLowerCase();
+      final cleanSiteName = (siteName ?? '').trim().toLowerCase();
+
+      final auth = AuthService();
+      final currentSupName = (auth.userData['supervisorName'] ??
+              auth.userData['fullName'] ??
+              auth.userData['FullName'] ??
+              auth.userData['name'] ??
+              auth.userData['username'] ??
+              auth.userData['UserName'] ??
+              '')
+          .toString()
+          .trim()
+          .toLowerCase();
+      final currentSupId = (auth.userData['Supervisor ID'] ??
+              auth.userData['supervisorId'] ??
+              auth.userData['SupervisorId'] ??
+              auth.userData['id'] ??
+              '')
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      // 1. Check siteSupervisorMap
+      final mapSnap = await FirestoreService.getCollection('siteSupervisorMap').get();
+
+      // Pass 1: Try matching both site AND current supervisor
+      if (currentSupName.isNotEmpty || currentSupId.isNotEmpty) {
+        for (final doc in mapSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['site'] ?? d['siteDocId'] ?? doc.id).toString().trim().toLowerCase();
+          final sName = (d['siteName'] ?? '').toString().trim().toLowerCase();
+          final docId = doc.id.trim().toLowerCase();
+
+          final isSiteMatch = sId == cleanSiteId ||
+              docId.startsWith('${cleanSiteId}_') ||
+              docId == cleanSiteId ||
+              (cleanSiteName.isNotEmpty && (sName == cleanSiteName || docId.contains(cleanSiteName)));
+
+          if (isSiteMatch) {
+            final sup = (d['supervisor'] ?? d['supervisorName'] ?? d['FullName'] ?? '').toString().trim().toLowerCase();
+            final supId = (d['Supervisor ID'] ?? d['supervisorId'] ?? d['SupervisorId'] ?? '').toString().trim().toLowerCase();
+
+            final isSupMatch = (currentSupName.isNotEmpty && (sup == currentSupName || docId.contains(currentSupName))) ||
+                (currentSupId.isNotEmpty && (supId == currentSupId || docId.contains(currentSupId)));
+
+            if (isSupMatch) {
+              final mName = (d['managerName'] ?? d['manager'] ?? d['assignedByManager'] ?? d['assignedManager'] ?? d['Manager'] ?? d['createdByName'] ?? d['createdBy'] ?? '').toString().trim();
+              if (mName.isNotEmpty && mName.toLowerCase() != 'manager') return mName;
+            }
+          }
+        }
+      }
+
+      // Pass 2: Match site generally
+      for (final doc in mapSnap.docs) {
+        final d = doc.data();
+        final sId = (d['siteId'] ?? d['site'] ?? d['siteDocId'] ?? doc.id).toString().trim().toLowerCase();
+        final sName = (d['siteName'] ?? '').toString().trim().toLowerCase();
+        final docId = doc.id.trim().toLowerCase();
+
+        if (sId == cleanSiteId ||
+            docId.startsWith('${cleanSiteId}_') ||
+            docId == cleanSiteId ||
+            (cleanSiteName.isNotEmpty && (sName == cleanSiteName || docId.contains(cleanSiteName)))) {
+          final mName = (d['managerName'] ?? d['manager'] ?? d['assignedByManager'] ?? d['assignedManager'] ?? d['Manager'] ?? d['createdByName'] ?? d['createdBy'] ?? '').toString().trim();
+          if (mName.isNotEmpty && mName.toLowerCase() != 'manager') return mName;
+        }
+      }
+
+      // 2. Check Site collection
+      final siteSnap = await FirestoreService.getCollection('Site').get();
+      for (final doc in siteSnap.docs) {
+        final d = doc.data();
+        final sId = (d['siteCode'] ?? d['siteId'] ?? doc.id).toString().trim().toLowerCase();
+        final sName = (d['siteName'] ?? '').toString().trim().toLowerCase();
+        final docId = doc.id.trim().toLowerCase();
+
+        if (sId == cleanSiteId ||
+            docId == cleanSiteId ||
+            (cleanSiteName.isNotEmpty && (sName == cleanSiteName || docId.contains(cleanSiteName)))) {
+          final mName = (d['managerName'] ?? d['manager'] ?? d['assignedManager'] ?? d['Manager'] ?? d['createdByName'] ?? d['createdBy'] ?? '').toString().trim();
+          if (mName.isNotEmpty && mName.toLowerCase() != 'manager') return mName;
+        }
+      }
+
+      // 3. Check projects collection
+      if (cleanProjName.isNotEmpty) {
+        final projSnap = await FirestoreService.getCollection('projects').get();
+        for (final doc in projSnap.docs) {
+          final d = doc.data();
+          final pName = (d['projectName'] ?? d['name'] ?? doc.id).toString().trim().toLowerCase();
+          if (pName == cleanProjName || doc.id.trim().toLowerCase() == cleanProjName) {
+            final mName = (d['managerName'] ?? d['manager'] ?? d['projectManager'] ?? d['assignedManager'] ?? '').toString().trim();
+            if (mName.isNotEmpty && mName.toLowerCase() != 'manager') return mName;
+          }
+        }
+      }
+
+      // 4. Check if any manager in manager collection is assigned to this site
+      final mgrSnap = await FirestoreService.getCollection('manager').get();
+      for (final doc in mgrSnap.docs) {
+        final d = doc.data();
+        final assignedSites = (d['assignedSites'] ?? d['sites'] ?? '').toString().toLowerCase();
+        if (assignedSites.contains(cleanSiteId) || (cleanSiteName.isNotEmpty && assignedSites.contains(cleanSiteName))) {
+          final mName = (d['FullName'] ?? d['fullName'] ?? d['name'] ?? d['UserName'] ?? d['username'] ?? '').toString().trim();
+          if (mName.isNotEmpty) return mName;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error resolving manager for site: $e');
+    }
+    return 'Not Assigned';
+  }
+
   // Load site data from siteSupervisorMap collection
   Future<void> _loadSiteData() async {
     try {
@@ -253,27 +372,75 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         'siteSupervisorMap',
       ).get();
 
+      final siteSnap = await FirestoreService.getCollection('Site').get().catchError((_) => querySnapshot);
+
+      final Map<String, String> siteToManager = {};
+      for (final doc in siteSnap.docs) {
+        final data = doc.data();
+        final sId = (data['siteCode'] ?? data['siteId'] ?? doc.id).toString().trim();
+        final mName = (data['managerName'] ?? data['manager'] ?? data['assignedManager'] ?? data['createdByName'] ?? data['createdBy'] ?? data['Manager'] ?? '').toString().trim();
+        if (mName.isNotEmpty && mName.toLowerCase() != 'manager') {
+          siteToManager[sId.toLowerCase()] = mName;
+          siteToManager[doc.id.toLowerCase()] = mName;
+          final sName = (data['siteName'] ?? '').toString().trim();
+          if (sName.isNotEmpty) siteToManager[sName.toLowerCase()] = mName;
+        }
+      }
+
       if (mounted) {
-        final List<Map<String, dynamic>> parsedSites = [];
+        final auth = AuthService();
+        final currentSupName = (auth.userData['supervisorName'] ??
+                auth.userData['fullName'] ??
+                auth.userData['FullName'] ??
+                auth.userData['name'] ??
+                auth.userData['username'] ??
+                auth.userData['UserName'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        final Map<String, Map<String, dynamic>> consolidatedSites = {};
+
         for (final doc in querySnapshot.docs) {
           final data = doc.data();
           final loc = (data['location'] ?? '').toString().trim();
           final s = (data['site'] ?? '').toString().trim();
           final sId = (data['siteId'] ?? '').toString().trim();
           
-          String resolvedSiteId = s.isNotEmpty && s != loc
-              ? s
-              : (sId.isNotEmpty && sId != loc ? sId : doc.id.trim());
+          String resolvedSiteId = sId.isNotEmpty && sId != loc
+              ? sId
+              : (s.isNotEmpty && s != loc ? s : doc.id.trim());
           if (resolvedSiteId.isEmpty) resolvedSiteId = doc.id.trim();
 
-          parsedSites.add({
+          final resolvedSiteName = (data['siteName'] ?? data['projectName'] ?? resolvedSiteId).toString().trim();
+
+          String mName = (data['managerName'] ?? data['manager'] ?? data['assignedByManager'] ?? data['assignedManager'] ?? data['createdByName'] ?? data['createdBy'] ?? data['Manager'] ?? '').toString().trim();
+          if (mName.isEmpty || mName.toLowerCase() == 'manager') {
+            mName = siteToManager[resolvedSiteId.toLowerCase()] ??
+                siteToManager[doc.id.toLowerCase()] ??
+                siteToManager[resolvedSiteName.toLowerCase()] ??
+                '';
+          }
+
+          final supName = (data['supervisorName'] ?? data['supervisor'] ?? data['FullName'] ?? '').toString().trim();
+          final isMyAssignment = currentSupName.isNotEmpty && supName.toLowerCase() == currentSupName;
+
+          final candidate = {
             'siteId': resolvedSiteId,
-            'siteName': resolvedSiteId, // Ensure clean Site ID (e.g. ST001_shek) is used, never address!
-            'projectName': data['projectName'] ?? '',
-            'supervisorName':
-                data['supervisor'] ?? data['supervisorName'] ?? '',
-          });
+            'siteName': resolvedSiteName.isNotEmpty ? resolvedSiteName : resolvedSiteId,
+            'projectName': data['projectName'] ?? data['project'] ?? '',
+            'supervisorName': supName,
+            'managerName': mName.isNotEmpty ? mName : 'Not Assigned',
+          };
+
+          // If not seen or if this doc matches current supervisor, update the consolidated entry
+          if (!consolidatedSites.containsKey(resolvedSiteId) || isMyAssignment) {
+            consolidatedSites[resolvedSiteId] = candidate;
+          }
         }
+
+        final List<Map<String, dynamic>> parsedSites = consolidatedSites.values.toList();
 
         setState(() {
           sitesList = parsedSites;
@@ -303,6 +470,10 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
               _fromSiteNameController.text = mySite['siteName']?.toString() ?? '';
               _fromSupervisorController.text = mySite['supervisorName']?.toString() ?? '';
               _fromProjectNameController.text = mySite['projectName']?.toString() ?? '';
+              final fromMName = (mySite['managerName'] ?? '').toString().trim();
+              if (fromMName.isNotEmpty && fromMName != 'Not Assigned') {
+                _fromManagerController.text = fromMName;
+              }
             }
           }
         });
@@ -1328,24 +1499,29 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         ),
         child: Column(
           children: [
-            _buildTextField(
-              controller: _toManagerController,
-              label: 'Manager Name *',
-              hint: 'Enter manager name',
-              icon: Icons.person_rounded,
-              primaryColor: primaryColor,
-            ),
-            const SizedBox(height: 12),
             _buildSiteDropdownGeneric(
               'Destination Site ID *',
               _toSiteId,
               sitesList,
               primaryColor,
-              (v) {
+              (v) async {
+                if (v == null || v.isEmpty) {
+                  setState(() {
+                    _toSiteId = null;
+                    _toSiteNameController.clear();
+                    _toProjectNameController.clear();
+                    _toSupervisorController.clear();
+                    _toManagerController.clear();
+                  });
+                  return;
+                }
+
                 final site = sitesList.firstWhere(
                   (s) => s['siteId'] == v,
                   orElse: () => {},
                 );
+
+                String mName = (site['managerName'] ?? '').toString().trim();
                 setState(() {
                   _toSiteId = v;
                   _toSiteNameController.text =
@@ -1354,8 +1530,36 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                       site['projectName']?.toString() ?? '';
                   _toSupervisorController.text =
                       site['supervisorName']?.toString() ?? '';
+                  _toManagerController.text = mName.isNotEmpty
+                      ? mName
+                      : 'Loading...';
                 });
+
+                if (mName.isEmpty || mName == 'Not Assigned' || mName == 'Loading...') {
+                  final fetched = await _fetchManagerForSite(
+                    v,
+                    site['projectName']?.toString(),
+                    site['siteName']?.toString(),
+                  );
+                  if (mounted && _toSiteId == v) {
+                    setState(() {
+                      _toManagerController.text = fetched.isNotEmpty ? fetched : 'Not Assigned';
+                      if (site.isNotEmpty) {
+                        site['managerName'] = _toManagerController.text;
+                      }
+                    });
+                  }
+                }
               },
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _toManagerController,
+              label: 'Manager Name',
+              hint: 'Auto-filled from selection',
+              enabled: false,
+              icon: Icons.person_rounded,
+              primaryColor: primaryColor,
             ),
             const SizedBox(height: 12),
             _buildTextField(

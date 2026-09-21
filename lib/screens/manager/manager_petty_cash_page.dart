@@ -24,6 +24,9 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
   String _searchQuery = '';
   String _reportPeriod = 'This Month';
 
+  // Expense Approvals Filter State
+  String _expenseApprovalTypeFilter = 'All'; // 'All', 'site', 'other'
+
   // Site-Wise Filter States
   String _siteSearchQuery = '';
   String _selectedSiteFilter = 'All';
@@ -50,9 +53,9 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 6,
+      length: 8,
       vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 5),
+      initialIndex: widget.initialTabIndex.clamp(0, 7),
     );
   }
 
@@ -110,11 +113,13 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
           unselectedLabelColor: Colors.white70,
           labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
           tabs: const [
-            Tab(icon: Icon(Icons.rate_review_rounded, size: 18), text: 'Reviews'),
-            Tab(icon: Icon(Icons.payments_rounded, size: 18), text: 'Allocations'),
+            Tab(icon: Icon(Icons.rate_review_rounded, size: 18), text: 'Request Reviews'),
+            Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), text: 'Expense Approvals'),
+            Tab(icon: Icon(Icons.payments_rounded, size: 18), text: 'Disbursements'),
+            Tab(icon: Icon(Icons.fact_check_rounded, size: 18), text: 'Reconcile & Returns'),
             Tab(icon: Icon(Icons.location_city_rounded, size: 18), text: 'Site-Wise'),
             Tab(icon: Icon(Icons.supervisor_account_rounded, size: 18), text: 'Supervisors'),
-            Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), text: 'Ledger'),
+            Tab(icon: Icon(Icons.menu_book_rounded, size: 18), text: 'Ledger'),
             Tab(icon: Icon(Icons.analytics_rounded, size: 18), text: 'Reports'),
           ],
         ),
@@ -140,7 +145,9 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
                 controller: _tabController,
                 children: [
                   _buildReviewsTab(),
+                  _buildExpenseApprovalsTab(),
                   _buildAllocationsTab(),
+                  _buildReconcileAndReturnsTab(),
                   _buildSiteWiseTab(),
                   _buildSupervisorsTab(),
                   _buildLedgerTab(),
@@ -186,6 +193,8 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
             final readyForAlloc = requests.where((r) =>
                 r.status == ApprovalWorkflowService.statusPendingManagerClearance ||
                 r.status == 'org_approved' ||
+                r.status == PettyCashStatus.approved ||
+                r.status == PettyCashStatus.awaitingDisbursement ||
                 ApprovalWorkflowService.parseStatus(r.status) == ApprovalStage.pendingManagerClearance).length;
 
             return Container(
@@ -626,7 +635,535 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
   }
 
   // ---------------------------------------------------------------------------
-  // 3. TAB 2: APPROVED ALLOCATIONS (STAGE 3 -> STAGE 4)
+  // 2. TAB 2: EXPENSE APPROVALS (TWO-STAGE EXPENSE WORKFLOW)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildExpenseApprovalsTab() {
+    return StreamBuilder<List<PettyCashExpense>>(
+      stream: _pettyCashService.streamAllExpenses(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final expenses = snapshot.data ?? [];
+        final pendingExpenses = expenses
+            .where((e) =>
+                e.status == PettyCashStatus.pendingExpenseReview ||
+                e.status == PettyCashStatus.pendingManagerReview)
+            .where((e) {
+              if (_expenseApprovalTypeFilter == 'site') {
+                return e.isSiteExpense && e.expenseType != 'other';
+              } else if (_expenseApprovalTypeFilter == 'other') {
+                return !e.isSiteExpense || e.expenseType == 'other';
+              }
+              return true;
+            })
+            .toList();
+
+        return Column(
+          children: [
+            // Filter Pills Row
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _buildExpenseTypeFilterChip('All Types', 'All'),
+                    const SizedBox(width: 8),
+                    _buildExpenseTypeFilterChip('Site Expenses', 'site'),
+                    const SizedBox(width: 8),
+                    _buildExpenseTypeFilterChip('Supervisor Non-Site', 'other'),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+            Expanded(
+              child: pendingExpenses.isEmpty
+                  ? _buildEmptyState(
+                      icon: Icons.receipt_long_rounded,
+                      title: 'No pending expense approvals',
+                      subtitle: _expenseApprovalTypeFilter == 'All'
+                          ? 'Expenses submitted by supervisors for verification and ledger posting will appear here.'
+                          : 'No pending ${_expenseApprovalTypeFilter == 'site' ? 'site' : 'non-site'} expenses found.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: pendingExpenses.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final exp = pendingExpenses[index];
+                        return _buildExpenseApprovalCard(exp);
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildExpenseTypeFilterChip(String label, String value) {
+    final isSelected = _expenseApprovalTypeFilter == value;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+          color: isSelected ? Colors.white : const Color(0xFF475569),
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: primaryColor,
+      backgroundColor: const Color(0xFFF1F5F9),
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? primaryColor : const Color(0xFFCBD5E1),
+        ),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _expenseApprovalTypeFilter = value;
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildExpenseApprovalCard(PettyCashExpense exp) {
+    final dateStr = DateFormat('dd MMM yyyy • hh:mm a').format(exp.transactionDate);
+    final hasReceipt = exp.receiptUrl != null && exp.receiptUrl!.isNotEmpty;
+    final isSite = exp.isSiteExpense && exp.expenseType != 'other';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Supervisor, Category & Amount
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: isSite ? const Color(0xFFEFF6FF) : const Color(0xFFFFFBEB),
+                      child: Text(
+                        exp.supervisorName.isNotEmpty ? exp.supervisorName[0].toUpperCase() : 'S',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: isSite ? const Color(0xFF2563EB) : const Color(0xFFD97706),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            exp.supervisorName,
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          if (isSite) ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on_rounded, size: 12, color: Color(0xFF2563EB)),
+                                const SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(
+                                    (exp.siteName != null && exp.siteName!.isNotEmpty)
+                                        ? exp.siteName!
+                                        : ((exp.siteId != null && exp.siteId!.isNotEmpty) ? exp.siteId! : 'Site Expense'),
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB), fontWeight: FontWeight.w700),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else ...[
+                            Row(
+                              children: const [
+                                Icon(Icons.person_rounded, size: 12, color: Color(0xFFD97706)),
+                                SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(
+                                    'Supervisor Personal / Non-Site',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.w700),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    PettyCashService.formatCurrency(exp.amount),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'PENDING REVIEW',
+                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Color(0xFFD97706)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          Text(
+            exp.description,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSite ? const Color(0xFFEFF6FF) : const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isSite ? 'SITE EXPENSE' : 'NON-SITE EXPENSE',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: isSite ? const Color(0xFF1D4ED8) : const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  exp.expenseCategory,
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                ),
+              ),
+              if (exp.vendorName != null && exp.vendorName!.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '• Payee: ${exp.vendorName}',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
+              ],
+            ],
+          ),
+
+          // Receipt section
+          const SizedBox(height: 8),
+          if (hasReceipt) ...[
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.receipt_rounded, size: 16, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text('Receipt Image Attached', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF15803D))),
+                  ),
+                  TextButton(
+                    onPressed: () => _viewReceiptImage(exp.receiptUrl!),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                    ),
+                    child: const Text('View Receipt', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (exp.noReceiptReason != null && exp.noReceiptReason!.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFD97706)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'No Receipt Justification: ${exp.noReceiptReason}',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 6),
+          Text(
+            'Submitted: $dateStr',
+            style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 12),
+
+          // Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showRejectExpenseDialog(exp),
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  label: const Text('Reject'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    side: const BorderSide(color: Color(0xFFFCA5A5)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _showApproveExpenseDialog(exp),
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('Approve & Post'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _viewReceiptImage(String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: const Text('Receipt Image', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.black,
+            ),
+            InteractiveViewer(
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                errorBuilder: (ctx, err, stack) => const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('Unable to load receipt image'),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showApproveExpenseDialog(PettyCashExpense exp) {
+    bool receiptVerified = exp.receiptUrl != null && exp.receiptUrl!.isNotEmpty;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Approve Expense & Post Ledger', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Approving this expense of ${PettyCashService.formatCurrency(exp.amount)} for ${exp.supervisorName} will permanently deduct it from the petty cash balance and post an immutable ledger transaction.',
+                style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), height: 1.3),
+              ),
+              if (exp.receiptUrl != null && exp.receiptUrl!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: receiptVerified,
+                  title: const Text('I have verified the receipt image', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  onChanged: (val) => setDialogState(() => receiptVerified = val ?? false),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await _pettyCashService.managerApproveExpense(
+                    expenseId: exp.expenseId,
+                    managerId: _currentManagerId,
+                    managerName: _currentManagerName,
+                    receiptVerified: receiptVerified,
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Expense approved and posted to ledger!'), backgroundColor: Color(0xFF059669)),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to approve expense: $e'), backgroundColor: const Color(0xFFEF4444)),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm Approval'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRejectExpenseDialog(PettyCashExpense exp) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Reject Expense', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Rejecting this expense of ${PettyCashService.formatCurrency(exp.amount)} will release the reserved balance back to the supervisor.',
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Mandatory reason for rejection',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.all(10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please provide a rejection reason.')),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await _pettyCashService.managerRejectExpense(
+                  expenseId: exp.expenseId,
+                  managerId: _currentManagerId,
+                  managerName: _currentManagerName,
+                  reason: reasonController.text.trim(),
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Expense rejected and reserved balance released.')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to reject: $e'), backgroundColor: const Color(0xFFEF4444)),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm Reject'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. TAB 3: APPROVED ALLOCATIONS (STAGE 3 -> STAGE 4)
   // ---------------------------------------------------------------------------
 
   Widget _buildAllocationsTab() {
@@ -638,11 +1175,13 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
         }
 
         final requests = snapshot.data ?? [];
-        final approvedForClearance = requests
-            .where((r) =>
-                r.status == ApprovalWorkflowService.statusPendingManagerClearance ||
-                r.status == 'org_approved')
-            .toList();
+        final approvedForClearance = requests.where((r) =>
+            r.status == ApprovalWorkflowService.statusPendingManagerClearance ||
+            r.status == 'org_approved' ||
+            r.status == PettyCashStatus.approved ||
+            r.status == PettyCashStatus.awaitingDisbursement ||
+            ApprovalWorkflowService.parseStatus(r.status) == ApprovalStage.pendingManagerClearance
+        ).toList();
 
         if (approvedForClearance.isEmpty) {
           return _buildEmptyState(
@@ -855,7 +1394,309 @@ class _ManagerPettyCashPageState extends State<ManagerPettyCashPage>
   }
 
   // ---------------------------------------------------------------------------
-  // 3. TAB 2: SITE-WISE PETTY CASH TRACKING & BALANCES
+  // 4. TAB 4: RECONCILIATIONS & CASH RETURNS REVIEW
+  // ---------------------------------------------------------------------------
+
+  Widget _buildReconcileAndReturnsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section A: Physical Cash Reconciliations
+          Row(
+            children: const [
+              Icon(Icons.fact_check_rounded, color: Color(0xFF6366F1), size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Physical Cash Reconciliations',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          StreamBuilder<List<PettyCashReconciliation>>(
+            stream: _pettyCashService.streamAllReconciliations(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
+              }
+              final reconciliations = snapshot.data ?? [];
+              final pending = reconciliations
+                  .where((r) =>
+                      r.status == PettyCashStatus.reconciliationPending ||
+                      r.status == PettyCashStatus.discrepancyReview)
+                  .toList();
+
+              if (pending.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Center(
+                    child: Text('No pending cash reconciliations.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: pending.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final rec = pending[index];
+                  final isDiscrepancy = rec.difference.abs() > 0.01;
+
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: isDiscrepancy ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              rec.supervisorName,
+                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isDiscrepancy ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                isDiscrepancy ? 'DISCREPANCY' : 'MATCHED',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDiscrepancy ? const Color(0xFFEF4444) : const Color(0xFF059669),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (rec.siteName.isNotEmpty || rec.siteId.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Site: ${rec.siteName.isNotEmpty ? rec.siteName : rec.siteId}',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Expected: ${PettyCashService.formatCurrency(rec.expectedCash)}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569))),
+                            Text('Counted: ${PettyCashService.formatCurrency(rec.physicalCash)}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                          ],
+                        ),
+                        if (isDiscrepancy) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Diff: ${rec.difference >= 0 ? '+' : ''}${PettyCashService.formatCurrency(rec.difference)} (${rec.differenceReason ?? 'No reason provided'})',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFFEF4444)),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            if (isDiscrepancy) ...[
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _reviewReconciliation(rec, isApproved: false),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFEF4444),
+                                    side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                  ),
+                                  child: const Text('Flag Discrepancy', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => _reviewReconciliation(rec, isApproved: true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366F1),
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Approve Count', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+
+          // Section B: Cash Returns
+          Row(
+            children: const [
+              Icon(Icons.currency_exchange_rounded, color: Color(0xFFD97706), size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Supervisor Cash Returns',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          StreamBuilder<List<PettyCashReturn>>(
+            stream: _pettyCashService.streamAllReturns(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
+              }
+              final returns = snapshot.data ?? [];
+              final pending = returns
+                  .where((r) =>
+                      r.status == PettyCashStatus.submitted ||
+                      r.status == PettyCashStatus.draft)
+                  .toList();
+
+              if (pending.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Center(
+                    child: Text('No pending cash returns from supervisors.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: pending.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final ret = pending[index];
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              ret.supervisorName,
+                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              PettyCashService.formatCurrency(ret.returnAmount),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFFD97706)),
+                            ),
+                          ],
+                        ),
+                        if (ret.siteName.isNotEmpty || ret.siteId.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Site: ${ret.siteName.isNotEmpty ? ret.siteName : ret.siteId}',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          'Reason: ${ret.reason}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => _confirmCashReturn(ret),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD97706),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Confirm Cash Return & Post Ledger', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _reviewReconciliation(PettyCashReconciliation rec, {required bool isApproved}) async {
+    try {
+      await _pettyCashService.reviewReconciliation(
+        reconciliationId: rec.reconciliationId,
+        managerId: _currentManagerId,
+        managerName: _currentManagerName,
+        isApproved: isApproved,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isApproved ? 'Reconciliation approved!' : 'Discrepancy flagged for audit review.'),
+            backgroundColor: isApproved ? const Color(0xFF059669) : const Color(0xFFEF4444),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmCashReturn(PettyCashReturn ret) async {
+    try {
+      await _pettyCashService.confirmCashReturn(
+        returnId: ret.returnId,
+        managerId: _currentManagerId,
+        managerName: _currentManagerName,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cash return confirmed and posted to ledger!'), backgroundColor: Color(0xFF059669)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5. TAB 5: SITE-WISE PETTY CASH TRACKING & BALANCES
   // ---------------------------------------------------------------------------
 
   Widget _buildSiteWiseTab() {

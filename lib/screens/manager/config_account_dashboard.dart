@@ -645,29 +645,6 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                 backgroundColor: Colors.transparent,
                 extendBody: true,
                 endDrawer: _buildManagerEndDrawer(context),
-                floatingActionButtonLocation:
-                    FloatingActionButtonLocation.endFloat,
-                floatingActionButton: _currentIndex == 0
-                    ? FloatingActionButton(
-                        onPressed: () {
-                          HapticFeedback.mediumImpact();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ProjectSetupWizard(),
-                            ),
-                          );
-                        },
-                        backgroundColor: primaryColor,
-                        elevation: 4,
-                        shape: const CircleBorder(),
-                        child: const Icon(
-                          Icons.add_rounded,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      )
-                    : null,
                 bottomNavigationBar: _buildBottomNavigationBar(context),
                 body: Align(
                   alignment: Alignment.topCenter,

@@ -40,14 +40,140 @@ class _WorkersAvailabilityReportPageState
       final Map<String, Map<String, dynamic>> sitesMap = {};
       final Set<String> uniqueWorkerNames = {};
 
+      // 0. Build a comprehensive site lookup cache from projects, Site, and siteSupervisorMap
+      final Map<String, Map<String, String>> siteLookup = {};
+
+      void registerSiteLookup(String? rawId, String? rawName, String? sup) {
+        final cleanId = SiteDisplayHelper.extractSiteId(rawId ?? '');
+        final cleanName = SiteDisplayHelper.extractSiteName(
+          rawName ?? '',
+          siteId: cleanId.isNotEmpty ? cleanId : null,
+        );
+        final supervisor = (sup ?? '').trim();
+
+        final info = {
+          'siteId': cleanId,
+          'siteName': cleanName,
+          if (supervisor.isNotEmpty) 'supervisor': supervisor,
+        };
+
+        if (cleanId.isNotEmpty) {
+          siteLookup[cleanId.toLowerCase()] = info;
+          siteLookup[cleanId.toLowerCase().replaceAll(' ', '')] = info;
+        }
+        if (cleanName.isNotEmpty) {
+          siteLookup[cleanName.toLowerCase()] = info;
+          siteLookup[cleanName.toLowerCase().replaceAll(' ', '')] = info;
+        }
+        if (rawId != null && rawId.isNotEmpty) {
+          siteLookup[rawId.toLowerCase()] = info;
+        }
+        if (cleanId.isNotEmpty && cleanName.isNotEmpty) {
+          siteLookup['${cleanId}_$cleanName'.toLowerCase()] = info;
+        }
+      }
+
+      try {
+        final projSnap = await FirestoreService.projects.get();
+        for (final doc in projSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['id'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['projectName'] ?? d['name'] ?? '').toString();
+          final sup = (d['assignedSupervisor'] ?? d['supervisor'] ?? d['supervisorName'] ?? '').toString();
+          registerSiteLookup(sId, sName, sup);
+          registerSiteLookup(doc.id, sName, sup);
+        }
+      } catch (e) {
+        debugPrint('Error pre-loading projects for site lookup: $e');
+      }
+
+      try {
+        final siteSnap = await FirestoreService.sites.get();
+        for (final doc in siteSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['siteCode'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['name'] ?? '').toString();
+          final sup = (d['assignedSupervisor'] ?? d['supervisor'] ?? '').toString();
+          registerSiteLookup(sId, sName, sup);
+          registerSiteLookup(doc.id, sName, sup);
+        }
+      } catch (e) {
+        debugPrint('Error pre-loading sites for site lookup: $e');
+      }
+
+      try {
+        final mapSnap = await FirestoreService.siteSupervisorMap.get();
+        for (final doc in mapSnap.docs) {
+          final d = doc.data();
+          final sId = (d['siteId'] ?? d['site'] ?? doc.id).toString();
+          final sName = (d['siteName'] ?? d['projectName'] ?? d['site_name'] ?? '').toString();
+          final sup = (d['supervisor'] ?? d['supervisorName'] ?? '').toString();
+          registerSiteLookup(sId, sName, sup);
+        }
+      } catch (e) {
+        debugPrint('Error pre-loading siteSupervisorMap for site lookup: $e');
+      }
+
+      Map<String, String> resolveCanonicalSite(String rawId, [String? rawName]) {
+        String cleanId = SiteDisplayHelper.extractSiteId(rawId);
+        String cleanName = SiteDisplayHelper.extractSiteName(
+          rawName ?? rawId,
+          siteId: cleanId.isNotEmpty ? cleanId : null,
+        );
+        String supervisor = '';
+
+        final lookupMatch = siteLookup[rawId.toLowerCase()] ??
+            (cleanId.isNotEmpty ? siteLookup[cleanId.toLowerCase()] : null) ??
+            (cleanName.isNotEmpty ? siteLookup[cleanName.toLowerCase()] : null);
+
+        if (lookupMatch != null) {
+          if (cleanId.isEmpty && (lookupMatch['siteId'] ?? '').isNotEmpty) {
+            cleanId = lookupMatch['siteId']!;
+          }
+          if (cleanName.isEmpty && (lookupMatch['siteName'] ?? '').isNotEmpty) {
+            cleanName = lookupMatch['siteName']!;
+          }
+          if ((lookupMatch['supervisor'] ?? '').isNotEmpty) {
+            supervisor = lookupMatch['supervisor']!;
+          }
+        }
+
+        final formattedDisplay = SiteDisplayHelper.formatSiteDisplay(
+          siteId: cleanId,
+          siteName: cleanName,
+          rawCombined: rawId,
+        );
+
+        final canonicalId = formattedDisplay.isNotEmpty
+            ? formattedDisplay
+            : (cleanId.isNotEmpty ? cleanId : rawId);
+
+        return {
+          'canonicalId': canonicalId,
+          'siteId': cleanId.isNotEmpty ? cleanId : (lookupMatch?['siteId'] ?? rawId),
+          'siteName': cleanName.isNotEmpty ? cleanName : (lookupMatch?['siteName'] ?? (cleanId.isNotEmpty ? cleanId : rawId)),
+          'displayName': formattedDisplay.isNotEmpty ? formattedDisplay : rawId,
+          'supervisor': supervisor,
+        };
+      }
+
       // 1. Fetch active worker mappings
       try {
         final mappingSnap = await FirestoreService.getCollection('workerSiteMapping').get();
         for (final doc in mappingSnap.docs) {
           final data = doc.data();
-          final siteId = doc.id;
-          final siteName = (data['siteName'] ?? data['site'] ?? siteId).toString();
-          final supervisor = (data['supervisor'] ?? 'Assigned').toString();
+          final rawSiteId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
+          final rawSiteName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+          final resolved = resolveCanonicalSite(
+            rawSiteId,
+            rawSiteName.isNotEmpty ? rawSiteName : null,
+          );
+          final canonicalKey = resolved['canonicalId']!;
+          final siteId = resolved['siteId']!;
+          final siteName = resolved['siteName']!;
+          final displayName = resolved['displayName']!;
+          final supervisor = (data['supervisor'] ??
+              (resolved['supervisor']!.isNotEmpty ? resolved['supervisor']! : 'Assigned')).toString();
           final workersList = data['workers'] as List<dynamic>? ?? [];
 
           final List<Map<String, dynamic>> formattedWorkers = [];
@@ -69,16 +195,32 @@ class _WorkersAvailabilityReportPageState
             }
           }
 
-          sitesMap[siteId] = {
-            'id': siteId,
-            'site': siteName,
-            'siteId': siteId,
-            'siteName': siteName,
-            'projectName': siteName,
-            'supervisor': supervisor,
-            'workers': formattedWorkers,
-            'extraWorkers': <Map<String, dynamic>>[],
-          };
+          if (!sitesMap.containsKey(canonicalKey)) {
+            sitesMap[canonicalKey] = {
+              'id': canonicalKey,
+              'site': displayName,
+              'siteId': siteId,
+              'siteName': siteName,
+              'displayName': displayName,
+              'projectName': siteName,
+              'supervisor': supervisor,
+              'workers': formattedWorkers,
+              'extraWorkers': <Map<String, dynamic>>[],
+            };
+          } else {
+            final existingWorkers = sitesMap[canonicalKey]!['workers'] as List<Map<String, dynamic>>;
+            for (final fw in formattedWorkers) {
+              final exists = existingWorkers.any((w) =>
+                  w['workerId'] == fw['workerId'] ||
+                  w['workerName'].toString().toLowerCase() == fw['workerName'].toString().toLowerCase());
+              if (!exists) {
+                existingWorkers.add(fw);
+              }
+            }
+            if (supervisor.isNotEmpty && supervisor != 'Assigned' && sitesMap[canonicalKey]!['supervisor'] == 'Assigned') {
+              sitesMap[canonicalKey]!['supervisor'] = supervisor;
+            }
+          }
         }
       } catch (e) {
         debugPrint('Error loading workerSiteMapping in report: $e');
@@ -92,27 +234,37 @@ class _WorkersAvailabilityReportPageState
 
         for (var doc in attendanceSnap.docs) {
           final data = doc.data();
-          final siteId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
-          final siteName = (data['siteName'] ?? data['site'] ?? siteId).toString();
+          final rawSiteId = (data['siteId'] ?? data['site'] ?? doc.id).toString();
+          final rawSiteName = (data['siteName'] ?? data['projectName'] ?? '').toString();
+          final resolved = resolveCanonicalSite(
+            rawSiteId,
+            rawSiteName.isNotEmpty ? rawSiteName : null,
+          );
+          final canonicalKey = resolved['canonicalId']!;
+          final siteId = resolved['siteId']!;
+          final siteName = resolved['siteName']!;
+          final displayName = resolved['displayName']!;
           final workersData = data['workers'] as Map<String, dynamic>? ?? {};
           final extraList = data['extraWorkers'] as List<dynamic>? ?? [];
 
-          if (!sitesMap.containsKey(siteId)) {
-            sitesMap[siteId] = {
-              'id': siteId,
-              'site': siteName,
+          if (!sitesMap.containsKey(canonicalKey)) {
+            sitesMap[canonicalKey] = {
+              'id': canonicalKey,
+              'site': displayName,
               'siteId': siteId,
               'siteName': siteName,
+              'displayName': displayName,
               'projectName': siteName,
-              'supervisor': data['supervisor'] ?? 'Various',
+              'supervisor': data['supervisor'] ??
+                  (resolved['supervisor']!.isNotEmpty ? resolved['supervisor']! : 'Various'),
               'workers': <Map<String, dynamic>>[],
               'extraWorkers': extraList,
             };
-          } else if ((sitesMap[siteId]!['extraWorkers'] as List).isEmpty && extraList.isNotEmpty) {
-            sitesMap[siteId]!['extraWorkers'] = extraList;
+          } else if ((sitesMap[canonicalKey]!['extraWorkers'] as List).isEmpty && extraList.isNotEmpty) {
+            sitesMap[canonicalKey]!['extraWorkers'] = extraList;
           }
 
-          final currentWorkers = sitesMap[siteId]!['workers'] as List<Map<String, dynamic>>;
+          final currentWorkers = sitesMap[canonicalKey]!['workers'] as List<Map<String, dynamic>>;
 
           workersData.forEach((workerName, workerInfo) {
             if (workerInfo is! Map) return;
@@ -142,6 +294,11 @@ class _WorkersAvailabilityReportPageState
       }
 
       final mappings = sitesMap.values.toList();
+      mappings.sort((a, b) {
+        final nameA = (a['displayName'] ?? a['site'] ?? '').toString().toLowerCase();
+        final nameB = (b['displayName'] ?? b['site'] ?? '').toString().toLowerCase();
+        return nameA.compareTo(nameB);
+      });
       final totalWorkers = uniqueWorkerNames.length;
 
       if (!mounted) return;
@@ -149,7 +306,7 @@ class _WorkersAvailabilityReportPageState
         _siteMappings = mappings;
         _totalWorkersCount = totalWorkers;
         _isLoading = false;
-        if (_siteMappings.isNotEmpty && _selectedSiteId == null) {
+        if (_siteMappings.isNotEmpty && (_selectedSiteId == null || !_siteMappings.any((m) => m['id'] == _selectedSiteId))) {
           _selectedSiteId = _siteMappings.first['id'];
         }
       });
@@ -328,100 +485,142 @@ class _WorkersAvailabilityReportPageState
   Widget _buildSearchAndFilter(Color primaryColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(flex: 2, child: _buildSiteDropdown(primaryColor)),
-          const SizedBox(width: 10),
-          Expanded(
-            flex: 3,
-            child: Container(
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFCBD5E1)),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0A183D).withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (v) => setState(() => _searchQuery = v),
-                style: const TextStyle(
-                  color: Color(0xFF0A183D),
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search worker...',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    size: 18,
-                    color: primaryColor,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
-                ),
-              ),
-            ),
-          ),
+          _buildSiteDropdown(primaryColor),
+          const SizedBox(height: 8),
+          _buildSearchField(primaryColor),
         ],
       ),
     );
   }
 
   Widget _buildSiteDropdown(Color primaryColor) {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      initialValue: _siteMappings.any((m) => m['id'] == _selectedSiteId) ? _selectedSiteId : null,
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0F172A), size: 24),
+      decoration: InputDecoration(
+        labelText: 'Select Site',
+        labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        filled: true,
+        fillColor: Colors.white,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        prefixIcon: Icon(Icons.location_on_rounded, color: primaryColor, size: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 1.8),
+        ),
       ),
-      child: DropdownButtonFormField<String>(
-        isExpanded: true,
-        initialValue: _selectedSiteId,
-        dropdownColor: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0A183D)),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          prefixIcon: Icon(Icons.location_on_rounded, color: primaryColor, size: 18),
-        ),
-        hint: const Text(
-          'Select Site',
-          style: TextStyle(
-            fontSize: 13,
-            color: Color(0xFF94A3B8),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: const TextStyle(
-          color: Color(0xFF0A183D),
-          fontSize: 13.5,
-          fontWeight: FontWeight.w700,
-        ),
-        items: _siteMappings.map((m) {
-          final displayName = SiteDisplayHelper.formatSiteDisplay(
-            siteId: m['siteId'] ?? m['id'],
-            siteName: m['siteName'] ?? m['site'],
-          );
-          return DropdownMenuItem<String>(
-            value: m['id'] as String?,
+      style: const TextStyle(
+        color: Color(0xFF0F172A),
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
+      ),
+      selectedItemBuilder: (BuildContext context) {
+        return _siteMappings.map<Widget>((m) {
+          final displayName = (m['displayName'] ??
+                  SiteDisplayHelper.formatSiteDisplay(
+                    siteId: m['siteId'] ?? m['id'],
+                    siteName: m['siteName'] ?? m['site'],
+                  ))
+              .toString();
+          return Align(
+            alignment: Alignment.centerLeft,
             child: Text(
               displayName,
+              maxLines: 2,
+              softWrap: true,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13.5),
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0F172A),
+                height: 1.25,
+              ),
             ),
           );
-        }).toList(),
-        onChanged: (v) => setState(() => _selectedSiteId = v),
+        }).toList();
+      },
+      items: _siteMappings.map((m) {
+        final displayName = (m['displayName'] ??
+                SiteDisplayHelper.formatSiteDisplay(
+                  siteId: m['siteId'] ?? m['id'],
+                  siteName: m['siteName'] ?? m['site'],
+                ))
+            .toString();
+        return DropdownMenuItem<String>(
+          value: m['id'] as String?,
+          child: Text(
+            displayName,
+            maxLines: 2,
+            softWrap: true,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        );
+      }).toList(),
+      onChanged: (v) => setState(() => _selectedSiteId = v),
+    );
+  }
+
+  Widget _buildSearchField(Color primaryColor) {
+    return TextField(
+      controller: _searchController,
+      onChanged: (v) => setState(() => _searchQuery = v),
+      style: const TextStyle(
+        color: Color(0xFF0F172A),
+        fontSize: 13.5,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        hintText: 'Search worker by name...',
+        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.normal),
+        filled: true,
+        fillColor: Colors.white,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          size: 20,
+          color: primaryColor,
+        ),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              )
+            : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 1.8),
+        ),
       ),
     );
   }
@@ -451,15 +650,18 @@ class _WorkersAvailabilityReportPageState
               color: Color(0xFF475569),
             ),
           ),
-          Text(
-            supervisor,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-              color: primaryColor,
+          Expanded(
+            child: Text(
+              supervisor,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: primaryColor,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(

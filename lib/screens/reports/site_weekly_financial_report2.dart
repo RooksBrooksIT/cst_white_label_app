@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -81,114 +82,123 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
               paymentPeriod == null ||
               paymentPeriod.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<QuerySnapshot>(
-              stream: FirestoreService.getCollection('siteSupervisorPayments')
-                  .where('siteId', isEqualTo: siteId)
-                  .where('paymentPeriod', isEqualTo: paymentPeriod)
-                  .snapshots()
-                  .timeout(const Duration(seconds: 15)),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+          : FutureBuilder<Set<String>>(
+              future: ExpenseService.resolveSiteKeys(siteId),
+              builder: (context, keysSnap) {
+                if (!keysSnap.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (snapshot.hasError ||
-                    !snapshot.hasData ||
-                    snapshot.data!.docs.isEmpty) {
-                  return _buildErrorOrEmpty(context, snapshot);
-                }
-
-                final doc = snapshot.data!.docs.first;
-                final summary = doc.data() as Map<String, dynamic>;
-                final List<dynamic> payments =
-                    (summary['payments'] ?? []) as List<dynamic>;
-                payments.sort(
-                  (a, b) => (a['paymentDate'] ?? '').compareTo(
-                    b['paymentDate'] ?? '',
-                  ),
-                );
-                final List<String> paymentDates = payments
-                    .map((p) => p['paymentDate']?.toString() ?? '')
-                    .where((date) => date.isNotEmpty)
-                    .toSet()
-                    .toList();
-
-                String? prevPaymentPeriod = _getPrevPeriod(
-                  summary['paymentPeriod'],
-                );
-
-                return FutureBuilder<Map<String, dynamic>>(
-                  future: _fetchOpeningBalance(
-                    siteId,
-                    prevPaymentPeriod,
-                    paymentDates,
-                  ),
-                  builder: (context, openingSnapshot) {
-                    if (!openingSnapshot.hasData) {
+                final keysToQuery = keysSnap.data!.take(10).toList();
+                return StreamBuilder<QuerySnapshot>(
+                  stream: FirestoreService.getCollection('siteSupervisorPayments')
+                      .where('siteId', whereIn: keysToQuery)
+                      .where('paymentPeriod', isEqualTo: paymentPeriod)
+                      .snapshots()
+                      .timeout(const Duration(seconds: 15)),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
-
-                    final int openingBalance =
-                        (openingSnapshot.data?['openingBalance'] as num? ?? 0)
-                            .toInt();
-                    final Map<String, num> expensesByDate =
-                        Map<String, num>.from(
-                          openingSnapshot.data?['expensesByDate'] ?? {},
-                        );
-
-                    int totalPayment = 0;
-                    int totalExpenses = 0;
-                    for (var p in payments) {
-                      final String date = p['paymentDate'] ?? '';
-                      totalPayment += (p['paymentAmount'] as num? ?? 0).toInt();
-                      totalExpenses += (expensesByDate[date] ?? 0).toInt();
+                    if (snapshot.hasError ||
+                        !snapshot.hasData ||
+                        snapshot.data!.docs.isEmpty) {
+                      return _buildErrorOrEmpty(context, snapshot);
                     }
 
-                    int totalAmount = openingBalance + totalPayment;
-                    int totalNet = totalAmount - totalExpenses;
+                    final doc = snapshot.data!.docs.first;
+                    final summary = doc.data() as Map<String, dynamic>;
+                    final List<dynamic> payments =
+                        (summary['payments'] ?? []) as List<dynamic>;
+                    payments.sort(
+                      (a, b) => (a['paymentDate'] ?? '').compareTo(
+                        b['paymentDate'] ?? '',
+                      ),
+                    );
+                    final List<String> paymentDates = payments
+                        .map((p) => p['paymentDate']?.toString() ?? '')
+                        .where((date) => date.isNotEmpty)
+                        .toSet()
+                        .toList();
 
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 24,
+                    String? prevPaymentPeriod = _getPrevPeriod(
+                      summary['paymentPeriod'],
+                    );
+
+                    return FutureBuilder<Map<String, dynamic>>(
+                      future: _fetchOpeningBalance(
+                        siteId,
+                        prevPaymentPeriod,
+                        paymentDates,
                       ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 800),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildSiteInfoCard(context, summary),
-                              const SizedBox(height: 24),
-                              _buildSummaryGrid(
-                                context,
-                                openingBalance,
-                                totalPayment,
-                                totalAmount,
-                                totalExpenses,
-                                totalNet,
-                                colorScheme,
-                              ),
-                              const SizedBox(height: 32),
-                              Text(
-                                'Daily Breakdown',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildPaymentsTable(
-                                context,
-                                payments,
-                                expensesByDate,
-                                openingBalance,
-                                colorScheme,
-                              ),
-                            ],
+                      builder: (context, openingSnapshot) {
+                        if (!openingSnapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        final int openingBalance =
+                            (openingSnapshot.data?['openingBalance'] as num? ?? 0)
+                                .toInt();
+                        final Map<String, num> expensesByDate =
+                            Map<String, num>.from(
+                              openingSnapshot.data?['expensesByDate'] ?? {},
+                            );
+
+                        int totalPayment = 0;
+                        int totalExpenses = 0;
+                        for (var p in payments) {
+                          final String date = p['paymentDate'] ?? '';
+                          totalPayment += (p['paymentAmount'] as num? ?? 0).toInt();
+                          totalExpenses += (expensesByDate[date] ?? 0).toInt();
+                        }
+
+                        int totalAmount = openingBalance + totalPayment;
+                        int totalNet = totalAmount - totalExpenses;
+
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 24,
                           ),
-                        ),
-                      ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 800),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSiteInfoCard(context, summary),
+                                  const SizedBox(height: 24),
+                                  _buildSummaryGrid(
+                                    context,
+                                    openingBalance,
+                                    totalPayment,
+                                    totalAmount,
+                                    totalExpenses,
+                                    totalNet,
+                                    colorScheme,
+                                  ),
+                                  const SizedBox(height: 32),
+                                  Text(
+                                    'Daily Breakdown',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildPaymentsTable(
+                                    context,
+                                    payments,
+                                    expensesByDate,
+                                    openingBalance,
+                                    colorScheme,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
@@ -589,8 +599,10 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
     Map<String, int> cache,
   ) async {
     if (cache.containsKey(period)) return cache[period]!;
+    final siteKeys = (await ExpenseService.resolveSiteKeys(siteId)).toList();
+    final keysToQuery = siteKeys.take(10).toList();
     final snap = await FirestoreService.getCollection('siteSupervisorPayments')
-        .where('siteId', isEqualTo: siteId)
+        .where('siteId', whereIn: keysToQuery)
         .where('paymentPeriod', isEqualTo: period)
         .limit(1)
         .get();
@@ -624,24 +636,25 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
   ) async {
     Map<String, num> result = {};
     try {
-      QuerySnapshot entrySnap = await FirestoreService.getCollection(
-        'siteSupervisorEntries',
-      ).where('siteId', isEqualTo: siteId).get();
-      for (var doc in entrySnap.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        String entryDate = '';
-        if (data['date'] is String) {
-          entryDate = DateFormat(
-            'yyyy-MM-dd',
-          ).format(DateTime.parse(data['date']));
-        } else if (data['date'] is Timestamp) {
-          entryDate = DateFormat(
-            'yyyy-MM-dd',
-          ).format((data['date'] as Timestamp).toDate());
-        }
-        if (dates.contains(entryDate)) {
-          num amt = (data['totalAmount'] ?? 0) as num;
-          result[entryDate] = (result[entryDate] ?? 0) + amt;
+      final siteKeys = (await ExpenseService.resolveSiteKeys(siteId)).toList();
+      final keysToQuery = siteKeys.take(10).toList();
+      final snaps = await Future.wait([
+        FirestoreService.getCollection('siteSupervisorEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('siteSupervisorEntries').where('site', whereIn: keysToQuery).get(),
+      ]);
+      final seenDocIds = <String>{};
+      for (var snap in snaps) {
+        for (var doc in snap.docs) {
+          if (!seenDocIds.add(doc.id)) continue;
+          final data = doc.data();
+          final parsedDate = ExpenseService.parseDate(data['date'] ?? data['entryDate'] ?? data['createdAt']);
+          if (parsedDate != null) {
+            final entryDate = DateFormat('yyyy-MM-dd').format(parsedDate);
+            if (dates.contains(entryDate)) {
+              num amt = (data['totalAmount'] ?? data['amount'] ?? 0) as num;
+              result[entryDate] = (result[entryDate] ?? 0) + amt;
+            }
+          }
         }
       }
     } catch (e) {
@@ -660,8 +673,10 @@ class SiteWeeklyFinancialReport2 extends StatelessWidget {
 
     // Fetch same data as in build
     final prevPeriod = _getPrevPeriod(period);
+    final siteKeys = (await ExpenseService.resolveSiteKeys(siteId)).toList();
+    final keysToQuery = siteKeys.take(10).toList();
     final snap = await FirestoreService.getCollection('siteSupervisorPayments')
-        .where('siteId', isEqualTo: siteId)
+        .where('siteId', whereIn: keysToQuery)
         .where('paymentPeriod', isEqualTo: period)
         .limit(1)
         .get();

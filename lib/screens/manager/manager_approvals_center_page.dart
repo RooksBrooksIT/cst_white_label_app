@@ -166,7 +166,7 @@ class _ManagerApprovalsCenterPageState
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          '4 Workflows',
+                                          'Workflows',
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,

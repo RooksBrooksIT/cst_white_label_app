@@ -593,7 +593,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
           children: [
             // ── Modern Pill Tab Switcher ──────────────────────────────────────
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -678,12 +678,13 @@ class _ToolMasterPageState extends State<ToolMasterPage>
   // ---------------------------------------------------------------------------
 
   Widget _buildNewToolSection(bool isMobile, Color darkAccent) {
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1081,12 +1082,13 @@ class _ToolMasterPageState extends State<ToolMasterPage>
       return matchesSearch && matchesOwner;
     }).toList();
 
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1193,7 +1195,7 @@ class _ToolMasterPageState extends State<ToolMasterPage>
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
 
               // Tools Stock Table Card
               Container(

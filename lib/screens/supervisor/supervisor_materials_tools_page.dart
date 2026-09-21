@@ -198,11 +198,31 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 14),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: AppTheme.orgName,
+                                    builder: (context, orgName, _) {
+                                      if (orgName.isEmpty) return const SizedBox.shrink();
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: 2),
+                                        child: Text(
+                                          orgName.toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0D9488),
+                                            letterSpacing: 0.5,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const Text(
                                     'Materials & Tools Hub',
                                     style: TextStyle(
                                       fontSize: 16,
@@ -211,15 +231,21 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
                                       letterSpacing: -0.3,
                                     ),
                                   ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Track site material stocks, tools inventory, movements and product specifications.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF64748B),
-                                      height: 1.25,
-                                    ),
+                                  const SizedBox(height: 2),
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: AppTheme.appName,
+                                    builder: (context, appName, _) {
+                                      final app = appName.isNotEmpty ? appName : 'eBricks';
+                                      return Text(
+                                        'Track site stocks, tools & equipment via $app.',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF64748B),
+                                          height: 1.25,
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
@@ -259,7 +285,30 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
 
                       // Action Cards List
                       ...items.map((item) => _buildActionCard(context, item)),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 20),
+                      Center(
+                        child: ValueListenableBuilder<String>(
+                          valueListenable: AppTheme.orgName,
+                          builder: (context, orgName, _) {
+                            return ValueListenableBuilder<String>(
+                              valueListenable: AppTheme.appName,
+                              builder: (context, appName, _) {
+                                final org = orgName.isNotEmpty ? orgName : 'Organization';
+                                final app = appName.isNotEmpty ? appName : 'eBricks';
+                                return Text(
+                                  '$org • $app',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -283,7 +332,7 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
           },
           borderRadius: BorderRadius.circular(18),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
@@ -305,11 +354,12 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
               ],
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Icon Badge
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -329,41 +379,45 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
                     child: Icon(
                       item.icon,
                       color: item.accentColor,
-                      size: 25,
+                      size: 24,
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
 
-                // Text Information
+                // Text Information & Badge (Flexible / Responsive Layout)
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          Flexible(
-                            child: Text(
-                              item.title,
-                              style: const TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0F172A),
-                                letterSpacing: -0.3,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.2,
+                              height: 1.2,
                             ),
                           ),
-                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
+                              horizontal: 7.5,
+                              vertical: 2.5,
                             ),
                             decoration: BoxDecoration(
                               color: item.accentColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: item.accentColor.withValues(alpha: 0.22),
+                                width: 0.9,
+                              ),
                             ),
                             child: Text(
                               item.badgeText,
@@ -371,6 +425,7 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
                                 color: item.accentColor,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ),
@@ -379,23 +434,22 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         item.subtitle,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12.5,
-                          color: Colors.grey.shade600,
-                          height: 1.3,
+                          color: Color(0xFF64748B),
+                          height: 1.35,
+                          fontWeight: FontWeight.w400,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
 
                 // Chevron Arrow Button
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
@@ -407,7 +461,7 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
                   child: const Center(
                     child: Icon(
                       Icons.arrow_forward_ios_rounded,
-                      size: 13,
+                      size: 12,
                       color: Color(0xFF94A3B8),
                     ),
                   ),

@@ -55,9 +55,15 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, num>> fetchExpenseTotals() async {
     try {
-      final query = await FirestoreService.getCollection(
-        'siteSupervisorEntries',
-      ).where('siteId', isEqualTo: widget.siteId).get();
+      final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
+      final keysToQuery = siteKeys.take(10).toList();
+
+      final results = await Future.wait([
+        FirestoreService.getCollection('siteSupervisorEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('siteSupervisorEntries').where('site', whereIn: keysToQuery).get(),
+      ]);
+
+      final allDocs = {...results[0].docs, ...results[1].docs};
 
       final List<String> expenseFields = ['food', 'fuel', 'transport'];
       Map<String, num> totals = {
@@ -66,8 +72,14 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
         'materials': 0,
       };
 
-      for (var doc in query.docs) {
+      for (var doc in allDocs) {
         final data = doc.data();
+
+        // Skip manager or org flagged entries to avoid duplicate counting
+        if (data['isManagerEntry'] == true || data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+          continue;
+        }
 
         // Filter by stage if provided
         if (widget.projectStage != null) {
@@ -136,11 +148,19 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<num> fetchManagerExpenses() async {
     try {
-      final query = await FirestoreService.getCollection(
-        'managerExpenses',
-      ).where('siteId', isEqualTo: widget.siteId).get();
+      final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
+      final keysToQuery = siteKeys.take(10).toList();
+
+      final results = await Future.wait([
+        FirestoreService.getCollection('managerExpenses').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('managerExpenses').where('site', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('managerEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('managerEntries').where('site', whereIn: keysToQuery).get(),
+      ]);
+
+      final allDocs = {...results[0].docs, ...results[1].docs, ...results[2].docs, ...results[3].docs};
       num total = 0;
-      for (var doc in query.docs) {
+      for (var doc in allDocs) {
         final data = doc.data();
 
         // Filter by stage if provided
@@ -151,7 +171,26 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
           if (docStage != widget.projectStage?.trim()) continue;
         }
 
-        final value = data['totalAmount'];
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          num billsSum = 0;
+          for (final b in bills) {
+            if (b is Map) {
+              final bAmt = b['billAmount'] ?? b['amount'];
+              if (bAmt is num) billsSum += bAmt;
+              else if (bAmt is String) {
+                final parsed = num.tryParse(bAmt.replaceAll(RegExp(r'[^0-9.]'), ''));
+                if (parsed != null) billsSum += parsed;
+              }
+            }
+          }
+          if (billsSum > 0) {
+            total += billsSum;
+            continue;
+          }
+        }
+
+        final value = data['totalAmount'] ?? data['mgrExpenseTotalAmount'] ?? data['amount'];
         if (value != null) {
           if (value is int || value is double) {
             total += value;
@@ -172,11 +211,19 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<num> fetchOrganizationExpenses() async {
     try {
-      final query = await FirestoreService.getCollection(
-        'organizationEntries',
-      ).where('siteId', isEqualTo: widget.siteId).get();
+      final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
+      final keysToQuery = siteKeys.take(10).toList();
+
+      final results = await Future.wait([
+        FirestoreService.getCollection('organizationEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('organizationEntries').where('site', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('organizationExpenses').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('organizationExpenses').where('site', whereIn: keysToQuery).get(),
+      ]);
+
+      final allDocs = {...results[0].docs, ...results[1].docs, ...results[2].docs, ...results[3].docs};
       num total = 0;
-      for (var doc in query.docs) {
+      for (var doc in allDocs) {
         final data = doc.data();
 
         // Filter by stage if provided
@@ -187,7 +234,26 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
           if (docStage != widget.projectStage?.trim()) continue;
         }
 
-        final value = data['totalAmount'];
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          num billsSum = 0;
+          for (final b in bills) {
+            if (b is Map) {
+              final bAmt = b['billAmount'] ?? b['amount'];
+              if (bAmt is num) billsSum += bAmt;
+              else if (bAmt is String) {
+                final parsed = num.tryParse(bAmt.replaceAll(RegExp(r'[^0-9.]'), ''));
+                if (parsed != null) billsSum += parsed;
+              }
+            }
+          }
+          if (billsSum > 0) {
+            total += billsSum;
+            continue;
+          }
+        }
+
+        final value = data['totalAmount'] ?? data['orgExpenseTotalAmount'] ?? data['amount'];
         if (value != null) {
           if (value is int || value is double) {
             total += value;
@@ -208,78 +274,59 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, num>> fetchContractorAndIncentiveExpenses() async {
     try {
-      final canonicalDocId =
-          await ExpenseService.resolveCanonicalSiteDocId(widget.siteId);
+      final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
+      final canonicalDocId = await ExpenseService.resolveCanonicalSiteDocId(widget.siteId);
 
       num totalContractorExpense = 0;
       num totalIncentiveExpenses = 0;
 
-      // Direct lookup by canonical document ID
+      // 1. Check totalSiteExpensesPerDay canonical document
       final totalsDoc = await FirestoreService.getCollection(
         'totalSiteExpensesPerDay',
       ).doc(canonicalDocId).get();
 
       if (totalsDoc.exists && totalsDoc.data() != null) {
         final data = totalsDoc.data()!;
-        if (data['totalContractorExpense'] != null) {
-          final value = data['totalContractorExpense'];
-          if (value is int || value is double) {
-            totalContractorExpense += value;
-          } else if (value is String) {
-            final parsed = num.tryParse(
-              value.replaceAll(RegExp(r'[^0-9.]'), ''),
-            );
+        if (data['totalContractorExpense'] is num) {
+          totalContractorExpense = (data['totalContractorExpense'] as num);
+        }
+        if (data['totalIncentiveExpenses'] is num) {
+          totalIncentiveExpenses = (data['totalIncentiveExpenses'] as num);
+        }
+      }
+
+      // 2. Direct contractor entries query if total is 0
+      if (totalContractorExpense == 0) {
+        final cQuery = await FirestoreService.getCollection(
+          'contractorEntries',
+        ).where('siteId', whereIn: siteKeys.take(10).toList()).get();
+        for (var doc in cQuery.docs) {
+          final data = doc.data();
+          if (widget.projectStage != null) {
+            final docStage = (data['projectStage'] ?? data['projectField'])?.toString().trim();
+            if (docStage != widget.projectStage?.trim()) continue;
+          }
+          final val = data['totalAmount'] ?? data['amount'];
+          if (val is num) totalContractorExpense += val;
+          else if (val is String) {
+            final parsed = num.tryParse(val.replaceAll(RegExp(r'[^0-9.]'), ''));
             if (parsed != null) totalContractorExpense += parsed;
           }
         }
-        if (data['totalIncentiveExpenses'] != null) {
-          final value = data['totalIncentiveExpenses'];
-          if (value is int || value is double) {
-            totalIncentiveExpenses += value;
-          } else if (value is String) {
-            final parsed = num.tryParse(
-              value.replaceAll(RegExp(r'[^0-9.]'), ''),
-            );
-            if (parsed != null) totalIncentiveExpenses += parsed;
-          }
-        }
-      } else {
-        // Fallback query across siteId aliases
-        final query = await FirestoreService.getCollection(
-          'totalSiteExpensesPerDay',
-        ).where('siteId', isEqualTo: widget.siteId).get();
+      }
 
-        for (var doc in query.docs) {
+      // 3. Direct incentives query if total is 0
+      if (totalIncentiveExpenses == 0) {
+        final iQuery = await FirestoreService.siteSupervisorIncentives
+            .where('siteId', whereIn: siteKeys.take(10).toList())
+            .get();
+        for (var doc in iQuery.docs) {
           final data = doc.data();
-
-          if (widget.projectStage != null) {
-            final docStage = (data['projectStage'] ?? data['projectField'])
-                ?.toString()
-                .trim();
-            if (docStage != widget.projectStage?.trim()) continue;
-          }
-
-          if (data['totalContractorExpense'] != null) {
-            final value = data['totalContractorExpense'];
-            if (value is int || value is double) {
-              totalContractorExpense += value;
-            } else if (value is String) {
-              final parsed = num.tryParse(
-                value.replaceAll(RegExp(r'[^0-9.]'), ''),
-              );
-              if (parsed != null) totalContractorExpense += parsed;
-            }
-          }
-          if (data['totalIncentiveExpenses'] != null) {
-            final value = data['totalIncentiveExpenses'];
-            if (value is int || value is double) {
-              totalIncentiveExpenses += value;
-            } else if (value is String) {
-              final parsed = num.tryParse(
-                value.replaceAll(RegExp(r'[^0-9.]'), ''),
-              );
-              if (parsed != null) totalIncentiveExpenses += parsed;
-            }
+          final val = data['incentiveAmount'] ?? data['amount'] ?? data['totalAmount'];
+          if (val is num) totalIncentiveExpenses += val;
+          else if (val is String) {
+            final parsed = num.tryParse(val.replaceAll(RegExp(r'[^0-9.]'), ''));
+            if (parsed != null) totalIncentiveExpenses += parsed;
           }
         }
       }
@@ -296,57 +343,51 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
   Future<Map<String, dynamic>?> fetchProjectInfo() async {
     try {
-      // Try 1: query projects by siteId field
-      var query = await FirestoreService.getCollection(
-        'projects',
-      ).where('siteId', isEqualTo: widget.siteId).limit(1).get();
+      final siteKeys = await ExpenseService.resolveSiteKeys(widget.siteId);
 
-      // Try 2: query by site field
-      if (query.docs.isEmpty) {
-        query = await FirestoreService.getCollection(
-          'projects',
-        ).where('site', isEqualTo: widget.siteId).limit(1).get();
-      }
-
-      // Try 3: query by siteName from Site collection
-      if (query.docs.isEmpty) {
-        final siteDoc = await FirestoreService.getCollection(
-          'Site',
-        ).doc(widget.siteId).get();
-        if (siteDoc.exists) {
-          final siteData = siteDoc.data()!;
-          final sName = siteData['siteName']?.toString();
-          if (sName != null && sName.isNotEmpty && sName != widget.siteId) {
-            query = await FirestoreService.getCollection(
-              'projects',
-            ).where('siteName', isEqualTo: sName).limit(1).get();
+      // Try searching project doc via all site keys
+      for (final key in siteKeys) {
+        final pDoc = await FirestoreService.findLinkedProjectDoc(
+          siteDocId: key,
+          siteCode: key,
+          siteName: key,
+        );
+        if (pDoc != null && pDoc.exists && pDoc.data() != null) {
+          final pData = Map<String, dynamic>.from(pDoc.data()!);
+          // Ensure location and siteName are filled
+          if (pData['siteLocation'] == null && pData['location'] != null) {
+            pData['siteLocation'] = pData['location'];
           }
+          return pData;
         }
       }
 
-      Map<String, dynamic>? data = query.docs.isNotEmpty
-          ? query.docs.first.data()
-          : null;
-
-      // Fallback to fetch from 'Site' collection if project data is missing or has no location
-      if (data == null ||
-          (data['siteLocation'] == null && data['location'] == null)) {
-        final siteDoc = await FirestoreService.getCollection(
-          'Site',
-        ).doc(widget.siteId).get();
-        if (siteDoc.exists) {
-          final siteData = siteDoc.data()!;
-          if (data == null) {
-            data = siteData;
-          } else {
-            // Merge missing location info into project data
-            data['siteLocation'] =
-                siteData['location'] ?? siteData['siteLocation'];
-            data['siteName'] = data['siteName'] ?? siteData['siteName'];
+      // Try searching Site doc via all site keys
+      for (final key in siteKeys) {
+        final sDoc = await FirestoreService.findLinkedSiteDoc(
+          projectDocId: key,
+          siteId: key,
+        );
+        if (sDoc != null && sDoc.exists && sDoc.data() != null) {
+          final sData = Map<String, dynamic>.from(sDoc.data()!);
+          if (sData['siteLocation'] == null && sData['location'] != null) {
+            sData['siteLocation'] = sData['location'];
           }
+          return sData;
         }
       }
-      return data;
+
+      final details = await ExpenseService.resolveSiteDetails(widget.siteId);
+      return {
+        'siteLocation': details.location ?? details.siteName,
+        'projectName': details.projectName ?? details.siteName,
+        'siteName': details.siteName,
+        'siteId': details.canonicalDocId,
+        'supervisor': details.supervisor,
+        'projectBudget': 0,
+        'amountSpent': 0,
+        'currentStatus': 'In Progress',
+      };
     } catch (e) {
       print('[fetchProjectInfo] Error: $e');
       return null;

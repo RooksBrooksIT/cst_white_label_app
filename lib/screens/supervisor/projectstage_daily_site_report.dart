@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import '/widgets/glass_scaffold.dart';
@@ -44,84 +45,92 @@ class _ProjectStageDailySiteExpensesReportPageState
     _loadReport();
   }
 
-  String get _documentId {
-    final formattedDate = DateFormat('ddMMyyyy').format(widget.date);
-    return '${widget.siteId}_$formattedDate';
-  }
-
   Future<void> _loadReport() async {
     setState(() => isLoading = true);
     try {
+      final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId ?? '')).toList();
+      final ddMMyyyy = DateFormat('ddMMyyyy').format(widget.date);
+      final yyyyMMdd = DateFormat('yyyy-MM-dd').format(widget.date);
+
+      // Attempt direct doc gets for supervisor entries first
+      final docIdsToTry = <String>{};
+      for (final key in siteKeys) {
+        docIdsToTry.add('${key}_$ddMMyyyy');
+        docIdsToTry.add('${key}_$yyyyMMdd');
+      }
+
+      DocumentSnapshot? foundSupervisorDoc;
+      for (final docId in docIdsToTry) {
+        try {
+          final doc = await FirestoreService.getCollection('siteSupervisorEntries').doc(docId).get();
+          if (doc.exists) {
+            foundSupervisorDoc = doc;
+            break;
+          }
+        } catch (_) {}
+      }
+
       final results = await Future.wait([
-        FirestoreService.getCollection(
-          'siteSupervisorEntries',
-        ).doc(_documentId).get(),
-        // Check both siteId and site for broader compatibility
-        _fetchCollectionBySite('managerExpenses'),
-        _fetchCollectionBySite('organizationExpenses'),
-        _fetchCollectionBySite('contractorEntries'),
-        _fetchCollectionBySite('managerEntries'),
-        _fetchCollectionBySite('organizationEntries'),
+        _fetchCollectionBySite('siteSupervisorEntries', siteKeys),
+        _fetchCollectionBySite('managerExpenses', siteKeys),
+        _fetchCollectionBySite('organizationExpenses', siteKeys),
+        _fetchCollectionBySite('contractorEntries', siteKeys),
+        _fetchCollectionBySite('managerEntries', siteKeys),
+        _fetchCollectionBySite('organizationEntries', siteKeys),
       ]);
 
-      final supervisorDoc = results[0] as DocumentSnapshot;
-      final managerDocs = results[1] as List<DocumentSnapshot>;
-      final orgDocs = results[2] as List<DocumentSnapshot>;
-      final contractorDocs = results[3] as List<DocumentSnapshot>;
-      final managerEntryDocs = results[4] as List<DocumentSnapshot>;
-      final orgEntryDocs = results[5] as List<DocumentSnapshot>;
+      final supervisorDocs = results[0];
+      final managerDocs = results[1];
+      final orgDocs = results[2];
+      final contractorDocs = results[3];
+      final managerEntryDocs = results[4];
+      final orgEntryDocs = results[5];
 
-      final targetStage = widget.projectStage.trim();
-      final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
+      final targetStage = widget.projectStage.trim().toLowerCase();
 
       bool filterEntry(DocumentSnapshot doc) {
         final data = doc.data() as Map<String, dynamic>;
-        final docStage = (data['projectStage'] ?? data['projectField'])
+        final docStage = (data['projectStage'] ?? data['projectField'] ?? data['stage'])
             ?.toString()
-            .trim();
-        if (docStage != targetStage) return false;
+            .trim()
+            .toLowerCase();
+        if (docStage != null && targetStage.isNotEmpty && docStage != targetStage) {
+          return false;
+        }
 
         // 1. Check top-level date
-        final rawDate = data['date'] ?? data['entryDate'];
-        DateTime? entryDate;
-        if (rawDate is Timestamp) {
-          entryDate = rawDate.toDate();
-        } else if (rawDate is String) {
-          entryDate = DateTime.tryParse(rawDate);
-        }
-
-        if (entryDate != null) {
-          final entryDateStr = DateFormat('yyyy-MM-dd').format(entryDate);
-          if (entryDateStr == formattedDateYMD) return true;
-        }
+        final rawDate = data['date'] ?? data['entryDate'] ?? data['createdAt'] ?? data['updatedAt'];
+        if (ExpenseService.isSameDay(rawDate, widget.date)) return true;
 
         // 2. Check bills list
         final bills = data['bills'] as List? ?? [];
         return bills.any((bill) {
-          final billDateRaw = bill['billDate'];
-          DateTime? billDate;
-          if (billDateRaw is Timestamp) {
-            billDate = billDateRaw.toDate();
-          } else if (billDateRaw is String) {
-            billDate = DateTime.tryParse(billDateRaw);
-          }
-
-          if (billDate != null) {
-            final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
-            return billDateStr == formattedDateYMD;
+          if (bill is Map) {
+            final billDateRaw = bill['billDate'] ?? bill['date'];
+            return ExpenseService.isSameDay(billDateRaw, widget.date);
           }
           return false;
         });
       }
 
       // 1. Supervisor Data
-      if (supervisorDoc.exists) {
-        final data = supervisorDoc.data() as Map<String, dynamic>?;
-        final docStage = (data?['projectStage'] ?? data?['projectField'])
+      if (foundSupervisorDoc != null && foundSupervisorDoc.exists) {
+        final data = foundSupervisorDoc.data() as Map<String, dynamic>?;
+        final docStage = (data?['projectStage'] ?? data?['projectField'] ?? data?['stage'])
             ?.toString()
-            .trim();
-        if (docStage == targetStage) {
+            .trim()
+            .toLowerCase();
+        if (docStage == null || targetStage.isEmpty || docStage == targetStage) {
           supervisorData = data;
+        }
+      }
+
+      if (supervisorData == null) {
+        for (final doc in supervisorDocs) {
+          if (filterEntry(doc)) {
+            supervisorData = doc.data() as Map<String, dynamic>;
+            break;
+          }
         }
       }
 
@@ -151,21 +160,29 @@ class _ProjectStageDailySiteExpensesReportPageState
 
   Future<List<DocumentSnapshot>> _fetchCollectionBySite(
     String collection,
+    List<String> siteKeys,
   ) async {
+    final keysToQuery = siteKeys.take(10).toList();
     final snapshots = await Future.wait([
       FirestoreService.getCollection(
         collection,
-      ).where('siteId', isEqualTo: widget.siteId).get(),
+      ).where('siteId', whereIn: keysToQuery).get(),
       FirestoreService.getCollection(
         collection,
-      ).where('site', isEqualTo: widget.siteId).get(),
+      ).where('site', whereIn: keysToQuery).get(),
     ]);
-    return [...snapshots[0].docs, ...snapshots[1].docs];
+    final seen = <String>{};
+    final docs = <DocumentSnapshot>[];
+    for (var doc in [...snapshots[0].docs, ...snapshots[1].docs]) {
+      if (seen.add(doc.id)) {
+        docs.add(doc);
+      }
+    }
+    return docs;
   }
 
   void _calculateGrandTotal() {
     double total = 0;
-    final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
 
     // Supervisor Total
     if (supervisorData != null) {
@@ -176,20 +193,19 @@ class _ProjectStageDailySiteExpensesReportPageState
     for (var doc in managerEntries) {
       final data = doc.data() as Map<String, dynamic>;
       final bills = data['bills'] as List? ?? [];
-      for (var bill in bills) {
-        final billDateRaw = bill['billDate'];
-        DateTime? billDate;
-        if (billDateRaw is Timestamp) {
-          billDate = billDateRaw.toDate();
-        } else if (billDateRaw is String) {
-          billDate = DateTime.tryParse(billDateRaw);
-        }
-
-        if (billDate != null) {
-          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
-          if (billDateStr == formattedDateYMD) {
-            total += _toNum(bill['billAmount']);
+      if (bills.isNotEmpty) {
+        for (var bill in bills) {
+          if (bill is Map) {
+            final billDateRaw = bill['billDate'] ?? bill['date'];
+            if (ExpenseService.isSameDay(billDateRaw, widget.date)) {
+              total += _toNum(bill['billAmount'] ?? bill['amount']);
+            }
           }
+        }
+      } else {
+        final rawDate = data['date'] ?? data['entryDate'] ?? data['createdAt'];
+        if (ExpenseService.isSameDay(rawDate, widget.date)) {
+          total += _toNum(data['totalAmount'] ?? data['amount']);
         }
       }
     }
@@ -198,20 +214,19 @@ class _ProjectStageDailySiteExpensesReportPageState
     for (var doc in orgEntries) {
       final data = doc.data() as Map<String, dynamic>;
       final bills = data['bills'] as List? ?? [];
-      for (var bill in bills) {
-        final billDateRaw = bill['billDate'];
-        DateTime? billDate;
-        if (billDateRaw is Timestamp) {
-          billDate = billDateRaw.toDate();
-        } else if (billDateRaw is String) {
-          billDate = DateTime.tryParse(billDateRaw);
-        }
-
-        if (billDate != null) {
-          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
-          if (billDateStr == formattedDateYMD) {
-            total += _toNum(bill['billAmount']);
+      if (bills.isNotEmpty) {
+        for (var bill in bills) {
+          if (bill is Map) {
+            final billDateRaw = bill['billDate'] ?? bill['date'];
+            if (ExpenseService.isSameDay(billDateRaw, widget.date)) {
+              total += _toNum(bill['billAmount'] ?? bill['amount']);
+            }
           }
+        }
+      } else {
+        final rawDate = data['date'] ?? data['entryDate'] ?? data['createdAt'];
+        if (ExpenseService.isSameDay(rawDate, widget.date)) {
+          total += _toNum(data['totalAmount'] ?? data['amount']);
         }
       }
     }
@@ -219,7 +234,7 @@ class _ProjectStageDailySiteExpensesReportPageState
     // Contractor Total
     for (var doc in contractorEntries) {
       final data = doc.data() as Map<String, dynamic>;
-      total += _toNum(data['totalAmount']);
+      total += _toNum(data['totalAmount'] ?? data['amount']);
     }
 
     grandTotal = total;
@@ -308,28 +323,30 @@ class _ProjectStageDailySiteExpensesReportPageState
     String title,
     List<DocumentSnapshot> entries,
   ) {
-    final formattedDateYMD = DateFormat('yyyy-MM-dd').format(widget.date);
     double sectionTotal = 0;
     final List<Map<String, dynamic>> dailyBills = [];
 
     for (var doc in entries) {
       final data = doc.data() as Map<String, dynamic>;
       final bills = data['bills'] as List? ?? [];
-      for (var bill in bills) {
-        final billDateRaw = bill['billDate'];
-        DateTime? billDate;
-        if (billDateRaw is Timestamp) {
-          billDate = billDateRaw.toDate();
-        } else if (billDateRaw is String) {
-          billDate = DateTime.tryParse(billDateRaw);
-        }
-
-        if (billDate != null) {
-          final billDateStr = DateFormat('yyyy-MM-dd').format(billDate);
-          if (billDateStr == formattedDateYMD) {
-            dailyBills.add(bill);
-            sectionTotal += _toNum(bill['billAmount']);
+      if (bills.isNotEmpty) {
+        for (var bill in bills) {
+          if (bill is Map) {
+            final billDateRaw = bill['billDate'] ?? bill['date'];
+            if (ExpenseService.isSameDay(billDateRaw, widget.date)) {
+              dailyBills.add(Map<String, dynamic>.from(bill));
+              sectionTotal += _toNum(bill['billAmount'] ?? bill['amount']);
+            }
           }
+        }
+      } else {
+        final rawDate = data['date'] ?? data['entryDate'] ?? data['createdAt'];
+        if (ExpenseService.isSameDay(rawDate, widget.date)) {
+          dailyBills.add({
+            'billVendor': data['vendorName'] ?? data['category'] ?? title,
+            'billAmount': data['totalAmount'] ?? data['amount'] ?? 0,
+          });
+          sectionTotal += _toNum(data['totalAmount'] ?? data['amount']);
         }
       }
     }

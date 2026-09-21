@@ -27,6 +27,8 @@ class NotificationService {
 
   static StreamSubscription? _realtimeNotifSub;
   static final Set<String> _processedNotifIds = {};
+  static final Set<String> _cachedSupervisorSites = {};
+  static StreamSubscription? _supervisorSitesSub;
   static bool _isLocalNotificationsInitialized = false;
   static GlobalKey<NavigatorState>? _navigatorKey;
 
@@ -382,6 +384,10 @@ class NotificationService {
     final orgId = FirestoreService.currentOrgId;
     if (orgId.isEmpty || orgId == 'uninitialized') return;
 
+    if (canonicalRole == 'supervisor') {
+      _initSupervisorSiteCache(userName: userName, userId: userId);
+    }
+
     try {
       final collection = FirestoreService.getCollection('notifications');
       // Look back 2 minutes to eliminate any device-server clock skew differences,
@@ -490,10 +496,28 @@ class NotificationService {
               isRecipient = targetRole == 'supervisor' ||
                   normalizedTargetRoles.contains('supervisor') ||
                   rawTargetRoles.contains('supervisor');
+
               if (forSupervisorName.isNotEmpty &&
                   currentUserName.isNotEmpty &&
                   forSupervisorName != currentUserName) {
                 isRecipient = false;
+              }
+
+              // Site-specific filter: If notification is site-related, ensure supervisor works at this site
+              final notifSiteId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+              final notifSiteName = (data['siteName'] ?? '').toString().trim().toLowerCase();
+              if (isRecipient && (notifSiteId.isNotEmpty || notifSiteName.isNotEmpty)) {
+                final isExplicitSupervisor = forSupervisorName.isNotEmpty &&
+                    currentUserName.isNotEmpty &&
+                    forSupervisorName == currentUserName;
+                if (!isExplicitSupervisor) {
+                  final isAssigned = _cachedSupervisorSites.isEmpty ||
+                      (notifSiteId.isNotEmpty && _cachedSupervisorSites.contains(notifSiteId)) ||
+                      (notifSiteName.isNotEmpty && _cachedSupervisorSites.contains(notifSiteName));
+                  if (!isAssigned) {
+                    isRecipient = false;
+                  }
+                }
               }
             }
 
@@ -543,6 +567,202 @@ class NotificationService {
       debugPrint(
           'NotificationService: Failed to initialize realtime bridge: $e');
     }
+  }
+
+  /// Initializes and maintains a live cache of site IDs assigned to the supervisor.
+  static void _initSupervisorSiteCache({String? userName, String? userId}) {
+    _supervisorSitesSub?.cancel();
+    _cachedSupervisorSites.clear();
+    final cleanName = (userName ?? '').trim().toLowerCase();
+    final cleanId = (userId ?? '').trim().toLowerCase();
+    if (cleanName.isEmpty && cleanId.isEmpty) return;
+
+    try {
+      _supervisorSitesSub = FirestoreService.getCollection('siteSupervisorMap')
+          .snapshots()
+          .listen((snap) {
+        final sites = <String>{};
+        for (final doc in snap.docs) {
+          final d = doc.data();
+          final sName = (d['supervisorName'] ??
+                  d['supervisor'] ??
+                  d['FullName'] ??
+                  d['fullName'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final sId = (d['supervisorId'] ??
+                  d['Supervisor ID'] ??
+                  d['SupervisorId'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final isMatch = (cleanName.isNotEmpty &&
+                  (sName == cleanName ||
+                      sName.contains(cleanName) ||
+                      cleanName.contains(sName))) ||
+              (cleanId.isNotEmpty &&
+                  (sId == cleanId || doc.id.toLowerCase().contains(cleanId)));
+          if (isMatch) {
+            final s1 = (d['siteId'] ?? '').toString().trim().toLowerCase();
+            final s2 = (d['siteCode'] ?? '').toString().trim().toLowerCase();
+            final s3 = (d['site'] ?? '').toString().trim().toLowerCase();
+            final s4 = (d['siteDocId'] ?? doc.id).toString().trim().toLowerCase();
+            final s5 = (d['siteName'] ?? '').toString().trim().toLowerCase();
+            if (s1.isNotEmpty) sites.add(s1);
+            if (s2.isNotEmpty) sites.add(s2);
+            if (s3.isNotEmpty) sites.add(s3);
+            if (s4.isNotEmpty) sites.add(s4);
+            if (s5.isNotEmpty) sites.add(s5);
+          }
+        }
+        _cachedSupervisorSites.clear();
+        _cachedSupervisorSites.addAll(sites);
+      }, onError: (_) {});
+    } catch (_) {}
+  }
+
+  /// Retrieves all Supervisors assigned to a specific site.
+  static Future<List<Map<String, String>>> getAssignedSupervisorsForSite(
+      String siteId) async {
+    final cleanSiteId = siteId.trim().toLowerCase();
+    if (cleanSiteId.isEmpty) return [];
+
+    final results = <Map<String, String>>[];
+    final seen = <String>{};
+
+    void addSupervisor(String? name, String? id) {
+      final sName = (name ?? '').trim();
+      final sId = (id ?? '').trim();
+      if (sName.isEmpty && sId.isEmpty) return;
+      final lowerName = sName.toLowerCase();
+      if (lowerName == 'not available' ||
+          lowerName == 'unassigned' ||
+          lowerName == 'none' ||
+          lowerName == 'null') {
+        return;
+      }
+      final key = '${sName.toLowerCase()}_${sId.toLowerCase()}';
+      if (!seen.contains(key)) {
+        seen.add(key);
+        results.add({
+          'supervisorName': sName.isNotEmpty ? sName : sId,
+          'supervisorId': sId,
+        });
+      }
+    }
+
+    try {
+      // 1. Query siteSupervisorMap
+      final mapSnap =
+          await FirestoreService.getCollection('siteSupervisorMap').get();
+      for (final doc in mapSnap.docs) {
+        final d = doc.data();
+        final docSite = (d['siteId'] ??
+                d['siteCode'] ??
+                d['site'] ??
+                d['siteDocId'] ??
+                doc.id)
+            .toString()
+            .trim()
+            .toLowerCase();
+        final docSiteName = (d['siteName'] ??
+                d['project'] ??
+                d['projectName'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final isMatch = docSite == cleanSiteId ||
+            docSite.contains(cleanSiteId) ||
+            cleanSiteId.contains(docSite) ||
+            doc.id.toLowerCase().contains(cleanSiteId) ||
+            (docSiteName.isNotEmpty &&
+                (docSiteName == cleanSiteId ||
+                    docSiteName.contains(cleanSiteId)));
+        if (isMatch) {
+          addSupervisor(
+            d['supervisorName'] ??
+                d['supervisor'] ??
+                d['FullName'] ??
+                d['fullName'],
+            d['supervisorId'] ??
+                d['Supervisor ID'] ??
+                d['SupervisorId'],
+          );
+        }
+      }
+
+      // 2. Query Site collection as fallback
+      if (results.isEmpty) {
+        final siteSnap =
+            await FirestoreService.getCollection('Site').get();
+        for (final doc in siteSnap.docs) {
+          final d = doc.data();
+          final docSite = (d['siteId'] ?? d['siteCode'] ?? doc.id)
+              .toString()
+              .trim()
+              .toLowerCase();
+          final docSiteName =
+              (d['siteName'] ?? d['name'] ?? '').toString().trim().toLowerCase();
+          if (docSite == cleanSiteId ||
+              doc.id.toLowerCase() == cleanSiteId ||
+              docSiteName == cleanSiteId) {
+            addSupervisor(
+              d['supervisorName'] ?? d['supervisor'] ?? d['FullName'],
+              d['supervisorId'] ?? d['Supervisor ID'],
+            );
+          }
+        }
+      }
+
+      // 3. Query projects collection as fallback
+      if (results.isEmpty) {
+        final projSnap =
+            await FirestoreService.getCollection('projects').get();
+        for (final doc in projSnap.docs) {
+          final d = doc.data();
+          final docSite =
+              (d['siteId'] ?? d['site'] ?? doc.id).toString().trim().toLowerCase();
+          if (docSite == cleanSiteId || doc.id.toLowerCase() == cleanSiteId) {
+            addSupervisor(
+              d['supervisorName'] ?? d['supervisor'] ?? d['assignedSupervisor'],
+              d['supervisorId'] ?? d['Supervisor ID'],
+            );
+          }
+        }
+      }
+
+      // 4. Query workerSiteMapping collection as fallback
+      if (results.isEmpty) {
+        final wsmDoc = await FirestoreService.getCollection('workerSiteMapping')
+            .doc(siteId.trim())
+            .get();
+        if (wsmDoc.exists) {
+          final d = wsmDoc.data();
+          if (d != null) {
+            addSupervisor(
+              d['supervisor'] ?? d['supervisorName'],
+              d['supervisorId'] ?? d['Supervisor ID'],
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint(
+          'NotificationService: Error getting assigned supervisors for site $siteId: $e');
+    }
+
+    return results;
+  }
+
+  /// Convenience method to get the primary assigned Supervisor for a site.
+  static Future<Map<String, String>?> getAssignedSupervisorForSite(
+      String siteId) async {
+    final list = await getAssignedSupervisorsForSite(siteId);
+    return list.isNotEmpty ? list.first : null;
   }
 
   /// Shows a rich foreground notification banner that can be tapped to navigate directly.
@@ -1481,7 +1701,7 @@ class NotificationService {
     );
   }
 
-  /// 7a. Notifies Organization when a Manager creates or updates a Project.
+  /// 7a. Notifies Organization and the assigned Supervisor when a Manager creates or updates a Project.
   static Future<void> notifyProjectCreatedOrUpdated({
     required String projectId,
     required String projectName,
@@ -1489,6 +1709,8 @@ class NotificationService {
     required String siteName,
     String? location,
     String? managerName,
+    String? supervisorName,
+    String? supervisorId,
     bool isCreated = true,
   }) async {
     final title = isCreated ? 'New Project Created' : 'Project Updated';
@@ -1501,7 +1723,7 @@ class NotificationService {
     final reqType = isCreated ? 'project_created' : 'project_updated';
     final idempotencyKey = '${reqType}_${orgId}_${projectId}_$timeBucket';
 
-    // 1. Notify Organization
+    // 1. Notify Organization (existing flow preserved)
     await notifyOrganisation(
       title: title,
       body: body,
@@ -1525,6 +1747,282 @@ class NotificationService {
         'actionRoute': '/project_details',
       },
     );
+
+    // 2. Identify assigned supervisor(s) for the site and notify them
+    List<Map<String, String>> supervisors = [];
+    if (supervisorName != null && supervisorName.trim().isNotEmpty) {
+      supervisors = [
+        {
+          'supervisorName': supervisorName.trim(),
+          'supervisorId': supervisorId?.trim() ?? '',
+        }
+      ];
+    } else if (siteId.trim().isNotEmpty) {
+      supervisors = await getAssignedSupervisorsForSite(siteId);
+    }
+
+    // Only send supervisor notifications if a supervisor is assigned to this site
+    for (final sup in supervisors) {
+      final supName = sup['supervisorName'];
+      if (supName == null || supName.isEmpty) continue;
+      final supTitle =
+          isCreated ? '🏗️ New Project Assigned' : '🏗️ Project Details Updated';
+      final supBody =
+          'Manager ${managerName ?? "Admin"} has $actionWord project: "$projectName" for your assigned site "$siteName ($siteId)".';
+
+      await notifySupervisor(
+        supervisorName: supName,
+        supervisorId: sup['supervisorId'],
+        title: supTitle,
+        body: supBody,
+        requestType: reqType,
+        requestId: projectId,
+        docId: projectId,
+        siteId: siteId,
+        siteName: siteName,
+        status: isCreated ? 'created' : 'updated',
+        senderRole: 'Manager',
+        senderName: managerName ?? 'Manager',
+        remarks: 'Project assignment for site',
+        data: {
+          'idempotencyKey': '${idempotencyKey}_sup_${supName.toLowerCase()}',
+          'projectId': projectId,
+          'projectName': projectName,
+          'siteId': siteId,
+          'siteName': siteName,
+          'location': location ?? '',
+          'type': reqType,
+          'actionRoute': '/project_details',
+        },
+      );
+    }
+  }
+
+  /// 7b. Notifies assigned Supervisor when materials are assigned/transferred to their site.
+  static Future<void> notifyMaterialAssignment({
+    required String siteId,
+    required String siteName,
+    required String materialName,
+    required int quantity,
+    String? managerName,
+    String? supervisorName,
+    String? supervisorId,
+    String? projectName,
+    bool isUpdate = false,
+  }) async {
+    final cleanSiteId = siteId.trim();
+    if (cleanSiteId.isEmpty) return;
+
+    List<Map<String, String>> supervisors = [];
+    if (supervisorName != null && supervisorName.trim().isNotEmpty) {
+      supervisors = [
+        {
+          'supervisorName': supervisorName.trim(),
+          'supervisorId': supervisorId?.trim() ?? '',
+        }
+      ];
+    } else {
+      supervisors = await getAssignedSupervisorsForSite(cleanSiteId);
+    }
+
+    // If no supervisor assigned to the site, do not send notification
+    if (supervisors.isEmpty) return;
+
+    final title = isUpdate
+        ? '📦 Material Assignment Updated'
+        : '📦 Materials Assigned to Site';
+    final actionWord =
+        isUpdate ? 'updated material allocation' : 'assigned and transferred';
+    final projectText = (projectName != null && projectName.isNotEmpty)
+        ? ' (Project: $projectName)'
+        : '';
+    final body =
+        'Manager ${managerName ?? "Manager"} has $actionWord $quantity x $materialName for site "$siteName ($cleanSiteId)"$projectText.';
+
+    for (final sup in supervisors) {
+      final supName = sup['supervisorName'];
+      if (supName == null || supName.isEmpty) continue;
+
+      await notifySupervisor(
+        supervisorName: supName,
+        supervisorId: sup['supervisorId'],
+        title: title,
+        body: body,
+        requestType: 'material',
+        requestId: cleanSiteId,
+        docId: cleanSiteId,
+        siteId: cleanSiteId,
+        siteName: siteName,
+        status: isUpdate ? 'updated' : 'assigned',
+        senderRole: 'Manager',
+        senderName: managerName ?? 'Manager',
+        remarks: 'Materials dispatched to site',
+        data: {
+          'siteId': cleanSiteId,
+          'siteName': siteName,
+          'materialName': materialName,
+          'quantity': quantity,
+          'projectName': projectName ?? '',
+          'actionRoute': '/material_inventory',
+        },
+      );
+    }
+  }
+
+  /// 7c. Notifies assigned Supervisor when workers are mapped/allocated to their site.
+  static Future<void> notifyWorkerAssignment({
+    required String siteId,
+    required String siteName,
+    required int workerCount,
+    List<String>? workerNames,
+    String? managerName,
+    String? supervisorName,
+    String? supervisorId,
+    String? projectName,
+    bool isUpdate = false,
+  }) async {
+    final cleanSiteId = siteId.trim();
+    if (cleanSiteId.isEmpty) return;
+
+    List<Map<String, String>> supervisors = [];
+    final validSupervisorName = (supervisorName != null &&
+            supervisorName.trim().isNotEmpty &&
+            supervisorName.trim().toLowerCase() != 'not available' &&
+            supervisorName.trim().toLowerCase() != 'unassigned' &&
+            supervisorName.trim().toLowerCase() != 'none' &&
+            supervisorName.trim().toLowerCase() != 'null')
+        ? supervisorName.trim()
+        : null;
+
+    if (validSupervisorName != null) {
+      supervisors = [
+        {
+          'supervisorName': validSupervisorName,
+          'supervisorId': supervisorId?.trim() ?? '',
+        }
+      ];
+    } else {
+      supervisors = await getAssignedSupervisorsForSite(cleanSiteId);
+      if (supervisors.isEmpty &&
+          siteName.trim().isNotEmpty &&
+          siteName.trim().toLowerCase() != cleanSiteId.toLowerCase()) {
+        supervisors = await getAssignedSupervisorsForSite(siteName.trim());
+      }
+    }
+
+    // If no supervisor assigned to the site, do not send notification
+    if (supervisors.isEmpty) return;
+
+    final title = isUpdate
+        ? 'Workers Allocation Updated'
+        : 'Workers Allocated to Your Site';
+    final workerText =
+        workerCount == 1 ? '1 worker has' : '$workerCount workers have';
+    final body =
+        '$workerText been allocated to your site for your management.';
+
+    for (final sup in supervisors) {
+      final supName = sup['supervisorName'];
+      if (supName == null || supName.isEmpty) continue;
+
+      await notifySupervisor(
+        supervisorName: supName,
+        supervisorId: sup['supervisorId'],
+        title: title,
+        body: body,
+        requestType: 'workforce',
+        requestId: cleanSiteId,
+        docId: cleanSiteId,
+        siteId: cleanSiteId,
+        siteName: siteName,
+        status: isUpdate ? 'updated' : 'assigned',
+        senderRole: 'Manager',
+        senderName: managerName ?? 'Manager',
+        remarks: isUpdate ? 'Worker allocation updated' : 'Workers allocated to site',
+        data: {
+          'siteId': cleanSiteId,
+          'siteName': siteName,
+          'totalWorkersMapped': workerCount,
+          'workerNames': workerNames ?? [],
+          'projectName': projectName ?? '',
+          'actionRoute': '/workers_site_mapping',
+        },
+      );
+    }
+  }
+
+  /// 7d. Notifies assigned Supervisor when tools are assigned/dispatched to their site.
+  static Future<void> notifyToolAssignment({
+    required String siteId,
+    required String siteName,
+    required int toolCount,
+    List<String>? toolNames,
+    String? managerName,
+    String? supervisorName,
+    String? supervisorId,
+    String? projectName,
+    String? tmId,
+    bool isUpdate = false,
+  }) async {
+    final cleanSiteId = siteId.trim();
+    if (cleanSiteId.isEmpty) return;
+
+    List<Map<String, String>> supervisors = [];
+    if (supervisorName != null && supervisorName.trim().isNotEmpty) {
+      supervisors = [
+        {
+          'supervisorName': supervisorName.trim(),
+          'supervisorId': supervisorId?.trim() ?? '',
+        }
+      ];
+    } else {
+      supervisors = await getAssignedSupervisorsForSite(cleanSiteId);
+    }
+
+    // If no supervisor assigned to the site, do not send notification
+    if (supervisors.isEmpty) return;
+
+    final title = isUpdate
+        ? '🛠️ Tool Assignment Updated'
+        : '🛠️ Tools Dispatched to Site';
+    final actionWord = isUpdate ? 'updated tools assignment' : 'dispatched';
+    final idText =
+        (tmId != null && tmId.isNotEmpty) ? ' (Movement #$tmId)' : '';
+    final projectText = (projectName != null && projectName.isNotEmpty)
+        ? ' (Project: $projectName)'
+        : '';
+    final body =
+        'Manager ${managerName ?? "Manager"} has $actionWord $toolCount tool(s) to site "$siteName ($cleanSiteId)"$idText$projectText.';
+
+    for (final sup in supervisors) {
+      final supName = sup['supervisorName'];
+      if (supName == null || supName.isEmpty) continue;
+
+      await notifySupervisor(
+        supervisorName: supName,
+        supervisorId: sup['supervisorId'],
+        title: title,
+        body: body,
+        requestType: 'tools',
+        requestId: tmId ?? cleanSiteId,
+        docId: tmId ?? cleanSiteId,
+        siteId: cleanSiteId,
+        siteName: siteName,
+        status: isUpdate ? 'updated' : 'assigned',
+        senderRole: 'Manager',
+        senderName: managerName ?? 'Manager',
+        remarks: 'Tools movement to site',
+        data: {
+          'siteId': cleanSiteId,
+          'siteName': siteName,
+          'toolCount': toolCount,
+          'toolNames': toolNames ?? [],
+          'tmId': tmId ?? '',
+          'projectName': projectName ?? '',
+          'actionRoute': '/tools_inventory',
+        },
+      );
+    }
   }
 
   /// 8. Notifies Managers and Organization when a Master Configuration is updated.

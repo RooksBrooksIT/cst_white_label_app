@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/auth_service.dart';
@@ -169,75 +170,160 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         debugPrint('Error fetching siteSupervisorMap: $e');
       }
 
-      // 4. Combine all sources into a consolidated list
-      final consolidated = <Map<String, dynamic>>[];
-      final seenKeys = <String>{};
+      // 4. Ingest and deduplicate across all sources by canonical siteId
+      final Map<String, Map<String, dynamic>> consolidatedMap = {};
 
-      // First add all sites from Site collection
-      for (var entry in siteDocs.entries) {
-        final sData = entry.value;
-        final docId = entry.key;
-        final rawSiteId = (sData['siteId'] ?? docId).toString().trim();
-        final rawSiteName = (sData['siteName'] ?? rawSiteId).toString().trim();
+      void ingestSiteRecord({
+        required String docId,
+        required Map<String, dynamic> data,
+      }) {
+        final rawSiteId = (data['siteId'] ??
+                data['siteCode'] ??
+                data['SiteCode'] ??
+                data['id'] ??
+                data['siteDocId'] ??
+                docId)
+            .toString()
+            .trim();
 
-        final proj = projectMap[rawSiteId] ?? projectMap[rawSiteName] ?? projectMap[docId];
-        final mapping = mappingMap[rawSiteId] ?? mappingMap[rawSiteName] ?? mappingMap[docId];
+        String cleanSiteId = SiteDisplayHelper.extractSiteId(rawSiteId);
+        if (cleanSiteId.isEmpty) {
+          cleanSiteId = rawSiteId.contains('_') ? rawSiteId.split('_').first.trim() : rawSiteId;
+        }
+        if (cleanSiteId.isEmpty) {
+          cleanSiteId = docId.trim();
+        }
+
+        String cleanSiteName = (data['siteName'] ??
+                data['name'] ??
+                data['projectName'] ??
+                data['project'] ??
+                '')
+            .toString()
+            .trim();
+
+        if (cleanSiteName.isEmpty || cleanSiteName.toLowerCase() == cleanSiteId.toLowerCase()) {
+          cleanSiteName = SiteDisplayHelper.extractSiteName(data['siteName'] ?? data['site'] ?? docId, siteId: cleanSiteId);
+        }
+        if (cleanSiteName.isEmpty) {
+          cleanSiteName = cleanSiteId;
+        }
+
+        // Canonical deduplication key (using siteId)
+        final canonicalKey = cleanSiteId.isNotEmpty ? cleanSiteId.toLowerCase() : cleanSiteName.toLowerCase();
+        if (canonicalKey.isEmpty) return;
+
+        final proj = projectMap[cleanSiteId] ??
+            projectMap[cleanSiteName] ??
+            projectMap[docId] ??
+            projectMap[canonicalKey];
+        final mapping = mappingMap[cleanSiteId] ??
+            mappingMap[cleanSiteName] ??
+            mappingMap[docId] ??
+            mappingMap[canonicalKey];
 
         final projectNameVal = (mapping?['projectName'] ??
                 mapping?['project'] ??
                 proj?['projectName'] ??
-                sData['projectName'] ??
-                sData['project'] ??
-                '')
-            .toString();
+                data['projectName'] ??
+                data['project'] ??
+                cleanSiteName)
+            .toString()
+            .trim();
+
         final stageVal = (mapping?['projectStage'] ??
                 mapping?['stage'] ??
                 proj?['projectStage'] ??
                 proj?['stage'] ??
-                sData['projectStage'] ??
+                data['projectStage'] ??
+                data['stage'] ??
                 '')
-            .toString();
+            .toString()
+            .trim();
+
         final locVal = (mapping?['location'] ??
                 mapping?['address'] ??
-                sData['location'] ??
+                data['location'] ??
+                data['address'] ??
                 proj?['location'] ??
+                proj?['address'] ??
                 '')
-            .toString();
-        final sDate = _parseDate(
-            mapping?['startDate'] ?? proj?['startDate'] ?? sData['startDate']);
-        final eDate = _parseDate(
-            mapping?['endDate'] ?? proj?['endDate'] ?? sData['endDate']);
-        final jDate = _parseDate(mapping?['Joined On'] ??
-            mapping?['joinedDate'] ??
-            mapping?['joined_date']);
+            .toString()
+            .trim();
+
+        final sDate = _parseDate(mapping?['startDate'] ?? proj?['startDate'] ?? data['startDate']);
+        final eDate = _parseDate(mapping?['endDate'] ?? proj?['endDate'] ?? data['endDate']);
+        final jDate = _parseDate(mapping?['Joined On'] ?? mapping?['joinedDate'] ?? data['Joined On'] ?? data['joinedDate']);
+
         final supId = (mapping?['Supervisor ID'] ??
                 mapping?['supervisorId'] ??
                 mapping?['SupervisorId'] ??
+                data['Supervisor ID'] ??
+                data['supervisorId'] ??
+                data['SupervisorId'] ??
                 '')
-            .toString();
+            .toString()
+            .trim();
+
         final supName = (mapping?['supervisor'] ??
                 mapping?['supervisorName'] ??
                 mapping?['FullName'] ??
+                data['supervisor'] ??
+                data['supervisorName'] ??
+                data['FullName'] ??
                 '')
-            .toString();
-        final comments =
-            (mapping?['siteComments'] ?? mapping?['comments'] ?? '').toString();
+            .toString()
+            .trim();
+
+        final comments = (mapping?['siteComments'] ??
+                mapping?['comments'] ??
+                data['siteComments'] ??
+                data['comments'] ??
+                '')
+            .toString()
+            .trim();
 
         final label = SiteDisplayHelper.formatSiteDisplay(
-          siteId: rawSiteId,
-          siteName: rawSiteName,
+          siteId: cleanSiteId,
+          siteName: cleanSiteName,
         );
 
-        final uniqueKey = rawSiteId.isNotEmpty
-            ? rawSiteId
-            : (rawSiteName.isNotEmpty ? rawSiteName : docId);
-        if (seenKeys.add(uniqueKey)) {
-          consolidated.add({
-            'key': uniqueKey,
+        if (consolidatedMap.containsKey(canonicalKey)) {
+          final existing = consolidatedMap[canonicalKey]!;
+          if ((existing['projectName'] as String).isEmpty && projectNameVal.isNotEmpty) {
+            existing['projectName'] = projectNameVal;
+          }
+          if ((existing['projectStage'] as String).isEmpty && stageVal.isNotEmpty) {
+            existing['projectStage'] = stageVal;
+          }
+          if ((existing['location'] as String).isEmpty && locVal.isNotEmpty) {
+            existing['location'] = locVal;
+          }
+          if (existing['startDate'] == null && sDate != null) {
+            existing['startDate'] = sDate;
+          }
+          if (existing['endDate'] == null && eDate != null) {
+            existing['endDate'] = eDate;
+          }
+          if (existing['joinedDate'] == null && jDate != null) {
+            existing['joinedDate'] = jDate;
+          }
+          if ((existing['siteComments'] as String).isEmpty && comments.isNotEmpty) {
+            existing['siteComments'] = comments;
+          }
+          if ((existing['supervisorId'] as String).isEmpty && supId.isNotEmpty) {
+            existing['supervisorId'] = supId;
+          }
+          if ((existing['supervisorName'] as String).isEmpty && supName.isNotEmpty) {
+            existing['supervisorName'] = supName;
+          }
+        } else {
+          consolidatedMap[canonicalKey] = {
+            'key': cleanSiteId.isNotEmpty ? cleanSiteId : canonicalKey,
             'docId': docId,
-            'siteId': rawSiteId,
-            'siteName': rawSiteName,
-            'displayLabel': label,
+            'siteId': cleanSiteId,
+            'siteName': cleanSiteName,
+            'displayLabel': label.isNotEmpty ? label : (cleanSiteName.isNotEmpty ? '${cleanSiteId}_$cleanSiteName' : cleanSiteId),
             'projectName': projectNameVal,
             'projectStage': stageVal,
             'location': locVal,
@@ -248,121 +334,26 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
             'supervisorName': supName,
             'siteComments': comments,
             'rawMapping': mapping,
-          });
+          };
         }
       }
 
-      // Also include sites from projects collection
+      // Ingest from Site collection
+      for (var entry in siteDocs.entries) {
+        ingestSiteRecord(docId: entry.key, data: entry.value);
+      }
+
+      // Ingest from projects collection
       for (var entry in projectMap.entries) {
-        final pData = entry.value;
-        final docId = entry.key;
-        final rawSiteId = (pData['siteId'] ?? pData['id'] ?? docId).toString().trim();
-        final rawSiteName = (pData['siteName'] ?? pData['projectName'] ?? rawSiteId).toString().trim();
-
-        final mapping = mappingMap[rawSiteId] ?? mappingMap[rawSiteName] ?? mappingMap[docId];
-        final projectNameVal = (mapping?['projectName'] ?? pData['projectName'] ?? rawSiteName).toString();
-        final stageVal = (mapping?['projectStage'] ?? mapping?['stage'] ?? pData['projectStage'] ?? pData['stage'] ?? '').toString();
-        final locVal = (mapping?['location'] ?? mapping?['address'] ?? pData['location'] ?? pData['address'] ?? '').toString();
-        final sDate = _parseDate(mapping?['startDate'] ?? pData['startDate'] ?? pData['actualStartDate']);
-        final eDate = _parseDate(mapping?['endDate'] ?? pData['endDate'] ?? pData['actualEndDate']);
-        final jDate = _parseDate(mapping?['Joined On'] ?? mapping?['joinedDate']);
-        final supId = (mapping?['Supervisor ID'] ?? mapping?['supervisorId'] ?? pData['supervisorId'] ?? '').toString();
-        final supName = (mapping?['supervisor'] ?? mapping?['supervisorName'] ?? pData['assignedSupervisor'] ?? pData['supervisor'] ?? '').toString();
-        final comments = (mapping?['siteComments'] ?? mapping?['comments'] ?? '').toString();
-
-        final label = SiteDisplayHelper.formatSiteDisplay(
-          siteId: rawSiteId,
-          siteName: rawSiteName,
-        );
-
-        final uniqueKey = rawSiteId.isNotEmpty
-            ? rawSiteId
-            : (rawSiteName.isNotEmpty ? rawSiteName : docId);
-        if (seenKeys.add(uniqueKey)) {
-          consolidated.add({
-            'key': uniqueKey,
-            'docId': docId,
-            'siteId': rawSiteId,
-            'siteName': rawSiteName,
-            'displayLabel': label,
-            'projectName': projectNameVal,
-            'projectStage': stageVal,
-            'location': locVal,
-            'startDate': sDate,
-            'endDate': eDate,
-            'joinedDate': jDate,
-            'supervisorId': supId,
-            'supervisorName': supName,
-            'siteComments': comments,
-            'rawMapping': mapping,
-          });
-        }
+        ingestSiteRecord(docId: entry.key, data: entry.value);
       }
 
-      // Also include any mappings that might exist in siteSupervisorMap but not in Site collection
-      for (var entry in mappingMap.entries) {
-        final mData = entry.value;
-        final docId = entry.key;
-        final sId = (mData['siteId'] ?? mData['site'] ?? docId).toString().trim();
-        final sName =
-            (mData['siteName'] ?? mData['site'] ?? sId).toString().trim();
-        final uniqueKey = sId.isNotEmpty ? sId : sName;
-
-        if (uniqueKey.isNotEmpty && seenKeys.add(uniqueKey)) {
-          final proj = projectMap[sId] ?? projectMap[sName];
-          final projectNameVal = (mData['projectName'] ??
-                  mData['project'] ??
-                  proj?['projectName'] ??
-                  '')
-              .toString();
-          final stageVal = (mData['projectStage'] ??
-                  mData['stage'] ??
-                  proj?['projectStage'] ??
-                  '')
-              .toString();
-          final locVal =
-              (mData['location'] ?? mData['address'] ?? '').toString();
-          final sDate = _parseDate(mData['startDate'] ?? proj?['startDate']);
-          final eDate = _parseDate(mData['endDate'] ?? proj?['endDate']);
-          final jDate = _parseDate(mData['Joined On'] ?? mData['joinedDate']);
-          final supId = (mData['Supervisor ID'] ??
-                  mData['supervisorId'] ??
-                  mData['SupervisorId'] ??
-                  '')
-              .toString();
-          final supName = (mData['supervisor'] ??
-                  mData['supervisorName'] ??
-                  mData['FullName'] ??
-                  '')
-              .toString();
-          final comments =
-              (mData['siteComments'] ?? mData['comments'] ?? '').toString();
-
-          final label = SiteDisplayHelper.formatSiteDisplay(
-            siteId: sId,
-            siteName: sName,
-          );
-
-          consolidated.add({
-            'key': uniqueKey,
-            'docId': docId,
-            'siteId': sId,
-            'siteName': sName,
-            'displayLabel': label,
-            'projectName': projectNameVal,
-            'projectStage': stageVal,
-            'location': locVal,
-            'startDate': sDate,
-            'endDate': eDate,
-            'joinedDate': jDate,
-            'supervisorId': supId,
-            'supervisorName': supName,
-            'siteComments': comments,
-            'rawMapping': mData,
-          });
-        }
+      // Ingest from siteSupervisorMap collection
+      for (var entry in tempCache.entries) {
+        ingestSiteRecord(docId: entry.key, data: entry.value);
       }
 
+      final consolidated = consolidatedMap.values.toList();
       consolidated.sort((a, b) =>
           (a['displayLabel'] as String).toLowerCase().compareTo(
                 (b['displayLabel'] as String).toLowerCase(),
@@ -566,35 +557,58 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       final sId = (selectedSiteId != null && selectedSiteId!.trim().isNotEmpty)
           ? selectedSiteId!.trim()
           : (selectedSite ?? 'SITE').trim();
+      final sName = (selectedSite != null && selectedSite!.trim().isNotEmpty)
+          ? selectedSite!.trim()
+          : sId;
       final supName = (selectedSupervisor != null && selectedSupervisor!.trim().isNotEmpty)
           ? selectedSupervisor!.trim()
           : (selectedSupervisorId ?? 'SUPERVISOR').trim();
 
-      final cleanSite = sId.replaceAll(' ', '');
-      final cleanSup = supName.replaceAll(' ', '');
-      final docId = '${cleanSite}_$cleanSup';
+      // Construct document ID as unique combination of Site ID, Site Name, and Supervisor Name
+      // e.g. ST001_Testing_Suban
+      final docId = '${sId}_${sName}_$supName';
 
       final canonicalSiteDocId = ExpenseService.formatCanonicalSiteDocId(
         selectedSiteId ?? '',
         selectedSite ?? '',
       );
 
+      final managerName = (AuthService().userData['FullName'] ??
+              AuthService().userData['fullName'] ??
+              AuthService().userData['Name'] ??
+              AuthService().userData['name'] ??
+              AuthService().userData['managerName'] ??
+              AuthService().userData['username'] ??
+              AuthService().userData['userName'] ??
+              'Manager Admin')
+          .toString()
+          .trim();
+      final effectiveManagerName =
+          managerName.isNotEmpty ? managerName : 'Manager Admin';
+
       final mappingData = {
+        'siteId': sId,
+        'siteName': sName,
+        'supervisorName': supName,
+        'managerName': effectiveManagerName,
         'site': canonicalSiteDocId.isNotEmpty
             ? canonicalSiteDocId
             : (selectedSiteId ?? selectedSite),
-        'siteDocId': canonicalSiteDocId,
-        'siteName': selectedSite ?? selectedSiteId,
-        'siteId': selectedSiteId ?? selectedSite ?? '',
+        'siteDocId': canonicalSiteDocId.isNotEmpty ? canonicalSiteDocId : sId,
         'projectName': projectName ?? projectNameController.text.trim(),
         'project': projectName ?? projectNameController.text.trim(),
         'location': locationController.text.trim(),
         'Supervisor ID': selectedSupervisorId ?? '',
         'supervisorId': selectedSupervisorId ?? '',
         'SupervisorId': selectedSupervisorId ?? '',
-        'supervisor': selectedSupervisor ?? '',
-        'supervisorName': selectedSupervisor ?? '',
-        'FullName': selectedSupervisor ?? '',
+        'supervisor': supName,
+        'FullName': supName,
+        'manager': effectiveManagerName,
+        'assignedByManager': effectiveManagerName,
+        'managerId': FirebaseAuth.instance.currentUser?.uid ??
+            AuthService().userData['id']?.toString() ??
+            AuthService().userData['userId']?.toString() ??
+            '',
         'projectStage':
             selectedProjectStage ?? projectStageController.text.trim(),
         'stage': selectedProjectStage ?? projectStageController.text.trim(),
@@ -614,26 +628,21 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // Store once in siteSupervisorMap with document ID siteid_with supervisor name
+      // Store in siteSupervisorMap with document ID siteId_siteName_supervisorName
       await FirestoreService.getCollection('siteSupervisorMap')
           .doc(docId)
           .set(mappingData, SetOptions(merge: true));
 
       // Trigger immediate real-time push notification to the mapped supervisor
       try {
-        final managerName = AuthService().userData['Name'] ??
-            AuthService().userData['username'] ??
-            AuthService().userData['userName'] ??
-            'Manager';
-
         await NotificationService.notifySiteAssignment(
-          supervisorName: selectedSupervisor ?? supName,
+          supervisorName: supName,
           supervisorId: selectedSupervisorId,
-          siteId: selectedSiteId ?? selectedSite ?? sId,
-          siteName: selectedSite ?? selectedSiteId ?? sId,
+          siteId: sId,
+          siteName: sName,
           projectName: projectName ?? projectNameController.text.trim(),
           location: locationController.text.trim(),
-          managerName: managerName.toString(),
+          managerName: effectiveManagerName,
         );
       } catch (notifErr) {
         debugPrint('Error triggering site assignment notification: $notifErr');
@@ -1192,6 +1201,44 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
               );
               selectedSupervisor = match['fullName'] ?? '';
               supervisorNameController.text = selectedSupervisor ?? '';
+
+              // If a mapping for this (site, supervisor) already exists in cache, load its specific details
+              final sId = (selectedSiteId != null && selectedSiteId!.trim().isNotEmpty)
+                  ? selectedSiteId!.trim()
+                  : (selectedSite ?? '').trim();
+              final sName = (selectedSite != null && selectedSite!.trim().isNotEmpty)
+                  ? selectedSite!.trim()
+                  : sId;
+              final supName = (selectedSupervisor ?? '').trim();
+              final directDocId = '${sId}_${sName}_$supName';
+
+              Map<String, dynamic>? existing = _docCache[directDocId];
+              if (existing == null && sId.isNotEmpty && supName.isNotEmpty) {
+                for (var entry in _docCache.entries) {
+                  final d = entry.value;
+                  final dSite = (d['siteId'] ?? d['site'] ?? '').toString().trim().toLowerCase();
+                  final dSup = (d['supervisorName'] ?? d['supervisor'] ?? d['FullName'] ?? '').toString().trim().toLowerCase();
+                  final dSupId = (d['Supervisor ID'] ?? d['supervisorId'] ?? '').toString().trim().toLowerCase();
+                  if ((dSite == sId.toLowerCase() || entry.key.toLowerCase().startsWith('${sId.toLowerCase()}_')) &&
+                      (dSup == supName.toLowerCase() || (value != null && dSupId == value.toLowerCase()))) {
+                    existing = d;
+                    break;
+                  }
+                }
+              }
+
+              if (existing != null) {
+                if ((existing['location'] ?? '').toString().isNotEmpty) {
+                  locationController.text = existing['location'].toString();
+                }
+                if ((existing['siteComments'] ?? existing['comments'] ?? '').toString().isNotEmpty) {
+                  commentsController.text = (existing['siteComments'] ?? existing['comments']).toString();
+                }
+                final jDate = _parseDate(existing['Joined On'] ?? existing['joinedDate']);
+                if (jDate != null) {
+                  joinedDate = jDate;
+                }
+              }
             });
           },
         ),
@@ -1747,6 +1794,34 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                               ),
                             ],
                           ),
+                          if ((data['managerName'] ?? data['manager'] ?? data['assignedByManager'] ?? '').toString().isNotEmpty &&
+                              (data['managerName'] ?? data['manager'] ?? data['assignedByManager'] ?? '').toString().toLowerCase() != 'manager') ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(Icons.manage_accounts_rounded,
+                                    size: 16, color: Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Manager: ',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    (data['managerName'] ?? data['manager'] ?? data['assignedByManager'] ?? '').toString(),
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF0A183D),
+                                        fontWeight: FontWeight.w600),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           if (loc.isNotEmpty) ...[
                             const SizedBox(height: 6),
                             Row(

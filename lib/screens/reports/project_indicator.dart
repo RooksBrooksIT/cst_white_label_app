@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import '/services/firestore_service.dart';
+import 'package:ebricks/services/expense_service.dart';
 import '/widgets/glass_card.dart';
 import '/widgets/glass_button.dart';
 import '/utils/responsive.dart';
@@ -48,7 +48,7 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
 
   Future<void> _fetchProjectData() async {
     try {
-      if (widget.siteId == null) {
+      if (widget.siteId == null || widget.siteId!.trim().isEmpty) {
         setState(() {
           errorMsg = 'Site ID is required.';
           isLoading = false;
@@ -56,15 +56,23 @@ class _ProjectIndicatorPageState extends State<ProjectIndicatorPage> with Single
         return;
       }
 
-      final col = FirestoreService.getCollection('projects');
-      var query = await col.where('siteId', isEqualTo: widget.siteId).limit(1).get();
-      if (query.docs.isEmpty) {
-        query = await col.where('site', isEqualTo: widget.siteId).limit(1).get();
+      final projectDoc = await ExpenseService.findLinkedProjectDoc(widget.siteId!);
+      final siteDoc = await ExpenseService.findLinkedSiteDoc(widget.siteId!);
+
+      Map<String, dynamic> data = {};
+      if (projectDoc != null && projectDoc.exists) {
+        data.addAll(projectDoc.data() as Map<String, dynamic>);
+      }
+      if (siteDoc != null && siteDoc.exists) {
+        final siteData = siteDoc.data() as Map<String, dynamic>;
+        for (var entry in siteData.entries) {
+          data.putIfAbsent(entry.key, () => entry.value);
+        }
       }
 
-      if (query.docs.isNotEmpty) {
+      if (data.isNotEmpty) {
         setState(() {
-          projectData = query.docs.first.data();
+          projectData = data;
           isLoading = false;
         });
         _animationController.forward();

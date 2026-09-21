@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
 
 /// Represents site-specific inventory for a material
 class SiteInventoryEntry {
@@ -1235,15 +1236,39 @@ class MaterialInventoryService {
 
       Query<Map<String, dynamic>> query = FirestoreService.materialTransactions;
 
-      if (siteId != null && siteId.trim().isNotEmpty) {
-        query = query.where('siteId', isEqualTo: siteId.trim());
+      final cleanSiteId = siteId?.trim();
+      final cleanMatName = materialName?.trim();
+
+      if (cleanSiteId != null && cleanSiteId.isNotEmpty) {
+        query = query.where('siteId', isEqualTo: cleanSiteId);
       }
-      if (materialName != null && materialName.trim().isNotEmpty) {
-        query = query.where('materialName', isEqualTo: materialName.trim());
+      if (cleanMatName != null && cleanMatName.isNotEmpty) {
+        query = query.where('materialName', isEqualTo: cleanMatName);
       }
 
       final snap = await query.get();
-      final list = snap.docs.map((d) => MaterialTransactionRecord.fromMap(d.id, d.data())).toList();
+      List<MaterialTransactionRecord> list =
+          snap.docs.map((d) => MaterialTransactionRecord.fromMap(d.id, d.data())).toList();
+
+      // Fallback for case-insensitive matching if exact query returned empty
+      if (list.isEmpty && cleanMatName != null && cleanMatName.isNotEmpty) {
+        final allSnap = await FirestoreService.materialTransactions.get();
+        final targetLow = cleanMatName.toLowerCase();
+        list = allSnap.docs
+            .where((d) {
+              final data = d.data();
+              final mName = (data['materialName'] ?? '').toString().trim().toLowerCase();
+              final sId = (data['siteId'] ?? '').toString().trim();
+              final matchesMat = mName == targetLow ||
+                  mName.replaceAll(' ', '_') == targetLow.replaceAll(' ', '_');
+              final matchesSite =
+                  cleanSiteId == null || cleanSiteId.isEmpty || sId == cleanSiteId;
+              return matchesMat && matchesSite;
+            })
+            .map((d) => MaterialTransactionRecord.fromMap(d.id, d.data()))
+            .toList();
+      }
+
       list.sort((a, b) => b.date.compareTo(a.date));
       return list;
     } catch (e) {
@@ -1480,6 +1505,17 @@ class MaterialInventoryService {
         ],
       );
 
+      // Notify assigned supervisor for this site
+      NotificationService.notifyMaterialAssignment(
+        siteId: siteId,
+        siteName: siteName ?? siteId,
+        materialName: displayName ?? materialName,
+        quantity: quantity,
+        managerName: managerName,
+        supervisorName: supervisorName,
+        projectName: projectName,
+      );
+
       // Sync company-level legacy mirrors
       _syncLegacyMirrors(
         materialName: materialName,
@@ -1629,6 +1665,16 @@ class MaterialInventoryService {
             'toSiteNewCount': toNewCount,
           }
         ],
+      );
+
+      // Notify assigned supervisor for the destination site
+      NotificationService.notifyMaterialAssignment(
+        siteId: toSiteId,
+        siteName: toSiteName ?? toSiteId,
+        materialName: displayName ?? materialName,
+        quantity: quantity,
+        managerName: toManagerName ?? fromManagerName,
+        supervisorName: toSupervisorName,
       );
 
       // Sync site mirrors for both sites
@@ -1901,27 +1947,17 @@ class MaterialInventoryService {
   /// Fetches single consolidated material inventory item by name.
   static Future<MaterialInventoryItem?> fetchMaterialInventory(String materialName) async {
     try {
-      final docId = getMaterialDocId(materialName);
-      final availDoc = await FirestoreService.getCollection('materialsAvailability').doc(docId).get();
+      final allItems = await fetchAllMaterialsInventory();
+      final targetKey = getMaterialDocId(materialName);
+      final targetLow = materialName.trim().toLowerCase();
 
-      if (availDoc.exists && availDoc.data() != null) {
-        return MaterialInventoryItem.fromMap(docId, availDoc.data()!);
-      }
-
-      final transferDoc = await FirestoreService.getCollection('materialTransfer').doc(docId).get();
-      if (transferDoc.exists && transferDoc.data() != null) {
-        return MaterialInventoryItem.fromMap(docId, transferDoc.data()!);
-      }
-
-      // Fallback to searching materials catalog
-      final masterQuery = await FirestoreService.getCollection('materials')
-          .where('materialName', isEqualTo: materialName)
-          .limit(1)
-          .get();
-
-      if (masterQuery.docs.isNotEmpty) {
-        final doc = masterQuery.docs.first;
-        return MaterialInventoryItem.fromMap(doc.id, doc.data());
+      for (final item in allItems) {
+        if (item.docId == targetKey ||
+            item.materialName.trim().toLowerCase() == targetLow ||
+            item.displayName.trim().toLowerCase() == targetLow ||
+            getMaterialDocId(item.materialName) == targetKey) {
+          return item;
+        }
       }
 
       return null;
@@ -1942,29 +1978,149 @@ class MaterialInventoryService {
         FirestoreService.getCollection('materials').get(),
         FirestoreService.getCollection('materialsAvailability').get(),
         FirestoreService.getCollection('materialTransfer').get(),
+        FirestoreService.siteMaterialPool.get(),
+        FirestoreService.getCollection('Site').get(),
+        FirestoreService.projects.get(),
       ]);
 
       final masterDocs = results[0].docs;
       final availDocs = results[1].docs;
       final transferDocs = results[2].docs;
+      final poolDocs = results[3].docs;
+      final siteDocs = results[4].docs;
+      final projectDocs = results[5].docs;
+
+      // Build Site and Project ID -> Friendly Name map
+      final Map<String, String> siteNameMap = {};
+      final Map<String, String> siteProjMap = {};
+
+      for (final d in siteDocs) {
+        final data = d.data();
+        final sId = (data['siteId'] ?? d.id).toString().trim();
+        final sName = (data['siteName'] ?? data['projectName'] ?? sId).toString().trim();
+        final pName = (data['projectName'] ?? '').toString().trim();
+        if (sId.isNotEmpty) {
+          siteNameMap[sId.toLowerCase()] = sName;
+          if (pName.isNotEmpty) siteProjMap[sId.toLowerCase()] = pName;
+        }
+      }
+
+      for (final d in projectDocs) {
+        final data = d.data();
+        final sId = (data['siteId'] ?? d.id).toString().trim();
+        final pName = (data['projectName'] ?? '').toString().trim();
+        if (sId.isNotEmpty) {
+          if (!siteNameMap.containsKey(sId.toLowerCase()) || siteNameMap[sId.toLowerCase()] == sId) {
+            siteNameMap[sId.toLowerCase()] = pName.isNotEmpty ? pName : sId;
+          }
+          if (pName.isNotEmpty) siteProjMap[sId.toLowerCase()] = pName;
+        }
+      }
 
       final Map<String, MaterialInventoryItem> itemsMap = {};
+      final Map<String, Map<String, SiteInventoryEntry>> siteInventoriesByMaterial = {};
 
-      // 1. Ingest master materials definitions strictly from 'materials' collection
+      // Helper function to resolve or create material item
+      void recordOrUpdateMaterial({
+        required String docKey,
+        required String materialName,
+        String? materialId,
+        String? displayName,
+        String? category,
+        String? subCategory,
+        String? unit,
+        double? unitPrice,
+        String? description,
+        int? companyAvailableCount,
+        dynamic lastUpdated,
+      }) {
+        final existing = itemsMap[docKey];
+        if (existing == null) {
+          itemsMap[docKey] = MaterialInventoryItem(
+            docId: docKey,
+            materialId: materialId ?? docKey,
+            materialName: materialName,
+            displayName: displayName ?? materialName,
+            category: (category != null && category.isNotEmpty) ? category : 'General Material',
+            subCategory: subCategory ?? '',
+            unit: (unit != null && unit.isNotEmpty) ? unit : 'Units',
+            unitPrice: unitPrice ?? 0.0,
+            description: description ?? '',
+            companyAvailableCount: companyAvailableCount ?? 0,
+            siteInventories: [],
+            lastUpdated: lastUpdated,
+          );
+        } else {
+          final newCat = (category != null && category.isNotEmpty && category != 'General Material')
+              ? category
+              : existing.category;
+          final newSubCat = (subCategory != null && subCategory.isNotEmpty)
+              ? subCategory
+              : existing.subCategory;
+          final newUnit = (unit != null && unit.isNotEmpty && unit != 'Units')
+              ? unit
+              : existing.unit;
+          final newPrice = (unitPrice != null && unitPrice > 0)
+              ? unitPrice
+              : existing.unitPrice;
+          final newDesc = (description != null && description.isNotEmpty)
+              ? description
+              : existing.description;
+          final newMatId = (materialId != null && materialId.isNotEmpty && materialId != docKey)
+              ? materialId
+              : existing.materialId;
+          final newCompany = (companyAvailableCount != null && companyAvailableCount >= 0)
+              ? companyAvailableCount
+              : existing.companyAvailableCount;
+
+          itemsMap[docKey] = MaterialInventoryItem(
+            docId: docKey,
+            materialId: newMatId,
+            materialName: existing.materialName.isNotEmpty ? existing.materialName : materialName,
+            displayName: existing.displayName.isNotEmpty ? existing.displayName : (displayName ?? materialName),
+            category: newCat,
+            subCategory: newSubCat,
+            unit: newUnit,
+            unitPrice: newPrice,
+            description: newDesc,
+            companyAvailableCount: newCompany,
+            siteInventories: existing.siteInventories,
+            lastUpdated: lastUpdated ?? existing.lastUpdated,
+          );
+        }
+      }
+
+      // 1. Ingest master materials definitions from 'materials' collection
       for (final doc in masterDocs) {
         final data = doc.data();
         final rawName = (data['materialName'] ?? data['matName'] ?? data['name'] ?? '').toString().trim();
         if (rawName.isEmpty) continue;
         final docKey = getMaterialDocId(rawName);
 
-        itemsMap[docKey] = MaterialInventoryItem.fromMap(docKey, {
-          ...data,
-          'materialName': rawName,
-          'displayName': rawName,
-        });
+        final cat = (data['materialCategory'] ?? data['matCategory'] ?? data['category'] ?? 'General Material').toString().trim();
+        final subCat = (data['materialSubCategory'] ?? data['matSubCategory'] ?? data['subCategory'] ?? '').toString().trim();
+        final unit = (data['materialUnit'] ?? data['matUnit'] ?? data['unit'] ?? 'Units').toString().trim();
+        final price = MaterialInventoryItem._parseNum(data['unitPrice'] ?? data['materialPrice'] ?? data['price']);
+        final companyCount = MaterialInventoryItem._parseCount(data['companyAvailableCount'] ?? data['availableCount'] ?? data['count']);
+        final matId = (data['materialId'] ?? data['code'] ?? doc.id).toString().trim();
+        final desc = (data['description'] ?? '').toString().trim();
+
+        recordOrUpdateMaterial(
+          docKey: docKey,
+          materialName: rawName,
+          materialId: matId,
+          displayName: rawName,
+          category: cat,
+          subCategory: subCat,
+          unit: unit,
+          unitPrice: price,
+          description: desc,
+          companyAvailableCount: companyCount,
+          lastUpdated: data['updatedAt'] ?? data['lastUpdated'],
+        );
       }
 
-      // 2. Ingest and merge live canonical availability & transfers
+      // 2. Ingest canonical availability and transfer collections
       final liveDocs = [...availDocs, ...transferDocs];
       for (final doc in liveDocs) {
         final data = doc.data();
@@ -1972,33 +2128,133 @@ class MaterialInventoryService {
         if (name.isEmpty) continue;
         final docKey = getMaterialDocId(name);
 
-        // Only merge stock for materials existing in master 'materials' collection
-        if (itemsMap.containsKey(docKey)) {
-          final liveItem = MaterialInventoryItem.fromMap(docKey, data);
-          final existing = itemsMap[docKey]!;
-          // Merge metadata + live stock counts (live canonical stock takes precedence)
-          itemsMap[docKey] = MaterialInventoryItem(
-            docId: docKey,
-            materialId: existing.materialId.isNotEmpty ? existing.materialId : liveItem.materialId,
-            materialName: existing.materialName,
-            displayName: existing.materialName,
-            category: existing.category != 'General Material' ? existing.category : liveItem.category,
-            subCategory: existing.subCategory.isNotEmpty ? existing.subCategory : liveItem.subCategory,
-            unit: existing.unit != 'Units' ? existing.unit : liveItem.unit,
-            unitPrice: existing.unitPrice > 0 ? existing.unitPrice : liveItem.unitPrice,
-            description: existing.description.isNotEmpty ? existing.description : liveItem.description,
-            companyAvailableCount: liveItem.companyAvailableCount,
-            siteInventories: liveItem.siteInventories.isNotEmpty
-                ? liveItem.siteInventories
-                : existing.siteInventories,
-            lastUpdated: liveItem.lastUpdated ?? existing.lastUpdated,
+        final cat = (data['category'] ?? data['materialCategory'] ?? '').toString().trim();
+        final subCat = (data['subCategory'] ?? data['materialSubCategory'] ?? '').toString().trim();
+        final unit = (data['unit'] ?? data['materialUnit'] ?? '').toString().trim();
+        final price = MaterialInventoryItem._parseNum(data['unitPrice'] ?? data['materialPrice'] ?? data['price']);
+        final companyCount = data.containsKey('companyAvailableCount') || data.containsKey('count')
+            ? MaterialInventoryItem._parseCount(data['companyAvailableCount'] ?? data['count'])
+            : null;
+        final matId = (data['materialId'] ?? '').toString().trim();
+        final desc = (data['description'] ?? '').toString().trim();
+
+        recordOrUpdateMaterial(
+          docKey: docKey,
+          materialName: name,
+          materialId: matId.isNotEmpty ? matId : null,
+          displayName: name,
+          category: cat,
+          subCategory: subCat,
+          unit: unit,
+          unitPrice: price > 0 ? price : null,
+          description: desc,
+          companyAvailableCount: companyCount,
+          lastUpdated: data['lastUpdated'] ?? data['updatedAt'],
+        );
+
+        // Process siteInventories array in availability/transfer docs
+        final rawSites = data['siteInventories'];
+        if (rawSites is List) {
+          final sMap = siteInventoriesByMaterial.putIfAbsent(docKey, () => <String, SiteInventoryEntry>{});
+          for (final item in rawSites) {
+            if (item is Map) {
+              final siteEntry = SiteInventoryEntry.fromMap(Map<String, dynamic>.from(item));
+              if (siteEntry.siteId.isNotEmpty) {
+                final sKey = siteEntry.siteId.toLowerCase();
+                final resolvedSiteName = siteEntry.siteName.isNotEmpty
+                    ? siteEntry.siteName
+                    : (siteNameMap[sKey] ?? siteEntry.siteId);
+                final resolvedProj = siteEntry.projectName.isNotEmpty
+                    ? siteEntry.projectName
+                    : (siteProjMap[sKey] ?? '');
+
+                sMap[sKey] = SiteInventoryEntry(
+                  siteId: siteEntry.siteId,
+                  siteName: resolvedSiteName,
+                  projectName: resolvedProj,
+                  availableCount: siteEntry.availableCount,
+                  updatedAt: siteEntry.updatedAt,
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Ingest and merge siteMaterialPool (Allocations & Consumptions)
+      for (final doc in poolDocs) {
+        final data = doc.data();
+        final poolItem = SiteMaterialPoolItem.fromMap(doc.id, data);
+        final rawName = poolItem.materialName.trim();
+        if (rawName.isEmpty) continue;
+        final docKey = getMaterialDocId(rawName);
+
+        recordOrUpdateMaterial(
+          docKey: docKey,
+          materialName: rawName,
+          displayName: poolItem.displayName.isNotEmpty ? poolItem.displayName : rawName,
+          category: poolItem.category,
+          subCategory: poolItem.subCategory,
+          unit: poolItem.unit,
+          unitPrice: poolItem.effectiveUnitRate > 0 ? poolItem.effectiveUnitRate : null,
+          lastUpdated: poolItem.updatedAt,
+        );
+
+        final sId = poolItem.siteId.trim();
+        if (sId.isNotEmpty) {
+          final sKey = sId.toLowerCase();
+          final resolvedSiteName = poolItem.siteName.isNotEmpty
+              ? poolItem.siteName
+              : (siteNameMap[sKey] ?? sId);
+          final resolvedProj = poolItem.projectName.isNotEmpty
+              ? poolItem.projectName
+              : (siteProjMap[sKey] ?? '');
+
+          final remQty = poolItem.remainingQty.toInt();
+          final sMap = siteInventoriesByMaterial.putIfAbsent(docKey, () => <String, SiteInventoryEntry>{});
+          
+          // SiteMaterialPool is the single source of truth for site allocated minus consumed stock
+          sMap[sKey] = SiteInventoryEntry(
+            siteId: sId,
+            siteName: resolvedSiteName,
+            projectName: resolvedProj,
+            availableCount: remQty,
+            updatedAt: poolItem.updatedAt,
           );
         }
       }
 
-      final list = itemsMap.values.toList();
-      list.sort((a, b) => a.materialName.toLowerCase().compareTo(b.materialName.toLowerCase()));
-      return list;
+      // 4. Assemble final consolidated MaterialInventoryItem list with merged siteInventories
+      final List<MaterialInventoryItem> resultList = [];
+
+      for (final entry in itemsMap.entries) {
+        final docKey = entry.key;
+        final m = entry.value;
+        final sitesMap = siteInventoriesByMaterial[docKey] ?? {};
+        final List<SiteInventoryEntry> mergedSites = sitesMap.values
+            .where((s) => s.availableCount > 0)
+            .toList();
+
+        mergedSites.sort((a, b) => a.siteName.toLowerCase().compareTo(b.siteName.toLowerCase()));
+
+        resultList.add(MaterialInventoryItem(
+          docId: m.docId,
+          materialId: m.materialId,
+          materialName: m.materialName,
+          displayName: m.displayName,
+          category: m.category,
+          subCategory: m.subCategory,
+          unit: m.unit,
+          unitPrice: m.unitPrice,
+          description: m.description,
+          companyAvailableCount: m.companyAvailableCount,
+          siteInventories: mergedSites,
+          lastUpdated: m.lastUpdated,
+        ));
+      }
+
+      resultList.sort((a, b) => a.materialName.toLowerCase().compareTo(b.materialName.toLowerCase()));
+      return resultList;
     } catch (e) {
       debugPrint('MaterialInventoryService.fetchAllMaterialsInventory error: $e');
       return [];

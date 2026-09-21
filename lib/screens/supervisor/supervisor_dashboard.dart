@@ -36,6 +36,30 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   Color get primaryColor => Theme.of(context).primaryColor;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncBranding();
+    });
+  }
+
+  Future<void> _syncBranding() async {
+    try {
+      final auth = AuthService();
+      final orgId = (auth.userData['orgId'] ??
+              auth.userData['dynamicPath'] ??
+              FirestoreService.currentOrgId)
+          ?.toString()
+          .trim();
+      if (orgId != null && orgId.isNotEmpty && orgId != 'uninitialized') {
+        await AppTheme.syncWithFirestore(orgId);
+      }
+    } catch (e) {
+      debugPrint('SupervisorDashboard: Error syncing branding: $e');
+    }
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
@@ -140,14 +164,43 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
           iconTheme: const IconThemeData(color: Colors.white),
-          title: const Text(
-            'Supervisor Portal',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              letterSpacing: -0.3,
-            ),
+          title: ValueListenableBuilder<String>(
+            valueListenable: AppTheme.appName,
+            builder: (context, appName, _) {
+              return ValueListenableBuilder<String>(
+                valueListenable: AppTheme.orgName,
+                builder: (context, orgName, _) {
+                  final displayName = (appName.isNotEmpty && appName != 'eBricks')
+                      ? appName
+                      : (orgName.isNotEmpty
+                          ? orgName
+                          : (appName.isNotEmpty ? appName : 'eBricks'));
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        displayName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        'Supervisor Portal',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
           ),
           centerTitle: true,
           elevation: 0,
@@ -267,6 +320,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                     ),
                   ),
 
+                  // 4. White-Label Branding Footer
+                  SliverToBoxAdapter(
+                    child: _buildBrandingFooter(context, primaryColor, darkAccent),
+                  ),
+
                   const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],
               ),
@@ -300,6 +358,103 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             size: 28,
           ),
         ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // BRANDING FOOTER
+  // ---------------------------------------------------------------------------
+
+  Widget _buildBrandingFooter(
+    BuildContext context,
+    Color primaryColor,
+    Color darkAccent,
+  ) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 12),
+      child: ValueListenableBuilder<String>(
+        valueListenable: AppTheme.orgName,
+        builder: (context, orgName, _) {
+          return ValueListenableBuilder<String>(
+            valueListenable: AppTheme.appName,
+            builder: (context, appName, _) {
+              final displayOrg = orgName.isNotEmpty ? orgName : 'Organization';
+              final displayApp = appName.isNotEmpty ? appName : 'eBricks';
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.business_rounded,
+                        color: primaryColor,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        displayOrg,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E293B),
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF94A3B8),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Powered by $displayApp',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -358,11 +513,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Site Operations Supervisor',
+                    'Site Operations',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -450,91 +605,248 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           stream: FirestoreService.getCollection('siteSupervisorMap').snapshots(),
           builder: (context, mapSnap) {
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirestoreService.getCollection('supervisor_requests').snapshots(),
-              builder: (context, reqSnap) {
-                final Set<String> assignedSiteNames = {};
-                final List<Map<String, dynamic>> assignedSiteDocs = [];
+              stream: FirestoreService.getCollection('siteMaterialsRequest').snapshots(),
+              builder: (context, matReqSnap) {
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirestoreService.getCollection('siteToolsRequest').snapshots(),
+                  builder: (context, toolReqSnap) {
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirestoreService.getCollection('siteSupervisorProjectStageSchedule').snapshots(),
+                      builder: (context, stageReqSnap) {
+                        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: FirestoreService.getCollection('pettyCashRequests').snapshots(),
+                          builder: (context, pettyReqSnap) {
+                            // Helper to check if a record matches the supervisor
+                            bool isSupervisorMatch(Map<String, dynamic> data, [String? docId]) {
+                              final cleanPassedId = widget.supervisorId.trim().toLowerCase();
+                              final cleanPassedName = widget.supervisorName.trim().toLowerCase();
 
-                if (mapSnap.hasData) {
-                  for (var doc in mapSnap.data!.docs) {
-                    final data = doc.data();
-                    final supName = data['supervisor']?.toString() ?? '';
-                    final supId = data['supervisorId']?.toString() ?? '';
-                    if (supName == widget.supervisorName || supId == widget.supervisorId) {
-                      final site = data['site']?.toString() ?? '';
-                      if (site.isNotEmpty) assignedSiteNames.add(site);
-                    }
-                  }
-                }
+                              final sId1 = (data['Supervisor ID'] ?? '').toString().trim().toLowerCase();
+                              final sId2 = (data['supervisorId'] ?? '').toString().trim().toLowerCase();
+                              final sId3 = (data['SupervisorId'] ?? '').toString().trim().toLowerCase();
+                              final sId4 = (data['supervisor_id'] ?? '').toString().trim().toLowerCase();
+                              final sId5 = (data['submittedById'] ?? data['userId'] ?? '').toString().trim().toLowerCase();
 
-                if (sitesSnap.hasData) {
-                  for (var doc in sitesSnap.data!.docs) {
-                    final data = doc.data();
-                    final docId = doc.id;
-                    final siteName = data['siteName']?.toString() ?? docId;
-                    final supName = data['assignedSupervisor']?.toString() ?? data['supervisor']?.toString() ?? '';
-                    final supId = data['supervisorId']?.toString() ?? '';
+                              final sName1 = (data['supervisor'] ?? '').toString().trim().toLowerCase();
+                              final sName2 = (data['supervisorName'] ?? '').toString().trim().toLowerCase();
+                              final sName3 = (data['assignedSupervisor'] ?? '').toString().trim().toLowerCase();
+                              final sName4 = (data['FullName'] ?? data['fullName'] ?? '').toString().trim().toLowerCase();
+                              final sName5 = (data['userName'] ?? data['username'] ?? '').toString().trim().toLowerCase();
+                              final sName6 = (data['submittedByName'] ?? '').toString().trim().toLowerCase();
 
-                    if (supName == widget.supervisorName ||
-                        supId == widget.supervisorId ||
-                        assignedSiteNames.contains(docId) ||
-                        assignedSiteNames.contains(siteName)) {
-                      assignedSiteDocs.add(data);
-                      assignedSiteNames.add(siteName);
-                    }
-                  }
-                }
+                              final cleanDocId = (docId ?? '').trim().toLowerCase();
 
-                int totalAssignedSites = assignedSiteDocs.length;
-                int inProgressCount = 0;
-                int notStartedCount = 0;
-                int onHoldCount = 0;
-                int completedCount = 0;
+                              if (cleanPassedId.isNotEmpty) {
+                                if (sId1 == cleanPassedId ||
+                                    sId2 == cleanPassedId ||
+                                    sId3 == cleanPassedId ||
+                                    sId4 == cleanPassedId ||
+                                    sId5 == cleanPassedId) {
+                                  return true;
+                                }
+                                if (cleanDocId.isNotEmpty && cleanDocId.contains(cleanPassedId)) {
+                                  return true;
+                                }
+                              }
+                              if (cleanPassedName.isNotEmpty) {
+                                if (sName1 == cleanPassedName ||
+                                    sName2 == cleanPassedName ||
+                                    sName3 == cleanPassedName ||
+                                    sName4 == cleanPassedName ||
+                                    sName5 == cleanPassedName ||
+                                    sName6 == cleanPassedName) {
+                                  return true;
+                                }
+                                if (cleanDocId.isNotEmpty && cleanDocId.contains(cleanPassedName)) {
+                                  return true;
+                                }
+                              }
+                              return false;
+                            }
 
-                for (var doc in assignedSiteDocs) {
-                  final rawStatus = (doc['currentStatus'] ?? doc['status'] ?? 'In Progress')
-                      .toString()
-                      .trim()
-                      .toLowerCase();
+                            // 1. Ingest assigned sites from siteSupervisorMap
+                            final Map<String, Map<String, dynamic>> assignedSitesMap = {};
 
-                  if (rawStatus.contains('progress') ||
-                      rawStatus.contains('active') ||
-                      rawStatus.contains('ongoing') ||
-                      rawStatus.contains('execution')) {
-                    inProgressCount++;
-                  } else if (rawStatus.contains('complete') ||
-                      rawStatus.contains('finish') ||
-                      rawStatus.contains('done') ||
-                      rawStatus.contains('closed')) {
-                    completedCount++;
-                  } else if (rawStatus.contains('plan') ||
-                      rawStatus.contains('start') ||
-                      rawStatus.contains('draft') ||
-                      rawStatus.contains('upcoming')) {
-                    notStartedCount++;
-                  } else if (rawStatus.contains('hold') ||
-                      rawStatus.contains('pause') ||
-                      rawStatus.contains('delay') ||
-                      rawStatus.contains('suspend')) {
-                    onHoldCount++;
-                  } else {
-                    inProgressCount++;
-                  }
-                }
+                            if (mapSnap.hasData) {
+                              for (var doc in mapSnap.data!.docs) {
+                                final data = doc.data();
+                                if (isSupervisorMatch(data, doc.id)) {
+                                  final siteKey = (data['siteDocId'] ??
+                                          data['siteId'] ??
+                                          data['site'] ??
+                                          data['siteName'] ??
+                                          doc.id)
+                                      .toString()
+                                      .trim();
+                                  if (siteKey.isNotEmpty) {
+                                    assignedSitesMap[siteKey] = Map<String, dynamic>.from(data);
+                                  }
+                                }
+                              }
+                            }
 
-                int pendingRequestsCount = 0;
-                if (reqSnap.hasData) {
-                  for (var doc in reqSnap.data!.docs) {
-                    final data = doc.data();
-                    final supName = data['supervisorName']?.toString() ?? '';
-                    final supId = data['supervisorId']?.toString() ?? '';
-                    final status = data['status']?.toString() ?? 'Pending';
-                    if ((supName == widget.supervisorName || supId == widget.supervisorId) &&
-                        status == 'Pending') {
-                      pendingRequestsCount++;
-                    }
-                  }
-                }
+                            // 2. Ingest / merge assigned sites from Site collection
+                            if (sitesSnap.hasData) {
+                              for (var doc in sitesSnap.data!.docs) {
+                                final data = doc.data();
+                                final docId = doc.id.trim();
+                                final siteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
+                                final siteId = (data['siteCode'] ?? data['siteId'] ?? docId).toString().trim();
+
+                                final bool isDirectMatch = isSupervisorMatch(data, docId);
+                                final bool isMappedMatch = assignedSitesMap.containsKey(docId) ||
+                                    assignedSitesMap.containsKey(siteName) ||
+                                    assignedSitesMap.containsKey(siteId) ||
+                                    assignedSitesMap.keys.any((k) =>
+                                        k.toLowerCase() == docId.toLowerCase() ||
+                                        (siteName.isNotEmpty && k.toLowerCase() == siteName.toLowerCase()) ||
+                                        (siteId.isNotEmpty && k.toLowerCase() == siteId.toLowerCase()));
+
+                                if (isDirectMatch || isMappedMatch) {
+                                  String targetKey = docId;
+                                  for (final k in assignedSitesMap.keys) {
+                                    if (k.toLowerCase() == docId.toLowerCase() ||
+                                        (siteName.isNotEmpty && k.toLowerCase() == siteName.toLowerCase()) ||
+                                        (siteId.isNotEmpty && k.toLowerCase() == siteId.toLowerCase())) {
+                                      targetKey = k;
+                                      break;
+                                    }
+                                  }
+                                  assignedSitesMap[targetKey] = {
+                                    ...?assignedSitesMap[targetKey],
+                                    ...data,
+                                  };
+                                }
+                              }
+                            }
+
+                            final int totalAssignedSites = assignedSitesMap.length;
+                            int inProgressCount = 0;
+                            int notStartedCount = 0;
+                            int onHoldCount = 0;
+                            int completedCount = 0;
+
+                            for (var doc in assignedSitesMap.values) {
+                              final rawStatus = (doc['currentStatus'] ??
+                                      doc['status'] ??
+                                      doc['projectStage'] ??
+                                      doc['stage'] ??
+                                      'In Progress')
+                                  .toString()
+                                  .trim()
+                                  .toLowerCase();
+
+                              if (rawStatus.contains('complete') ||
+                                  rawStatus.contains('finish') ||
+                                  rawStatus.contains('done') ||
+                                  rawStatus.contains('closed')) {
+                                completedCount++;
+                              } else if (rawStatus.contains('plan') ||
+                                  rawStatus.contains('start') ||
+                                  rawStatus.contains('draft') ||
+                                  rawStatus.contains('upcoming')) {
+                                notStartedCount++;
+                              } else if (rawStatus.contains('hold') ||
+                                  rawStatus.contains('pause') ||
+                                  rawStatus.contains('delay') ||
+                                  rawStatus.contains('suspend')) {
+                                onHoldCount++;
+                              } else {
+                                inProgressCount++;
+                              }
+                            }
+
+                            // 3. Aggregate Pending Requests across all supervisor request pipelines
+                            bool isPendingStatus(String? status, String? stage, String? approvalStage) {
+                              final s = (status ?? '').trim().toLowerCase();
+                              final st = (stage ?? '').trim().toLowerCase();
+                              final ast = (approvalStage ?? '').trim().toLowerCase();
+
+                              final combined = '$s $st $ast';
+                              if (combined.contains('approved') ||
+                                  combined.contains('rejected') ||
+                                  combined.contains('declined') ||
+                                  combined.contains('cancelled') ||
+                                  combined.contains('completed') ||
+                                  combined.contains('closed')) {
+                                return false;
+                              }
+
+                              return combined.contains('pending') ||
+                                  combined.contains('review') ||
+                                  combined.contains('approval') ||
+                                  combined.contains('clearance') ||
+                                  combined.contains('requested') ||
+                                  combined.contains('submitted') ||
+                                  combined.contains('processing') ||
+                                  s.isEmpty;
+                            }
+
+                            int pendingRequestsCount = 0;
+
+                            // Materials requests
+                            if (matReqSnap.hasData) {
+                              for (var doc in matReqSnap.data!.docs) {
+                                final data = doc.data();
+                                if (isSupervisorMatch(data, doc.id)) {
+                                  if (isPendingStatus(
+                                    data['status']?.toString(),
+                                    data['stage']?.toString(),
+                                    data['approvalStage']?.toString(),
+                                  )) {
+                                    pendingRequestsCount++;
+                                  }
+                                }
+                              }
+                            }
+
+                            // Tools requests
+                            if (toolReqSnap.hasData) {
+                              for (var doc in toolReqSnap.data!.docs) {
+                                final data = doc.data();
+                                if (isSupervisorMatch(data, doc.id)) {
+                                  if (isPendingStatus(
+                                    data['status']?.toString(),
+                                    data['stage']?.toString(),
+                                    data['approvalStage']?.toString(),
+                                  )) {
+                                    pendingRequestsCount++;
+                                  }
+                                }
+                              }
+                            }
+
+                            // Stage & workforce approvals
+                            if (stageReqSnap.hasData) {
+                              for (var doc in stageReqSnap.data!.docs) {
+                                final data = doc.data();
+                                if (isSupervisorMatch(data, doc.id)) {
+                                  if (isPendingStatus(
+                                    data['status']?.toString() ?? data['approvalStatus']?.toString(),
+                                    data['stage']?.toString() ?? data['projectStage']?.toString(),
+                                    data['approvalStage']?.toString(),
+                                  )) {
+                                    pendingRequestsCount++;
+                                  }
+                                }
+                              }
+                            }
+
+                            // Petty cash requests
+                            if (pettyReqSnap.hasData) {
+                              for (var doc in pettyReqSnap.data!.docs) {
+                                final data = doc.data();
+                                if (isSupervisorMatch(data, doc.id)) {
+                                  if (isPendingStatus(
+                                    data['status']?.toString(),
+                                    null,
+                                    data['approvalStage']?.toString(),
+                                  )) {
+                                    pendingRequestsCount++;
+                                  }
+                                }
+                              }
+                            }
 
                 return Padding(
                   padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 16),
@@ -706,6 +1018,12 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                       ),
                     ],
                   ),
+                );
+                          },
+                        );
+                      },
+                    );
+                  },
                 );
               },
             );
@@ -955,9 +1273,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 ),
               ),
 
-              // 3. Workers Hub
+              // 3. Workforce Hub
               _buildConstructionActionCard(
-                title: 'Workers',
+                title: 'Workforce',
                 subtitle: 'Attendance, presence & logs',
                 icon: Icons.people_rounded,
                 accentColor: const Color(0xFFF57C00),

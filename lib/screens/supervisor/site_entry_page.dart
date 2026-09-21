@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/expense_service.dart';
@@ -59,6 +60,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   bool isSaving = false;
   Map<String, num> materialPrices = {};
   Map<String, num> labourSalaries = {};
+
+  // Site Mapped Labour State
+  Map<String, int> siteMappedLabourCounts = {};
 
   // Site Material Pool State
   List<SiteMaterialPoolItem> sitePoolItems = [];
@@ -144,6 +148,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     _fetchSupervisorData();
     _fetchProjectPhases();
     _fetchSiteMaterialPool();
+    _fetchSiteLabourMapping();
   }
 
   Future<void> _fetchProjectPhases() async {
@@ -439,6 +444,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         }
       }
       _fetchSiteMaterialPool();
+      _fetchSiteLabourMapping();
     } catch (e) {
       debugPrint('Error fetching supervisor data in site_entry_page: $e');
       setState(() {
@@ -602,38 +608,213 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     }
   }
 
-  Future<void> _pickDate() async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Theme.of(context).primaryColor,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).primaryColor,
-              ),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
+  Future<void> _fetchSiteLabourMapping() async {
+    final targetSite = (selectedSiteId ?? siteCode).trim();
+    if (targetSite.isEmpty) {
+      if (mounted) {
+        setState(() {
+          siteMappedLabourCounts = {};
+          labourOptions = [];
+          _filteredLabourOptions = null;
+          selectedLabour = null;
+          isLoadingLabours = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
       setState(() {
-        selectedDate = picked;
+        isLoadingLabours = true;
+        labourError = null;
       });
-      _fetchProjectPhases();
-      _fetchSupervisorData();
-      _fetchMaterialOptions();
-      _fetchLabourOptions();
+    }
+
+    final String cleanSiteCode = targetSite.split('_').first.trim().toLowerCase();
+    final String cleanSiteName = (projectName ?? siteLocation).trim().toLowerCase();
+    final String rawDocId = targetSite.toLowerCase();
+
+    bool matchesSiteKey(String key) {
+      final clean = key.trim().toLowerCase();
+      if (clean.isEmpty) return false;
+      if (clean == cleanSiteCode || clean == cleanSiteName || clean == rawDocId) return true;
+      if (cleanSiteCode.isNotEmpty && (clean.startsWith('${cleanSiteCode}_') || clean.endsWith('_$cleanSiteCode') || clean == cleanSiteCode)) {
+        return true;
+      }
+      if (cleanSiteName.isNotEmpty && (clean.startsWith('${cleanSiteName}_') || clean.endsWith('_$cleanSiteName') || clean == cleanSiteName)) {
+        return true;
+      }
+      return false;
+    }
+
+    try {
+      final Map<String, Map<String, dynamic>> dedupWorkers = {};
+      final Map<String, num> mappedSalaries = {};
+
+      if (OfflineSyncService().isOnline) {
+        // 1. Check primary workerSiteMapping collection
+        final snap = await FirestoreService.getCollection('workerSiteMapping').get();
+        for (final doc in snap.docs) {
+          final docId = doc.id.trim().toLowerCase();
+          final data = doc.data();
+          final dSiteId = (data['siteId'] ?? '').toString();
+          final dSite = (data['site'] ?? '').toString();
+          final dSiteName = (data['siteName'] ?? '').toString();
+          final dProjectName = (data['projectName'] ?? '').toString();
+
+          final isMatch = matchesSiteKey(docId) ||
+              matchesSiteKey(dSiteId) ||
+              matchesSiteKey(dSite) ||
+              matchesSiteKey(dSiteName) ||
+              matchesSiteKey(dProjectName);
+
+          if (isMatch) {
+            final raw = (data['workers'] ?? data['mappedWorkers'] ?? data['workerList']) as List<dynamic>? ?? [];
+            for (final item in raw) {
+              if (item is Map) {
+                final w = Map<String, dynamic>.from(item);
+                final name = (w['workerName'] ?? w['name'] ?? w['fullName'] ?? w['worker_name'] ?? '').toString().trim();
+                if (name.isNotEmpty) {
+                  final wId = (w['workerId'] ?? w['id'] ?? w['worker_id'] ?? name).toString().trim();
+                  final key = '${wId}_$name'.toLowerCase();
+                  final desig = (w['workerDesignation'] ?? w['designation'] ?? w['role'] ?? 'Labour').toString().trim();
+                  final salRaw = (w['workerSalary'] ?? w['salary'] ?? w['wage'] ?? '0').toString();
+                  final sal = num.tryParse(salRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+
+                  dedupWorkers[key] = {
+                    'workerId': wId,
+                    'workerName': name,
+                    'workerDesignation': desig,
+                    'workerSalary': sal,
+                  };
+                  if (sal > 0) {
+                    mappedSalaries[desig] = sal;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // 2. Fallback to legacy workerSiteMap if empty
+        if (dedupWorkers.isEmpty) {
+          final legacySnap = await FirestoreService.getCollection('workerSiteMap').get();
+          for (final doc in legacySnap.docs) {
+            final docId = doc.id.trim().toLowerCase();
+            final data = doc.data();
+            final dSiteId = (data['siteId'] ?? '').toString();
+            final dSite = (data['site'] ?? '').toString();
+            final dSiteName = (data['siteName'] ?? '').toString();
+            final dProjectName = (data['projectName'] ?? '').toString();
+
+            final isMatch = matchesSiteKey(docId) ||
+                matchesSiteKey(dSiteId) ||
+                matchesSiteKey(dSite) ||
+                matchesSiteKey(dSiteName) ||
+                matchesSiteKey(dProjectName);
+
+            if (isMatch) {
+              final raw = (data['workers'] ?? data['mappedWorkers'] ?? data['workerList']) as List<dynamic>? ?? [];
+              for (final item in raw) {
+                if (item is Map) {
+                  final w = Map<String, dynamic>.from(item);
+                  final name = (w['workerName'] ?? w['name'] ?? w['fullName'] ?? w['worker_name'] ?? '').toString().trim();
+                  if (name.isNotEmpty) {
+                    final wId = (w['workerId'] ?? w['id'] ?? w['worker_id'] ?? name).toString().trim();
+                    final key = '${wId}_$name'.toLowerCase();
+                    final desig = (w['workerDesignation'] ?? w['designation'] ?? w['role'] ?? 'Labour').toString().trim();
+                    final salRaw = (w['workerSalary'] ?? w['salary'] ?? w['wage'] ?? '0').toString();
+                    final sal = num.tryParse(salRaw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+
+                    dedupWorkers[key] = {
+                      'workerId': wId,
+                      'workerName': name,
+                      'workerDesignation': desig,
+                      'workerSalary': sal,
+                    };
+                    if (sal > 0) {
+                      mappedSalaries[desig] = sal;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Group counts by designation
+        final Map<String, int> counts = {};
+        for (final w in dedupWorkers.values) {
+          final desig = (w['workerDesignation'] as String?)?.trim() ?? 'Labour';
+          if (desig.isNotEmpty) {
+            counts[desig] = (counts[desig] ?? 0) + 1;
+          }
+        }
+
+        final options = counts.keys.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+        // Cache for offline support
+        await OfflineSyncService.cacheMasterData('site_labours_counts_$targetSite', counts);
+        await OfflineSyncService.cacheMasterData('site_labours_options_$targetSite', options);
+        await OfflineSyncService.cacheMasterData('site_labours_salaries_$targetSite', mappedSalaries);
+
+        if (!mounted) return;
+        setState(() {
+          siteMappedLabourCounts = counts;
+          labourOptions = options;
+          _filteredLabourOptions = null;
+          labourSalaries.addAll(mappedSalaries);
+          if (options.isNotEmpty) {
+            if (selectedLabour == null || !options.contains(selectedLabour)) {
+              selectedLabour = options.first;
+            }
+          } else {
+            selectedLabour = null;
+          }
+          isLoadingLabours = false;
+        });
+      } else {
+        // Offline retrieval
+        final cachedCounts = await OfflineSyncService.getCachedMasterData('site_labours_counts_$targetSite');
+        final cachedOptions = await OfflineSyncService.getCachedMasterData('site_labours_options_$targetSite');
+        final cachedSalaries = await OfflineSyncService.getCachedMasterData('site_labours_salaries_$targetSite');
+
+        Map<String, int> counts = {};
+        List<String> options = [];
+        Map<String, num> salaries = {};
+
+        if (cachedCounts is Map) {
+          counts = Map<String, int>.from(cachedCounts.map((k, v) => MapEntry(k.toString(), (v as num).toInt())));
+        }
+        if (cachedOptions is List) {
+          options = cachedOptions.map((e) => e.toString()).toList();
+        }
+        if (cachedSalaries is Map) {
+          salaries = Map<String, num>.from(cachedSalaries.map((k, v) => MapEntry(k.toString(), (v as num))));
+        }
+
+        if (!mounted) return;
+        setState(() {
+          siteMappedLabourCounts = counts;
+          labourOptions = options;
+          _filteredLabourOptions = null;
+          labourSalaries.addAll(salaries);
+          if (options.isNotEmpty) {
+            if (selectedLabour == null || !options.contains(selectedLabour)) {
+              selectedLabour = options.first;
+            }
+          } else {
+            selectedLabour = null;
+          }
+          isLoadingLabours = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching site labour mapping in site_entry_page: $e');
+      if (!mounted) return;
+      setState(() {
+        isLoadingLabours = false;
+      });
     }
   }
 
@@ -786,14 +967,35 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
   }
 
   void _addLabour() {
-    int qty = int.tryParse(labourQtyController.text) ?? 0;
-    if (selectedLabour != null && qty > 0) {
-      setState(() {
-        labours.add({'type': selectedLabour!, 'count': qty});
-        labourQty = 0;
-        labourQtyController.text = '0';
-      });
+    final int qty = int.tryParse(labourQtyController.text.trim()) ?? 0;
+    if (selectedLabour == null) return;
+    final int available = siteMappedLabourCounts[selectedLabour!] ?? 0;
+
+    if (qty <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid labour count greater than 0.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
     }
+
+    if (qty > available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Entered labour count cannot exceed the available workers ($available).'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      labours.add({'type': selectedLabour!, 'count': qty});
+      labourQty = 0;
+      labourQtyController.text = '0';
+    });
   }
 
   void _removeMaterial(int index) {
@@ -847,9 +1049,29 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     return total.round();
   }
 
+  bool get _hasValidEntryDetails {
+    final hasMaterials = materials.isNotEmpty;
+    final hasLabours = labours.isNotEmpty;
+    final foodVal = num.tryParse(foodCost.text) ?? 0;
+    final transportVal = num.tryParse(transportCost.text) ?? 0;
+    final fuelVal = num.tryParse(fuelCost.text) ?? 0;
+    final hasAdditionalCosts = foodVal > 0 || transportVal > 0 || fuelVal > 0;
+    return hasMaterials || hasLabours || hasAdditionalCosts;
+  }
+
   Future<void> _saveToFirestore() async {
     // Prevent duplicate submissions while operation is in progress
     if (isSaving) return;
+
+    if (!_hasValidEntryDetails) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one material, labour, or cost detail before saving.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
 
     if (siteCode.isEmpty ||
         selectedDate == null ||
@@ -1152,8 +1374,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
         });
       }
 
-      // Refresh site material pool in background
+      // Refresh site material pool and site labour mapping in background
       await _fetchSiteMaterialPool();
+      await _fetchSiteLabourMapping();
 
       if (!mounted) return;
 
@@ -1418,6 +1641,24 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     );
   }
 
+  Widget _buildFieldLabel(String label) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: labelColor,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          letterSpacing: -0.1,
+        ),
+      ),
+    );
+  }
+
   Widget _buildCostInput(
     String label,
     TextEditingController controller,
@@ -1426,29 +1667,20 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.primaryColor;
-    final labelColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
     final fieldBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
     final borderColor = isDark ? Colors.white.withValues(alpha: 0.15) : const Color(0xFFCBD5E1);
     final textColor = isDark ? Colors.white : const Color(0xFF0A183D);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+      padding: const EdgeInsets.only(bottom: 14.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: labelColor,
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 8),
+          _buildFieldLabel(label),
           TextField(
             controller: controller,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 14.5,
               color: textColor,
               fontWeight: FontWeight.w800,
             ),
@@ -1459,25 +1691,29 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                 color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(color: borderColor, width: 1.0),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(color: borderColor, width: 1.0),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(color: primaryColor, width: 1.8),
               ),
               filled: true,
               fillColor: fieldBg,
+              isDense: true,
               contentPadding: const EdgeInsets.symmetric(
-                vertical: 16,
-                horizontal: 16,
+                vertical: 12,
+                horizontal: 14,
               ),
             ),
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
             onChanged: (_) => setState(() {}),
           ),
         ],
@@ -1989,6 +2225,7 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                           }
 
                                           _fetchSiteMaterialPool();
+                                          _fetchSiteLabourMapping();
                                         },
                                 ),
                               ),
@@ -2047,20 +2284,6 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const Spacer(),
-                              TextButton.icon(
-                                onPressed: _pickDate,
-                                icon: const Icon(Icons.edit, size: 16),
-                                label: const Text(
-                                  'Change',
-                                  style: TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: Size.zero,
-                                ),
-                              ),
                             ],
                           ),
                         ],
@@ -2089,110 +2312,557 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _buildSectionHeader('Material Details'),
-                          const SizedBox(height: 12),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: isLoadingMaterials || isLoadingSitePool
-                                        ? const Center(
-                                            child: SizedBox(
-                                              height: 24,
-                                              width: 24,
-                                              child: CircularProgressIndicator(strokeWidth: 2),
+                          const SizedBox(height: 14),
+                          if (isLoadingMaterials || isLoadingSitePool)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24.0),
+                                child: SizedBox(
+                                  height: 28,
+                                  width: 28,
+                                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                                ),
+                              ),
+                            )
+                          else if (materialError != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                materialError!,
+                                style: const TextStyle(
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          else ...[
+                            // Search Material Input
+                            _buildFieldLabel('Search Material'),
+                            TextField(
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                              decoration: InputDecoration(
+                                prefixIcon: Icon(
+                                  Icons.search_rounded,
+                                  size: 20,
+                                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                ),
+                                hintText: 'Search material by name...',
+                                hintStyle: TextStyle(
+                                  color: labelColor.withValues(alpha: 0.8),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13.5,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                ),
+                                filled: true,
+                                fillColor: fieldBg,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 14,
+                                ),
+                              ),
+                              onChanged: (query) {
+                                setState(() {
+                                  final q = query.toLowerCase().trim();
+                                  final filtered = _availableMaterialNames
+                                      .where((item) => item.toLowerCase().contains(q))
+                                      .toList();
+                                  filtered.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+                                  if (filtered.isNotEmpty) {
+                                    selectedMaterial = filtered.contains(selectedMaterial)
+                                        ? selectedMaterial
+                                        : filtered.first;
+                                  } else {
+                                    selectedMaterial = null;
+                                  }
+                                  _filteredMaterialOptions = filtered;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Select Material Dropdown
+                            _buildFieldLabel('Select Material from Site Stock'),
+                            DropdownButtonFormField<String>(
+                              initialValue: selectedMaterial,
+                              isExpanded: true,
+                              dropdownColor: dropdownBg,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                prefixIcon: Icon(
+                                  Icons.category_outlined,
+                                  size: 20,
+                                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                ),
+                                filled: true,
+                                fillColor: fieldBg,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 14,
+                                ),
+                              ),
+                              items: (_filteredMaterialOptions ?? _availableMaterialNames)
+                                  .map((item) {
+                                final pItem = sitePoolItems.cast<SiteMaterialPoolItem?>().firstWhere(
+                                  (p) => p != null && p.materialName.toLowerCase().trim() == item.toLowerCase().trim(),
+                                  orElse: () => null,
+                                );
+                                return DropdownMenuItem<String>(
+                                  value: item,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          item,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            color: textColor,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      if (pItem != null) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: pItem.remainingQty > 0
+                                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                                : const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            pItem.remainingQty > 0
+                                                ? '${_formatQty(pItem.remainingQty)} ${pItem.unit}'
+                                                : '0 (Empty)',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                              color: pItem.remainingQty > 0
+                                                  ? const Color(0xFF10B981)
+                                                  : const Color(0xFFEF4444),
                                             ),
-                                          )
-                                        : materialError != null
-                                        ? Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 8.0,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) => setState(() => selectedMaterial = value),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Quantity & Live Amount Row
+                            Builder(
+                              builder: (context) {
+                                final poolItem = _currentPoolItem;
+                                final price = (poolItem != null && poolItem.effectiveUnitRate > 0)
+                                    ? poolItem.effectiveUnitRate
+                                    : (materialPrices[selectedMaterial ?? ''] ?? (poolItem != null ? (materialPrices[poolItem.materialName] ?? 0) : 0)).toDouble();
+                                final qty = materialQty;
+                                final total = price * qty;
+
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          _buildFieldLabel('Used Quantity'),
+                                          TextField(
+                                            controller: materialQtyController,
+                                            style: TextStyle(
+                                              color: textColor,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 15,
                                             ),
-                                            child: Text(
-                                              materialError!,
-                                              style: const TextStyle(
-                                                color: Colors.redAccent,
+                                            decoration: InputDecoration(
+                                              prefixIcon: Icon(
+                                                Icons.pin_outlined,
+                                                size: 20,
+                                                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                              ),
+                                              suffixText: poolItem?.unit,
+                                              suffixStyle: TextStyle(
+                                                color: labelColor,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 12.5,
+                                              ),
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(14),
+                                                borderSide: BorderSide(color: borderColor, width: 1.0),
+                                              ),
+                                              enabledBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(14),
+                                                borderSide: BorderSide(color: borderColor, width: 1.0),
+                                              ),
+                                              focusedBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(14),
+                                                borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                              ),
+                                              filled: true,
+                                              fillColor: fieldBg,
+                                              isDense: true,
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                vertical: 12,
+                                                horizontal: 14,
                                               ),
                                             ),
-                                          )
-                                        : Column(
+                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                            ],
+                                            onChanged: (value) {
+                                              setState(() {
+                                                materialQty = num.tryParse(value) ?? 0;
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          _buildFieldLabel('Estimated Cost'),
+                                          Container(
+                                            height: 48,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: fieldBg,
+                                              borderRadius: BorderRadius.circular(14),
+                                              border: Border.all(color: borderColor, width: 1.0),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.currency_rupee_rounded,
+                                                  size: 18,
+                                                  color: total > 0
+                                                      ? const Color(0xFF10B981)
+                                                      : (isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Column(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        poolItem != null ? 'Rate: ₹${price.toStringAsFixed(0)}/${poolItem.unit}' : 'Rate: ₹${price.toStringAsFixed(0)}',
+                                                        style: TextStyle(
+                                                          fontSize: 10.5,
+                                                          color: labelColor,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                      Text(
+                                                        '₹${total.toStringAsFixed(0)}',
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: total > 0 ? const Color(0xFF10B981) : textColor,
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+
+                            // Live Material Stock Balance Card
+                            Builder(
+                              builder: (context) {
+                                final poolItem = _currentPoolItem;
+                                if (poolItem == null) return const SizedBox.shrink();
+                                final availStock = _getAvailableStock(poolItem);
+                                final enteredQty = num.tryParse(materialQtyController.text) ?? 0;
+                                final isOverLimit = enteredQty > availStock;
+                                final balanceAfter = availStock - enteredQty;
+                                final rate = (poolItem.effectiveUnitRate > 0)
+                                    ? poolItem.effectiveUnitRate
+                                    : (materialPrices[poolItem.materialName] ?? materialPrices[selectedMaterial ?? ''] ?? 0).toDouble();
+                                final consumptionVal = enteredQty * rate;
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 14.0),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: isOverLimit
+                                          ? const Color(0xFFFEF2F2)
+                                          : (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC)),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: isOverLimit
+                                            ? const Color(0xFFEF4444)
+                                            : (isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0)),
+                                        width: isOverLimit ? 1.5 : 1.0,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.inventory_2_outlined,
+                                                  size: 16,
+                                                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  'Site Stock Balance',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: availStock > 0
+                                                    ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                                    : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                availStock > 0 ? '${_formatQty(availStock)} ${poolItem.unit} Available' : 'Out of Stock',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: availStock > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: _buildStockMetric(
+                                                label: 'Effective Rate',
+                                                value: '₹${poolItem.effectiveUnitRate.toStringAsFixed(2)} / ${poolItem.unit}',
+                                                isDark: isDark,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: _buildStockMetric(
+                                                label: 'Usage Value',
+                                                value: '₹${consumptionVal.toStringAsFixed(2)}',
+                                                isDark: isDark,
+                                                highlight: true,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: _buildStockMetric(
+                                                label: 'Balance After',
+                                                value: '${_formatQty(balanceAfter < 0 ? 0 : balanceAfter)} ${poolItem.unit}',
+                                                isDark: isDark,
+                                                isWarning: isOverLimit,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (isOverLimit) ...[
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  'Insufficient material. Only ${_formatQty(availStock)} ${poolItem.unit} is currently available at this site.',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFFDC2626),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Material Action Buttons
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: Builder(
+                                    builder: (context) {
+                                      final poolItem = _currentPoolItem;
+                                      final availStock = poolItem != null ? _getAvailableStock(poolItem) : double.infinity;
+                                      final enteredQty = num.tryParse(materialQtyController.text) ?? 0;
+                                      final isOverLimit = poolItem != null && enteredQty > availStock;
+                                      final isOutOfStock = poolItem != null && availStock <= 0;
+                                      final isDisabled = isLoadingMaterials ||
+                                          isLoadingSitePool ||
+                                          _availableMaterialNames.isEmpty ||
+                                          enteredQty <= 0 ||
+                                          isOverLimit ||
+                                          isOutOfStock;
+
+                                      return GlassButton(
+                                        label: 'Add Material Usage',
+                                        icon: Icons.add_circle_outline_rounded,
+                                        onPressed: isDisabled ? null : _addMaterial,
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  flex: 2,
+                                  child: GlassButton(
+                                    label: _showCustomMaterialFields ? 'Hide Others' : 'Others',
+                                    icon: _showCustomMaterialFields ? Icons.close_rounded : Icons.more_horiz_rounded,
+                                    onPressed: () {
+                                      setState(() {
+                                        _showCustomMaterialFields = !_showCustomMaterialFields;
+                                      });
+                                    },
+                                    isSecondary: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // Custom Material Section
+                            if (_showCustomMaterialFields) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: borderColor, width: 1.0),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildFieldLabel('Custom Material Name'),
+                                    TextField(
+                                      controller: _customMaterialNameController,
+                                      style: TextStyle(
+                                        color: textColor,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                      decoration: InputDecoration(
+                                        prefixIcon: Icon(
+                                          Icons.edit_note_rounded,
+                                          size: 20,
+                                          color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                        ),
+                                        hintText: 'Enter material name...',
+                                        hintStyle: TextStyle(
+                                          color: labelColor.withValues(alpha: 0.8),
+                                          fontSize: 13.5,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide(color: borderColor, width: 1.0),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide(color: borderColor, width: 1.0),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                        ),
+                                        filled: true,
+                                        fillColor: fieldBg,
+                                        isDense: true,
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                          horizontal: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(
-                                                'Select Material from Site Stock',
-                                                style: TextStyle(
-                                                  color: labelColor,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
+                                              _buildFieldLabel('Quantity'),
                                               TextField(
+                                                controller: _customMaterialQtyController,
                                                 style: TextStyle(
                                                   color: textColor,
                                                   fontWeight: FontWeight.w700,
                                                   fontSize: 14,
-                                                ),
-                                                decoration: InputDecoration(
-                                                  hintText: 'Search Material...',
-                                                  hintStyle: TextStyle(
-                                                    color: labelColor,
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: 14,
-                                                  ),
-                                                  border: OutlineInputBorder(
-                                                    borderRadius: BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
-                                                  ),
-                                                  enabledBorder: OutlineInputBorder(
-                                                    borderRadius: BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
-                                                  ),
-                                                  focusedBorder: OutlineInputBorder(
-                                                    borderRadius: BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                                  ),
-                                                  filled: true,
-                                                  fillColor: fieldBg,
-                                                  isDense: true,
-                                                  contentPadding: const EdgeInsets.symmetric(
-                                                    vertical: 12,
-                                                    horizontal: 14,
-                                                  ),
-                                                ),
-                                                onChanged: (query) {
-                                                  setState(() {
-                                                    final q = query.toLowerCase();
-                                                    final filtered = _availableMaterialNames
-                                                        .where((item) => item.toLowerCase().contains(q))
-                                                        .toList();
-                                                    filtered.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-                                                    if (filtered.isNotEmpty) {
-                                                      selectedMaterial = filtered.contains(selectedMaterial)
-                                                          ? selectedMaterial
-                                                          : filtered.first;
-                                                    } else {
-                                                      selectedMaterial = null;
-                                                    }
-                                                    _filteredMaterialOptions = filtered;
-                                                  });
-                                                },
-                                              ),
-                                              const SizedBox(height: 8),
-                                              DropdownButtonFormField<String>(
-                                                initialValue: selectedMaterial,
-                                                isExpanded: true,
-                                                dropdownColor: dropdownBg,
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: textColor,
-                                                  fontWeight: FontWeight.w700,
                                                 ),
                                                 decoration: InputDecoration(
                                                   prefixIcon: Icon(
-                                                    Icons.category_outlined,
+                                                    Icons.pin_outlined,
+                                                    size: 20,
                                                     color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
                                                   ),
                                                   border: OutlineInputBorder(
@@ -2215,434 +2885,72 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                                     horizontal: 14,
                                                   ),
                                                 ),
-                                                items: (_filteredMaterialOptions ?? _availableMaterialNames)
-                                                    .map((item) {
-                                                  final pItem = sitePoolItems.cast<SiteMaterialPoolItem?>().firstWhere(
-                                                    (p) => p != null && p.materialName.toLowerCase().trim() == item.toLowerCase().trim(),
-                                                    orElse: () => null,
-                                                  );
-                                                  return DropdownMenuItem<String>(
-                                                    value: item,
-                                                    child: Row(
-                                                      children: [
-                                                        Expanded(
-                                                          child: Text(
-                                                            item,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(
-                                                              fontSize: 13.5,
-                                                              color: textColor,
-                                                              fontWeight: FontWeight.w700,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        if (pItem != null) ...[
-                                                          const SizedBox(width: 6),
-                                                          Container(
-                                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                            decoration: BoxDecoration(
-                                                              color: pItem.remainingQty > 0
-                                                                  ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                                                                  : const Color(0xFFEF4444).withValues(alpha: 0.12),
-                                                              borderRadius: BorderRadius.circular(6),
-                                                            ),
-                                                            child: Text(
-                                                              pItem.remainingQty > 0
-                                                                  ? '${_formatQty(pItem.remainingQty)} ${pItem.unit}'
-                                                                  : '0 (Empty)',
-                                                              style: TextStyle(
-                                                                fontSize: 10.5,
-                                                                fontWeight: FontWeight.w800,
-                                                                color: pItem.remainingQty > 0
-                                                                    ? const Color(0xFF10B981)
-                                                                    : const Color(0xFFEF4444),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ],
-                                                    ),
-                                                  );
-                                                }).toList(),
-                                                onChanged: (value) => setState(() => selectedMaterial = value),
+                                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                ],
+                                                onChanged: (_) => setState(() {}),
                                               ),
                                             ],
                                           ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Used Qty',
-                                          style: TextStyle(
-                                            color: labelColor,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13,
-                                          ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        TextField(
-                                          controller: materialQtyController,
-                                          style: TextStyle(
-                                            color: textColor,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 15,
-                                          ),
-                                          decoration: InputDecoration(
-                                            border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
-                                              borderSide: BorderSide(color: borderColor, width: 1.0),
-                                            ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
-                                              borderSide: BorderSide(color: borderColor, width: 1.0),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
-                                              borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                            ),
-                                            filled: true,
-                                            fillColor: fieldBg,
-                                            isDense: true,
-                                            contentPadding: const EdgeInsets.symmetric(
-                                              vertical: 12,
-                                              horizontal: 14,
-                                            ),
-                                          ),
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              materialQty = num.tryParse(value) ?? 0;
-                                            });
-                                          },
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Builder(
-                                          builder: (context) {
-                                            final poolItem = _currentPoolItem;
-                                            final price = (poolItem != null && poolItem.effectiveUnitRate > 0)
-                                                ? poolItem.effectiveUnitRate
-                                                : (materialPrices[selectedMaterial ?? ''] ?? (poolItem != null ? (materialPrices[poolItem.materialName] ?? 0) : 0)).toDouble();
-                                            final qty = materialQty;
-                                            final total = price * qty;
-                                            return Text(
-                                              '$qty × ₹${price.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
-                                              style: TextStyle(
-                                                fontSize: 11.5,
-                                                color: total > 0
-                                                    ? const Color(0xFF10B981)
-                                                    : labelColor,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                          // Live Material Stock Balance & Calculation Card
-                          Builder(
-                            builder: (context) {
-                              final poolItem = _currentPoolItem;
-                              if (poolItem == null) return const SizedBox.shrink();
-                              final availStock = _getAvailableStock(poolItem);
-                              final enteredQty = num.tryParse(materialQtyController.text) ?? 0;
-                              final isOverLimit = enteredQty > availStock;
-                              final balanceAfter = availStock - enteredQty;
-                              final rate = (poolItem.effectiveUnitRate > 0)
-                                  ? poolItem.effectiveUnitRate
-                                  : (materialPrices[poolItem.materialName] ?? materialPrices[selectedMaterial ?? ''] ?? 0).toDouble();
-                              final consumptionVal = enteredQty * rate;
-
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 12.0),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isOverLimit
-                                        ? const Color(0xFFFEF2F2)
-                                        : (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC)),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: isOverLimit
-                                          ? const Color(0xFFEF4444)
-                                          : (isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0)),
-                                      width: isOverLimit ? 1.5 : 1.0,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Row(
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Icon(
-                                                Icons.inventory_2_outlined,
-                                                size: 16,
-                                                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                'Site Stock Balance',
+                                              _buildFieldLabel('Unit Price (₹)'),
+                                              TextField(
+                                                controller: _customMaterialPriceController,
                                                 style: TextStyle(
-                                                  fontSize: 12,
+                                                  color: textColor,
                                                   fontWeight: FontWeight.w700,
-                                                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                                                  fontSize: 14,
                                                 ),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: Icon(
+                                                    Icons.currency_rupee_rounded,
+                                                    size: 20,
+                                                    color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                                  ),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  enabledBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  focusedBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: fieldBg,
+                                                  isDense: true,
+                                                  contentPadding: const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                    horizontal: 14,
+                                                  ),
+                                                ),
+                                                keyboardType: TextInputType.number,
+                                                onChanged: (_) => setState(() {}),
                                               ),
                                             ],
                                           ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: availStock > 0
-                                                  ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                                                  : const Color(0xFFEF4444).withValues(alpha: 0.15),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              availStock > 0 ? '${_formatQty(availStock)} ${poolItem.unit} Available' : 'Out of Stock',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w800,
-                                                color: availStock > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _buildStockMetric(
-                                              label: 'Effective Rate',
-                                              value: '₹${poolItem.effectiveUnitRate.toStringAsFixed(2)} / ${poolItem.unit}',
-                                              isDark: isDark,
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: _buildStockMetric(
-                                              label: 'Usage Value',
-                                              value: '₹${consumptionVal.toStringAsFixed(2)}',
-                                              isDark: isDark,
-                                              highlight: true,
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: _buildStockMetric(
-                                              label: 'Balance After',
-                                              value: '${_formatQty(balanceAfter < 0 ? 0 : balanceAfter)} ${poolItem.unit}',
-                                              isDark: isDark,
-                                              isWarning: isOverLimit,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      if (isOverLimit) ...[
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                'Insufficient material. Only ${_formatQty(availStock)} ${poolItem.unit} is currently available at this site.',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Color(0xFFDC2626),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
                                         ),
                                       ],
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Builder(
-                                  builder: (context) {
-                                    final poolItem = _currentPoolItem;
-                                    final availStock = poolItem != null ? _getAvailableStock(poolItem) : double.infinity;
-                                    final enteredQty = num.tryParse(materialQtyController.text) ?? 0;
-                                    final isOverLimit = poolItem != null && enteredQty > availStock;
-                                    final isOutOfStock = poolItem != null && availStock <= 0;
-                                    final isDisabled = isLoadingMaterials ||
-                                        isLoadingSitePool ||
-                                        _availableMaterialNames.isEmpty ||
-                                        enteredQty <= 0 ||
-                                        isOverLimit ||
-                                        isOutOfStock;
-
-                                    return GlassButton(
-                                      label: 'Add Material Usage',
-                                      icon: Icons.add,
-                                      onPressed: isDisabled ? null : _addMaterial,
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: GlassButton(
-                                  label: _showCustomMaterialFields ? 'Hide Others' : 'Others',
-                                  icon: Icons.more_horiz,
-                                  onPressed: () {
-                                    setState(() {
-                                      _showCustomMaterialFields = !_showCustomMaterialFields;
-                                    });
-                                  },
-                                  isSecondary: true,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    GlassButton(
+                                      label: 'Add Custom Material',
+                                      icon: Icons.playlist_add_rounded,
+                                      onPressed: _addCustomMaterial,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
-                          ),
-                          if (_showCustomMaterialFields) ...[
-                            const SizedBox(height: 16),
-                            Text(
-                              'Material Name',
-                              style: TextStyle(
-                                color: labelColor,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: _customMaterialNameController,
-                              style: TextStyle(
-                                color: textColor,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(color: borderColor, width: 1.0),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(color: borderColor, width: 1.0),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                ),
-                                filled: true,
-                                fillColor: fieldBg,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Qty',
-                                        style: TextStyle(
-                                          color: labelColor,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      TextField(
-                                        controller: _customMaterialQtyController,
-                                        style: TextStyle(
-                                          color: textColor,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        decoration: InputDecoration(
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: BorderSide(color: borderColor, width: 1.0),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: BorderSide(color: borderColor, width: 1.0),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                          ),
-                                          filled: true,
-                                          fillColor: fieldBg,
-                                        ),
-                                        keyboardType: TextInputType.number,
-                                        onChanged: (_) => setState(() {}),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Unit Price (₹)',
-                                        style: TextStyle(
-                                          color: labelColor,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      TextField(
-                                        controller: _customMaterialPriceController,
-                                        style: TextStyle(
-                                          color: textColor,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        decoration: InputDecoration(
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: BorderSide(color: borderColor, width: 1.0),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: BorderSide(color: borderColor, width: 1.0),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                          ),
-                                          filled: true,
-                                          fillColor: fieldBg,
-                                        ),
-                                        keyboardType: TextInputType.number,
-                                        onChanged: (_) => setState(() {}),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            GlassButton(
-                              label: 'Add Custom Material',
-                              icon: Icons.playlist_add,
-                              onPressed: _addCustomMaterial,
-                            ),
                           ],
                         ],
                       ),
@@ -2656,305 +2964,95 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _buildSectionHeader('Labour Details'),
-                          const SizedBox(height: 12),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 14),
+                          if (isLoadingLabours)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24.0),
+                                child: SizedBox(
+                                  height: 28,
+                                  width: 28,
+                                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                                ),
+                              ),
+                            )
+                          else if (labourError != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                labourError!,
+                                style: const TextStyle(
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          else if (labourOptions.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.25),
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: Row(
                                 children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: isLoadingLabours
-                                        ? const Center(
-                                            child:
-                                                CircularProgressIndicator(),
-                                          )
-                                        : labourError != null
-                                        ? Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 8.0,
-                                            ),
-                                            child: Text(
-                                              labourError!,
-                                              style: const TextStyle(
-                                                color: Colors.redAccent,
-                                              ),
-                                            ),
-                                          )
-                                        : Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Search & Select Labour',
-                                                style: TextStyle(
-                                                  color: labelColor,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              TextField(
-                                                style: TextStyle(
-                                                  color: textColor,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 14,
-                                                ),
-                                                decoration: InputDecoration(
-                                                  hintText:
-                                                      'Search Labour...',
-                                                  hintStyle: TextStyle(
-                                                    color: labelColor,
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: 14,
-                                                  ),
-                                                  border: OutlineInputBorder(
-                                                    borderRadius: BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
-                                                  ),
-                                                  enabledBorder: OutlineInputBorder(
-                                                    borderRadius: BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
-                                                  ),
-                                                  focusedBorder: OutlineInputBorder(
-                                                    borderRadius: BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                                  ),
-                                                  filled: true,
-                                                  fillColor: fieldBg,
-                                                  isDense: true,
-                                                  contentPadding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 12,
-                                                        horizontal: 14,
-                                                      ),
-                                                ),
-                                                onChanged: (query) {
-                                                  setState(() {
-                                                    final q = query
-                                                        .toLowerCase();
-                                                    final filtered =
-                                                        labourOptions
-                                                            .where(
-                                                              (item) => item
-                                                                  .toLowerCase()
-                                                                  .startsWith(
-                                                                    q,
-                                                                  ),
-                                                            )
-                                                            .toList();
-                                                    filtered.sort(
-                                                      (a, b) => a
-                                                          .toLowerCase()
-                                                          .compareTo(
-                                                            b.toLowerCase(),
-                                                          ),
-                                                    );
-                                                    if (filtered.isNotEmpty) {
-                                                      selectedLabour =
-                                                          filtered.contains(
-                                                            selectedLabour,
-                                                          )
-                                                          ? selectedLabour
-                                                          : filtered.first;
-                                                    } else {
-                                                      selectedLabour = null;
-                                                    }
-                                                    _filteredLabourOptions =
-                                                        filtered;
-                                                  });
-                                                },
-                                              ),
-                                              const SizedBox(height: 8),
-                                              DropdownButtonFormField<String>(
-                                                initialValue: selectedLabour,
-                                                isExpanded: true,
-                                                dropdownColor: dropdownBg,
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: textColor,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                                decoration: InputDecoration(
-                                                  prefixIcon: Icon(
-                                                    Icons.group,
-                                                    color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
-                                                  ),
-                                                  border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
-                                                  ),
-                                                  enabledBorder: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
-                                                  ),
-                                                  focusedBorder: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(14),
-                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                                  ),
-                                                  filled: true,
-                                                  fillColor: fieldBg,
-                                                  isDense: true,
-                                                  contentPadding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 12,
-                                                        horizontal: 14,
-                                                      ),
-                                                ),
-                                                items:
-                                                    (_filteredLabourOptions ??
-                                                            labourOptions)
-                                                        .map(
-                                                          (
-                                                            item,
-                                                          ) => DropdownMenuItem(
-                                                            value: item,
-                                                            child: Text(
-                                                              item,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: TextStyle(
-                                                                fontSize: 14,
-                                                                color: textColor,
-                                                                fontWeight: FontWeight.w700,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        )
-                                                        .toList(),
-                                                onChanged: (value) =>
-                                                    setState(
-                                                      () => selectedLabour =
-                                                          value,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
+                                  const Icon(
+                                    Icons.engineering_outlined,
+                                    color: Color(0xFFF59E0B),
+                                    size: 22,
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   Expanded(
-                                    flex: 2,
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          'Count',
+                                        const Text(
+                                          'No Workers Mapped To Site',
                                           style: TextStyle(
-                                            color: labelColor,
                                             fontWeight: FontWeight.w700,
                                             fontSize: 13,
+                                            color: Color(0xFFD97706),
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        TextField(
-                                          controller: labourQtyController,
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'No workers are currently configured for this site by the Manager.',
                                           style: TextStyle(
-                                            color: textColor,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 15,
+                                            fontSize: 11.5,
+                                            color: labelColor,
+                                            fontWeight: FontWeight.w500,
                                           ),
-                                          decoration: InputDecoration(
-                                            border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
-                                              borderSide: BorderSide(color: borderColor, width: 1.0),
-                                            ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
-                                              borderSide: BorderSide(color: borderColor, width: 1.0),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
-                                              borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                            ),
-                                            filled: true,
-                                            fillColor: fieldBg,
-                                            isDense: true,
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  vertical: 12,
-                                                  horizontal: 14,
-                                                ),
-                                          ),
-                                          keyboardType: TextInputType.number,
-                                          onChanged: (value) {
-                                            setState(() {
-                                              labourQty =
-                                                  int.tryParse(value) ?? 0;
-                                            });
-                                          },
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Builder(
-                                          builder: (context) {
-                                            final salary =
-                                                labourSalaries[selectedLabour ??
-                                                    ''] ??
-                                                0;
-                                            final count = labourQty;
-                                            final total = salary * count;
-                                            return Text(
-                                              '$count × ₹${salary.toStringAsFixed(0)} = ₹${total.toStringAsFixed(0)}',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: total > 0
-                                                    ? const Color(0xFF10B981)
-                                                    : labelColor,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            );
-                                          },
                                         ),
                                       ],
                                     ),
                                   ),
                                 ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GlassButton(
-                                  label: 'Add Labour',
-                                  icon: Icons.person_add,
-                                  onPressed: isLoadingLabours || labourOptions.isEmpty
-                                      ? null
-                                      : _addLabour,
-                                ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: GlassButton(
-                                  label: _showCustomLabourFields ? 'Hide Others' : 'Others',
-                                  icon: Icons.more_horiz,
-                                  onPressed: () {
-                                    setState(() {
-                                      _showCustomLabourFields = !_showCustomLabourFields;
-                                    });
-                                  },
-                                  isSecondary: true,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_showCustomLabourFields) ...[
-                            const SizedBox(height: 16),
+                            )
+                          else ...[
+                            // Search Labour Input
+                            _buildFieldLabel('Search Labour'),
                             TextField(
-                              controller: _customLabourNameController,
                               style: TextStyle(
                                 color: textColor,
                                 fontWeight: FontWeight.w700,
+                                fontSize: 14,
                               ),
                               decoration: InputDecoration(
-                                labelText: 'Labour Type',
-                                labelStyle: TextStyle(
-                                  color: labelColor,
-                                  fontWeight: FontWeight.w600,
+                                prefixIcon: Icon(
+                                  Icons.search_rounded,
+                                  size: 20,
+                                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                ),
+                                hintText: 'Search labour designation...',
+                                hintStyle: TextStyle(
+                                  color: labelColor.withValues(alpha: 0.8),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13.5,
                                 ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
@@ -2970,84 +3068,553 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                                 ),
                                 filled: true,
                                 fillColor: fieldBg,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 14,
+                                ),
                               ),
+                              onChanged: (query) {
+                                setState(() {
+                                  final q = query.toLowerCase().trim();
+                                  final filtered = labourOptions
+                                      .where((item) => item.toLowerCase().contains(q))
+                                      .toList();
+                                  filtered.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+                                  if (filtered.isNotEmpty) {
+                                    selectedLabour = filtered.contains(selectedLabour)
+                                        ? selectedLabour
+                                        : filtered.first;
+                                  } else {
+                                    selectedLabour = null;
+                                  }
+                                  _filteredLabourOptions = filtered;
+                                });
+                              },
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 12),
+
+                            // Select Labour Dropdown
+                            _buildFieldLabel('Select Labour / Designation'),
+                            DropdownButtonFormField<String>(
+                              initialValue: selectedLabour,
+                              isExpanded: true,
+                              dropdownColor: dropdownBg,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: textColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                prefixIcon: Icon(
+                                  Icons.engineering_outlined,
+                                  size: 20,
+                                  color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: borderColor, width: 1.0),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                ),
+                                filled: true,
+                                fillColor: fieldBg,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 14,
+                                ),
+                              ),
+                              items: (_filteredLabourOptions ?? labourOptions)
+                                  .map(
+                                    (item) {
+                                      final count = siteMappedLabourCounts[item] ?? 0;
+                                      return DropdownMenuItem(
+                                        value: item,
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                item,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: count > 0
+                                                    ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                                    : const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                '$count Available',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: count > 0
+                                                      ? const Color(0xFF10B981)
+                                                      : const Color(0xFFEF4444),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setState(() => selectedLabour = value),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Mapped Worker Availability Info Banner
+                            if (selectedLabour != null) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isDark ? Colors.white.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.groups_rounded,
+                                          size: 18,
+                                          color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Available $selectedLabour:',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? Colors.white70 : const Color(0xFF475569),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: (siteMappedLabourCounts[selectedLabour] ?? 0) > 0
+                                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                            : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '${siteMappedLabourCounts[selectedLabour] ?? 0} ${(siteMappedLabourCounts[selectedLabour] == 1) ? "Worker" : "Workers"} Available',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: (siteMappedLabourCounts[selectedLabour] ?? 0) > 0
+                                              ? const Color(0xFF10B981)
+                                              : const Color(0xFFEF4444),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+
+                            // Labour Count & Wage Row
+                            Builder(
+                              builder: (context) {
+                                final salary = labourSalaries[selectedLabour ?? ''] ?? 0;
+                                final count = labourQty;
+                                final total = salary * count;
+
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          _buildFieldLabel('Labour Count'),
+                                          TextField(
+                                            controller: labourQtyController,
+                                            style: TextStyle(
+                                              color: textColor,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 15,
+                                            ),
+                                            decoration: InputDecoration(
+                                              prefixIcon: Icon(
+                                                Icons.people_outline_rounded,
+                                                size: 20,
+                                                color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                              ),
+                                              suffixText: 'Persons',
+                                              suffixStyle: TextStyle(
+                                                color: labelColor,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 12.5,
+                                              ),
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(14),
+                                                borderSide: BorderSide(color: borderColor, width: 1.0),
+                                              ),
+                                              enabledBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(14),
+                                                borderSide: BorderSide(color: borderColor, width: 1.0),
+                                              ),
+                                              focusedBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(14),
+                                                borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                              ),
+                                              filled: true,
+                                              fillColor: fieldBg,
+                                              isDense: true,
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                vertical: 12,
+                                                horizontal: 14,
+                                              ),
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter.digitsOnly,
+                                            ],
+                                            onChanged: (value) {
+                                              setState(() {
+                                                labourQty = int.tryParse(value) ?? 0;
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          _buildFieldLabel('Estimated Wage'),
+                                          Container(
+                                            height: 48,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: fieldBg,
+                                              borderRadius: BorderRadius.circular(14),
+                                              border: Border.all(color: borderColor, width: 1.0),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.currency_rupee_rounded,
+                                                  size: 18,
+                                                  color: total > 0
+                                                      ? const Color(0xFF10B981)
+                                                      : (isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Column(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        'Rate: ₹${salary.toStringAsFixed(0)}/day',
+                                                        style: TextStyle(
+                                                          fontSize: 10.5,
+                                                          color: labelColor,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                      Text(
+                                                        '₹${total.toStringAsFixed(0)}',
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: total > 0 ? const Color(0xFF10B981) : textColor,
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+
+                            // Dynamic Labour Limit Warning
+                            Builder(
+                              builder: (context) {
+                                final available = selectedLabour != null ? (siteMappedLabourCounts[selectedLabour!] ?? 0) : 0;
+                                final enteredCount = int.tryParse(labourQtyController.text.trim()) ?? 0;
+                                final isExceeding = available > 0 && enteredCount > available;
+
+                                if (!isExceeding) return const SizedBox.shrink();
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 10.0),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF2F2),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFFEF4444), width: 1.0),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Entered labour count cannot exceed the available workers ($available).',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFFDC2626),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Labour Action Buttons
                             Row(
                               children: [
                                 Expanded(
-                                  child: TextField(
-                                    controller: _customLabourCountController,
-                                    style: TextStyle(
-                                      color: textColor,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    decoration: InputDecoration(
-                                      labelText: 'Count',
-                                      labelStyle: TextStyle(
-                                        color: labelColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(color: borderColor, width: 1.0),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(color: borderColor, width: 1.0),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                      ),
-                                      filled: true,
-                                      fillColor: fieldBg,
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (_) => setState(() {}),
+                                  flex: 3,
+                                  child: Builder(
+                                    builder: (context) {
+                                      final available = selectedLabour != null ? (siteMappedLabourCounts[selectedLabour!] ?? 0) : 0;
+                                      final enteredCount = int.tryParse(labourQtyController.text.trim()) ?? 0;
+                                      final isExceeding = available > 0 && enteredCount > available;
+                                      final isZeroOrLess = enteredCount <= 0;
+                                      final isOutOfWorkers = available <= 0;
+                                      final isDisabled = isLoadingLabours ||
+                                          labourOptions.isEmpty ||
+                                          selectedLabour == null ||
+                                          isZeroOrLess ||
+                                          isExceeding ||
+                                          isOutOfWorkers;
+
+                                      return GlassButton(
+                                        label: 'Add Labour',
+                                        icon: Icons.person_add_rounded,
+                                        onPressed: isDisabled ? null : _addLabour,
+                                      );
+                                    },
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 10),
                                 Expanded(
-                                  child: TextField(
-                                    controller: _customLabourSalaryController,
-                                    style: TextStyle(
-                                      color: textColor,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    decoration: InputDecoration(
-                                      labelText: 'Salary (₹)',
-                                      labelStyle: TextStyle(
-                                        color: labelColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(color: borderColor, width: 1.0),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(color: borderColor, width: 1.0),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(color: primaryColor, width: 1.8),
-                                      ),
-                                      filled: true,
-                                      fillColor: fieldBg,
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (_) => setState(() {}),
+                                  flex: 2,
+                                  child: GlassButton(
+                                    label: _showCustomLabourFields ? 'Hide Others' : 'Others',
+                                    icon: _showCustomLabourFields ? Icons.close_rounded : Icons.more_horiz_rounded,
+                                    onPressed: () {
+                                      setState(() {
+                                        _showCustomLabourFields = !_showCustomLabourFields;
+                                      });
+                                    },
+                                    isSecondary: true,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            GlassButton(
-                              label: 'Add Custom Labour',
-                              icon: Icons.playlist_add,
-                              onPressed: _addCustomLabour,
-                            ),
+
+                            // Custom Labour Section
+                            if (_showCustomLabourFields) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: borderColor, width: 1.0),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildFieldLabel('Custom Labour Designation'),
+                                    TextField(
+                                      controller: _customLabourNameController,
+                                      style: TextStyle(
+                                        color: textColor,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                      decoration: InputDecoration(
+                                        prefixIcon: Icon(
+                                          Icons.edit_note_rounded,
+                                          size: 20,
+                                          color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                        ),
+                                        hintText: 'e.g. Electrician, Painter...',
+                                        hintStyle: TextStyle(
+                                          color: labelColor.withValues(alpha: 0.8),
+                                          fontSize: 13.5,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide(color: borderColor, width: 1.0),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide(color: borderColor, width: 1.0),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                        ),
+                                        filled: true,
+                                        fillColor: fieldBg,
+                                        isDense: true,
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                          horizontal: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              _buildFieldLabel('Count'),
+                                              TextField(
+                                                controller: _customLabourCountController,
+                                                style: TextStyle(
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 14,
+                                                ),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: Icon(
+                                                    Icons.people_outline_rounded,
+                                                    size: 20,
+                                                    color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                                  ),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  enabledBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  focusedBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: fieldBg,
+                                                  isDense: true,
+                                                  contentPadding: const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                    horizontal: 14,
+                                                  ),
+                                                ),
+                                                keyboardType: TextInputType.number,
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.digitsOnly,
+                                                ],
+                                                onChanged: (_) => setState(() {}),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              _buildFieldLabel('Daily Salary (₹)'),
+                                              TextField(
+                                                controller: _customLabourSalaryController,
+                                                style: TextStyle(
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 14,
+                                                ),
+                                                decoration: InputDecoration(
+                                                  prefixIcon: Icon(
+                                                    Icons.currency_rupee_rounded,
+                                                    size: 20,
+                                                    color: isDark ? AppTheme.getCardAccent(primaryColor) : primaryColor,
+                                                  ),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  enabledBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: borderColor, width: 1.0),
+                                                  ),
+                                                  focusedBorder: OutlineInputBorder(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderSide: BorderSide(color: primaryColor, width: 1.8),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor: fieldBg,
+                                                  isDense: true,
+                                                  contentPadding: const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                    horizontal: 14,
+                                                  ),
+                                                ),
+                                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                ],
+                                                onChanged: (_) => setState(() {}),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    GlassButton(
+                                      label: 'Add Custom Labour',
+                                      icon: Icons.playlist_add_rounded,
+                                      onPressed: _addCustomLabour,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -3141,7 +3708,9 @@ class _SiteEntryPageState extends State<SiteEntryPage> {
                           child: GlassButton(
                             label: 'Save Entry',
                             icon: Icons.save,
-                            onPressed: isSaving ? null : _saveToFirestore,
+                            onPressed: (_hasValidEntryDetails && !isSaving)
+                                ? _saveToFirestore
+                                : null,
                             isLoading: isSaving,
                           ),
                         ),
