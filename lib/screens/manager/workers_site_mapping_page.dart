@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/site_display_helper.dart';
 
@@ -534,6 +535,21 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
+      // Check if this site already had allocated workers (to distinguish new vs updated allocation)
+      bool isUpdate = false;
+      try {
+        final existingDoc = await FirestoreService.getCollection('workerSiteMapping')
+            .doc(cleanSiteId)
+            .get();
+        if (existingDoc.exists) {
+          final existingCount =
+              (existingDoc.data()?['totalWorkersMapped'] as num?)?.toInt() ?? 0;
+          if (existingCount > 0) {
+            isUpdate = true;
+          }
+        }
+      } catch (_) {}
+
       // 1. Commit mapping to both workerSiteMapping and legacy workerSiteMap across all canonical keys
       final batch = FirebaseFirestore.instance.batch();
 
@@ -589,6 +605,29 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       }
 
       await batch.commit();
+
+      try {
+        final workerNames = _selectedWorkersList
+            .map((w) => (w['workerName'] ?? w['name'] ?? '').toString().trim())
+            .where((n) => n.isNotEmpty)
+            .toList();
+        final cleanSupervisor = (supervisor.isNotEmpty &&
+                supervisor.toLowerCase() != 'not available' &&
+                supervisor.toLowerCase() != 'unassigned')
+            ? supervisor
+            : null;
+        await NotificationService.notifyWorkerAssignment(
+          siteId: cleanSiteId,
+          siteName: cleanSiteName.isNotEmpty ? cleanSiteName : cleanSiteId,
+          workerCount: _selectedWorkersList.length,
+          workerNames: workerNames,
+          supervisorName: cleanSupervisor,
+          projectName: cleanSiteName,
+          isUpdate: isUpdate,
+        );
+      } catch (notifErr) {
+        debugPrint('Error sending worker assignment notification: $notifErr');
+      }
 
       if (!mounted) return;
 

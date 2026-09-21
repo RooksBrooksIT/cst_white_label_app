@@ -198,11 +198,31 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 14),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: AppTheme.orgName,
+                                    builder: (context, orgName, _) {
+                                      if (orgName.isEmpty) return const SizedBox.shrink();
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: 2),
+                                        child: Text(
+                                          orgName.toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0D9488),
+                                            letterSpacing: 0.5,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const Text(
                                     'Materials & Tools Hub',
                                     style: TextStyle(
                                       fontSize: 16,
@@ -211,15 +231,21 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
                                       letterSpacing: -0.3,
                                     ),
                                   ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Track site material stocks, tools inventory, movements and product specifications.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF64748B),
-                                      height: 1.25,
-                                    ),
+                                  const SizedBox(height: 2),
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: AppTheme.appName,
+                                    builder: (context, appName, _) {
+                                      final app = appName.isNotEmpty ? appName : 'eBricks';
+                                      return Text(
+                                        'Track site stocks, tools & equipment via $app.',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF64748B),
+                                          height: 1.25,
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
@@ -259,7 +285,30 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
 
                       // Action Cards List
                       ...items.map((item) => _buildActionCard(context, item)),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 20),
+                      Center(
+                        child: ValueListenableBuilder<String>(
+                          valueListenable: AppTheme.orgName,
+                          builder: (context, orgName, _) {
+                            return ValueListenableBuilder<String>(
+                              valueListenable: AppTheme.appName,
+                              builder: (context, appName, _) {
+                                final org = orgName.isNotEmpty ? orgName : 'Organization';
+                                final app = appName.isNotEmpty ? appName : 'eBricks';
+                                return Text(
+                                  '$org • $app',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),

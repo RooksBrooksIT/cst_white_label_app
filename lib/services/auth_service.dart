@@ -182,32 +182,7 @@ class AuthService {
   /// Fetch and apply organization branding from Firestore
   Future<void> refreshBranding(String orgId) async {
     try {
-      var doc = await FirestoreService.brandingDocWithId(orgId).get();
-
-      // Fallback: If admin/branding doc doesn't exist, check root doc (legacy)
-      if (!doc.exists) {
-        debugPrint(
-          'AuthService: Branding doc not found in admin, falling back to root.',
-        );
-        doc = await FirebaseFirestore.instance
-            .collection('organisation')
-            .doc(orgId)
-            .get();
-      }
-
-      if (doc.exists) {
-        final data = doc.data()!;
-        final appName = data['appName'] as String?;
-        final primaryColorHex = data['primaryColor'] as String?;
-
-        if (appName != null && appName.isNotEmpty) {
-          await AppTheme.updateAppName(appName);
-        }
-        if (primaryColorHex != null && primaryColorHex.isNotEmpty) {
-          final color = AppTheme.hexToColor(primaryColorHex);
-          await AppTheme.updateTheme(color);
-        }
-      }
+      await AppTheme.syncWithFirestore(orgId);
     } catch (e) {
       debugPrint('Error refreshing branding for $orgId: $e');
     }

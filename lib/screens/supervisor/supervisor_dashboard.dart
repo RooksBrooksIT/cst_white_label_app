@@ -36,6 +36,30 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   Color get primaryColor => Theme.of(context).primaryColor;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncBranding();
+    });
+  }
+
+  Future<void> _syncBranding() async {
+    try {
+      final auth = AuthService();
+      final orgId = (auth.userData['orgId'] ??
+              auth.userData['dynamicPath'] ??
+              FirestoreService.currentOrgId)
+          ?.toString()
+          .trim();
+      if (orgId != null && orgId.isNotEmpty && orgId != 'uninitialized') {
+        await AppTheme.syncWithFirestore(orgId);
+      }
+    } catch (e) {
+      debugPrint('SupervisorDashboard: Error syncing branding: $e');
+    }
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
@@ -140,14 +164,43 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
           iconTheme: const IconThemeData(color: Colors.white),
-          title: const Text(
-            'Supervisor Portal',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              letterSpacing: -0.3,
-            ),
+          title: ValueListenableBuilder<String>(
+            valueListenable: AppTheme.appName,
+            builder: (context, appName, _) {
+              return ValueListenableBuilder<String>(
+                valueListenable: AppTheme.orgName,
+                builder: (context, orgName, _) {
+                  final displayName = (appName.isNotEmpty && appName != 'eBricks')
+                      ? appName
+                      : (orgName.isNotEmpty
+                          ? orgName
+                          : (appName.isNotEmpty ? appName : 'eBricks'));
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        displayName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        'Supervisor Portal',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
           ),
           centerTitle: true,
           elevation: 0,
@@ -267,6 +320,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                     ),
                   ),
 
+                  // 4. White-Label Branding Footer
+                  SliverToBoxAdapter(
+                    child: _buildBrandingFooter(context, primaryColor, darkAccent),
+                  ),
+
                   const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],
               ),
@@ -300,6 +358,103 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             size: 28,
           ),
         ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // BRANDING FOOTER
+  // ---------------------------------------------------------------------------
+
+  Widget _buildBrandingFooter(
+    BuildContext context,
+    Color primaryColor,
+    Color darkAccent,
+  ) {
+    final hPad = Responsive.horizontalPadding(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 12),
+      child: ValueListenableBuilder<String>(
+        valueListenable: AppTheme.orgName,
+        builder: (context, orgName, _) {
+          return ValueListenableBuilder<String>(
+            valueListenable: AppTheme.appName,
+            builder: (context, appName, _) {
+              final displayOrg = orgName.isNotEmpty ? orgName : 'Organization';
+              final displayApp = appName.isNotEmpty ? appName : 'eBricks';
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.business_rounded,
+                        color: primaryColor,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        displayOrg,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E293B),
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF94A3B8),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Powered by $displayApp',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -358,11 +513,11 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Site Operations Supervisor',
+                    'Site Operations',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
                   ),
                   const SizedBox(height: 2),

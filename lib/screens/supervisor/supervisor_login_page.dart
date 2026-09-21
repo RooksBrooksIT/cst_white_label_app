@@ -14,7 +14,7 @@ class SupervisorLoginPage extends StatefulWidget {
   const SupervisorLoginPage({super.key});
 
   @override
-  _SupervisorLoginPageState createState() => _SupervisorLoginPageState();
+  State<SupervisorLoginPage> createState() => _SupervisorLoginPageState();
 }
 
 class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
@@ -26,11 +26,13 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
   bool _isPasswordVisible = false;
 
   final bool _isContractor = false;
+  // ignore: unused_field
   List<String> _supervisorNames = [];
   String? _selectedSupervisorName;
   String? _tempOrgName;
   String? _tempLogoUrl;
   String? _actualReferralCode;
+  // ignore: unused_field
   bool _isFromReferralFlow = false;
 
   @override
@@ -519,15 +521,44 @@ class _SupervisorLoginPageState extends State<SupervisorLoginPage> {
                         const SizedBox(height: 18),
 
                         // Title & Subtitle
-                        Text(
-                          _tempOrgName ?? 'Supervisor Login',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: isDesktop ? 26 : (isTablet ? 24 : 22),
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                            color: darkAccent,
-                          ),
+                        ValueListenableBuilder<String>(
+                          valueListenable: AppTheme.orgName,
+                          builder: (context, dynamicOrg, _) {
+                            final org = _tempOrgName ?? (dynamicOrg.isNotEmpty ? dynamicOrg : null);
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  org ?? 'Supervisor Login',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: isDesktop ? 26 : (isTablet ? 24 : 22),
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.5,
+                                    color: darkAccent,
+                                  ),
+                                ),
+                                if (org != null) ...[
+                                  const SizedBox(height: 3),
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: AppTheme.appName,
+                                    builder: (context, appName, _) {
+                                      final app = appName.isNotEmpty ? appName : 'eBricks';
+                                      return Text(
+                                        '$app • Supervisor Portal',
+                                        style: TextStyle(
+                                          fontSize: isDesktop ? 13 : 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: primaryColor,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: 6),
                         Text(

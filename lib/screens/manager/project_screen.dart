@@ -675,11 +675,16 @@ class _ProjectScreenState extends State<ProjectScreen>
         ).doc(selectedProjectId).update(projectData);
 
         try {
+          final effectiveSiteId = _selectedSiteId ?? selectedProjectData?['siteId'] ?? '';
+          final effectiveSiteName = (selectedProjectData?['siteName'] ??
+                  selectedProjectData?['projectName'] ??
+                  _projectNameController.text.trim())
+              .toString();
           await NotificationService.notifyProjectCreatedOrUpdated(
             projectId: selectedProjectId!,
             projectName: _projectNameController.text.trim(),
-            siteId: _selectedSiteId ?? selectedProjectData?['siteId'] ?? '',
-            siteName: _selectedSiteId ?? selectedProjectData?['siteName'] ?? '',
+            siteId: effectiveSiteId,
+            siteName: effectiveSiteName.isNotEmpty ? effectiveSiteName : effectiveSiteId,
             isCreated: false,
           );
         } catch (notifErr) {

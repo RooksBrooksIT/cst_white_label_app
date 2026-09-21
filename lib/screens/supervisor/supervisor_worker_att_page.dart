@@ -28,16 +28,8 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   List<Map<String, dynamic>> _sites = [];
   List<Map<String, dynamic>> _workers = [];
 
-  // Extra / Unknown count-based workers
+  // Preserved extra workers list from existing backend documents
   List<Map<String, dynamic>> _extraWorkers = [];
-  String _selectedExtraWorkerType = 'Mason';
-  int _currentExtraCount = 1;
-  final TextEditingController _customTypeController = TextEditingController();
-  bool _isCustomType = false;
-
-  // Dynamic worker categories fetched from 'labours' collection
-  List<String> _workerCategories = [];
-  bool _isLoadingLabours = false;
 
   // Loading states
   bool _isLoadingSites = false;
@@ -52,104 +44,18 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   // Real-time stream subscriptions
   StreamSubscription<dynamic>? _siteMappingSub;
   StreamSubscription<dynamic>? _todayAttendanceSub;
-  StreamSubscription<dynamic>? _laboursSub;
 
   @override
   void initState() {
     super.initState();
-    _initLaboursListener();
     _fetchAssignedSitesAndLoad();
   }
 
   @override
   void dispose() {
-    _laboursSub?.cancel();
     _siteMappingSub?.cancel();
     _todayAttendanceSub?.cancel();
-    _customTypeController.dispose();
     super.dispose();
-  }
-
-  /// Real-time listener for worker designations from 'labours' collection
-  void _initLaboursListener() {
-    setState(() => _isLoadingLabours = true);
-    _laboursSub?.cancel();
-    _laboursSub = FirestoreService.getCollection('labours')
-        .snapshots()
-        .listen((snapshot) {
-      if (!mounted) return;
-      final Set<String> seen = {};
-      final List<String> fetchedDesignations = [];
-
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final des = (data['designation'] ?? data['name'] ?? data['trade'] ?? data['type'] ?? data['role'] ?? doc.id).toString().trim();
-        if (des.isNotEmpty) {
-          final lower = des.toLowerCase();
-          if (!seen.contains(lower) && lower != 'other / custom' && lower != 'other') {
-            seen.add(lower);
-            fetchedDesignations.add(des);
-          }
-        }
-      }
-
-      // Sort alphabetically
-      fetchedDesignations.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
-      // Fallback defaults if labours collection is empty
-      if (fetchedDesignations.isEmpty) {
-        fetchedDesignations.addAll([
-          'Mason',
-          'Helper',
-          'Carpenter',
-          'Painter',
-          'Electrician',
-          'Plumber',
-          'Barbender',
-          'Welder',
-          'Tile Mason',
-          'General Labour',
-        ]);
-      }
-
-      // Append Other / Custom option for custom trade inputs
-      fetchedDesignations.add('Other / Custom');
-
-      setState(() {
-        _workerCategories = fetchedDesignations;
-        _isLoadingLabours = false;
-
-        if (_selectedExtraWorkerType.isEmpty || !_workerCategories.contains(_selectedExtraWorkerType)) {
-          _selectedExtraWorkerType = _workerCategories.firstWhere(
-            (c) => c != 'Other / Custom',
-            orElse: () => _workerCategories.first,
-          );
-        }
-      });
-    }, onError: (e) {
-      debugPrint('Error listening to labours collection: $e');
-      if (mounted) {
-        setState(() {
-          _isLoadingLabours = false;
-          if (_workerCategories.isEmpty) {
-            _workerCategories = [
-              'Mason',
-              'Helper',
-              'Carpenter',
-              'Painter',
-              'Electrician',
-              'Plumber',
-              'Barbender',
-              'Welder',
-              'Tile Mason',
-              'General Labour',
-              'Other / Custom',
-            ];
-            _selectedExtraWorkerType = 'Mason';
-          }
-        });
-      }
-    });
   }
 
   Future<void> _fetchAssignedSitesAndLoad() async {
@@ -527,12 +433,15 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         final dSiteName = (data['siteName'] ?? '').toString();
         final dDate = (data['Day'] ?? data['date'] ?? '').toString();
 
+        final currentDocId = '${(_selectedSiteId ?? '').trim().replaceAll(' ', '_')}_${(_selectedSiteName ?? '').trim().replaceAll(' ', '_')}_${widget.supervisorName.trim().replaceAll(' ', '_')}';
+        final isExactDocMatch = docId == currentDocId && (dDate == _currentDate || dDate.isEmpty);
+
         final isSiteMatch = docId.contains(formattedDayMonthYear) &&
             (matchesSiteKey(docId) || matchesSiteKey(dSiteId) || matchesSiteKey(dSite) || matchesSiteKey(dSiteName));
 
         final isDateMatch = dDate == _currentDate || docId.contains(formattedDayMonthYear);
 
-        if (isSiteMatch || (isDateMatch && (matchesSiteKey(dSiteId) || matchesSiteKey(dSite) || matchesSiteKey(dSiteName)))) {
+        if (isExactDocMatch || isSiteMatch || (isDateMatch && (matchesSiteKey(dSiteId) || matchesSiteKey(dSite) || matchesSiteKey(dSiteName)))) {
           final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
           final rawExtra = data['extraWorkers'] as List<dynamic>? ?? [];
 
@@ -570,84 +479,6 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     });
   }
 
-  void _addExtraWorkers() {
-    final type = _isCustomType
-        ? _customTypeController.text.trim()
-        : _selectedExtraWorkerType;
-
-    if (type.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid worker trade/category'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
-    if (_currentExtraCount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Worker count must be at least 1'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
-    final existingIndex = _extraWorkers.indexWhere(
-      (e) => (e['workerType'] ?? '').toString().toLowerCase() == type.toLowerCase(),
-    );
-
-    final addedCount = _currentExtraCount;
-    final addedType = type;
-
-    setState(() {
-      if (existingIndex >= 0) {
-        final current = (_extraWorkers[existingIndex]['count'] as num?)?.toInt() ?? 0;
-        _extraWorkers[existingIndex]['count'] = current + _currentExtraCount;
-      } else {
-        _extraWorkers.add({
-          'workerType': type,
-          'count': _currentExtraCount,
-          'supervisor': widget.supervisorName,
-        });
-      }
-
-      // Reset input
-      _currentExtraCount = 1;
-      _customTypeController.clear();
-      _isCustomType = false;
-      _selectedExtraWorkerType = _workerCategories.isNotEmpty ? _workerCategories.first : 'Mason';
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Added $addedCount $addedType worker(s)'),
-        backgroundColor: const Color(0xFF10B981),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _removeExtraWorker(int index) {
-    setState(() {
-      _extraWorkers.removeAt(index);
-    });
-  }
-
-  void _updateExtraCount(int index, int delta) {
-    setState(() {
-      final current = (_extraWorkers[index]['count'] as num?)?.toInt() ?? 1;
-      final updated = current + delta;
-      if (updated <= 0) {
-        _extraWorkers.removeAt(index);
-      } else {
-        _extraWorkers[index]['count'] = updated;
-      }
-    });
-  }
-
   int get _totalExtraCount {
     return _extraWorkers.fold(0, (acc, item) => acc + ((item['count'] as num?)?.toInt() ?? 0));
   }
@@ -661,7 +492,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
   }
 
   int get _totalWorkforcePresentCount {
-    return _totalMappedPresentCount + _totalExtraCount;
+    return _totalMappedPresentCount;
   }
 
   Future<void> _submitAttendance() async {
@@ -672,9 +503,9 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       return;
     }
 
-    if (_workers.isEmpty && _extraWorkers.isEmpty) {
+    if (_workers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No mapped workers or extra workers to record attendance for')),
+        const SnackBar(content: Text('No mapped workers to record attendance for')),
       );
       return;
     }
@@ -700,7 +531,6 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     try {
       final String month = _currentMonth;
       final String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final String formattedDayMonthYear = DateFormat('dd_MM_yyyy').format(DateTime.now());
       final batch = FirebaseFirestore.instance.batch();
 
       // 1. Process Mapped Workers Individual Attendance
@@ -746,7 +576,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         }, SetOptions(merge: true));
       }
 
-      // 2. Prepare Comprehensive Daily Attendance Document (Mapped + Extra Count-Based)
+      // 2. Prepare Comprehensive Daily Attendance Document
       final dailyDocData = {
         'day': DateFormat('dd').format(DateTime.now()),
         'month': DateFormat('MM-yyyy').format(DateTime.now()),
@@ -760,22 +590,23 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
         'totalMappedWorkers': _workers.length,
         'totalMappedPresent': _totalMappedPresentCount,
         'totalExtraWorkers': _totalExtraCount,
-        'totalPresentCount': _totalWorkforcePresentCount,
-        'totalWorkersOnSite': _totalWorkforcePresentCount,
+        'totalPresentCount': _totalMappedPresentCount,
+        'totalWorkersOnSite': _totalMappedPresentCount,
         'Day': _currentDate,
         'date': _currentDate,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      final docRefBySiteId = FirestoreService.getCollection('workersAttendance')
-          .doc('${_selectedSiteId}_$formattedDayMonthYear');
-      final docRefBySiteName = FirestoreService.getCollection('workersAttendance')
-          .doc('${_selectedSiteName}_$formattedDayMonthYear');
+      final String siteId = (_selectedSiteId ?? '').trim().replaceAll(' ', '_');
+      final String siteName = (_selectedSiteName ?? '').trim().replaceAll(' ', '_');
+      final String supervisorName = widget.supervisorName.trim().replaceAll(' ', '_');
+      // Format: ST001_SiteName_SupervisorName (e.g. ST001_Pothys_Abi123)
+      final String attendanceDocId = '${siteId}_${siteName}_$supervisorName';
 
-      batch.set(docRefBySiteId, dailyDocData, SetOptions(merge: true));
-      if (_selectedSiteName != _selectedSiteId) {
-        batch.set(docRefBySiteName, dailyDocData, SetOptions(merge: true));
-      }
+      final attendanceDocRef = FirestoreService.getCollection('workersAttendance')
+          .doc(attendanceDocId);
+
+      batch.set(attendanceDocRef, dailyDocData, SetOptions(merge: true));
 
       await batch.commit();
 
@@ -788,7 +619,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Attendance submitted: $_totalWorkforcePresentCount total workers present ($_totalMappedPresentCount mapped + $_totalExtraCount extra)',
+            'Attendance submitted: $_totalMappedPresentCount worker(s) present out of ${_workers.length} mapped',
           ),
           backgroundColor: const Color(0xFF10B981),
         ),
@@ -956,11 +787,6 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                             // 1. Mapped Configured Workers Section
                             _buildMappedWorkersCard(primaryColor),
 
-                            const SizedBox(height: 16),
-
-                            // 2. Extra / Unknown Workers (Count Based) Section
-                            _buildExtraWorkersCard(primaryColor),
-
                             const SizedBox(height: 20),
 
                             // Submit Button
@@ -1073,7 +899,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$_totalWorkforcePresentCount Present on Site',
+                        '$_totalMappedPresentCount Present on Site',
                         style: TextStyle(
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                           fontSize: 14.5,
@@ -1102,7 +928,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
               ),
             ),
             child: Text(
-              '$_totalMappedPresentCount Mapped + $_totalExtraCount Additional',
+              '$_totalMappedPresentCount / ${_workers.length} Present',
               style: TextStyle(
                 color: isDark ? const Color(0xFF38BDF8) : primaryColor,
                 fontSize: 11,
@@ -1424,478 +1250,7 @@ class _AttendanceManagementPageState extends State<AttendanceManagementPage> {
     );
   }
 
-  Widget _buildExtraWorkersCard(Color primaryColor) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.person_add_rounded, color: Color(0xFFD97706), size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Additional Workers',
-                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                      ),
-                      Text(
-                        'Count-based daily attendance by worker trade',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              if (_extraWorkers.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: Text(
-                    '$_totalExtraCount Additional',
-                    style: const TextStyle(
-                      color: Color(0xFFB45309),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
 
-          // Input Form Container
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: _isCustomType
-                // Vertical Layout for "Other / Custom" Worker Entry
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 1. Full-width Worker Name / Trade Text Field
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Worker Name / Trade *',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF475569),
-                            ),
-                          ),
-                          TextButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _isCustomType = false;
-                                _customTypeController.clear();
-                                _selectedExtraWorkerType = _workerCategories.isNotEmpty
-                                    ? _workerCategories.first
-                                    : 'Mason';
-                              });
-                            },
-                            icon: const Icon(Icons.list_rounded, size: 15),
-                            label: const Text(
-                              'Standard Trades',
-                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                            ),
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                              foregroundColor: const Color(0xFFD97706),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _customTypeController,
-                        autofocus: true,
-                        decoration: InputDecoration(
-                          hintText: 'Enter worker name or trade (e.g. Scaffolder)',
-                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          filled: true,
-                          fillColor: Colors.white,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          prefixIcon: const Icon(Icons.badge_outlined, size: 18, color: Color(0xFFD97706)),
-                          suffixIcon: _customTypeController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 16),
-                                  onPressed: () => setState(() => _customTypeController.clear()),
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // 2. Worker Count Field (Below Name/Trade)
-                      const Text(
-                        'Worker Count',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF475569),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_rounded, size: 18, color: Color(0xFF64748B)),
-                              onPressed: () {
-                                if (_currentExtraCount > 1) {
-                                  setState(() => _currentExtraCount--);
-                                }
-                              },
-                            ),
-                            Text(
-                              '$_currentExtraCount',
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add_rounded, size: 18, color: Color(0xFF64748B)),
-                              onPressed: () {
-                                setState(() => _currentExtraCount++);
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // 3. Add Worker Button (Below Name & Count)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 44,
-                        child: ElevatedButton.icon(
-                          onPressed: _addExtraWorkers,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD97706),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.person_add_rounded, size: 18, color: Colors.white),
-                          label: const Text(
-                            'Add Worker',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                // Standard Selection Layout
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Worker Type / Trade',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
-                      ),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        key: ValueKey('extra_cat_${_selectedExtraWorkerType}_${_workerCategories.length}_$_isLoadingLabours'),
-                        initialValue: _workerCategories.contains(_selectedExtraWorkerType)
-                            ? _selectedExtraWorkerType
-                            : (_workerCategories.isNotEmpty ? _workerCategories.first : null),
-                        dropdownColor: Colors.white,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                          prefixIcon: const Icon(Icons.handyman_outlined, size: 18, color: Color(0xFFD97706)),
-                          suffixIcon: _isLoadingLabours
-                              ? Container(
-                                  padding: const EdgeInsets.all(12),
-                                  width: 14,
-                                  height: 14,
-                                  child: const CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
-                        items: _workerCategories.map((cat) {
-                          return DropdownMenuItem(
-                            value: cat,
-                            child: Text(cat, overflow: TextOverflow.ellipsis),
-                          );
-                        }).toList(),
-                        onChanged: (v) {
-                          if (v == 'Other / Custom') {
-                            setState(() {
-                              _isCustomType = true;
-                              _customTypeController.clear();
-                            });
-                          } else if (v != null) {
-                            setState(() {
-                              _selectedExtraWorkerType = v;
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 4,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Worker Count',
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  height: 42,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      IconButton(
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                        icon: const Icon(Icons.remove_rounded, size: 16, color: Color(0xFF64748B)),
-                                        onPressed: () {
-                                          if (_currentExtraCount > 1) {
-                                            setState(() => _currentExtraCount--);
-                                          }
-                                        },
-                                      ),
-                                      Text(
-                                        '$_currentExtraCount',
-                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                                      ),
-                                      IconButton(
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                        icon: const Icon(Icons.add_rounded, size: 16, color: Color(0xFF64748B)),
-                                        onPressed: () {
-                                          setState(() => _currentExtraCount++);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 5,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 18),
-                                SizedBox(
-                                  height: 42,
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: _addExtraWorkers,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD97706),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      elevation: 0,
-                                    ),
-                                    icon: const Icon(Icons.person_add_rounded, size: 16, color: Colors.white),
-                                    label: const Text('Add Worker', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // List of added extra worker counts
-          if (_extraWorkers.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: Text(
-                  'No additional workers added for today',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _extraWorkers.length,
-              separatorBuilder: (c, i) => const SizedBox(height: 6),
-              itemBuilder: (context, index) {
-                final item = _extraWorkers[index];
-                final type = item['workerType'] ?? 'Worker';
-                final count = (item['count'] as num?)?.toInt() ?? 1;
-
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.handyman_rounded, color: Color(0xFFD97706), size: 16),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            type,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: Color(0xFF78350F)),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          // Stepper
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFFCD34D)),
-                            ),
-                            child: Row(
-                              children: [
-                                InkWell(
-                                  onTap: () => _updateExtraCount(index, -1),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    child: Icon(Icons.remove_rounded, size: 14, color: Color(0xFF92400E)),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  child: Text(
-                                    '$count',
-                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF78350F)),
-                                  ),
-                                ),
-                                InkWell(
-                                  onTap: () => _updateExtraCount(index, 1),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    child: Icon(Icons.add_rounded, size: 14, color: Color(0xFF92400E)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                            onPressed: () => _removeExtraWorker(index),
-                            tooltip: 'Remove',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildAttendanceButton(String status, String workerName, String currentStatus) {
     final isSelected = currentStatus.toLowerCase() == status.toLowerCase();

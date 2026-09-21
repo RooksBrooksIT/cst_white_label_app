@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/notification_service.dart';
 
 /// Represents site-specific inventory for a material
 class SiteInventoryEntry {
@@ -1504,6 +1505,17 @@ class MaterialInventoryService {
         ],
       );
 
+      // Notify assigned supervisor for this site
+      NotificationService.notifyMaterialAssignment(
+        siteId: siteId,
+        siteName: siteName ?? siteId,
+        materialName: displayName ?? materialName,
+        quantity: quantity,
+        managerName: managerName,
+        supervisorName: supervisorName,
+        projectName: projectName,
+      );
+
       // Sync company-level legacy mirrors
       _syncLegacyMirrors(
         materialName: materialName,
@@ -1653,6 +1665,16 @@ class MaterialInventoryService {
             'toSiteNewCount': toNewCount,
           }
         ],
+      );
+
+      // Notify assigned supervisor for the destination site
+      NotificationService.notifyMaterialAssignment(
+        siteId: toSiteId,
+        siteName: toSiteName ?? toSiteId,
+        materialName: displayName ?? materialName,
+        quantity: quantity,
+        managerName: toManagerName ?? fromManagerName,
+        supervisorName: toSupervisorName,
       );
 
       // Sync site mirrors for both sites

@@ -13,8 +13,8 @@ class ProjectFinancialStatusReportPage extends StatefulWidget {
       _ProjectFinancialStatusReportPageState();
 }
 
-class _ProjectFinancialStatusReportPageState
-    extends State<ProjectFinancialStatusReportPage> {
+  class _ProjectFinancialStatusReportPageState
+      extends State<ProjectFinancialStatusReportPage> {
   String? selectedSiteId;
   final projectNameController = TextEditingController();
   final ownerNameController = TextEditingController();

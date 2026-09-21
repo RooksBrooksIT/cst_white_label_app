@@ -1053,6 +1053,48 @@ const normalizeRole = (r) => {
 };
 
 /**
+ * Helper to fetch assigned supervisors for a given site from siteSupervisorMap
+ */
+async function getAssignedSupervisorsForSite(siteId, orgId) {
+  if (!siteId) return [];
+  const db = admin.firestore();
+  const cleanSite = String(siteId).trim().toLowerCase();
+  const supervisors = [];
+  const seenSupIds = new Set();
+
+  const checkDoc = (data) => {
+    const sId = String(data.siteId || data.siteCode || data.site || data.siteDocId || "").trim().toLowerCase();
+    if (sId && (sId === cleanSite || sId.includes(cleanSite) || cleanSite.includes(sId))) {
+      const supName = (data.supervisorName || data.FullName || data.name || data.supervisor || "").trim();
+      const supId = (data.supervisorId || data["Supervisor ID"] || data.supervisorDocId || data.userId || "").trim();
+      const key = `${supName}_${supId}`.toLowerCase();
+      if ((supName || supId) && !seenSupIds.has(key)) {
+        seenSupIds.add(key);
+        supervisors.push({ supervisorName: supName, supervisorId: supId });
+      }
+    }
+  };
+
+  try {
+    if (orgId && orgId !== "uninitialized") {
+      const snapOrg = await db.collection("organisation").doc(orgId).collection("siteSupervisorMap").get();
+      snapOrg.forEach((doc) => checkDoc(doc.data() || {}));
+    }
+  } catch (e) {
+    logger.warn(`Error querying org siteSupervisorMap for ${orgId}:`, e.message);
+  }
+
+  try {
+    const snapRoot = await db.collection("siteSupervisorMap").get();
+    snapRoot.forEach((doc) => checkDoc(doc.data() || {}));
+  } catch (e) {
+    logger.warn("Error querying root siteSupervisorMap:", e.message);
+  }
+
+  return supervisors;
+}
+
+/**
  * Processes a newly created notification document and dispatches real-time push notifications
  * using Firebase Cloud Messaging (FCM) Admin SDK to all active recipient devices.
  */
@@ -1161,6 +1203,16 @@ async function processNotificationAndSendPush(notificationData, docRef) {
         .filter(Boolean)
         .map((s) => String(s).trim().toLowerCase());
 
+      // Pre-resolve assigned supervisors if this is a site-scoped notification and targets include supervisor
+      let siteAssignedSupervisors = [];
+      if (siteId && (targetRoles.includes("supervisor") || targetRoles.includes("all"))) {
+        try {
+          siteAssignedSupervisors = await getAssignedSupervisorsForSite(siteId, orgId);
+        } catch (e) {
+          logger.warn(`Could not resolve supervisors for site ${siteId}:`, e.message);
+        }
+      }
+
       const evaluateTokenDoc = (doc) => {
         const d = doc.data() || {};
         const t = (d.token || "").trim();
@@ -1213,6 +1265,18 @@ async function processNotificationAndSendPush(notificationData, docRef) {
             const targetSupId = (forSupervisorId || "").toLowerCase().trim();
             isUserMatch = (targetSup && (uName === targetSup || uName.includes(targetSup) || targetSup.includes(uName))) ||
                           (targetSupId && (uId === targetSupId || doc.id.toLowerCase().includes(targetSupId)));
+          } else if (siteId) {
+            // Site-scoped activity: supervisor must be assigned to this site
+            if (siteAssignedSupervisors.length === 0) {
+              isUserMatch = false; // Suppress notification if no supervisor assigned to this site
+            } else {
+              isUserMatch = siteAssignedSupervisors.some((sup) => {
+                const sName = (sup.supervisorName || "").toLowerCase().trim();
+                const sId = (sup.supervisorId || "").toLowerCase().trim();
+                return (sName && (uName === sName || uName.includes(sName) || sName.includes(uName))) ||
+                       (sId && (uId === sId || doc.id.toLowerCase().includes(sId)));
+              });
+            }
           }
         } else if (isManagerUser) {
           if (forManagerName || forManagerId) {
@@ -1526,11 +1590,25 @@ exports.onProjectCreated = functions.region("us-central1").firestore
     const timeBucket = Math.floor(Date.now() / 25000);
     const idempotencyKey = `project_created_${orgId || "all"}_${projectId}_${timeBucket}`;
 
+    // Check if a supervisor is assigned to this project's site
+    const assignedSupervisors = siteId ? await getAssignedSupervisorsForSite(siteId, orgId) : [];
+    const targetRoles = ["organisation"];
+    let forSupervisorName = "";
+    let forSupervisorId = "";
+
+    if (assignedSupervisors.length > 0) {
+      targetRoles.push("supervisor");
+      forSupervisorName = assignedSupervisors[0].supervisorName || "";
+      forSupervisorId = assignedSupervisors[0].supervisorId || "";
+    }
+
     return processNotificationAndSendPush({
       title,
       body,
-      targetRole: "organisation",
-      targetRoles: ["organisation"],
+      targetRole: targetRoles.includes("supervisor") ? "manager_and_organisation" : "organisation",
+      targetRoles,
+      forSupervisorName,
+      forSupervisorId,
       requestType: "project_created",
       type: "project_created",
       projectId,
@@ -1578,11 +1656,25 @@ exports.onOrgProjectCreated = functions.region("us-central1").firestore
     const timeBucket = Math.floor(Date.now() / 25000);
     const idempotencyKey = `project_created_${orgId}_${projectId}_${timeBucket}`;
 
+    // Check if a supervisor is assigned to this project's site
+    const assignedSupervisors = siteId ? await getAssignedSupervisorsForSite(siteId, orgId) : [];
+    const targetRoles = ["organisation"];
+    let forSupervisorName = "";
+    let forSupervisorId = "";
+
+    if (assignedSupervisors.length > 0) {
+      targetRoles.push("supervisor");
+      forSupervisorName = assignedSupervisors[0].supervisorName || "";
+      forSupervisorId = assignedSupervisors[0].supervisorId || "";
+    }
+
     return processNotificationAndSendPush({
       title,
       body,
-      targetRole: "organisation",
-      targetRoles: ["organisation"],
+      targetRole: targetRoles.includes("supervisor") ? "manager_and_organisation" : "organisation",
+      targetRoles,
+      forSupervisorName,
+      forSupervisorId,
       requestType: "project_created",
       type: "project_created",
       projectId,
@@ -1634,11 +1726,25 @@ exports.onProjectUpdated = functions.region("us-central1").firestore
     const timeBucket = Math.floor(Date.now() / 25000);
     const idempotencyKey = `project_updated_${orgId || "all"}_${projectId}_${timeBucket}`;
 
+    // Check if a supervisor is assigned to this project's site
+    const assignedSupervisors = siteId ? await getAssignedSupervisorsForSite(siteId, orgId) : [];
+    const targetRoles = ["organisation"];
+    let forSupervisorName = "";
+    let forSupervisorId = "";
+
+    if (assignedSupervisors.length > 0) {
+      targetRoles.push("supervisor");
+      forSupervisorName = assignedSupervisors[0].supervisorName || "";
+      forSupervisorId = assignedSupervisors[0].supervisorId || "";
+    }
+
     return processNotificationAndSendPush({
       title,
       body,
-      targetRole: "organisation",
-      targetRoles: ["organisation"],
+      targetRole: targetRoles.includes("supervisor") ? "manager_and_organisation" : "organisation",
+      targetRoles,
+      forSupervisorName,
+      forSupervisorId,
       requestType: "project_updated",
       type: "project_updated",
       projectId,
@@ -1689,11 +1795,25 @@ exports.onOrgProjectUpdated = functions.region("us-central1").firestore
     const timeBucket = Math.floor(Date.now() / 25000);
     const idempotencyKey = `project_updated_${orgId}_${projectId}_${timeBucket}`;
 
+    // Check if a supervisor is assigned to this project's site
+    const assignedSupervisors = siteId ? await getAssignedSupervisorsForSite(siteId, orgId) : [];
+    const targetRoles = ["organisation"];
+    let forSupervisorName = "";
+    let forSupervisorId = "";
+
+    if (assignedSupervisors.length > 0) {
+      targetRoles.push("supervisor");
+      forSupervisorName = assignedSupervisors[0].supervisorName || "";
+      forSupervisorId = assignedSupervisors[0].supervisorId || "";
+    }
+
     return processNotificationAndSendPush({
       title,
       body,
-      targetRole: "organisation",
-      targetRoles: ["organisation"],
+      targetRole: targetRoles.includes("supervisor") ? "manager_and_organisation" : "organisation",
+      targetRoles,
+      forSupervisorName,
+      forSupervisorId,
       requestType: "project_updated",
       type: "project_updated",
       projectId,
@@ -1738,11 +1858,25 @@ exports.onOrgSiteCreated = functions.region("us-central1").firestore
     const timeBucket = Math.floor(Date.now() / 25000);
     const idempotencyKey = `site_mgmt_${orgId}_${siteId}_${timeBucket}`;
 
+    // Check if a supervisor is assigned to this site
+    const assignedSupervisors = siteId ? await getAssignedSupervisorsForSite(siteId, orgId) : [];
+    const targetRoles = ["organisation"];
+    let forSupervisorName = "";
+    let forSupervisorId = "";
+
+    if (assignedSupervisors.length > 0) {
+      targetRoles.push("supervisor");
+      forSupervisorName = assignedSupervisors[0].supervisorName || "";
+      forSupervisorId = assignedSupervisors[0].supervisorId || "";
+    }
+
     return processNotificationAndSendPush({
       title: "🏗️ New Site Registered",
       body: `Manager ${managerName} registered Site "${siteName}" at ${location || "Site Location"}.`,
-      targetRole: "organisation",
-      targetRoles: ["organisation"],
+      targetRole: targetRoles.includes("supervisor") ? "manager_and_organisation" : "organisation",
+      targetRoles,
+      forSupervisorName,
+      forSupervisorId,
       requestType: "site_management",
       type: "site_created",
       siteId,
@@ -1788,11 +1922,25 @@ exports.onOrgSiteUpdated = functions.region("us-central1").firestore
     const timeBucket = Math.floor(Date.now() / 25000);
     const idempotencyKey = `site_mgmt_${orgId}_${siteId}_${timeBucket}`;
 
+    // Check if a supervisor is assigned to this site
+    const assignedSupervisors = siteId ? await getAssignedSupervisorsForSite(siteId, orgId) : [];
+    const targetRoles = ["organisation"];
+    let forSupervisorName = "";
+    let forSupervisorId = "";
+
+    if (assignedSupervisors.length > 0) {
+      targetRoles.push("supervisor");
+      forSupervisorName = assignedSupervisors[0].supervisorName || "";
+      forSupervisorId = assignedSupervisors[0].supervisorId || "";
+    }
+
     return processNotificationAndSendPush({
       title: "🏗️ Site Values Updated",
       body: `Manager ${managerName} updated values for Site "${siteName}" (Status: ${status}).`,
-      targetRole: "organisation",
-      targetRoles: ["organisation"],
+      targetRole: targetRoles.includes("supervisor") ? "manager_and_organisation" : "organisation",
+      targetRoles,
+      forSupervisorName,
+      forSupervisorId,
       requestType: "site_management",
       type: "site_created",
       siteId,
@@ -1838,11 +1986,25 @@ exports.onOrgLowerSiteUpdated = functions.region("us-central1").firestore
     const timeBucket = Math.floor(Date.now() / 25000);
     const idempotencyKey = `site_mgmt_${orgId}_${siteId}_${timeBucket}`;
 
+    // Check if a supervisor is assigned to this site
+    const assignedSupervisors = siteId ? await getAssignedSupervisorsForSite(siteId, orgId) : [];
+    const targetRoles = ["organisation"];
+    let forSupervisorName = "";
+    let forSupervisorId = "";
+
+    if (assignedSupervisors.length > 0) {
+      targetRoles.push("supervisor");
+      forSupervisorName = assignedSupervisors[0].supervisorName || "";
+      forSupervisorId = assignedSupervisors[0].supervisorId || "";
+    }
+
     return processNotificationAndSendPush({
       title: "🏗️ Site Values Updated",
       body: `Manager ${managerName} updated values for Site "${siteName}" (Status: ${status}).`,
-      targetRole: "organisation",
-      targetRoles: ["organisation"],
+      targetRole: targetRoles.includes("supervisor") ? "manager_and_organisation" : "organisation",
+      targetRoles,
+      forSupervisorName,
+      forSupervisorId,
       requestType: "site_management",
       type: "site_created",
       siteId,

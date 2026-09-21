@@ -251,6 +251,64 @@ class _WorkerAttendanceSalaryPageState
       int totalDaysDetected = 0;
       final Map<String, int> extraMap = {};
       int totalExtraCount = 0;
+      final Set<String> seenExtraKeys = {};
+
+      String normalizeAttendanceDate(dynamic rawDate, dynamic updatedAt, String docId, String fallbackMonth) {
+        String dateStr = (rawDate ?? '').toString().trim();
+        if (dateStr.isEmpty && updatedAt is Timestamp) {
+          dateStr = DateFormat('yyyy-MM-dd').format(updatedAt.toDate());
+        }
+
+        if (dateStr.isNotEmpty) {
+          // 1. Check yyyy-MM-dd
+          if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(dateStr)) {
+            return dateStr;
+          }
+          // 2. Check dd/MM/yyyy or dd-MM-yyyy or dd_MM_yyyy
+          final parts = dateStr.split(RegExp(r'[/_-]'));
+          if (parts.length == 3) {
+            if (parts[0].length == 4) {
+              return '${parts[0]}-${parts[1].padLeft(2, '0')}-${parts[2].padLeft(2, '0')}';
+            } else if (parts[2].length == 4) {
+              return '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
+            }
+          }
+          // 3. Check single/double digit day number
+          if (RegExp(r'^\d{1,2}$').hasMatch(dateStr) && fallbackMonth.isNotEmpty) {
+            final day = dateStr.padLeft(2, '0');
+            final mParts = fallbackMonth.split(RegExp(r'[-_]'));
+            if (mParts.length == 2) {
+              if (mParts[0].length == 4) {
+                return '${mParts[0]}-${mParts[1].padLeft(2, '0')}-$day';
+              } else if (mParts[1].length == 4) {
+                return '${mParts[1]}-${mParts[0].padLeft(2, '0')}-$day';
+              }
+            }
+          }
+          try {
+            final parsed = DateTime.tryParse(dateStr);
+            if (parsed != null) {
+              return DateFormat('yyyy-MM-dd').format(parsed);
+            }
+          } catch (_) {}
+        }
+
+        // 4. Try extracting date from docId (e.g. ST001_21_09_2026)
+        final dmyMatch = RegExp(r'(\d{2})_(\d{2})_(\d{4})').firstMatch(docId);
+        if (dmyMatch != null) {
+          return '${dmyMatch.group(3)}-${dmyMatch.group(2)}-${dmyMatch.group(1)}';
+        }
+        final ymdMatch = RegExp(r'(\d{4})[-_](\d{2})[-_](\d{2})').firstMatch(docId);
+        if (ymdMatch != null) {
+          return '${ymdMatch.group(1)}-${ymdMatch.group(2)}-${ymdMatch.group(3)}';
+        }
+
+        if (updatedAt is Timestamp) {
+          return DateFormat('yyyy-MM-dd').format(updatedAt.toDate());
+        }
+
+        return dateStr.isNotEmpty ? dateStr : docId;
+      }
 
       // 1. Load active worker mappings for baseline worker information
       try {
@@ -310,27 +368,24 @@ class _WorkerAttendanceSalaryPageState
             continue;
           }
 
-          final extraList = (data['extraWorkers'] ?? data['extra_workers']) as List<dynamic>? ?? [];
-          for (final e in extraList) {
-            if (e is Map) {
-              final type = (e['workerType'] ?? e['type'] ?? 'General Labour').toString();
-              final count = (e['count'] as num?)?.toInt() ?? int.tryParse(e['count']?.toString() ?? '0') ?? 0;
-              if (count > 0) {
-                extraMap[type] = (extraMap[type] ?? 0) + count;
-                totalExtraCount += count;
+          final rawDate = data['Day'] ?? data['date'] ?? data['day'];
+          final fallbackMonth = (data['month'] ?? monthStrMonthYear).toString();
+          final canonicalDate = normalizeAttendanceDate(rawDate, data['updatedAt'], docId, fallbackMonth);
+
+          // Deduplicate extra workers per site and canonical date
+          final extraKey = '${sId}_${sName}_$canonicalDate';
+          if (seenExtraKeys.add(extraKey)) {
+            final extraList = (data['extraWorkers'] ?? data['extra_workers']) as List<dynamic>? ?? [];
+            for (final e in extraList) {
+              if (e is Map) {
+                final type = (e['workerType'] ?? e['type'] ?? 'General Labour').toString();
+                final count = (e['count'] as num?)?.toInt() ?? int.tryParse(e['count']?.toString() ?? '0') ?? 0;
+                if (count > 0) {
+                  extraMap[type] = (extraMap[type] ?? 0) + count;
+                  totalExtraCount += count;
+                }
               }
             }
-          }
-
-          String dateStr = (data['Day'] ?? data['date'] ?? '').toString();
-          if (dateStr.isEmpty && data['day'] != null) {
-            dateStr = '${data['day']}/${data['month'] ?? monthStrMonthYear}';
-          }
-          if (dateStr.isEmpty && data['updatedAt'] is Timestamp) {
-            dateStr = DateFormat('dd/MM/yyyy').format((data['updatedAt'] as Timestamp).toDate());
-          }
-          if (dateStr.isEmpty) {
-            dateStr = docId;
           }
 
           final workersMap = data['workers'] as Map<String, dynamic>? ?? {};
@@ -365,9 +420,9 @@ class _WorkerAttendanceSalaryPageState
             }
 
             final stats = workerAggregates[key]!;
-            final existingEntry = stats['attendanceData'][dateStr];
+            final existingEntry = stats['attendanceData'][canonicalDate];
             if (existingEntry == null) {
-              stats['attendanceData'][dateStr] = details;
+              stats['attendanceData'][canonicalDate] = details;
               totalDaysDetected++;
 
               if (status == 'present' || status == 'p') {
@@ -439,8 +494,10 @@ class _WorkerAttendanceSalaryPageState
 
           final stats = workerAggregates[key]!;
           attendanceData.forEach((dateKey, entry) {
-            if (entry is Map && !stats['attendanceData'].containsKey(dateKey)) {
-              stats['attendanceData'][dateKey] = entry;
+            if (entry is! Map) return;
+            final canonicalDate = normalizeAttendanceDate(dateKey, null, '', monthStrYearMonth);
+            if (!stats['attendanceData'].containsKey(canonicalDate)) {
+              stats['attendanceData'][canonicalDate] = entry;
               totalDaysDetected++;
               final status = (entry['status'] ?? entry['attendance'] ?? '').toString().toLowerCase();
               final daySalary = (entry['salaryPerDay'] as num?)?.toDouble() ??

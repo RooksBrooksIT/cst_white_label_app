@@ -9,6 +9,7 @@ import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/subscription_limit_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/screens/manager/project_configuration_screen.dart';
 
 class ProjectSetupWizard extends StatefulWidget {
   const ProjectSetupWizard({super.key});
@@ -1170,16 +1171,32 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   ],
                 ),
                 const SizedBox(height: 16),
-                _buildDropdownField(
-                  'Site Status',
-                  _siteStatus,
-                  _statuses.isNotEmpty
-                      ? _statuses
-                      : ['Planning', 'Ongoing', 'On Hold', 'Completed'],
-                  (v) => setState(() => _siteStatus = v),
-                  isLoading: _isLoadingDropdowns,
-                  primaryColor: primaryColor,
-                ),
+                if (_isLoadingDropdowns)
+                  _buildDropdownField(
+                    'Site Status',
+                    _siteStatus,
+                    const [],
+                    (v) => setState(() => _siteStatus = v),
+                    isLoading: true,
+                    primaryColor: primaryColor,
+                  )
+                else if (_statuses.isEmpty)
+                  _buildMissingConfigBanner(
+                    fieldLabel: 'Site Status',
+                    message:
+                        'No Site Status values have been configured yet. Please configure them in Project Configuration to continue.',
+                    configIndex: 4,
+                    primaryColor: primaryColor,
+                  )
+                else
+                  _buildDropdownField(
+                    'Site Status',
+                    _siteStatus,
+                    _statuses,
+                    (v) => setState(() => _siteStatus = v),
+                    isLoading: false,
+                    primaryColor: primaryColor,
+                  ),
               ],
             ),
           ],
@@ -1309,16 +1326,32 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               icon: Icons.category_rounded,
               primaryColor: primaryColor,
               children: [
-                _buildDropdownField(
-                  'Project Category',
-                  _siteProjectCategory,
-                  _categories.isNotEmpty
-                      ? _categories
-                      : ['Residential', 'Commercial', 'Industrial', 'Infrastructure'],
-                  (v) => setState(() => _siteProjectCategory = v),
-                  isLoading: _isLoadingDropdowns,
-                  primaryColor: primaryColor,
-                ),
+                if (_isLoadingDropdowns)
+                  _buildDropdownField(
+                    'Project Category',
+                    _siteProjectCategory,
+                    const [],
+                    (v) => setState(() => _siteProjectCategory = v),
+                    isLoading: true,
+                    primaryColor: primaryColor,
+                  )
+                else if (_categories.isEmpty)
+                  _buildMissingConfigBanner(
+                    fieldLabel: 'Project Category',
+                    message:
+                        'No Project Category values have been configured yet. Please configure them in Project Configuration to continue.',
+                    configIndex: 0,
+                    primaryColor: primaryColor,
+                  )
+                else
+                  _buildDropdownField(
+                    'Project Category',
+                    _siteProjectCategory,
+                    _categories,
+                    (v) => setState(() => _siteProjectCategory = v),
+                    isLoading: false,
+                    primaryColor: primaryColor,
+                  ),
                 const SizedBox(height: 16),
                 _buildDropdownField(
                   'Sub Category',
@@ -2143,6 +2176,104 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 ),
               ],
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // -------------------- MISSING CONFIG BANNER --------------------
+  Widget _buildMissingConfigBanner({
+    required String fieldLabel,
+    required String message,
+    required int configIndex,
+    required Color primaryColor,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFieldLabel(fieldLabel),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7ED),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: const Color(0xFFFED7AA),
+              width: 1.2,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 1),
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      size: 16,
+                      color: Color(0xFFF97316),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF9A3412),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProjectConfigurationScreen(
+                          initialIndex: configIndex,
+                        ),
+                      ),
+                    );
+                    // Refresh dropdown data after returning from configuration
+                    if (mounted) {
+                      await _fetchDropdownData();
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.settings_rounded,
+                    size: 14,
+                    color: Color(0xFFEA580C),
+                  ),
+                  label: const Text(
+                    'Configure Now',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFEA580C),
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    backgroundColor: const Color(0xFFFFEDD5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],

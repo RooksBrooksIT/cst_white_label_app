@@ -18,6 +18,9 @@ class AppTheme {
   // ValueNotifier to broadcast app name changes
   static final ValueNotifier<String> appName = ValueNotifier(defaultAppName);
 
+  // ValueNotifier to broadcast organization name
+  static final ValueNotifier<String> orgName = ValueNotifier('');
+
   // ValueNotifier to broadcast logo URL changes
   static final ValueNotifier<String> logoUrl = ValueNotifier('');
 
@@ -129,6 +132,11 @@ class AppTheme {
       appName.value = storedAppName;
     }
 
+    final storedOrgName = prefs.getString('org_name') ?? prefs.getString('organization_name');
+    if (storedOrgName != null && storedOrgName.isNotEmpty) {
+      orgName.value = storedOrgName;
+    }
+
     final storedLogoUrl = prefs.getString('logo_url');
     if (storedLogoUrl != null && storedLogoUrl.isNotEmpty) {
       logoUrl.value = storedLogoUrl;
@@ -137,56 +145,92 @@ class AppTheme {
 
   /// Synchronizes branding from Firestore for a given organization.
   static Future<void> syncWithFirestore(String orgId) async {
+    final cleanOrgId = orgId.trim();
+    if (cleanOrgId.isEmpty || cleanOrgId == 'uninitialized') return;
+
     try {
-      // Use the consistent path from FirestoreService: organisation/{id}/data/branding
-      final brandingDoc = await FirebaseFirestore.instance
-          .collection('organisation')
-          .doc(orgId)
-          .collection('data')
-          .doc('branding')
-          .get();
-
-      DocumentSnapshot<Map<String, dynamic>> finalDoc = brandingDoc;
-
-      if (!brandingDoc.exists) {
-        debugPrint(
-          'AppTheme: Branding doc not found in data/branding, falling back to root.',
-        );
-        finalDoc = await FirebaseFirestore.instance
+      final results = await Future.wait([
+        FirebaseFirestore.instance
             .collection('organisation')
-            .doc(orgId)
-            .get();
+            .doc(cleanOrgId)
+            .collection('data')
+            .doc('branding')
+            .get(),
+        FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(cleanOrgId)
+            .get(),
+      ]);
+
+      final brandingDoc = results[0];
+      final rootOrgDoc = results[1];
+
+      final brandingData = brandingDoc.data() ?? {};
+      final rootData = rootOrgDoc.data() ?? {};
+
+      // 1. Resolve Application Branding Name
+      final String? newAppName = (brandingData['appName'] ??
+              brandingData['app_name'] ??
+              rootData['appName'] ??
+              rootData['app_name'])
+          ?.toString()
+          .trim();
+
+      if (newAppName != null && newAppName.isNotEmpty) {
+        await updateAppName(newAppName);
       }
 
-      if (finalDoc.exists) {
-        final data = finalDoc.data()!;
-        final String? newAppName = data['appName'] as String?;
-        final String? newColorHex = data['primaryColor'] as String?;
-        final String? newLogoUrl = (data['logoUrl'] ?? data['logo_url']) as String?;
+      // 2. Resolve Organization Name
+      String? resolvedOrgName = (rootData['org_name'] ??
+              rootData['orgName'] ??
+              rootData['name'] ??
+              rootData['companyName'] ??
+              brandingData['orgName'] ??
+              brandingData['org_name'])
+          ?.toString()
+          .trim();
 
-        if (newAppName != null && newAppName.isNotEmpty) {
-          await updateAppName(newAppName);
+      if (resolvedOrgName == null || resolvedOrgName.isEmpty) {
+        if (cleanOrgId.contains('_')) {
+          final prefix = cleanOrgId.split('_').first.trim();
+          if (prefix.isNotEmpty) resolvedOrgName = prefix;
+        } else {
+          resolvedOrgName = cleanOrgId;
         }
-
-        if (newColorHex != null && newColorHex.isNotEmpty) {
-          final color = hexToColor(newColorHex);
-          await updateTheme(color);
-        }
-
-        if (newLogoUrl != null && newLogoUrl.isNotEmpty) {
-          logoUrl.value = newLogoUrl;
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('logo_url', newLogoUrl);
-        }
-
-        debugPrint(
-          'AppTheme: Successfully synchronized branding from Firestore for $orgId',
-        );
-      } else {
-        debugPrint(
-          'AppTheme: No branding document found for $orgId, using defaults.',
-        );
       }
+
+      if (resolvedOrgName != null && resolvedOrgName.isNotEmpty) {
+        await updateOrgName(resolvedOrgName);
+      }
+
+      // 3. Resolve Primary Theme Color
+      final String? newColorHex = (brandingData['primaryColor'] ??
+              brandingData['theme_color'] ??
+              rootData['primaryColor'])
+          ?.toString()
+          .trim();
+
+      if (newColorHex != null && newColorHex.isNotEmpty) {
+        final color = hexToColor(newColorHex);
+        await updateTheme(color);
+      }
+
+      // 4. Resolve Logo URL
+      final String? newLogoUrl = (brandingData['logoUrl'] ??
+              brandingData['logo_url'] ??
+              rootData['logoUrl'])
+          ?.toString()
+          .trim();
+
+      if (newLogoUrl != null && newLogoUrl.isNotEmpty) {
+        logoUrl.value = newLogoUrl;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('logo_url', newLogoUrl);
+      }
+
+      debugPrint(
+        'AppTheme: Successfully synchronized branding from Firestore for $cleanOrgId: appName="$newAppName", orgName="$resolvedOrgName"',
+      );
     } catch (e) {
       debugPrint('AppTheme: Error syncing with Firestore: $e');
     }
@@ -202,7 +246,19 @@ class AppTheme {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_name', newName);
-    await prefs.setString('org_name', newName);
+  }
+
+  /// Updates the organization name and persists it to SharedPreferences.
+  static Future<void> updateOrgName(String newOrgName) async {
+    orgName.value = newOrgName;
+
+    // Explicitly notify listeners
+    // ignore: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
+    orgName.notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('org_name', newOrgName);
+    await prefs.setString('organization_name', newOrgName);
   }
 
   /// Updates the global primary color and persists it to SharedPreferences.
