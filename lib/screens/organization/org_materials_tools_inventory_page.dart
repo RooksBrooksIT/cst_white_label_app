@@ -4,6 +4,7 @@ import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
 import 'package:ebricks/screens/reports/material_report.dart';
 import 'package:ebricks/screens/reports/tools_inventory_report.dart';
+import 'package:ebricks/screens/manager/config_materialavailability.dart';
 
 class OrgMaterialsToolsInventoryPage extends StatelessWidget {
   const OrgMaterialsToolsInventoryPage({super.key});
@@ -16,6 +17,21 @@ class OrgMaterialsToolsInventoryPage extends StatelessWidget {
         final darkAccent = AppTheme.getDarkAccent(primaryColor);
 
         final items = [
+          _MenuItemData(
+            title: 'Materials Availability',
+            subtitle: 'Add company stock, allocate to sites & track live site material pools',
+            icon: Icons.check_circle_rounded,
+            accentColor: const Color(0xFF10B981),
+            badgeText: 'Stock Flow',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MaterialAvailability(),
+                ),
+              );
+            },
+          ),
           _MenuItemData(
             title: 'Materials Inventory',
             subtitle: 'Stock availability, material categories & site consumption reports',

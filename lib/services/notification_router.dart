@@ -20,6 +20,7 @@ import '../screens/organization/org_notification_page.dart';
 import '../screens/common/notification_page.dart';
 import '../screens/organization/org_sites_list_page.dart';
 import '../screens/manager/manager_sites_list_page.dart';
+import '../screens/supervisor/supervisor_material_information.dart';
 
 /// Centralized Decoupled Notification Router.
 /// Resolves incoming FCM push notification payloads and in-app notification records
@@ -88,6 +89,17 @@ class NotificationRouter {
 
       if (isSiteAssignment) {
         SiteAssignmentDetailsDialog.show(context, model: model, rawData: rawMap);
+        return;
+      }
+
+      // Check for Material Allocation notifications
+      final isMaterialAllocation = reqType == 'material_allocation' ||
+          reqType == 'material_assignment' ||
+          title.contains('material allocated') ||
+          title.contains('materials assigned');
+
+      if (isMaterialAllocation) {
+        MaterialAllocationDetailsDialog.show(context, model: model, rawData: rawMap);
         return;
       }
 
@@ -898,6 +910,343 @@ class WelcomeNotificationDetailsDialog extends StatelessWidget {
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(List<_InfoRow> rows) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < rows.length; i++) ...[
+            rows[i],
+            if (i < rows.length - 1)
+              const Divider(height: 16, color: Color(0xFFE2E8F0)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// DEDICATED DIALOG 3: MATERIAL ALLOCATION DETAILS
+// =============================================================================
+
+class MaterialAllocationDetailsDialog extends StatelessWidget {
+  final NotificationModel model;
+  final Map<String, dynamic> rawData;
+
+  const MaterialAllocationDetailsDialog({
+    super.key,
+    required this.model,
+    required this.rawData,
+  });
+
+  static void show(
+    BuildContext context, {
+    required NotificationModel model,
+    required Map<String, dynamic> rawData,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => MaterialAllocationDetailsDialog(model: model, rawData: rawData),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    final siteId = (rawData['siteId'] ?? rawData['siteCode'] ?? model.siteId ?? '').toString().trim();
+    final siteName = (rawData['siteName'] ?? rawData['site'] ?? model.siteName ?? 'Site Allocation').toString().trim();
+    final projectName = (rawData['projectName'] ?? rawData['project'] ?? '').toString().trim();
+    final materialName = (rawData['materialName'] ?? rawData['displayName'] ?? 'Material').toString().trim();
+    final displayName = (rawData['displayName'] ?? materialName).toString().trim();
+
+    final dynamic rawQty = rawData['quantity'] ?? rawData['qty'];
+    final String qtyStr = rawData['quantityStr']?.toString() ??
+        (rawQty != null
+            ? (rawQty is num
+                ? (rawQty.truncateToDouble() == rawQty ? rawQty.toInt().toString() : rawQty.toString())
+                : rawQty.toString())
+            : '');
+    final String unitStr = (rawData['unit'] ?? '').toString().trim();
+    final String quantityDisplay = qtyStr.isNotEmpty
+        ? (unitStr.isNotEmpty ? '$qtyStr $unitStr' : qtyStr)
+        : 'Allocated';
+
+    final dynamic rawRate = rawData['unitRate'] ?? rawData['rate'];
+    final double? unitRate = (rawRate is num && rawRate > 0) ? rawRate.toDouble() : null;
+    final dynamic rawAmt = rawData['allocatedAmount'] ?? rawData['amount'];
+    final double? totalAmount = (rawAmt is num && rawAmt > 0) ? rawAmt.toDouble() : null;
+
+    final managerName = (rawData['managerName'] ??
+            rawData['allocatedBy'] ??
+            rawData['senderName'] ??
+            model.senderName ??
+            'Manager')
+        .toString()
+        .trim();
+    final remarks = (rawData['remarks'] ?? model.remarks ?? '').toString().trim();
+
+    String formattedDate = '';
+    final rawDate = rawData['allocationDateTime'] ?? rawData['allocationDate'];
+    if (rawDate != null && rawDate.toString().isNotEmpty) {
+      formattedDate = rawDate.toString();
+    } else {
+      final createdAt = rawData['createdAt'] ?? model.createdAt;
+      if (createdAt is Timestamp) {
+        formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(createdAt.toDate());
+      } else if (createdAt is String && createdAt.isNotEmpty) {
+        formattedDate = createdAt;
+      }
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      elevation: 12,
+      backgroundColor: Colors.white,
+      insetPadding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 40, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 480,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with Gradient
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF059669), // Emerald
+                    Color.alphaBlend(primaryColor.withValues(alpha: 0.7), const Color(0xFF047857)),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.inventory_2_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Material Allocation',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16.5,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Stock allocated by Manager to your site',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+
+            // Body content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 14),
+                          SizedBox(width: 5),
+                          Text(
+                            'Active Stock Allocated',
+                            style: TextStyle(
+                              color: Color(0xFF047857),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Material & Site Details Card
+                    _buildInfoCard([
+                      _InfoRow(
+                        icon: Icons.apartment_rounded,
+                        label: 'Site',
+                        value: siteName.isNotEmpty ? siteName : 'N/A',
+                        isBold: true,
+                      ),
+                      if (siteId.isNotEmpty)
+                        _InfoRow(
+                          icon: Icons.tag_rounded,
+                          label: 'Site ID',
+                          value: siteId,
+                          isHighlight: true,
+                          primaryColor: primaryColor,
+                        ),
+                      if (projectName.isNotEmpty)
+                        _InfoRow(
+                          icon: Icons.folder_special_rounded,
+                          label: 'Project',
+                          value: projectName,
+                        ),
+                      _InfoRow(
+                        icon: Icons.category_rounded,
+                        label: 'Material Name',
+                        value: displayName.isNotEmpty ? displayName : materialName,
+                        isBold: true,
+                      ),
+                      _InfoRow(
+                        icon: Icons.production_quantity_limits_rounded,
+                        label: 'Allocated Qty',
+                        value: quantityDisplay,
+                        isHighlight: true,
+                        primaryColor: const Color(0xFF059669),
+                      ),
+                      if (unitRate != null)
+                        _InfoRow(
+                          icon: Icons.currency_rupee_rounded,
+                          label: 'Unit Rate',
+                          value:
+                              '₹${unitRate.truncateToDouble() == unitRate ? unitRate.toInt() : unitRate.toStringAsFixed(2)} / $unitStr',
+                        ),
+                      if (totalAmount != null)
+                        _InfoRow(
+                          icon: Icons.receipt_long_rounded,
+                          label: 'Total Amount',
+                          value:
+                              '₹${NumberFormat.currency(symbol: '', decimalDigits: 0).format(totalAmount).trim()}',
+                          isBold: true,
+                        ),
+                    ]),
+
+                    const SizedBox(height: 12),
+
+                    // Allocation Metadata Card
+                    _buildInfoCard([
+                      _InfoRow(
+                        icon: Icons.manage_accounts_rounded,
+                        label: 'Allocated By',
+                        value: managerName.isNotEmpty ? managerName : 'Manager',
+                      ),
+                      if (formattedDate.isNotEmpty)
+                        _InfoRow(
+                          icon: Icons.access_time_filled_rounded,
+                          label: 'Allocation Date',
+                          value: formattedDate,
+                        ),
+                      if (remarks.isNotEmpty)
+                        _InfoRow(
+                          icon: Icons.notes_rounded,
+                          label: 'Remarks',
+                          value: remarks,
+                        ),
+                    ]),
+                  ],
+                ),
+              ),
+            ),
+
+            // Footer Buttons
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SupervisorMaterialInfoScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                      label: const Text(
+                        'View Site Stock',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF059669),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

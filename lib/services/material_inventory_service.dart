@@ -692,13 +692,126 @@ class MaterialInventoryService {
     );
     await txRef.set(tx.toMap());
 
-    // 4. Backward-compatible sync with site inventory mirrors
+    // 4. Deduct allocated quantity from Company Warehouse available stock and sync mirrors
+    try {
+      final docId = getMaterialDocId(materialName);
+      final availRef = FirestoreService.getCollection('materialsAvailability').doc(docId);
+      final matTransferRef = FirestoreService.getCollection('materialTransfer').doc(docId);
+
+      final docSnap = await availRef.get();
+      Map<String, dynamic> data = {};
+      if (docSnap.exists) {
+        data = docSnap.data() ?? {};
+      } else {
+        final tSnap = await matTransferRef.get();
+        if (tSnap.exists) {
+          data = tSnap.data() ?? {};
+        } else {
+          final mSnap = await FirestoreService.getCollection('materials')
+              .where('materialName', isEqualTo: materialName)
+              .limit(1)
+              .get();
+          if (mSnap.docs.isNotEmpty) {
+            data = mSnap.docs.first.data();
+          }
+        }
+      }
+
+      final int currentCompany = (data['companyAvailableCount'] as num?)?.toInt() ??
+          (data['count'] as num?)?.toInt() ??
+          (data['availableCount'] as num?)?.toInt() ??
+          0;
+
+      final int qtyInt = quantity.ceil();
+      final int newCompany = (currentCompany - qtyInt).clamp(0, 999999999);
+
+      final List<dynamic> rawSites = List.from(data['siteInventories'] ?? []);
+      final List<Map<String, dynamic>> siteInventories = [];
+      bool siteFound = false;
+
+      for (var item in rawSites) {
+        if (item is Map) {
+          final sMap = Map<String, dynamic>.from(item);
+          final sId = (sMap['siteId'] ?? '').toString().trim().toLowerCase();
+          if (sId == cleanSiteId.toLowerCase()) {
+            final currSite = (sMap['availableCount'] as num?)?.toInt() ?? 0;
+            sMap['availableCount'] = currSite + qtyInt;
+            if (siteName != null && siteName.isNotEmpty) sMap['siteName'] = siteName;
+            if (projectName != null && projectName.isNotEmpty) sMap['projectName'] = projectName;
+            sMap['updatedAt'] = DateTime.now().toIso8601String();
+            siteFound = true;
+          }
+          siteInventories.add(sMap);
+        }
+      }
+
+      if (!siteFound) {
+        siteInventories.add({
+          'siteId': cleanSiteId,
+          'siteName': (siteName != null && siteName.isNotEmpty) ? siteName : cleanSiteId,
+          if (projectName != null && projectName.isNotEmpty) 'projectName': projectName,
+          'availableCount': qtyInt,
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+      }
+
+      final totalSiteCount = siteInventories.fold<int>(
+        0,
+        (acc, s) => acc + ((s['availableCount'] as num?)?.toInt() ?? 0),
+      );
+
+      final updatePayload = {
+        'materialName': materialName,
+        'displayName': displayName ?? data['displayName'] ?? materialName,
+        'companyAvailableCount': newCompany,
+        'siteInventories': siteInventories,
+        'totalSiteCount': totalSiteCount,
+        'totalAvailableCount': newCompany + totalSiteCount,
+        'lastUpdated': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await Future.wait([
+        availRef.set(updatePayload, SetOptions(merge: true)),
+        matTransferRef.set(updatePayload, SetOptions(merge: true)),
+      ]);
+
+      _syncLegacyMirrors(
+        materialName: materialName,
+        docId: docId,
+        companyCount: newCompany,
+      );
+    } catch (e) {
+      debugPrint('Error deducting company stock during allocation: $e');
+    }
+
+    // 5. Backward-compatible sync with site inventory mirrors
     _syncSiteMirrors(
       siteId: cleanSiteId,
       materialName: materialName,
       siteCount: remainingQty.toInt(),
       displayName: displayName ?? materialName,
     );
+
+    // 6. Automatically trigger notification to assigned Supervisor for this site
+    try {
+      await NotificationService.notifyMaterialAllocation(
+        siteId: cleanSiteId,
+        siteName: (siteName != null && siteName.isNotEmpty) ? siteName : cleanSiteId,
+        projectName: projectName,
+        materialName: materialName,
+        displayName: displayName ?? materialName,
+        quantity: quantity,
+        unit: unit,
+        unitRate: effectiveRate,
+        allocatedAmount: allocatedAmount,
+        allocationDate: date,
+        managerName: managerName,
+        remarks: remarks,
+      );
+    } catch (e) {
+      debugPrint('Error triggering supervisor material allocation notification: $e');
+    }
 
     return allocation;
   }
@@ -1327,7 +1440,10 @@ class MaterialInventoryService {
 
       if (docSnap.exists) {
         final data = docSnap.data() ?? {};
-        final currentCount = (data['companyAvailableCount'] as num?)?.toInt() ?? 0;
+        final currentCount = (data['companyAvailableCount'] as num?)?.toInt() ??
+            (data['count'] as num?)?.toInt() ??
+            (data['availableCount'] as num?)?.toInt() ??
+            0;
         newCompanyCount = isAddition ? (currentCount + count) : count;
         if (newCompanyCount < 0) newCompanyCount = 0;
 
@@ -1340,7 +1456,10 @@ class MaterialInventoryService {
         final transferSnap = await matTransferRef.get();
         if (transferSnap.exists) {
           final tData = transferSnap.data() ?? {};
-          final currentCount = (tData['companyAvailableCount'] as num?)?.toInt() ?? 0;
+          final currentCount = (tData['companyAvailableCount'] as num?)?.toInt() ??
+              (tData['count'] as num?)?.toInt() ??
+              (tData['availableCount'] as num?)?.toInt() ??
+              0;
           newCompanyCount = isAddition ? (currentCount + count) : count;
           if (newCompanyCount < 0) newCompanyCount = 0;
 
@@ -1348,6 +1467,14 @@ class MaterialInventoryService {
           if (rawSites is List) {
             siteInventoriesList = rawSites.map((e) => Map<String, dynamic>.from(e as Map)).toList();
           }
+        } else if (masterMaterialQuery.docs.isNotEmpty) {
+          final mData = masterMaterialQuery.docs.first.data();
+          final currentCount = (mData['availableCount'] as num?)?.toInt() ??
+              (mData['count'] as num?)?.toInt() ??
+              (mData['companyAvailableCount'] as num?)?.toInt() ??
+              0;
+          newCompanyCount = isAddition ? (currentCount + count) : count;
+          if (newCompanyCount < 0) newCompanyCount = 0;
         }
       }
 
@@ -1421,10 +1548,23 @@ class MaterialInventoryService {
         data = docSnap.data() ?? {};
       } else {
         final tSnap = await matTransferRef.get();
-        if (tSnap.exists) data = tSnap.data() ?? {};
+        if (tSnap.exists) {
+          data = tSnap.data() ?? {};
+        } else {
+          final mSnap = await FirestoreService.getCollection('materials')
+              .where('materialName', isEqualTo: materialName)
+              .limit(1)
+              .get();
+          if (mSnap.docs.isNotEmpty) {
+            data = mSnap.docs.first.data();
+          }
+        }
       }
 
-      final int currentCompany = (data['companyAvailableCount'] as num?)?.toInt() ?? 0;
+      final int currentCompany = (data['companyAvailableCount'] as num?)?.toInt() ??
+          (data['count'] as num?)?.toInt() ??
+          (data['availableCount'] as num?)?.toInt() ??
+          0;
       final int newCompany = (currentCompany - quantity).clamp(0, 999999999);
 
       final List<dynamic> rawSites = List.from(data['siteInventories'] ?? []);
@@ -1506,14 +1646,15 @@ class MaterialInventoryService {
       );
 
       // Notify assigned supervisor for this site
-      NotificationService.notifyMaterialAssignment(
+      NotificationService.notifyMaterialAllocation(
         siteId: siteId,
         siteName: siteName ?? siteId,
-        materialName: displayName ?? materialName,
-        quantity: quantity,
+        projectName: projectName,
+        materialName: materialName,
+        displayName: displayName ?? materialName,
+        quantity: quantity.toDouble(),
         managerName: managerName,
         supervisorName: supervisorName,
-        projectName: projectName,
       );
 
       // Sync company-level legacy mirrors
@@ -1743,10 +1884,23 @@ class MaterialInventoryService {
         data = docSnap.data() ?? {};
       } else {
         final tSnap = await matTransferRef.get();
-        if (tSnap.exists) data = tSnap.data() ?? {};
+        if (tSnap.exists) {
+          data = tSnap.data() ?? {};
+        } else {
+          final mSnap = await FirestoreService.getCollection('materials')
+              .where('materialName', isEqualTo: materialName)
+              .limit(1)
+              .get();
+          if (mSnap.docs.isNotEmpty) {
+            data = mSnap.docs.first.data();
+          }
+        }
       }
 
-      final int currentCompany = (data['companyAvailableCount'] as num?)?.toInt() ?? 0;
+      final int currentCompany = (data['companyAvailableCount'] as num?)?.toInt() ??
+          (data['count'] as num?)?.toInt() ??
+          (data['availableCount'] as num?)?.toInt() ??
+          0;
       final int newCompany = currentCompany + quantity;
 
       final List<dynamic> rawSites = List.from(data['siteInventories'] ?? []);
@@ -1964,6 +2118,45 @@ class MaterialInventoryService {
     } catch (e) {
       debugPrint('MaterialInventoryService.fetchMaterialInventory error: $e');
       return null;
+    }
+  }
+
+  /// Fetches real-time available stock count in the Company Warehouse for a material.
+  static Future<int> fetchCompanyAvailableStock(String materialName) async {
+    try {
+      final docId = getMaterialDocId(materialName);
+      final availRef = FirestoreService.getCollection('materialsAvailability').doc(docId);
+      final docSnap = await availRef.get();
+      if (docSnap.exists) {
+        final d = docSnap.data() ?? {};
+        return (d['companyAvailableCount'] as num?)?.toInt() ??
+            (d['count'] as num?)?.toInt() ??
+            (d['availableCount'] as num?)?.toInt() ??
+            0;
+      }
+      final tSnap = await FirestoreService.getCollection('materialTransfer').doc(docId).get();
+      if (tSnap.exists) {
+        final d = tSnap.data() ?? {};
+        return (d['companyAvailableCount'] as num?)?.toInt() ??
+            (d['count'] as num?)?.toInt() ??
+            (d['availableCount'] as num?)?.toInt() ??
+            0;
+      }
+      final mSnap = await FirestoreService.getCollection('materials')
+          .where('materialName', isEqualTo: materialName)
+          .limit(1)
+          .get();
+      if (mSnap.docs.isNotEmpty) {
+        final d = mSnap.docs.first.data();
+        return (d['availableCount'] as num?)?.toInt() ??
+            (d['count'] as num?)?.toInt() ??
+            (d['companyAvailableCount'] as num?)?.toInt() ??
+            0;
+      }
+      return 0;
+    } catch (e) {
+      debugPrint('Error fetching company stock for $materialName: $e');
+      return 0;
     }
   }
 

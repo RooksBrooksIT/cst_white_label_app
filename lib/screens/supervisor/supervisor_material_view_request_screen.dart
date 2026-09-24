@@ -8,16 +8,21 @@ import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/widgets/glass_card.dart';
 import 'package:ebricks/widgets/approval_lifecycle_stepper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class SupervisorMaterialViewRequestScreen extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
+  final bool hideAppBar;
+  final VoidCallback? onNewRequestPressed;
 
   const SupervisorMaterialViewRequestScreen({
     super.key,
     required this.supervisorId,
     required this.supervisorName,
+    this.hideAppBar = false,
+    this.onNewRequestPressed,
   });
 
   @override
@@ -76,7 +81,9 @@ class _SupervisorMaterialViewRequestScreenState
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Material Requests',
@@ -114,6 +121,26 @@ class _SupervisorMaterialViewRequestScreenState
           onPressed: () => Navigator.pop(context),
         ),
       ),
+      floatingActionButton: widget.onNewRequestPressed != null
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                widget.onNewRequestPressed!();
+              },
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 4,
+              icon: const Icon(Icons.add_shopping_cart_rounded, size: 20),
+              label: const Text(
+                'New Request',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            )
+          : null,
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(

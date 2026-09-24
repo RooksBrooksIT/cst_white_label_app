@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -6,14 +5,14 @@ import 'package:ebricks/services/approval_workflow_service.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 
-class MaterialRequestForm extends StatefulWidget {
+class ToolRequestForm extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
   final bool hideAppBar;
   final VoidCallback? onRequestSubmitted;
   final VoidCallback? onCancel;
 
-  const MaterialRequestForm({
+  const ToolRequestForm({
     super.key,
     required this.supervisorId,
     required this.supervisorName,
@@ -23,16 +22,16 @@ class MaterialRequestForm extends StatefulWidget {
   });
 
   @override
-  State<MaterialRequestForm> createState() => _MaterialRequestFormState();
+  State<ToolRequestForm> createState() => _ToolRequestFormState();
 }
 
-class _MaterialRequestFormState extends State<MaterialRequestForm> {
+class _ToolRequestFormState extends State<ToolRequestForm> {
   // Dropdown lists
   List<String> siteDropdownItems = [];
   String? selectedSite;
 
-  List<String> unitDropdownItems = [];
-  String? selectedUnit;
+  List<String> unitDropdownItems = ['Units', 'Nos', 'Sets', 'Pieces', 'Pairs'];
+  String? selectedUnit = 'Units';
 
   String? supervisorError;
 
@@ -52,21 +51,22 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
   Color get darkAccent => AppTheme.getDarkAccent(primaryColor);
   Color get errorColor => Theme.of(context).colorScheme.error;
 
-  // Material dropdown data from 'materials' collection
-  List<Map<String, dynamic>> materialDocs = [];
-  List<String> materialDescriptions = [];
-  bool _isLoadingMaterialsList = true;
+  // Tools dropdown data from 'tools' collection
+  List<Map<String, dynamic>> toolDocs = [];
+  List<String> toolDescriptions = [];
+  bool _isLoadingToolsList = true;
 
   DateTime? selectedDate;
+  DateTime? returnDate;
 
-  // Section 2: Required Materials Controllers
-  String? selectedMaterial;
-  final TextEditingController quantityController = TextEditingController();
-  final TextEditingController unitController = TextEditingController();
+  // Section 2: Required Tools Controllers
+  String? selectedTool;
+  final TextEditingController toolCodeController = TextEditingController();
+  final TextEditingController quantityController = TextEditingController(text: '1');
   String selectedPriority = 'Immediate';
 
   // Data Table Rows
-  List<Map<String, dynamic>> addedMaterials = [];
+  List<Map<String, dynamic>> addedTools = [];
 
   @override
   void initState() {
@@ -76,25 +76,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       text: widget.supervisorName,
     );
     _fetchSupervisorSites();
-    _fetchMaterialsFromFirestore();
-    _fetchUnitsFromFirestore();
-  }
-
-  Future<void> _fetchUnitsFromFirestore() async {
-    try {
-      final snapshot = await FirestoreService.getCollection(
-        'materialUnits',
-      ).get();
-      final units = snapshot.docs
-          .map((doc) => doc.data()['matUnit']?.toString() ?? '')
-          .where((unit) => unit.isNotEmpty)
-          .toList();
-      setState(() {
-        unitDropdownItems = units;
-      });
-    } catch (e) {
-      // Optional error handling
-    }
+    _fetchToolsFromFirestore();
   }
 
   Future<void> _fetchSupervisorSites() async {
@@ -151,141 +133,58 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     }
   }
 
-  Future<void> _fetchMaterialsFromFirestore() async {
-    if (mounted) setState(() => _isLoadingMaterialsList = true);
+  Future<void> _fetchToolsFromFirestore() async {
+    setState(() => _isLoadingToolsList = true);
     try {
+      final snapshot = await FirestoreService.getCollection('tools').get();
+      final List<Map<String, dynamic>> allToolDocs = [];
       final Set<String> nameSet = {};
-      final List<Map<String, dynamic>> allMatDocs = [];
 
-      void processDocs(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
-        for (final doc in docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ??
-                  data['materialname'] ??
-                  data['name'] ??
-                  '')
-              .toString()
-              .trim();
-          if (name.isNotEmpty && !nameSet.contains(name)) {
-            nameSet.add(name);
-            allMatDocs.add({
-              'docId': doc.id,
-              'materialName': name,
-              'materialId': data['materialId'] ?? doc.id,
-              'materialUnit': (data['materialUnit'] ??
-                      data['unit'] ??
-                      data['matUnit'] ??
-                      '')
-                  .toString()
-                  .trim(),
-              'unitPrice': data['materialPrice'] ?? data['unitPrice'] ?? '',
-              'rawData': data,
-            });
-          }
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final name = (data['toolName'] ?? data['name'] ?? doc.id).toString().trim();
+        final code = (data['toolCode'] ?? data['code'] ?? doc.id).toString().trim();
+
+        if (name.isNotEmpty && !nameSet.contains(name)) {
+          nameSet.add(name);
+          allToolDocs.add({
+            'docId': doc.id,
+            'toolName': name,
+            'toolCode': code,
+            'toolId': doc.id,
+            'availableCount': data['availableCount'] ?? data['toolCount'] ?? 0,
+            'unit': (data['unit'] ?? 'Units').toString(),
+            'rawData': data,
+          });
         }
       }
-
-      // 1. Fetch strictly from 'materials' collection
-      try {
-        final matSnap = await FirestoreService.getCollection('materials').get();
-        processDocs(matSnap.docs);
-      } catch (e) {
-        debugPrint('Error fetching from materials: $e');
-      }
-
-      // 2. Secondary check for case sensitivity: 'Materials' collection
-      if (allMatDocs.isEmpty) {
-        try {
-          final matCapitalSnap =
-              await FirestoreService.getCollection('Materials').get();
-          for (final doc in matCapitalSnap.docs) {
-            final data = doc.data();
-            final name = (data['materialName'] ??
-                    data['materialname'] ??
-                    data['name'] ??
-                    '')
-                .toString()
-                .trim();
-            if (name.isNotEmpty && !nameSet.contains(name)) {
-              nameSet.add(name);
-              allMatDocs.add({
-                'docId': doc.id,
-                'materialName': name,
-                'materialId': data['materialId'] ?? doc.id,
-                'materialUnit': (data['materialUnit'] ??
-                        data['unit'] ??
-                        data['matUnit'] ??
-                        '')
-                    .toString()
-                    .trim(),
-                'materialCategory': (data['materialCategory'] ??
-                        data['matCategory'] ??
-                        '')
-                    .toString()
-                    .trim(),
-                'materialSubCategory':
-                    (data['materialSubCategory'] ?? '').toString().trim(),
-                'unitPrice': data['materialPrice'] ?? data['unitPrice'] ?? '',
-                'rawData': data,
-              });
-            }
-          }
-        } catch (e) {
-          debugPrint('Error fetching from Materials: $e');
-        }
-      }
-
-      try {
-        final availSnap =
-            await FirestoreService.getCollection('materialsAvailability').get();
-        for (final doc in availSnap.docs) {
-          final data = doc.data();
-          final name = (data['materialName'] ??
-                  data['materialname'] ??
-                  data['name'] ??
-                  '')
-              .toString()
-              .trim();
-          if (name.isNotEmpty && !nameSet.contains(name)) {
-            nameSet.add(name);
-            allMatDocs.add({
-              'docId': doc.id,
-              'materialName': name,
-              'materialId': doc.id,
-              'materialUnit':
-                  (data['materialUnit'] ?? data['unit'] ?? '').toString().trim(),
-              'rawData': data,
-            });
-          }
-        }
-      } catch (_) {}
 
       // Sort alphabetically
-      allMatDocs.sort(
-        (a, b) => (a['materialName'] as String).toLowerCase().compareTo(
-              (b['materialName'] as String).toLowerCase(),
+      allToolDocs.sort(
+        (a, b) => (a['toolName'] as String).toLowerCase().compareTo(
+              (b['toolName'] as String).toLowerCase(),
             ),
       );
 
       final descriptions =
-          allMatDocs.map((m) => m['materialName'] as String).toList();
+          allToolDocs.map((t) => t['toolName'] as String).toList();
 
       if (mounted) {
         setState(() {
-          materialDocs = allMatDocs;
-          materialDescriptions = descriptions;
-          _isLoadingMaterialsList = false;
+          toolDocs = allToolDocs;
+          toolDescriptions = descriptions;
+          _isLoadingToolsList = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetching materials: $e');
-      if (mounted) setState(() => _isLoadingMaterialsList = false);
+      debugPrint('Error fetching tools: $e');
+      if (mounted) setState(() => _isLoadingToolsList = false);
     }
   }
 
   @override
   void dispose() {
-    unitController.dispose();
+    toolCodeController.dispose();
     supervisorNameController.dispose();
     siteIdController.dispose();
     projectController.dispose();
@@ -294,38 +193,30 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     super.dispose();
   }
 
-  Future<void> _onMaterialChanged(String? value) async {
+  void _onToolChanged(String? value) {
     setState(() {
-      selectedMaterial = value;
+      selectedTool = value;
     });
 
     if (value != null && value.isNotEmpty) {
-      final mat = materialDocs.firstWhere(
-        (m) => (m['materialName'] ?? '').toString().trim() == value.trim(),
+      final tool = toolDocs.firstWhere(
+        (t) => (t['toolName'] ?? '').toString().trim() == value.trim(),
         orElse: () => {},
       );
 
-      final unitVal = (mat['materialUnit'] ?? '').toString().trim();
-      if (unitVal.isNotEmpty) {
-        final matchedUnit = unitDropdownItems.firstWhere(
-          (u) => u.toLowerCase() == unitVal.toLowerCase(),
-          orElse: () => '',
-        );
-        if (matchedUnit.isNotEmpty) {
-          setState(() {
-            selectedUnit = matchedUnit;
-            unitController.text = matchedUnit;
-          });
-        } else {
-          setState(() {
-            if (!unitDropdownItems.contains(unitVal)) {
-              unitDropdownItems.add(unitVal);
-            }
-            selectedUnit = unitVal;
-            unitController.text = unitVal;
-          });
+      final codeVal = (tool['toolCode'] ?? '').toString().trim();
+      final unitVal = (tool['unit'] ?? '').toString().trim();
+      setState(() {
+        if (codeVal.isNotEmpty) {
+          toolCodeController.text = codeVal;
         }
-      }
+        if (unitVal.isNotEmpty && !unitDropdownItems.contains(unitVal)) {
+          unitDropdownItems.add(unitVal);
+        }
+        if (unitVal.isNotEmpty) {
+          selectedUnit = unitVal;
+        }
+      });
     }
   }
 
@@ -349,38 +240,101 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         );
       },
     );
-    if (picked != null && picked != selectedDate) {
-      setState(() => selectedDate = picked);
+    if (picked != null) {
+      setState(() {
+        selectedDate = picked;
+      });
     }
   }
 
-  void _addMaterial() {
-    HapticFeedback.lightImpact();
-    if (selectedMaterial != null &&
-        quantityController.text.trim().isNotEmpty &&
-        selectedUnit != null &&
-        selectedUnit!.isNotEmpty) {
+  Future<void> _pickReturnDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: returnDate ?? (selectedDate ?? DateTime.now()).add(const Duration(days: 7)),
+      firstDate: selectedDate ?? DateTime.now(),
+      lastDate: DateTime(2100),
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: primaryColor,
+              onPrimary: Colors.white,
+              surface: Theme.of(context).colorScheme.surface,
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
       setState(() {
-        addedMaterials.add({
-          'material': selectedMaterial,
-          'unit': selectedUnit,
-          'quantity': quantityController.text.trim(),
-          'priority': selectedPriority,
-        });
-        selectedMaterial = null;
-        selectedUnit = null;
-        quantityController.clear();
-        selectedPriority = 'Immediate';
+        returnDate = picked;
       });
-      FocusScope.of(context).unfocus();
+    }
+  }
+
+  void _addTool() {
+    final tool = selectedTool?.trim() ?? '';
+    final code = toolCodeController.text.trim();
+    final qty = quantityController.text.trim();
+    final unit = selectedUnit?.trim() ?? 'Units';
+
+    if (tool.isNotEmpty && qty.isNotEmpty && (int.tryParse(qty) ?? 0) > 0) {
+      // Find matching tool doc
+      final toolDoc = toolDocs.firstWhere(
+        (t) => (t['toolName'] ?? '').toString().trim() == tool,
+        orElse: () => {},
+      );
+
+      setState(() {
+        addedTools.add({
+          "tool": tool,
+          "toolName": tool,
+          "toolCode": code.isNotEmpty ? code : (toolDoc['toolCode'] ?? ''),
+          "toolId": toolDoc['toolId'] ?? '',
+          "quantity": qty,
+          "toolCount": int.tryParse(qty) ?? 1,
+          "unit": unit,
+          "priority": selectedPriority,
+          "expectedReturnDate": returnDate != null
+              ? DateFormat('yyyy-MM-dd').format(returnDate!)
+              : null,
+        });
+
+        // Reset tool entry fields
+        selectedTool = null;
+        toolCodeController.clear();
+        quantityController.text = '1';
+        selectedPriority = 'Immediate';
+        returnDate = null;
+      });
+
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text('$tool added to request.')),
+            ],
+          ),
+          backgroundColor: const Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     } else {
+      HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.white),
               SizedBox(width: 8),
-              Text('Please fill in material, quantity, and unit.'),
+              Text('Please select equipment and enter a valid quantity.'),
             ],
           ),
           backgroundColor: errorColor,
@@ -391,22 +345,22 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     }
   }
 
-  void _removeMaterial(int index) {
+  void _removeTool(int index) {
     HapticFeedback.lightImpact();
     setState(() {
-      addedMaterials.removeAt(index);
+      addedTools.removeAt(index);
     });
   }
 
   void _sendForApproval() {
-    if (addedMaterials.isEmpty) {
+    if (addedTools.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
             children: [
               Icon(Icons.error_outline_rounded, color: Colors.white),
               SizedBox(width: 8),
-              Text('Please add at least one material before submitting.'),
+              Text('Please add at least one tool before submitting.'),
             ],
           ),
           backgroundColor: errorColor,
@@ -416,10 +370,10 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       );
       return;
     }
-    _submitMaterialRequest();
+    _submitToolRequest();
   }
 
-  Future<void> _submitMaterialRequest() async {
+  Future<void> _submitToolRequest() async {
     setState(() => isSubmitting = true);
     try {
       final siteId = siteIdController.text.trim();
@@ -429,43 +383,49 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       final formattedDate =
           '${DateFormat('MMMM d, yyyy at h:mm:ss a').format(now)} UTC${now.timeZoneOffset.isNegative ? '-' : '+'}${now.timeZoneOffset.inHours.abs()}:${(now.timeZoneOffset.inMinutes % 60).toString().padLeft(2, '0')}';
 
-      final reqCollection = FirestoreService.getCollection(
-        'siteMaterialsRequest',
-      );
+      final reqCollection = FirestoreService.getCollection('siteToolsRequest');
       final querySnapshot = await reqCollection
-          .orderBy('matReqId', descending: true)
+          .orderBy('toolReqId', descending: true)
           .limit(1)
           .get();
-      String matReqId = "MR001";
+
+      String toolReqId = "TR001";
       if (querySnapshot.docs.isNotEmpty) {
         final lastId =
-            querySnapshot.docs.first.data()['matReqId']?.toString() ?? "MR000";
+            querySnapshot.docs.first.data()['toolReqId']?.toString() ?? "TR000";
         final numPart =
             int.tryParse(lastId.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-        matReqId = "MR${(numPart + 1).toString().padLeft(3, '0')}";
+        toolReqId = "TR${(numPart + 1).toString().padLeft(3, '0')}";
       }
 
-      final List<Map<String, dynamic>> materials = addedMaterials
+      final List<Map<String, dynamic>> tools = addedTools
           .map(
-            (mat) => {
-              "materialName": mat['material'],
-              "materialQty":
-                  int.tryParse(mat['quantity'].toString()) ?? mat['quantity'],
-              "materialUnit": mat['unit'],
-              "priority": mat['priority'],
+            (t) => {
+              "toolName": t['toolName'] ?? t['tool'],
+              "name": t['toolName'] ?? t['tool'],
+              "toolCode": t['toolCode'] ?? '',
+              "toolId": t['toolId'] ?? '',
+              "toolCount": int.tryParse(t['quantity'].toString()) ?? 1,
+              "quantity": int.tryParse(t['quantity'].toString()) ?? 1,
+              "count": int.tryParse(t['quantity'].toString()) ?? 1,
+              "unit": t['unit'] ?? 'Units',
+              "priority": t['priority'] ?? 'Immediate',
+              if (t['expectedReturnDate'] != null)
+                "expectedReturnDate": t['expectedReturnDate'],
             },
           )
           .toList();
 
       final data = {
-        "matReqId": matReqId,
+        "toolReqId": toolReqId,
         "date": formattedDate,
         "siteId": siteId,
         "projectName": projectName,
         "projectStage": projectStageController.text.trim(),
         "supervisorName": supervisorName,
         "supervisorId": widget.supervisorId,
-        "materials": materials,
+        "toolName": tools.isNotEmpty ? tools.first['toolName'] : '',
+        "tools": tools,
       };
 
       String datePart;
@@ -477,29 +437,32 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       final docId = "${siteId}_$datePart";
 
       await ApprovalWorkflowService.submitRequest(
-        collectionName: 'siteMaterialsRequest',
+        collectionName: 'siteToolsRequest',
         docId: docId,
         baseData: data,
         supervisorName: supervisorName,
         supervisorId: widget.supervisorId,
-        initialRemarks: 'Requisition for ${materials.length} material items for $projectName ($siteId)',
+        initialRemarks:
+            'Requisition for ${tools.length} equipment items for $projectName ($siteId)',
       );
 
       if (!mounted) return;
 
       showDialog(
         context: context,
+        barrierDismissible: false,
         builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
               Icon(Icons.check_circle_rounded, color: primaryColor, size: 28),
               const SizedBox(width: 10),
-              const Text('Request Submitted', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Request Submitted',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           content: Text(
-            'Material Request $matReqId has been successfully submitted to Manager for review.',
+            'Tool Request $toolReqId has been successfully submitted to Manager for review.',
             style: const TextStyle(fontSize: 14),
           ),
           actions: [
@@ -515,7 +478,8 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Back to Dashboard'),
             ),
@@ -545,43 +509,43 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
       appBar: widget.hideAppBar
           ? null
           : AppBar(
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Material Request Form',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            letterSpacing: -0.3,
-          ),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                darkAccent,
-                Color.alphaBlend(
-                  primaryColor.withValues(alpha: 0.35),
-                  darkAccent,
+              iconTheme: const IconThemeData(color: Colors.white),
+              title: const Text(
+                'Tool Request Form',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  letterSpacing: -0.3,
                 ),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              ),
+              centerTitle: true,
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      darkAccent,
+                      Color.alphaBlend(
+                        primaryColor.withValues(alpha: 0.35),
+                        darkAccent,
+                      ),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-            size: 18,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
@@ -615,12 +579,12 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                       _buildSiteDetailsCard(darkAccent),
                       const SizedBox(height: 16),
 
-                      // Section 2: Material Entry Card
-                      _buildMaterialEntryCard(darkAccent),
+                      // Section 2: Tool Entry Card
+                      _buildToolEntryCard(darkAccent),
                       const SizedBox(height: 16),
 
-                      // Section 3: Added Materials List Card
-                      _buildAddedMaterialsListCard(darkAccent),
+                      // Section 3: Added Tools List Card
+                      _buildAddedToolsListCard(darkAccent),
                       const SizedBox(height: 24),
 
                       // Final Submit & Cancel Buttons
@@ -665,18 +629,18 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
-              Icons.inventory_2_rounded,
+              Icons.construction_rounded,
               color: Colors.white,
               size: 28,
             ),
           ),
           const SizedBox(width: 14),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Material Requisition',
+                Text(
+                  'Tool & Equipment Requisition',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -684,12 +648,12 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                     letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
-                  'Request raw materials & equipment for your site',
+                  'Request machinery, tools & equipment for site works',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: Colors.white70,
                   ),
                 ),
               ],
@@ -811,8 +775,8 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     );
   }
 
-  /// Card 2: Required Materials Section
-  Widget _buildMaterialEntryCard(Color darkAccent) {
+  /// Card 2: Required Tools Section
+  Widget _buildToolEntryCard(Color darkAccent) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -833,12 +797,12 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           Row(
             children: [
               _buildCardTitle(
-                icon: Icons.inventory_2_rounded,
+                icon: Icons.construction_rounded,
                 iconColor: primaryColor,
-                title: 'Required Materials',
+                title: 'Equipment & Tool Details',
               ),
               const Spacer(),
-              if (_isLoadingMaterialsList)
+              if (_isLoadingToolsList)
                 SizedBox(
                   width: 16,
                   height: 16,
@@ -856,7 +820,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${materialDescriptions.length} Available',
+                    '${toolDescriptions.length} In Catalog',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -868,29 +832,26 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           ),
           const SizedBox(height: 14),
 
-          // Required Material Dropdown (Fetched from materials collection)
+          // Required Tool Dropdown
           _buildFormDropdown<String>(
-            label: "Select Required Material",
-            hint: _isLoadingMaterialsList
-                ? "Loading materials..."
-                : "Choose material",
-            icon: Icons.category_rounded,
-            value: selectedMaterial,
-            items: materialDescriptions,
-            onChanged: _onMaterialChanged,
+            label: "Select Equipment / Tool",
+            hint: _isLoadingToolsList ? "Loading tools..." : "Choose tool",
+            icon: Icons.handyman_rounded,
+            value: selectedTool,
+            items: toolDescriptions,
+            onChanged: _onToolChanged,
           ),
           const SizedBox(height: 12),
 
-          // Unit & Quantity Row
+          // Tool Code & Quantity Row
           Row(
             children: [
               Expanded(
-                child: _buildFormDropdown<String>(
-                  label: "Unit",
-                  icon: Icons.square_foot_rounded,
-                  value: selectedUnit,
-                  items: unitDropdownItems,
-                  onChanged: (value) => setState(() => selectedUnit = value),
+                child: _buildFormTextField(
+                  label: "Tool Code",
+                  icon: Icons.qr_code_rounded,
+                  controller: toolCodeController,
+                  hint: "e.g. TL001",
                 ),
               ),
               const SizedBox(width: 10),
@@ -907,24 +868,44 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           ),
           const SizedBox(height: 12),
 
-          // Priority Dropdown
-          _buildFormDropdown<String>(
-            label: "Priority Level",
-            icon: Icons.priority_high_rounded,
-            value: selectedPriority,
-            items: const ['Immediate', 'In 2 days'],
-            onChanged: (value) => setState(() => selectedPriority = value!),
+          // Unit & Priority Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildFormDropdown<String>(
+                  label: "Unit",
+                  icon: Icons.square_foot_rounded,
+                  value: selectedUnit,
+                  items: unitDropdownItems,
+                  onChanged: (value) => setState(() => selectedUnit = value),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildFormDropdown<String>(
+                  label: "Priority Level",
+                  icon: Icons.priority_high_rounded,
+                  value: selectedPriority,
+                  items: const ['Immediate', 'In 2 days', 'Standard'],
+                  onChanged: (value) => setState(() => selectedPriority = value!),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 12),
+
+          // Expected Return Date Picker (Optional)
+          _buildReturnDateField(),
           const SizedBox(height: 16),
 
-          // Add Material Button (Branded)
+          // Add Tool Button (Branded)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _addMaterial,
+              onPressed: _addTool,
               icon: const Icon(Icons.add_rounded, size: 20),
               label: const Text(
-                "Add Material to Request",
+                "Add Tool to Request",
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
@@ -944,8 +925,8 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     );
   }
 
-  /// Card 3: Added Materials List Card
-  Widget _buildAddedMaterialsListCard(Color darkAccent) {
+  /// Card 3: Added Tools List Card
+  Widget _buildAddedToolsListCard(Color darkAccent) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -968,7 +949,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               _buildCardTitle(
                 icon: Icons.checklist_rounded,
                 iconColor: primaryColor,
-                title: 'Requested Items',
+                title: 'Requested Equipment Items',
               ),
               const Spacer(),
               Container(
@@ -978,7 +959,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${addedMaterials.length} Items',
+                  '${addedTools.length} Items',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -990,7 +971,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
           ),
           const SizedBox(height: 14),
 
-          if (addedMaterials.isEmpty)
+          if (addedTools.isEmpty)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24),
               width: double.infinity,
@@ -1002,13 +983,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               child: Column(
                 children: [
                   Icon(
-                    Icons.shopping_bag_outlined,
+                    Icons.construction_outlined,
                     size: 40,
                     color: Colors.grey.shade400,
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'No materials added yet',
+                    'No tools added yet',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -1017,7 +998,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Use the form above to add items to your request.',
+                    'Use the form above to add equipment to your request.',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -1030,14 +1011,16 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: addedMaterials.length,
+              itemCount: addedTools.length,
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
-                final item = addedMaterials[index];
-                final String matName = item['material'] ?? '';
-                final String qty = item['quantity'] ?? '0';
-                final String unit = item['unit'] ?? '';
+                final item = addedTools[index];
+                final String toolName = item['toolName'] ?? item['tool'] ?? '';
+                final String code = item['toolCode'] ?? '';
+                final String qty = item['quantity'] ?? '1';
+                final String unit = item['unit'] ?? 'Units';
                 final String priority = item['priority'] ?? 'Immediate';
+                final String? retDate = item['expectedReturnDate'];
                 final isImmediate = priority == 'Immediate';
 
                 return Container(
@@ -1062,7 +1045,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.inventory_2_rounded,
+                          Icons.construction_rounded,
                           size: 18,
                           color: isImmediate ? errorColor : primaryColor,
                         ),
@@ -1073,7 +1056,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              matName,
+                              toolName,
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -1084,13 +1067,22 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Qty: $qty $unit',
+                              'Qty: $qty $unit ${code.isNotEmpty ? '• Code: $code' : ''}',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.grey.shade700,
                               ),
                             ),
+                            if (retDate != null)
+                              Text(
+                                'Return by: $retDate',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF0284C7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -1101,27 +1093,28 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                         ),
                         decoration: BoxDecoration(
                           color: isImmediate
-                              ? errorColor.withValues(alpha: 0.12)
-                              : Colors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
+                              ? errorColor.withValues(alpha: 0.1)
+                              : const Color(0xFF10B981).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           priority,
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: isImmediate ? errorColor : Colors.amber.shade900,
+                            color: isImmediate
+                                ? errorColor
+                                : const Color(0xFF059669),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 4),
                       IconButton(
                         icon: Icon(
                           Icons.delete_outline_rounded,
                           color: errorColor,
                           size: 20,
                         ),
-                        onPressed: () => _removeMaterial(index),
+                        onPressed: () => _removeTool(index),
                       ),
                     ],
                   ),
@@ -1149,7 +1142,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             },
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              side: BorderSide(color: const Color(0xFFCBD5E1)),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -1159,7 +1152,7 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               style: TextStyle(
                 color: Color(0xFF475569),
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: 15,
               ),
             ),
           ),
@@ -1175,13 +1168,13 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
-              elevation: 4,
-              shadowColor: primaryColor.withValues(alpha: 0.4),
+              elevation: 3,
+              shadowColor: primaryColor.withValues(alpha: 0.35),
             ),
             child: isSubmitting
                 ? const SizedBox(
-                    height: 20,
                     width: 20,
+                    height: 20,
                     child: CircularProgressIndicator(
                       color: Colors.white,
                       strokeWidth: 2,
@@ -1193,9 +1186,9 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
                       Icon(Icons.send_rounded, size: 18),
                       SizedBox(width: 8),
                       Text(
-                        "Submit Request",
+                        "Submit",
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1207,7 +1200,106 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     );
   }
 
-  /// Card Section Header Helper
+  Widget _buildDateField() {
+    return InkWell(
+      onTap: _pickDate,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today_rounded, size: 18, color: primaryColor),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Required Date",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                Text(
+                  selectedDate != null
+                      ? DateFormat('EEE, MMM d, yyyy').format(selectedDate!)
+                      : 'Select Date',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReturnDateField() {
+    return InkWell(
+      onTap: _pickReturnDate,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.event_repeat_rounded, size: 18, color: Color(0xFFD97706)),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Expected Return Date (Optional)",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                Text(
+                  returnDate != null
+                      ? DateFormat('EEE, MMM d, yyyy').format(returnDate!)
+                      : 'Not Specified (Indefinite / Permanent)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: returnDate != null
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            if (returnDate != null)
+              IconButton(
+                icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
+                onPressed: () => setState(() => returnDate = null),
+              )
+            else
+              const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCardTitle({
     required IconData icon,
     required Color iconColor,
@@ -1218,17 +1310,17 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+            color: iconColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: iconColor, size: 18),
+          child: Icon(icon, size: 16, color: iconColor),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Text(
           title,
           style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
+            fontSize: 14.5,
+            fontWeight: FontWeight.bold,
             color: Color(0xFF0F172A),
           ),
         ),
@@ -1236,54 +1328,63 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     );
   }
 
-  /// Styled Text Form Field Helper
   Widget _buildFormTextField({
     required String label,
     required IconData icon,
     required TextEditingController controller,
+    String? hint,
     bool enabled = true,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
   }) {
-    return TextFormField(
-      controller: controller,
-      enabled: enabled,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      style: TextStyle(
-        fontSize: 13.5,
-        color: enabled ? const Color(0xFF0F172A) : Colors.grey.shade700,
-        fontWeight: enabled ? FontWeight.normal : FontWeight.w600,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-        prefixIcon: Icon(icon, size: 18, color: enabled ? primaryColor : Colors.grey.shade500),
-        filled: true,
-        fillColor: enabled ? Colors.grey.shade50 : Colors.grey.shade100,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: enabled ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: TextField(
+            controller: controller,
+            enabled: enabled,
+            keyboardType: keyboardType,
+            inputFormatters: inputFormatters,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: enabled ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: hint,
+              hintStyle: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
+              ),
+              prefixIcon: Icon(icon, size: 18, color: const Color(0xFF64748B)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 11,
+              ),
+            ),
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primaryColor, width: 1.8),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFF1F5F9)),
-        ),
-      ),
+      ],
     );
   }
 
-  /// Styled Dropdown Form Field Helper
   Widget _buildFormDropdown<T>({
     required String label,
     required IconData icon,
@@ -1292,92 +1393,73 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
     required ValueChanged<T?> onChanged,
     String? hint,
   }) {
-    final T? safeValue = (value != null && items.contains(value)) ? value : null;
-
-    return DropdownButtonFormField<T>(
-      isExpanded: true,
-      initialValue: safeValue,
-      hint: hint != null
-          ? Text(
-              hint,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-            )
-          : null,
-      style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-        prefixIcon: Icon(icon, size: 18, color: primaryColor),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primaryColor, width: 1.8),
-        ),
-      ),
-      dropdownColor: Colors.white,
-      icon: Icon(Icons.keyboard_arrow_down_rounded, color: primaryColor),
-      items: items.map((T item) {
-        return DropdownMenuItem<T>(
-          value: item,
-          child: Text(
-            item.toString(),
-            style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
-            overflow: TextOverflow.ellipsis,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
           ),
-        );
-      }).toList(),
-      onChanged: onChanged,
-    );
-  }
-
-  /// Date Field Widget
-  Widget _buildDateField() {
-    return GestureDetector(
-      onTap: _pickDate,
-      child: AbsorbPointer(
-        child: TextFormField(
-          readOnly: true,
-          controller: TextEditingController(
-            text: selectedDate != null
-                ? DateFormat('MMM dd, yyyy').format(selectedDate!)
-                : '',
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
-          decoration: InputDecoration(
-            labelText: "Target Request Date",
-            labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-            prefixIcon: Icon(Icons.calendar_month_rounded, size: 18, color: primaryColor),
-            filled: true,
-            fillColor: Colors.grey.shade50,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: primaryColor, width: 1.8),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              isExpanded: true,
+              value: (value != null && items.contains(value)) ? value : null,
+              hint: Row(
+                children: [
+                  Icon(icon, size: 18, color: const Color(0xFF64748B)),
+                  const SizedBox(width: 8),
+                  Text(
+                    hint ?? "Select $label",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
+              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+              items: items.map((T item) {
+                return DropdownMenuItem<T>(
+                  value: item,
+                  child: Row(
+                    children: [
+                      Icon(icon, size: 18, color: const Color(0xFF64748B)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.toString(),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
+
+/// Alias for ToolRequestForm
+typedef ToolRequestPage = ToolRequestForm;

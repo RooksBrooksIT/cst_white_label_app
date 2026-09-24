@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -6,11 +7,15 @@ import 'package:ebricks/utils/app_theme.dart';
 class ViewApprovalScreen extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
+  final bool hideAppBar;
+  final VoidCallback? onNewRequestPressed;
 
   const ViewApprovalScreen({
     super.key,
     required this.supervisorId,
     required this.supervisorName,
+    this.hideAppBar = false,
+    this.onNewRequestPressed,
   });
 
   @override
@@ -41,7 +46,9 @@ class _ViewApprovalScreenState extends State<ViewApprovalScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Work Schedule Approvals',
@@ -79,6 +86,26 @@ class _ViewApprovalScreenState extends State<ViewApprovalScreen>
           onPressed: () => Navigator.pop(context),
         ),
       ),
+      floatingActionButton: widget.onNewRequestPressed != null
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                widget.onNewRequestPressed!();
+              },
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 4,
+              icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
+              label: const Text(
+                'Request Workforce',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            )
+          : null,
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),

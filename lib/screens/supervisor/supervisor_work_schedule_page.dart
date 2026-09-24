@@ -10,10 +10,15 @@ import 'package:ebricks/utils/site_display_helper.dart';
 class SupervisorWorkSchedulePage extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
+  final bool hideAppBar;
+  final VoidCallback? onRequestSubmitted;
+
   const SupervisorWorkSchedulePage({
     super.key,
     required this.supervisorId,
     required this.supervisorName,
+    this.hideAppBar = false,
+    this.onRequestSubmitted,
   });
 
   @override
@@ -501,6 +506,9 @@ class _SupervisorWorkSchedulePageState
         ),
       );
       _resetForm();
+      if (widget.onRequestSubmitted != null) {
+        widget.onRequestSubmitted!();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -551,7 +559,9 @@ class _SupervisorWorkSchedulePageState
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Workforce Request',

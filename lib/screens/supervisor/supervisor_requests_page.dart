@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
-import 'package:ebricks/screens/supervisor/material_request_form.dart';
-import 'package:ebricks/screens/supervisor/supervisor_material_view_request_screen.dart';
-import 'package:ebricks/screens/supervisor/supervisor_tools_view_request_screen.dart';
-import 'package:ebricks/screens/supervisor/supervisor_work_schedule_page.dart';
-import 'package:ebricks/screens/supervisor/supervisor_view_request_screen.dart';
+import 'package:ebricks/screens/supervisor/supervisor_materials_workflow_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_workforce_workflow_page.dart';
+import 'package:ebricks/screens/supervisor/supervisor_tools_workflow_page.dart';
 
 class SupervisorRequestsPage extends StatelessWidget {
   final String supervisorId;
@@ -18,105 +16,54 @@ class SupervisorRequestsPage extends StatelessWidget {
     required this.supervisorName,
   });
 
+  void _navigateToMaterials(BuildContext context, {int initialTabIndex = 0}) {
+    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SupervisorMaterialsWorkflowPage(
+          supervisorId: supervisorId,
+          supervisorName: supervisorName,
+          initialTabIndex: initialTabIndex,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToWorkforce(BuildContext context, {int initialTabIndex = 0}) {
+    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SupervisorWorkforceWorkflowPage(
+          supervisorId: supervisorId,
+          supervisorName: supervisorName,
+          initialTabIndex: initialTabIndex,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToTools(BuildContext context, {int initialTabIndex = 0}) {
+    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SupervisorToolsWorkflowPage(
+          supervisorId: supervisorId,
+          supervisorName: supervisorName,
+          initialTabIndex: initialTabIndex,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Color>(
       valueListenable: AppTheme.primaryColor,
       builder: (context, primaryColor, _) {
         final darkAccent = AppTheme.getDarkAccent(primaryColor);
-
-        final items = [
-          _MenuItemData(
-            title: 'Materials Request Form',
-            subtitle: 'Create & submit new material requisitions for site works',
-            icon: Icons.add_shopping_cart_rounded,
-            accentColor: const Color(0xFF0284C7),
-            badgeText: 'New Request',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MaterialRequestForm(
-                    supervisorId: supervisorId,
-                    supervisorName: supervisorName,
-                  ),
-                ),
-              );
-            },
-          ),
-          _MenuItemData(
-            title: 'Material Approvals',
-            subtitle: 'Track material requests submitted to manager with review status',
-            icon: Icons.fact_check_rounded,
-            accentColor: const Color(0xFF0EA5E9),
-            badgeText: 'Materials',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SupervisorMaterialViewRequestScreen(
-                    supervisorId: supervisorId,
-                    supervisorName: supervisorName,
-                  ),
-                ),
-              );
-            },
-          ),
-          _MenuItemData(
-            title: 'Tool Approvals',
-            subtitle: 'Check tool requisition statuses, allocations & equipment arrivals',
-            icon: Icons.construction_rounded,
-            accentColor: const Color(0xFFD97706),
-            badgeText: 'Tools',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SupervisorToolsViewRequestScreen(
-                    supervisorId: supervisorId,
-                    supervisorName: supervisorName,
-                  ),
-                ),
-              );
-            },
-          ),
-          _MenuItemData(
-            title: 'Workforce Request',
-            subtitle: 'Submit site workforce requirements, timelines & labour allocation',
-            icon: Icons.calendar_today_rounded,
-            accentColor: const Color(0xFF10B981),
-            badgeText: 'Workforce',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SupervisorWorkSchedulePage(
-                    supervisorId: supervisorId,
-                    supervisorName: supervisorName,
-                  ),
-                ),
-              );
-            },
-          ),
-          _MenuItemData(
-            title: 'Site Approvals',
-            subtitle: 'View pending operational authorizations & general approvals',
-            icon: Icons.check_circle_rounded,
-            accentColor: const Color(0xFF059669),
-            badgeText: 'Operations',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ViewApprovalScreen(
-                    supervisorId: supervisorId,
-                    supervisorName: supervisorName,
-                  ),
-                ),
-              );
-            },
-          ),
-        ];
 
         return Theme(
           data: AppTheme.getTheme(primaryColor),
@@ -138,8 +85,8 @@ class SupervisorRequestsPage extends StatelessWidget {
               backgroundColor: Colors.transparent,
               systemOverlayStyle: const SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.dark,
-                statusBarBrightness: Brightness.light,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
               ),
               flexibleSpace: Container(
                 decoration: BoxDecoration(
@@ -174,143 +121,51 @@ class SupervisorRequestsPage extends StatelessWidget {
                   child: ListView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 20,
+                      horizontal: 16,
+                      vertical: 16,
                     ),
                     children: [
-                      // Overview Banner Card
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFFE2E8F0),
-                            width: 1.2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF0284C7).withValues(alpha: 0.18),
-                                    const Color(0xFF0284C7).withValues(alpha: 0.06),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: const Color(0xFF0284C7).withValues(alpha: 0.25),
-                                  width: 1.2,
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.fact_check_rounded,
-                                color: Color(0xFF0284C7),
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ValueListenableBuilder<String>(
-                                    valueListenable: AppTheme.orgName,
-                                    builder: (context, orgName, _) {
-                                      if (orgName.isEmpty) return const SizedBox.shrink();
-                                      return Padding(
-                                        padding: const EdgeInsets.only(bottom: 2),
-                                        child: Text(
-                                          orgName.toUpperCase(),
-                                          style: const TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w800,
-                                            color: Color(0xFF0284C7),
-                                            letterSpacing: 0.5,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  const Text(
-                                    'Requests & Approvals Center',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF0F172A),
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  ValueListenableBuilder<String>(
-                                    valueListenable: AppTheme.appName,
-                                    builder: (context, appName, _) {
-                                      final app = appName.isNotEmpty ? appName : 'eBricks';
-                                      return Text(
-                                        'Submit requests and track management approvals via $app.',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF64748B),
-                                          height: 1.25,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-
-                      // Section Title
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Available Request Workflows',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF64748B),
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                            Text(
-                              '${items.length} Actions',
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF0284C7),
-                              ),
-                            ),
-                          ],
-                        ),
+                      _buildWorkflowCard(
+                        title: 'Materials',
+                        icon: Icons.inventory_2_rounded,
+                        color: const Color(0xFF0284C7),
+                        requestLabel: 'New Request',
+                        approvalLabel: 'Track Approvals',
+                        onCardTap: () =>
+                            _navigateToMaterials(context, initialTabIndex: 0),
+                        onNewRequest: () =>
+                            _navigateToMaterials(context, initialTabIndex: 1),
+                        onApprovals: () =>
+                            _navigateToMaterials(context, initialTabIndex: 0),
                       ),
                       const SizedBox(height: 12),
-
-                      // Action Cards List
-                      ...items.map((item) => _buildActionCard(context, item)),
-                      const SizedBox(height: 40),
+                      _buildWorkflowCard(
+                        title: 'Tools & Equipment',
+                        icon: Icons.construction_rounded,
+                        color: const Color(0xFFD97706),
+                        requestLabel: 'New Request',
+                        approvalLabel: 'Track Approvals',
+                        onCardTap: () =>
+                            _navigateToTools(context, initialTabIndex: 0),
+                        onNewRequest: () =>
+                            _navigateToTools(context, initialTabIndex: 1),
+                        onApprovals: () =>
+                            _navigateToTools(context, initialTabIndex: 0),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildWorkflowCard(
+                        title: 'Workforce',
+                        icon: Icons.engineering_rounded,
+                        color: const Color(0xFF10B981),
+                        requestLabel: 'Request Labor',
+                        approvalLabel: 'Site Approvals',
+                        onCardTap: () =>
+                            _navigateToWorkforce(context, initialTabIndex: 0),
+                        onNewRequest: () =>
+                            _navigateToWorkforce(context, initialTabIndex: 1),
+                        onApprovals: () =>
+                            _navigateToWorkforce(context, initialTabIndex: 0),
+                      ),
                     ],
                   ),
                 ),
@@ -322,199 +177,123 @@ class SupervisorRequestsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildActionCard(BuildContext context, _MenuItemData item) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            item.onTap();
-          },
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: const Color(0xFFE2E8F0),
-                width: 1.2,
+  Widget _buildWorkflowCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required String requestLabel,
+    required String approvalLabel,
+    required VoidCallback onCardTap,
+    required VoidCallback onNewRequest,
+    required VoidCallback onApprovals,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onCardTap();
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-                BoxShadow(
-                  color: item.accentColor.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Icon Badge
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        item.accentColor.withValues(alpha: 0.16),
-                        item.accentColor.withValues(alpha: 0.06),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: item.accentColor.withValues(alpha: 0.25),
-                      width: 1.2,
-                    ),
+                    child: Icon(icon, color: color, size: 22),
                   ),
-                  child: Center(
-                    child: Icon(
-                      item.icon,
-                      color: item.accentColor,
-                      size: 24,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-
-                // Text Information & Badge (Flexible / Responsive Layout)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          Text(
-                            item.title,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F172A),
-                              letterSpacing: -0.2,
-                              height: 1.2,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7.5,
-                              vertical: 2.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: item.accentColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: item.accentColor.withValues(alpha: 0.22),
-                                width: 0.9,
-                              ),
-                            ),
-                            child: Text(
-                              item.badgeText,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                                color: item.accentColor,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ),
-                        ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        item.subtitle,
-                        style: const TextStyle(
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onNewRequest,
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: Text(requestLabel),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: color,
+                        backgroundColor: color.withValues(alpha: 0.04),
+                        side: BorderSide(
+                          color: color.withValues(alpha: 0.28),
+                          width: 1.1,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
                           fontSize: 12.5,
-                          color: Color(0xFF64748B),
-                          height: 1.35,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                // Chevron Arrow Button
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0xFFE2E8F0),
-                      width: 1,
                     ),
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 12,
-                      color: Color(0xFF94A3B8),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onApprovals,
+                      icon: const Icon(Icons.fact_check_rounded, size: 15),
+                      label: Text(approvalLabel),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: color,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Center(
-                  child: ValueListenableBuilder<String>(
-                    valueListenable: AppTheme.orgName,
-                    builder: (context, orgName, _) {
-                      return ValueListenableBuilder<String>(
-                        valueListenable: AppTheme.appName,
-                        builder: (context, appName, _) {
-                          final org = orgName.isNotEmpty ? orgName : 'Organization';
-                          final app = appName.isNotEmpty ? appName : 'eBricks';
-                          return Text(
-                            '$org • $app',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF94A3B8),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
-}
-
-class _MenuItemData {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accentColor;
-  final String badgeText;
-  final VoidCallback onTap;
-
-  const _MenuItemData({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accentColor,
-    required this.badgeText,
-    required this.onTap,
-  });
 }

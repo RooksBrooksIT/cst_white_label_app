@@ -8,16 +8,22 @@ import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/widgets/glass_card.dart';
 import 'package:ebricks/widgets/approval_lifecycle_stepper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:ebricks/screens/supervisor/tool_request_form.dart';
 
 class SupervisorToolsViewRequestScreen extends StatefulWidget {
   final String supervisorId;
   final String supervisorName;
+  final bool hideAppBar;
+  final VoidCallback? onNewRequestPressed;
 
   const SupervisorToolsViewRequestScreen({
     super.key,
     required this.supervisorId,
     required this.supervisorName,
+    this.hideAppBar = false,
+    this.onNewRequestPressed,
   });
 
   @override
@@ -76,7 +82,9 @@ class _SupervisorToolsViewRequestScreenState
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Tools Requisitions',
@@ -112,6 +120,36 @@ class _SupervisorToolsViewRequestScreenState
             size: 18,
           ),
           onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          if (widget.onNewRequestPressed != null) {
+            widget.onNewRequestPressed!();
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ToolRequestForm(
+                  supervisorId: widget.supervisorId,
+                  supervisorName: widget.supervisorName,
+                ),
+              ),
+            );
+          }
+        },
+        backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: const Icon(Icons.construction_rounded, size: 20),
+        label: const Text(
+          'New Tool Request',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            letterSpacing: -0.2,
+          ),
         ),
       ),
       body: Center(

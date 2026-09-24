@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'firestore_service.dart';
 import 'notification_router.dart';
 import 'auth_service.dart';
+import 'package:intl/intl.dart';
 
 /// Handles background FCM messages when the app is terminated/background.
 @pragma('vm:entry-point')
@@ -1793,6 +1794,140 @@ class NotificationService {
           'location': location ?? '',
           'type': reqType,
           'actionRoute': '/project_details',
+        },
+      );
+    }
+  }
+
+  /// 7b. Notifies assigned Supervisor when Manager manually allocates materials to their site.
+  static Future<void> notifyMaterialAllocation({
+    required String siteId,
+    String? siteName,
+    String? projectName,
+    required String materialName,
+    String? displayName,
+    required double quantity,
+    String? unit,
+    double? unitRate,
+    double? allocatedAmount,
+    String? allocationDate,
+    String? managerName,
+    String? supervisorName,
+    String? supervisorId,
+    String? remarks,
+  }) async {
+    final cleanSiteId = siteId.trim();
+    if (cleanSiteId.isEmpty) return;
+
+    List<Map<String, String>> supervisors = [];
+    if (supervisorName != null && supervisorName.trim().isNotEmpty) {
+      supervisors = [
+        {
+          'supervisorName': supervisorName.trim(),
+          'supervisorId': supervisorId?.trim() ?? '',
+        }
+      ];
+    } else {
+      supervisors = await getAssignedSupervisorsForSite(cleanSiteId);
+      if (supervisors.isEmpty &&
+          siteName != null &&
+          siteName.trim().isNotEmpty &&
+          siteName.trim().toLowerCase() != cleanSiteId.toLowerCase()) {
+        supervisors = await getAssignedSupervisorsForSite(siteName.trim());
+      }
+    }
+
+    // Ensure notification is sent ONLY to the Supervisor assigned to that site
+    if (supervisors.isEmpty) {
+      debugPrint(
+          'NotificationService: No supervisor assigned to site "$cleanSiteId" ($siteName). Allocation notification skipped.');
+      return;
+    }
+
+    final resolvedSiteName =
+        (siteName != null && siteName.isNotEmpty) ? siteName : cleanSiteId;
+    final matDisplay =
+        (displayName != null && displayName.isNotEmpty) ? displayName : materialName;
+    final qtyStr = quantity.truncateToDouble() == quantity
+        ? quantity.toInt().toString()
+        : quantity.toStringAsFixed(2);
+    final unitStr = (unit != null && unit.isNotEmpty) ? unit : 'Units';
+
+    final now = DateTime.now();
+    final formattedDateTime = DateFormat('dd MMM yyyy, hh:mm a').format(now);
+    final dateOnly = (allocationDate != null && allocationDate.isNotEmpty)
+        ? allocationDate
+        : DateFormat('yyyy-MM-dd').format(now);
+
+    final sender = (managerName != null && managerName.trim().isNotEmpty)
+        ? managerName.trim()
+        : 'Manager';
+    final projectText =
+        (projectName != null && projectName.trim().isNotEmpty) ? ' (Project: $projectName)' : '';
+
+    final title = '📦 Material Allocated to Site';
+    final body =
+        '$sender has allocated $qtyStr $unitStr of "$matDisplay" to site "$resolvedSiteName"$projectText on $formattedDateTime.';
+
+    for (final sup in supervisors) {
+      final supName = sup['supervisorName'];
+      if (supName == null || supName.isEmpty) continue;
+      final supId = sup['supervisorId'];
+
+      final reqId = 'alloc_${cleanSiteId}_${now.millisecondsSinceEpoch}';
+
+      await notifySupervisor(
+        supervisorName: supName,
+        supervisorId: supId,
+        title: title,
+        body: body,
+        requestType: 'material_allocation',
+        requestId: reqId,
+        docId: reqId,
+        siteId: cleanSiteId,
+        siteName: resolvedSiteName,
+        status: 'allocated',
+        senderRole: 'Manager',
+        senderName: sender,
+        remarks: remarks ?? 'Manual Material Allocation by Manager',
+        requiredAction: 'View Material Stock',
+        data: {
+          'idempotencyKey': '${reqId}_${supName.toLowerCase()}',
+          'siteId': cleanSiteId,
+          'siteName': resolvedSiteName,
+          'projectName': projectName ?? '',
+          'materialName': materialName,
+          'displayName': matDisplay,
+          'quantity': quantity,
+          'quantityStr': qtyStr,
+          'unit': unitStr,
+          'unitRate': unitRate ?? 0.0,
+          'allocatedAmount': allocatedAmount ?? 0.0,
+          'allocationDate': dateOnly,
+          'allocationDateTime': formattedDateTime,
+          'allocatedBy': sender,
+          'managerName': sender,
+          'remarks': remarks ?? '',
+          'requestType': 'material_allocation',
+          'type': 'material_allocation',
+          'actionRoute': '/material_inventory',
+        },
+        extraData: {
+          'siteId': cleanSiteId,
+          'siteName': resolvedSiteName,
+          'projectName': projectName ?? '',
+          'materialName': materialName,
+          'displayName': matDisplay,
+          'quantity': quantity,
+          'quantityStr': qtyStr,
+          'unit': unitStr,
+          'unitRate': unitRate ?? 0.0,
+          'allocatedAmount': allocatedAmount ?? 0.0,
+          'allocationDate': dateOnly,
+          'allocationDateTime': formattedDateTime,
+          'allocatedBy': sender,
+          'remarks': remarks ?? '',
+          'requestType': 'material_allocation',
         },
       );
     }
