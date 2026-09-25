@@ -1755,4 +1755,102 @@ class ExpenseService {
     final endDay = DateTime(end.year, end.month, end.day);
     return !dateDay.isBefore(startDay) && !dateDay.isAfter(endDay);
   }
+
+  /// Fetches approved petty cash expenses for a site within an optional date or date range and stage
+  static Future<List<Map<String, dynamic>>> fetchPettyCashForSite({
+    required String siteId,
+    DateTime? date,
+    DateTime? fromDate,
+    DateTime? toDate,
+    String? projectStage,
+  }) async {
+    final List<Map<String, dynamic>> results = [];
+    try {
+      final siteKeys = (await resolveSiteKeys(siteId)).toList();
+      final keysToQuery = siteKeys.take(10).toList();
+      if (keysToQuery.isEmpty) return results;
+
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+      for (final key in keysToQuery) {
+        queryFutures.add(
+          FirestoreService.pettyCashExpenses
+              .where('siteId', isEqualTo: key)
+              .get(),
+        );
+        queryFutures.add(
+          FirestoreService.pettyCashTransactions
+              .where('siteId', isEqualTo: key)
+              .get(),
+        );
+      }
+
+      final snapshots = await Future.wait(queryFutures);
+      final Set<String> seenExpenseIds = {};
+
+      for (final snap in snapshots) {
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final expId = (data['expenseId'] ??
+                  data['referenceId'] ??
+                  doc.id)
+              .toString();
+
+          if (seenExpenseIds.contains(expId)) continue;
+
+          // Check approval status
+          final status = (data['status'] ?? '').toString().toUpperCase();
+          final isApproved = status == 'EXPENSE_APPROVED' ||
+              status == 'APPROVED' ||
+              data['isApproved'] == true ||
+              data['postedToLedger'] == true;
+          if (!isApproved) continue;
+
+          // Check project stage if specified
+          if (projectStage != null && projectStage.trim().isNotEmpty) {
+            final stage = (data['projectStage'] ??
+                    data['stage'] ??
+                    data['projectField'])
+                ?.toString()
+                .trim();
+            if (stage != null &&
+                stage.isNotEmpty &&
+                stage.toLowerCase() != projectStage.trim().toLowerCase()) {
+              continue;
+            }
+          }
+
+          // Check date filter
+          final rawDate = data['expenseDate'] ??
+              data['date'] ??
+              data['createdAt'] ??
+              data['timestamp'];
+          if (date != null) {
+            if (!isSameDay(rawDate, date)) continue;
+          } else if (fromDate != null && toDate != null) {
+            if (!isDateInRange(rawDate, fromDate, toDate)) continue;
+          }
+
+          seenExpenseIds.add(expId);
+          final amount = _parseExpenseAmount(data['amount'], data);
+          results.add({
+            'docId': doc.id,
+            'id': expId,
+            'amount': amount,
+            'category': data['category'] ??
+                data['expenseCategory'] ??
+                'Petty Cash',
+            'description': data['description'] ??
+                data['purpose'] ??
+                data['vendorName'] ??
+                '',
+            'date': rawDate,
+            'supervisorName': data['supervisorName'] ?? '',
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error in fetchPettyCashForSite: $e');
+    }
+    return results;
+  }
 }

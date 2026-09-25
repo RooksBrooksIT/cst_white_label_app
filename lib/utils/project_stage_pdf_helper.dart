@@ -15,6 +15,7 @@ class ProjectStagePdfHelper {
     List<Map<String, dynamic>>? managerBills,
     List<Map<String, dynamic>>? organizationBills,
     List<Map<String, dynamic>>? contractorExpenses,
+    List<Map<String, dynamic>>? pettyCashExpenses,
     required double grandTotal,
     required PdfColor primaryColor,
   }) async {
@@ -306,6 +307,42 @@ class ProjectStagePdfHelper {
             pw.SizedBox(height: 24),
           ],
 
+          // Petty Cash Expenses Table
+          if (pettyCashExpenses != null && pettyCashExpenses.isNotEmpty) ...[
+            pw.Text(
+              'Petty Cash Expenses Breakdown',
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                font: PdfTemplates.boldFont,
+              ),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Table.fromTextArray(
+              headers: ['Category / Purpose', 'Amount'],
+              data: pettyCashExpenses
+                  .map(
+                    (e) => [
+                      (e['category'] ?? e['description'] ?? 'Petty Cash').toString(),
+                      '₹ ${toNum(e['amount']).toStringAsFixed(2)}',
+                    ],
+                  )
+                  .toList(),
+              headerStyle: pw.TextStyle(
+                color: PdfColors.white,
+                fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
+              ),
+              headerDecoration: pw.BoxDecoration(color: primaryColor),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
+              oddRowDecoration: const pw.BoxDecoration(
+                color: PdfColors.grey100,
+              ),
+            ),
+            pw.SizedBox(height: 24),
+          ],
+
           pw.SizedBox(height: 8),
 
           // Grand Total
@@ -357,6 +394,12 @@ class ProjectStagePdfHelper {
     required double organizationTotal,
     required double contractorTotal,
     required double incentiveTotal,
+    double materialsTotal = 0,
+    double labourTotal = 0,
+    double foodTotal = 0,
+    double transportTotal = 0,
+    double fuelTotal = 0,
+    double pettyCashTotal = 0,
     required PdfColor primaryColor,
   }) async {
     await PdfTemplates.loadFonts();
@@ -368,7 +411,8 @@ class ProjectStagePdfHelper {
         managerTotal +
         organizationTotal +
         contractorTotal +
-        incentiveTotal;
+        incentiveTotal +
+        pettyCashTotal;
 
     pdf.addPage(
       pw.MultiPage(
@@ -410,11 +454,19 @@ class ProjectStagePdfHelper {
           pw.Table.fromTextArray(
             headers: ['Category', 'Total Amount (₹)'],
             data: [
-              ['Supervisor Expenses', supervisorTotal.toStringAsFixed(2)],
+              ['Site Supervisor Expenses', supervisorTotal.toStringAsFixed(2)],
+              ['Materials', materialsTotal.toStringAsFixed(2)],
+              ['Labour', labourTotal.toStringAsFixed(2)],
               ['Manager Expenses', managerTotal.toStringAsFixed(2)],
               ['Organization Expenses', organizationTotal.toStringAsFixed(2)],
-              ['Contractor Expenses', contractorTotal.toStringAsFixed(2)],
-              ['Incentives', incentiveTotal.toStringAsFixed(2)],
+              ['Food', foodTotal.toStringAsFixed(2)],
+              ['Transport', transportTotal.toStringAsFixed(2)],
+              ['Fuel', fuelTotal.toStringAsFixed(2)],
+              ['Petty Cash', pettyCashTotal.toStringAsFixed(2)],
+              if (contractorTotal > 0)
+                ['Contractor Expenses', contractorTotal.toStringAsFixed(2)],
+              if (incentiveTotal > 0)
+                ['Incentives', incentiveTotal.toStringAsFixed(2)],
             ],
             headerStyle: pw.TextStyle(
               color: PdfColors.white,

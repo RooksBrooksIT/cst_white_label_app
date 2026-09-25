@@ -37,6 +37,7 @@ class _ProjectStageDailySiteExpensesReportPageState
   List<DocumentSnapshot> managerEntries = [];
   List<DocumentSnapshot> orgEntries = [];
   List<DocumentSnapshot> contractorEntries = [];
+  List<Map<String, dynamic>> pettyCashEntries = [];
   double grandTotal = 0;
 
   @override
@@ -149,11 +150,18 @@ class _ProjectStageDailySiteExpensesReportPageState
       // 4. Contractor Data
       contractorEntries = contractorDocs.where(filterEntry).toList();
 
+      // 5. Petty Cash Data
+      pettyCashEntries = await ExpenseService.fetchPettyCashForSite(
+        siteId: widget.siteId ?? '',
+        date: widget.date,
+        projectStage: widget.projectStage,
+      );
+
       _calculateGrandTotal();
 
       setState(() => isLoading = false);
     } catch (e) {
-      print('Error loading report: $e');
+      debugPrint('Error loading report: $e');
       setState(() => isLoading = false);
     }
   }
@@ -237,6 +245,11 @@ class _ProjectStageDailySiteExpensesReportPageState
       total += _toNum(data['totalAmount'] ?? data['amount']);
     }
 
+    // Petty Cash Total
+    for (var pc in pettyCashEntries) {
+      total += _toNum(pc['amount']);
+    }
+
     grandTotal = total;
   }
 
@@ -269,7 +282,8 @@ class _ProjectStageDailySiteExpensesReportPageState
           : (supervisorData == null &&
                 managerEntries.isEmpty &&
                 orgEntries.isEmpty &&
-                contractorEntries.isEmpty)
+                contractorEntries.isEmpty &&
+                pettyCashEntries.isEmpty)
           ? _buildEmptyState(theme)
           : SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -302,6 +316,10 @@ class _ProjectStageDailySiteExpensesReportPageState
                   ],
                   if (contractorEntries.isNotEmpty) ...[
                     _buildContractorBreakdown(theme),
+                    const SizedBox(height: 24),
+                  ],
+                  if (pettyCashEntries.isNotEmpty) ...[
+                    _buildPettyCashBreakdown(theme),
                     const SizedBox(height: 24),
                   ],
                   const SizedBox(height: 32),
@@ -619,11 +637,66 @@ class _ProjectStageDailySiteExpensesReportPageState
     );
   }
 
+  Widget _buildPettyCashBreakdown(ThemeData theme) {
+    double total = 0;
+    for (var pc in pettyCashEntries) {
+      total += _toNum(pc['amount']);
+    }
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'PETTY CASH EXPENSES',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  color: theme.primaryColor,
+                ),
+              ),
+              Text(
+                '₹ ${total.toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...pettyCashEntries.map((pc) {
+            final cat = pc['category'] ?? 'Petty Cash';
+            final desc = pc['description']?.toString() ?? '';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$cat${desc.isNotEmpty ? " - $desc" : ""}',
+                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                    ),
+                  ),
+                  Text(
+                    '₹ ${_toNum(pc['amount']).toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Future<void> _generatePdf() async {
     if (supervisorData == null &&
         managerEntries.isEmpty &&
         orgEntries.isEmpty &&
-        contractorEntries.isEmpty) {
+        contractorEntries.isEmpty &&
+        pettyCashEntries.isEmpty) {
       return;
     }
 
@@ -693,6 +766,7 @@ class _ProjectStageDailySiteExpensesReportPageState
         managerBills: managerBills,
         organizationBills: organizationBills,
         contractorExpenses: contractorExpenses,
+        pettyCashExpenses: pettyCashEntries,
         grandTotal: grandTotal,
         primaryColor: pdfPrimaryColor,
       );

@@ -31,8 +31,14 @@ class ProjectStageExpensesReportPage extends StatefulWidget {
 class _ProjectStageExpensesReportPageState
     extends State<ProjectStageExpensesReportPage> {
   double supervisorTotal = 0;
+  double materialsTotal = 0;
+  double labourTotal = 0;
   double managerTotal = 0;
   double organizationTotal = 0;
+  double foodTotal = 0;
+  double transportTotal = 0;
+  double fuelTotal = 0;
+  double pettyCashTotal = 0;
   double contractorTotal = 0;
   double incentiveTotal = 0;
   bool isLoading = true;
@@ -46,86 +52,268 @@ class _ProjectStageExpensesReportPageState
   Future<void> _loadReport() async {
     setState(() => isLoading = true);
 
-    final results = await Future.wait([
-      _fetchTotal('siteSupervisorEntries', 'date', 'totalAmount'),
-      _fetchTotal('managerEntries', 'entryDate', 'totalAmount'),
-      _fetchTotal('organizationEntries', 'entryDate', 'totalAmount'),
-      _fetchTotal('contractorEntries', 'date', 'totalAmount'),
-      _fetchTotal('siteSupervisorIncentives', 'updatedAt', 'incentiveAmount'),
-      _fetchTotal('managerExpenses', 'entryDate', 'totalAmount'),
-      _fetchTotal('organizationExpenses', 'entryDate', 'totalAmount'),
-    ]);
+    try {
+      final siteKeys =
+          (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
+      final keysToQuery = siteKeys.take(10).toList();
 
-    setState(() {
-      supervisorTotal = results[0];
-      managerTotal = results[1] + results[5];
-      organizationTotal = results[2] + results[6];
-      contractorTotal = results[3];
-      incentiveTotal = results[4];
-      isLoading = false;
-    });
-  }
+      final results = await Future.wait([
+        // 0, 1: Supervisor entries
+        FirestoreService.getCollection('siteSupervisorEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('siteSupervisorEntries').where('site', whereIn: keysToQuery).get(),
+        // 2, 3: Manager expenses & entries
+        FirestoreService.getCollection('managerExpenses').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('managerEntries').where('siteId', whereIn: keysToQuery).get(),
+        // 4, 5: Organization entries & expenses
+        FirestoreService.getCollection('organizationEntries').where('siteId', whereIn: keysToQuery).get(),
+        FirestoreService.getCollection('organizationExpenses').where('siteId', whereIn: keysToQuery).get(),
+        // 6: Contractor entries
+        FirestoreService.getCollection('contractorEntries').where('siteId', whereIn: keysToQuery).get(),
+        // 7: Incentives
+        FirestoreService.siteSupervisorIncentives.where('siteId', whereIn: keysToQuery).get(),
+      ]);
 
-  Future<double> _fetchTotal(
-    String collection,
-    String dateField,
-    String amountField,
-  ) async {
-    double total = 0;
-    final siteKeys =
-        (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
-    final keysToQuery = siteKeys.take(10).toList();
-    // Check both siteId and site field for broader compatibility across all aliases
-    final results = await Future.wait([
-      FirestoreService.getCollection(
-        collection,
-      ).where('siteId', whereIn: keysToQuery).get(),
-      FirestoreService.getCollection(
-        collection,
-      ).where('site', whereIn: keysToQuery).get(),
-    ]);
+      final pettyCashEntries = await ExpenseService.fetchPettyCashForSite(
+        siteId: widget.siteId,
+        fromDate: widget.fromDate,
+        toDate: widget.toDate,
+        projectStage: widget.projectStage,
+      );
 
-    final allDocs = {...results[0].docs, ...results[1].docs};
+      final allSupDocs = {...results[0].docs, ...results[1].docs};
+      final allMgrDocs = {...results[2].docs, ...results[3].docs};
+      final allOrgDocs = {...results[4].docs, ...results[5].docs};
+      final allContractorDocs = results[6].docs;
+      final allIncentiveDocs = results[7].docs;
 
-    final targetStage = widget.projectStage.trim().toLowerCase();
+      final targetStage = widget.projectStage.trim().toLowerCase();
 
-    for (var doc in allDocs) {
-      final data = doc.data();
+      double sTotal = 0;
+      double matTotal = 0;
+      double labTotal = 0;
+      double mTotal = 0;
+      double oTotal = 0;
+      double fTotal = 0;
+      double tTotal = 0;
+      double flTotal = 0;
+      double pcTotal = 0;
+      double cTotal = 0;
+      double incTotal = 0;
 
-      // Filter by stage manually
-      final docStage = (data['projectStage'] ?? data['projectField'] ?? data['stage'])
-          ?.toString()
-          .trim()
-          .toLowerCase();
-      if (docStage != null && targetStage.isNotEmpty && docStage != targetStage) {
-        continue;
-      }
+      // 1. Process Supervisor entries
+      for (final doc in allSupDocs) {
+        final data = doc.data();
+        if (data['isManagerEntry'] == true || data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+          continue;
+        }
+        final docStage = (data['projectStage'] ?? data['projectField'] ?? data['stage'])
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        if (targetStage.isNotEmpty && docStage != null && docStage != targetStage) {
+          continue;
+        }
 
-      if (data.containsKey('bills') && data['bills'] is List) {
-        final bills = data['bills'] as List;
-        for (var bill in bills) {
-          if (bill is Map) {
-            final billDate = ExpenseService.parseDate(bill['billDate'] ?? bill['date']);
-            if (billDate != null &&
-                ExpenseService.isDateInRange(billDate, widget.fromDate, widget.toDate)) {
-              total += _toDouble(bill['billAmount'] ?? bill['amount'] ?? bill['totalAmount']);
+        final entryDate = ExpenseService.parseDate(
+          data['date'] ?? data['entryDate'] ?? data['createdAt'],
+        );
+        if (entryDate == null || !ExpenseService.isDateInRange(entryDate, widget.fromDate, widget.toDate)) {
+          continue;
+        }
+
+        sTotal += _toDouble(data['totalAmount'] ?? data['amount']);
+        fTotal += _toDouble(data['food']);
+        tTotal += _toDouble(data['transport']);
+        flTotal += _toDouble(data['fuel']);
+
+        final materials = data['materials'];
+        if (materials is List) {
+          for (final m in materials) {
+            if (m is Map) {
+              final amt = _toDouble(m['amount']);
+              if (amt > 0) {
+                matTotal += amt;
+              } else {
+                final qty = _toDouble(m['quantity'] ?? m['qty']);
+                final price = _toDouble(m['unitPrice'] ?? m['price']);
+                matTotal += (qty * price);
+              }
             }
           }
         }
-      } else {
-        final entryDate = ExpenseService.parseDate(
-          data[dateField] ?? data['entryDate'] ?? data['date'] ?? data['updatedAt'] ?? data['createdAt'],
-        );
 
-        if (entryDate != null &&
-            ExpenseService.isDateInRange(entryDate, widget.fromDate, widget.toDate)) {
-          total += _toDouble(
-            data[amountField] ?? data['amount'] ?? data['totalAmount'] ?? data['incentiveAmount'],
-          );
+        final labours = data['labours'];
+        if (labours is List) {
+          for (final l in labours) {
+            if (l is Map) {
+              final amt = _toDouble(l['amount']);
+              if (amt > 0) {
+                labTotal += amt;
+              } else {
+                final count = _toDouble(l['count']);
+                final salary = _toDouble(l['unitSalary'] ?? l['salary']);
+                labTotal += (count * salary);
+              }
+            }
+          }
         }
       }
+
+      // 2. Process Manager entries
+      for (final doc in allMgrDocs) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'] ?? data['stage'])
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        if (targetStage.isNotEmpty && docStage != null && docStage != targetStage) {
+          continue;
+        }
+
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          for (final bill in bills) {
+            if (bill is Map) {
+              final billDate = ExpenseService.parseDate(bill['billDate'] ?? bill['date']);
+              if (billDate != null && ExpenseService.isDateInRange(billDate, widget.fromDate, widget.toDate)) {
+                mTotal += _toDouble(bill['billAmount'] ?? bill['amount'] ?? bill['totalAmount']);
+              }
+            }
+          }
+        } else {
+          final entryDate = ExpenseService.parseDate(
+            data['entryDate'] ?? data['date'] ?? data['createdAt'],
+          );
+          if (entryDate != null && ExpenseService.isDateInRange(entryDate, widget.fromDate, widget.toDate)) {
+            mTotal += _toDouble(data['totalAmount'] ?? data['amount']);
+          }
+        }
+      }
+
+      // 3. Process Organization entries
+      for (final doc in allOrgDocs) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'] ?? data['stage'])
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        if (targetStage.isNotEmpty && docStage != null && docStage != targetStage) {
+          continue;
+        }
+
+        final bills = data['bills'];
+        if (bills is List && bills.isNotEmpty) {
+          for (final bill in bills) {
+            if (bill is Map) {
+              final billDate = ExpenseService.parseDate(bill['billDate'] ?? bill['date']);
+              if (billDate != null && ExpenseService.isDateInRange(billDate, widget.fromDate, widget.toDate)) {
+                oTotal += _toDouble(bill['billAmount'] ?? bill['amount'] ?? bill['totalAmount']);
+              }
+            }
+          }
+        } else {
+          final entryDate = ExpenseService.parseDate(
+            data['entryDate'] ?? data['date'] ?? data['createdAt'],
+          );
+          if (entryDate != null && ExpenseService.isDateInRange(entryDate, widget.fromDate, widget.toDate)) {
+            oTotal += _toDouble(data['totalAmount'] ?? data['amount']);
+          }
+        }
+      }
+
+      // 4. Process Contractor entries
+      for (final doc in allContractorDocs) {
+        final data = doc.data();
+        final docStage = (data['projectStage'] ?? data['projectField'] ?? data['workStage'])
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        if (targetStage.isNotEmpty && docStage != null && docStage != targetStage) {
+          continue;
+        }
+
+        final entryDate = ExpenseService.parseDate(data['date'] ?? data['createdAt']);
+        if (entryDate == null || !ExpenseService.isDateInRange(entryDate, widget.fromDate, widget.toDate)) {
+          continue;
+        }
+
+        cTotal += _toDouble(data['totalAmount'] ?? data['amount']);
+        fTotal += _toDouble(data['food']);
+        tTotal += _toDouble(data['transport']);
+        flTotal += _toDouble(data['fuel']);
+
+        final materials = data['materials'];
+        if (materials is List) {
+          for (final m in materials) {
+            if (m is Map) {
+              final amt = _toDouble(m['amount']);
+              if (amt > 0) {
+                matTotal += amt;
+              } else {
+                final qty = _toDouble(m['quantity'] ?? m['qty']);
+                final price = _toDouble(m['unitPrice'] ?? m['price']);
+                matTotal += (qty * price);
+              }
+            }
+          }
+        }
+
+        final labours = data['labours'];
+        if (labours is List) {
+          for (final l in labours) {
+            if (l is Map) {
+              final amt = _toDouble(l['amount']);
+              if (amt > 0) {
+                labTotal += amt;
+              } else {
+                final count = _toDouble(l['count']);
+                final salary = _toDouble(l['unitSalary'] ?? l['salary']);
+                labTotal += (count * salary);
+              }
+            }
+          }
+        }
+      }
+
+      // 5. Process Incentives
+      for (final doc in allIncentiveDocs) {
+        final data = doc.data();
+        final entryDate = ExpenseService.parseDate(
+          data['updatedAt'] ?? data['createdAt'] ?? data['date'],
+        );
+        if (entryDate != null && ExpenseService.isDateInRange(entryDate, widget.fromDate, widget.toDate)) {
+          incTotal += _toDouble(data['incentiveAmount'] ?? data['amount']);
+        }
+      }
+
+      // 6. Process Petty Cash
+      for (final pc in pettyCashEntries) {
+        pcTotal += _toDouble(pc['amount']);
+      }
+
+      if (mounted) {
+        setState(() {
+          supervisorTotal = sTotal;
+          materialsTotal = matTotal;
+          labourTotal = labTotal;
+          managerTotal = mTotal;
+          organizationTotal = oTotal;
+          foodTotal = fTotal;
+          transportTotal = tTotal;
+          fuelTotal = flTotal;
+          pettyCashTotal = pcTotal;
+          contractorTotal = cTotal;
+          incentiveTotal = incTotal;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading stage expenses report: $e');
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
-    return total;
   }
 
   double _toDouble(dynamic v) {
@@ -148,7 +336,12 @@ class _ProjectStageExpensesReportPageState
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Stage Expense Analysis',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -185,7 +378,11 @@ class _ProjectStageExpensesReportPageState
             maxWidth: isMobile ? double.infinity : 600,
           ),
           child: isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                  ),
+                )
               : SingleChildScrollView(
                   padding: EdgeInsets.all(isMobile ? 16 : 24),
                   child: Column(
@@ -238,7 +435,8 @@ class _ProjectStageExpensesReportPageState
         managerTotal +
         organizationTotal +
         contractorTotal +
-        incentiveTotal;
+        incentiveTotal +
+        pettyCashTotal;
     return GlassCard(
       color: theme.primaryColor,
       child: Column(
@@ -280,9 +478,21 @@ class _ProjectStageExpensesReportPageState
         ),
         const SizedBox(height: 12),
         _expenseItem(
-          'Supervisor Expenses',
+          'Site Supervisor Expenses',
           supervisorTotal,
           Icons.engineering_outlined,
+          theme,
+        ),
+        _expenseItem(
+          'Materials',
+          materialsTotal,
+          Icons.inventory_2_outlined,
+          theme,
+        ),
+        _expenseItem(
+          'Labour',
+          labourTotal,
+          Icons.handyman_outlined,
           theme,
         ),
         _expenseItem(
@@ -298,17 +508,43 @@ class _ProjectStageExpensesReportPageState
           theme,
         ),
         _expenseItem(
-          'Contractor Expenses',
-          contractorTotal,
-          Icons.construction_outlined,
+          'Food',
+          foodTotal,
+          Icons.restaurant_outlined,
           theme,
         ),
         _expenseItem(
-          'Incentives',
-          incentiveTotal,
-          Icons.emoji_events_outlined,
+          'Transport',
+          transportTotal,
+          Icons.local_shipping_outlined,
           theme,
         ),
+        _expenseItem(
+          'Fuel',
+          fuelTotal,
+          Icons.local_gas_station_outlined,
+          theme,
+        ),
+        _expenseItem(
+          'Petty Cash',
+          pettyCashTotal,
+          Icons.payments_outlined,
+          theme,
+        ),
+        if (contractorTotal > 0)
+          _expenseItem(
+            'Contractor Expenses',
+            contractorTotal,
+            Icons.construction_outlined,
+            theme,
+          ),
+        if (incentiveTotal > 0)
+          _expenseItem(
+            'Incentives',
+            incentiveTotal,
+            Icons.emoji_events_outlined,
+            theme,
+          ),
       ],
     );
   }
@@ -358,6 +594,12 @@ class _ProjectStageExpensesReportPageState
         organizationTotal: organizationTotal,
         contractorTotal: contractorTotal,
         incentiveTotal: incentiveTotal,
+        materialsTotal: materialsTotal,
+        labourTotal: labourTotal,
+        foodTotal: foodTotal,
+        transportTotal: transportTotal,
+        fuelTotal: fuelTotal,
+        pettyCashTotal: pettyCashTotal,
         primaryColor: pdfPrimaryColor,
       );
       if (!mounted) return;

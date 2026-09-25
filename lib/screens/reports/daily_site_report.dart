@@ -33,11 +33,6 @@ class DailySiteExpensesReportPage extends StatefulWidget {
 
 class _DailySiteExpensesReportPageState
     extends State<DailySiteExpensesReportPage> {
-  String get _documentId {
-    final formattedDate = DateFormat('ddMMyyyy').format(widget.date);
-    return '${widget.siteId}_$formattedDate';
-  }
-
   Future<Map<String, dynamic>> _fetchAllReports() async {
     final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId ?? '')).toList();
     final keysToQuery = siteKeys.take(10).toList();
@@ -232,12 +227,19 @@ class _DailySiteExpensesReportPageState
       }
     }
 
+    final pettyCashEntries = await ExpenseService.fetchPettyCashForSite(
+      siteId: widget.siteId ?? '',
+      date: widget.date,
+      projectStage: widget.projectStage,
+    );
+
     return {
       'supervisor': filteredSupervisorDoc,
       'managerEntries': filteredManagerDocs,
       'organizationEntries': filteredOrgDocs,
       'contractorEntries': filteredContractorDocs,
       'incentiveDoc': filteredIncentiveDoc,
+      'pettyCashEntries': pettyCashEntries,
     };
   }
 
@@ -312,12 +314,15 @@ class _DailySiteExpensesReportPageState
                   (data['contractorEntries'] as List? ?? [])
                       .cast<DocumentSnapshot>();
               final incentiveDoc = data['incentiveDoc'] as DocumentSnapshot?;
+              final pettyCashEntries = (data['pettyCashEntries'] as List? ?? [])
+                  .cast<Map<String, dynamic>>();
 
               if (supervisorDoc == null &&
                   managerEntries.isEmpty &&
                   orgEntries.isEmpty &&
                   contractorEntries.isEmpty &&
-                  incentiveDoc == null) {
+                  incentiveDoc == null &&
+                  pettyCashEntries.isEmpty) {
                 return _buildNoDataView(theme, dateStr);
               }
 
@@ -353,6 +358,10 @@ class _DailySiteExpensesReportPageState
                     if (contractorEntries.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       _buildContractorSection(theme, contractorEntries),
+                    ],
+                    if (pettyCashEntries.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _buildPettyCashSection(theme, pettyCashEntries),
                     ],
                     const SizedBox(height: 40),
                     GlassButton(
@@ -646,6 +655,40 @@ class _DailySiteExpensesReportPageState
     );
   }
 
+  Widget _buildPettyCashSection(
+    ThemeData theme,
+    List<Map<String, dynamic>> entries,
+  ) {
+    num total = 0;
+    for (final e in entries) {
+      total += _parseAmount(e['amount']);
+    }
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'PETTY CASH EXPENSES',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...entries.map(
+            (e) => _buildDetailRow(
+              (e['category'] ?? 'Petty Cash').toString(),
+              (e['description'] ?? '').toString(),
+              '₹${_parseAmount(e['amount']).toStringAsFixed(2)}',
+            ),
+          ),
+          const Divider(height: 24),
+          _buildTotalRow(theme, 'Petty Cash Total', total),
+        ],
+      ),
+    );
+  }
+
   num _calculateTotal(Map<String, dynamic> data) {
     num total = 0;
     final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
@@ -687,6 +730,13 @@ class _DailySiteExpensesReportPageState
           0;
     }
 
+    final pettyCash = (data['pettyCashEntries'] as List? ?? []);
+    for (final pc in pettyCash) {
+      if (pc is Map) {
+        total += _parseAmount(pc['amount']);
+      }
+    }
+
     return total;
   }
 
@@ -715,6 +765,8 @@ class _DailySiteExpensesReportPageState
         .cast<DocumentSnapshot>();
     final contractorEntries = (reportData['contractorEntries'] as List? ?? [])
         .cast<DocumentSnapshot>();
+    final pettyCashEntries = (reportData['pettyCashEntries'] as List? ?? [])
+        .cast<Map<String, dynamic>>();
 
     pdf.addPage(
       pw.MultiPage(
@@ -931,6 +983,38 @@ class _DailySiteExpensesReportPageState
                   doc.id,
                   d['site'] ?? 'N/A',
                   '₹${d['totalAmount'] ?? 0}',
+                ];
+              }).toList(),
+              headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+              headerStyle: pw.TextStyle(
+                color: PdfColors.white,
+                fontWeight: pw.FontWeight.bold,
+                font: PdfTemplates.boldFont,
+              ),
+              cellStyle: pw.TextStyle(font: PdfTemplates.regularFont),
+            ),
+            pw.SizedBox(height: 20),
+          ],
+
+          // Petty Cash Section
+          if (pettyCashEntries.isNotEmpty) ...[
+            pw.Text(
+              'Petty Cash Expenses',
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 14,
+                color: pdfPrimaryColor,
+                font: PdfTemplates.boldFont,
+              ),
+            ),
+            pw.SizedBox(height: 8),
+            pw.TableHelper.fromTextArray(
+              headers: ['Category', 'Description', 'Amount'],
+              data: pettyCashEntries.map((e) {
+                return [
+                  (e['category'] ?? 'Petty Cash').toString(),
+                  (e['description'] ?? '-').toString(),
+                  '₹${_parseAmount(e['amount']).toStringAsFixed(2)}',
                 ];
               }).toList(),
               headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),

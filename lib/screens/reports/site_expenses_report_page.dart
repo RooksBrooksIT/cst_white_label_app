@@ -7,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '/utils/pdf_templates.dart';
+import '/widgets/glass_card.dart';
 import '/utils/app_theme.dart';
 
 class SiteExpensesReportPage extends StatefulWidget {
@@ -80,6 +81,13 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
     final allOrgDocs = {...fetchResults[4].docs, ...fetchResults[5].docs};
     final allContractorDocs = fetchResults[6].docs;
     final allIncentiveDocs = {...fetchResults[7].docs, ...fetchResults[8].docs};
+
+    final allPettyCash = await ExpenseService.fetchPettyCashForSite(
+      siteId: widget.siteId,
+      fromDate: widget.fromDate,
+      toDate: widget.toDate,
+      projectStage: widget.projectStage,
+    );
 
     DateTime current = widget.fromDate;
     while (!current.isAfter(widget.toDate)) {
@@ -212,25 +220,191 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
         }
       }
 
+      // 6. Match Petty Cash for current date
+      final List<Map<String, dynamic>> pettyCashEntries = [];
+      for (final pc in allPettyCash) {
+        if (ExpenseService.isSameDay(pc['date'], current)) {
+          pettyCashEntries.add(pc);
+        }
+      }
+
       final hasSupervisor = supervisorData != null && (supervisorData['totalAmount'] ?? 0) != 0;
       final hasManager = managerBills.isNotEmpty;
       final hasOrg = orgBills.isNotEmpty;
       final hasContractor = contractorEntries.isNotEmpty;
       final hasIncentives = incentiveEntries.isNotEmpty;
+      final hasPettyCash = pettyCashEntries.isNotEmpty;
 
-      if (hasSupervisor || hasManager || hasOrg || hasContractor || hasIncentives) {
+      if (hasSupervisor || hasManager || hasOrg || hasContractor || hasIncentives || hasPettyCash) {
         entries.add({
           'date': displayDateFormat.format(current),
+          'dateTime': current,
           'supervisorData': supervisorData,
           'managerBills': managerBills,
           'orgBills': orgBills,
           'contractorEntries': contractorEntries,
           'incentiveEntries': incentiveEntries,
+          'pettyCashEntries': pettyCashEntries,
         });
       }
       current = current.add(const Duration(days: 1));
     }
     return entries;
+  }
+
+  double _toDouble(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+  }
+
+  double _getSupervisorTotalForEntry(Map<String, dynamic> entry) {
+    final sup = entry['supervisorData'];
+    if (sup == null) return 0;
+    return _toDouble(sup['totalAmount'] ?? sup['amount']);
+  }
+
+  double _getMaterialsTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    final sup = entry['supervisorData'];
+    if (sup != null && sup['materials'] is List) {
+      for (final m in (sup['materials'] as List)) {
+        if (m is Map) {
+          final amt = _toDouble(m['amount']);
+          if (amt > 0) {
+            total += amt;
+          } else {
+            total += _toDouble(m['quantity'] ?? m['qty']) * _toDouble(m['unitPrice'] ?? m['price']);
+          }
+        }
+      }
+    }
+    for (final c in (entry['contractorEntries'] ?? [])) {
+      if (c['materials'] is List) {
+        for (final m in (c['materials'] as List)) {
+          if (m is Map) {
+            final amt = _toDouble(m['amount']);
+            if (amt > 0) {
+              total += amt;
+            } else {
+              total += _toDouble(m['quantity'] ?? m['qty']) * _toDouble(m['unitPrice'] ?? m['price']);
+            }
+          }
+        }
+      }
+    }
+    return total;
+  }
+
+  double _getLabourTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    final sup = entry['supervisorData'];
+    if (sup != null && sup['labours'] is List) {
+      for (final l in (sup['labours'] as List)) {
+        if (l is Map) {
+          final amt = _toDouble(l['amount']);
+          if (amt > 0) {
+            total += amt;
+          } else {
+            total += _toDouble(l['count']) * _toDouble(l['unitSalary'] ?? l['salary']);
+          }
+        }
+      }
+    }
+    for (final c in (entry['contractorEntries'] ?? [])) {
+      if (c['labours'] is List) {
+        for (final l in (c['labours'] as List)) {
+          if (l is Map) {
+            final amt = _toDouble(l['amount']);
+            if (amt > 0) {
+              total += amt;
+            } else {
+              total += _toDouble(l['count']) * _toDouble(l['unitSalary'] ?? l['salary']);
+            }
+          }
+        }
+      }
+    }
+    return total;
+  }
+
+  double _getManagerTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    for (final b in (entry['managerBills'] ?? [])) {
+      total += _toDouble(b['billAmount'] ?? b['amount']);
+    }
+    return total;
+  }
+
+  double _getOrgTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    for (final b in (entry['orgBills'] ?? [])) {
+      total += _toDouble(b['billAmount'] ?? b['amount']);
+    }
+    return total;
+  }
+
+  double _getFoodTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    final sup = entry['supervisorData'];
+    if (sup != null) total += _toDouble(sup['food']);
+    for (final c in (entry['contractorEntries'] ?? [])) {
+      total += _toDouble(c['food']);
+    }
+    return total;
+  }
+
+  double _getTransportTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    final sup = entry['supervisorData'];
+    if (sup != null) total += _toDouble(sup['transport']);
+    for (final c in (entry['contractorEntries'] ?? [])) {
+      total += _toDouble(c['transport']);
+    }
+    return total;
+  }
+
+  double _getFuelTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    final sup = entry['supervisorData'];
+    if (sup != null) total += _toDouble(sup['fuel']);
+    for (final c in (entry['contractorEntries'] ?? [])) {
+      total += _toDouble(c['fuel']);
+    }
+    return total;
+  }
+
+  double _getPettyCashTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    for (final pc in (entry['pettyCashEntries'] ?? [])) {
+      total += _toDouble(pc['amount']);
+    }
+    return total;
+  }
+
+  double _getContractorTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    for (final c in (entry['contractorEntries'] ?? [])) {
+      total += _toDouble(c['totalAmount'] ?? c['amount']);
+    }
+    return total;
+  }
+
+  double _getIncentiveTotalForEntry(Map<String, dynamic> entry) {
+    double total = 0;
+    for (final inc in (entry['incentiveEntries'] ?? [])) {
+      total += _toDouble(inc['incentiveAmount'] ?? inc['amount']);
+    }
+    return total;
+  }
+
+  double _getDateTotalForEntry(Map<String, dynamic> entry) {
+    return _getSupervisorTotalForEntry(entry) +
+        _getManagerTotalForEntry(entry) +
+        _getOrgTotalForEntry(entry) +
+        _getContractorTotalForEntry(entry) +
+        _getIncentiveTotalForEntry(entry) +
+        _getPettyCashTotalForEntry(entry);
   }
 
   Future<void> _generateAndPreviewPDF(
@@ -241,6 +415,46 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
     final DateFormat displayDateFormat = DateFormat('dd-MMM-yyyy');
     final pdfPrimaryColor = PdfColor.fromInt(primaryColor.toARGB32());
     final orgDetails = await PdfTemplates.fetchOrgDetails();
+
+    double supSum = 0;
+    double matSum = 0;
+    double labSum = 0;
+    double mgrSum = 0;
+    double orgSum = 0;
+    double foodSum = 0;
+    double transSum = 0;
+    double fuelSum = 0;
+    double pcSum = 0;
+    double contractorSum = 0;
+    double incSum = 0;
+
+    for (final entry in entries) {
+      supSum += _getSupervisorTotalForEntry(entry);
+      matSum += _getMaterialsTotalForEntry(entry);
+      labSum += _getLabourTotalForEntry(entry);
+      mgrSum += _getManagerTotalForEntry(entry);
+      orgSum += _getOrgTotalForEntry(entry);
+      foodSum += _getFoodTotalForEntry(entry);
+      transSum += _getTransportTotalForEntry(entry);
+      fuelSum += _getFuelTotalForEntry(entry);
+      pcSum += _getPettyCashTotalForEntry(entry);
+      contractorSum += _getContractorTotalForEntry(entry);
+      incSum += _getIncentiveTotalForEntry(entry);
+    }
+
+    final categoryBreakdown = [
+      {'name': 'Site Supervisor Expenses', 'amount': supSum},
+      {'name': 'Materials', 'amount': matSum},
+      {'name': 'Labour', 'amount': labSum},
+      {'name': 'Manager Expenses', 'amount': mgrSum},
+      {'name': 'Organization Expenses', 'amount': orgSum},
+      {'name': 'Food', 'amount': foodSum},
+      {'name': 'Transport', 'amount': transSum},
+      {'name': 'Fuel', 'amount': fuelSum},
+      {'name': 'Petty Cash', 'amount': pcSum},
+      if (contractorSum > 0) {'name': 'Contractor Expenses', 'amount': contractorSum},
+      if (incSum > 0) {'name': 'Incentives', 'amount': incSum},
+    ];
 
     pdf.addPage(
       pw.MultiPage(
@@ -272,84 +486,57 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
               ),
             ],
           ),
-          pw.SizedBox(height: 24),
+          pw.SizedBox(height: 16),
+          pw.Text(
+            'CONSOLIDATED EXPENSE BREAKDOWN',
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+              color: pdfPrimaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.TableHelper.fromTextArray(
+            headers: ['Expense Category', 'Total Amount (Rs.)'],
+            data: categoryBreakdown
+                .map((c) => [
+                      c['name'].toString(),
+                      'Rs. ${(c['amount'] as double).toStringAsFixed(2)}',
+                    ])
+                .toList(),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+              fontSize: 10,
+            ),
+            headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+            cellStyle: const pw.TextStyle(fontSize: 9),
+            cellAlignment: pw.Alignment.centerLeft,
+            cellAlignments: {1: pw.Alignment.centerRight},
+            border: pw.TableBorder.all(color: PdfColors.grey300),
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Text(
+            'DAILY BREAKDOWN',
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+              color: pdfPrimaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 8),
           ...entries.map((entry) {
-            num supervisorTotal = 0;
-            if (entry['supervisorData'] != null &&
-                entry['supervisorData']['totalAmount'] != null) {
-              supervisorTotal = entry['supervisorData']['totalAmount'] is num
-                  ? entry['supervisorData']['totalAmount']
-                  : num.tryParse(
-                          entry['supervisorData']['totalAmount'].toString(),
-                        ) ??
-                        0;
-            }
-
-            num managerTotal = 0;
-            for (final bill in (entry['managerBills'] ?? [])) {
-              if (bill['billAmount'] is num) {
-                managerTotal += bill['billAmount'] as num;
-              } else if (bill['billAmount'] is String) {
-                final parsed = double.tryParse(
-                  bill['billAmount'].toString().replaceAll(
-                    RegExp(r'[^0-9.]'),
-                    '',
-                  ),
-                );
-                if (parsed != null) managerTotal += parsed;
-              }
-            }
-
-            num orgTotal = 0;
-            for (final bill in (entry['orgBills'] ?? [])) {
-              if (bill['billAmount'] is num) {
-                orgTotal += bill['billAmount'] as num;
-              } else if (bill['billAmount'] is String) {
-                final parsed = double.tryParse(
-                  bill['billAmount'].toString().replaceAll(
-                    RegExp(r'[^0-9.]'),
-                    '',
-                  ),
-                );
-                if (parsed != null) orgTotal += parsed;
-              }
-            }
-
-            num contractorTotal = 0;
-            final contractorEntries = entry['contractorEntries'] ?? [];
-            for (final contractor in contractorEntries) {
-              if (contractor['totalAmount'] is num) {
-                contractorTotal += contractor['totalAmount'] as num;
-              } else if (contractor['totalAmount'] is String) {
-                final parsed = double.tryParse(
-                  contractor['totalAmount'].toString().replaceAll(
-                    RegExp(r'[^0-9.]'),
-                    '',
-                  ),
-                );
-                if (parsed != null) contractorTotal += parsed;
-              }
-            }
-
-            num incentiveTotal = 0;
-            final incentiveEntries = entry['incentiveEntries'] ?? [];
-            for (final inc in incentiveEntries) {
-              final amt = inc['incentiveAmount'] ?? inc['amount'];
-              if (amt is num) {
-                incentiveTotal += amt;
-              } else if (amt is String) {
-                final parsed = double.tryParse(
-                  amt.toString().replaceAll(
-                    RegExp(r'[^0-9.]'),
-                    '',
-                  ),
-                );
-                if (parsed != null) incentiveTotal += parsed;
-              }
-            }
-
-            num dateTotal =
-                supervisorTotal + managerTotal + orgTotal + contractorTotal + incentiveTotal;
+            final supervisorTotal = _getSupervisorTotalForEntry(entry);
+            final managerTotal = _getManagerTotalForEntry(entry);
+            final orgTotal = _getOrgTotalForEntry(entry);
+            final contractorTotal = _getContractorTotalForEntry(entry);
+            final incentiveTotal = _getIncentiveTotalForEntry(entry);
+            final pettyCashTotal = _getPettyCashTotalForEntry(entry);
+            final dateTotal = _getDateTotalForEntry(entry);
+            final contractorEntries = (entry['contractorEntries'] as List? ?? []);
+            final incentiveEntries = (entry['incentiveEntries'] as List? ?? []);
+            final pettyCashEntries = (entry['pettyCashEntries'] as List? ?? []);
 
             return pw.Container(
               margin: const pw.EdgeInsets.only(bottom: 12),
@@ -372,97 +559,36 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                   pw.SizedBox(height: 4),
                   if (entry['supervisorData'] != null)
                     pw.Text(
-                      'Site Entries Total: Rs. $supervisorTotal',
-                      style: pw.TextStyle(fontSize: 12),
+                      'Site Supervisor Entries: Rs. ${supervisorTotal.toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 11),
                     ),
-                  if ((entry['managerBills'] as List).isNotEmpty)
+                  if ((entry['managerBills'] as List? ?? []).isNotEmpty)
                     pw.Text(
-                      'Manager Expenses Total: Rs. $managerTotal',
-                      style: pw.TextStyle(fontSize: 12),
+                      'Manager Expenses: Rs. ${managerTotal.toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 11),
                     ),
-                  if ((entry['orgBills'] as List).isNotEmpty)
+                  if ((entry['orgBills'] as List? ?? []).isNotEmpty)
                     pw.Text(
-                      'Organization Expenses Total: Rs. $orgTotal',
-                      style: pw.TextStyle(fontSize: 12),
+                      'Organization Expenses: Rs. ${orgTotal.toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 11),
+                    ),
+                  if (pettyCashEntries.isNotEmpty)
+                    pw.Text(
+                      'Petty Cash: Rs. ${pettyCashTotal.toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 11),
                     ),
                   if (contractorEntries.isNotEmpty)
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
+                        pw.SizedBox(height: 4),
                         pw.Text(
-                          'Contractor Expenses:',
+                          'Contractor Expenses: Rs. ${contractorTotal.toStringAsFixed(2)}',
                           style: pw.TextStyle(
                             fontWeight: pw.FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
                         ),
-                        pw.SizedBox(height: 6),
-                        ...contractorEntries.map<pw.Widget>((contractor) {
-                          final labors =
-                              contractor['labours'] as List<dynamic>? ?? [];
-                          final materials =
-                              contractor['materials'] as List<dynamic>? ?? [];
-                          return pw.Container(
-                            margin: const pw.EdgeInsets.symmetric(vertical: 6),
-                            padding: const pw.EdgeInsets.all(8),
-                            decoration: pw.BoxDecoration(
-                              border: pw.Border.all(color: PdfColors.grey400),
-                              borderRadius: pw.BorderRadius.circular(6),
-                              color: PdfColors.white,
-                            ),
-                            child: pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text(
-                                  'Contractor: ${contractor['contractorName'] ?? '-'} | Project: ${contractor['projectField'] ?? '-'}',
-                                  style: pw.TextStyle(
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
-                                pw.Text(
-                                  'Food: Rs. ${contractor['food'] ?? 0} | Fuel: Rs. ${contractor['fuel'] ?? 0} | Transport: Rs. ${contractor['transport'] ?? 0}',
-                                ),
-                                pw.SizedBox(height: 4),
-                                pw.Text(
-                                  'Labours:',
-                                  style: pw.TextStyle(
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
-                                pw.Column(
-                                  children: labors.map<pw.Widget>((labour) {
-                                    return pw.Text(
-                                      '${labour['type']}: ${labour['count']} x Rs. ${labour['unitSalary']} = Rs. ${labour['amount']}',
-                                    );
-                                  }).toList(),
-                                ),
-                                pw.SizedBox(height: 4),
-                                pw.Text(
-                                  'Materials:',
-                                  style: pw.TextStyle(
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
-                                pw.Column(
-                                  children: materials.map<pw.Widget>((
-                                    material,
-                                  ) {
-                                    return pw.Text(
-                                      '${material['type']}: ${material['quantity']} x Rs. ${material['unitPrice']} = Rs. ${material['amount']}',
-                                    );
-                                  }).toList(),
-                                ),
-                                pw.SizedBox(height: 4),
-                                pw.Text(
-                                  'Total Amount: Rs. ${contractor['totalAmount'] ?? 0}',
-                                  style: pw.TextStyle(
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
                       ],
                     ),
                   if (incentiveEntries.isNotEmpty)
@@ -471,36 +597,32 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                       children: [
                         pw.SizedBox(height: 4),
                         pw.Text(
-                          'Supervisor / Extra Incentives:',
+                          'Supervisor / Extra Incentives: Rs. ${incentiveTotal.toStringAsFixed(2)}',
                           style: pw.TextStyle(
                             fontWeight: pw.FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        ...incentiveEntries.map<pw.Widget>((inc) {
-                          final name = inc['supervisorName'] ?? inc['name'] ?? 'Supervisor';
-                          final role = inc['role'] ?? 'Incentive';
-                          final amt = inc['incentiveAmount'] ?? inc['amount'] ?? 0;
-                          return pw.Text(
-                            '$name ($role): Rs. $amt',
-                            style: pw.TextStyle(fontSize: 10),
-                          );
-                        }),
-                        pw.SizedBox(height: 2),
-                        pw.Text(
-                          'Incentives Total: Rs. $incentiveTotal',
-                          style: pw.TextStyle(fontSize: 11),
                         ),
                       ],
                     ),
-                  pw.SizedBox(height: 4),
-                  pw.Text(
-                    'Total Amount: Rs. $dateTotal',
-                    style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: 13,
-                    ),
+                  pw.SizedBox(height: 6),
+                  pw.Divider(color: PdfColors.grey400, thickness: 0.5),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        'Day Total:',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12),
+                      ),
+                      pw.Text(
+                        'Rs. ${dateTotal.toStringAsFixed(2)}',
+                        style: pw.TextStyle(
+                          fontWeight: pw.FontWeight.bold,
+                          fontSize: 12,
+                          color: pdfPrimaryColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -582,142 +704,164 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 600),
-          child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildHeaderInfo(),
-            const SizedBox(height: 20),
-            Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _entriesFuture ??= _fetchEntriesForRange(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _entriesFuture ??= _fetchEntriesForRange(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                  ),
+                );
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Error: ${snapshot.error}',
+                    style: TextStyle(color: textColor),
+                  ),
+                );
+              }
+              final entries = snapshot.data ?? [];
+              if (entries.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      _buildHeaderInfo(0),
+                      const SizedBox(height: 32),
+                      Center(
+                        child: Text(
+                          'No data found for the selected range.',
+                          style: TextStyle(color: textColor, fontSize: 16),
+                        ),
                       ),
-                    );
-                  }
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Error: ${snapshot.error}',
-                        style: TextStyle(color: textColor),
-                      ),
-                    );
-                  }
-                  final entries = snapshot.data ?? [];
-                  if (entries.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No data found for the selected range.',
-                        style: TextStyle(color: textColor),
-                      ),
-                    );
-                  }
-                  // Calculate grand total
-                  num grandTotal = 0;
-                  List<Widget> cards = [];
-                  for (final entry in entries) {
-                    num supervisorTotal = 0;
-                    if (entry['supervisorData'] != null &&
-                        entry['supervisorData']['totalAmount'] != null) {
-                      supervisorTotal =
-                          entry['supervisorData']['totalAmount'] is num
-                          ? entry['supervisorData']['totalAmount']
-                          : num.tryParse(
-                                  entry['supervisorData']['totalAmount']
-                                      .toString(),
-                                ) ??
-                                0;
-                    }
-                    num managerTotal = 0;
-                    for (final bill in (entry['managerBills'] ?? [])) {
-                      if (bill['billAmount'] is num) {
-                        managerTotal += bill['billAmount'] as num;
-                      } else if (bill['billAmount'] is String) {
-                        final parsed = double.tryParse(
-                          bill['billAmount'].toString().replaceAll(
-                            RegExp(r'[^0-9.]'),
-                            '',
-                          ),
-                        );
-                        if (parsed != null) managerTotal += parsed;
-                      }
-                    }
-                    num orgTotal = 0;
-                    for (final bill in (entry['orgBills'] ?? [])) {
-                      if (bill['billAmount'] is num) {
-                        orgTotal += bill['billAmount'] as num;
-                      } else if (bill['billAmount'] is String) {
-                        final parsed = double.tryParse(
-                          bill['billAmount'].toString().replaceAll(
-                            RegExp(r'[^0-9.]'),
-                            '',
-                          ),
-                        );
-                        if (parsed != null) orgTotal += parsed;
-                      }
-                    }
-                    num contractorTotal = 0;
-                    final contractorEntries = entry['contractorEntries'] ?? [];
-                    for (final contractor in contractorEntries) {
-                      if (contractor['totalAmount'] is num) {
-                        contractorTotal += contractor['totalAmount'] as num;
-                      } else if (contractor['totalAmount'] is String) {
-                        final parsed = double.tryParse(
-                          contractor['totalAmount'].toString().replaceAll(
-                            RegExp(r'[^0-9.]'),
-                            '',
-                          ),
-                        );
-                        if (parsed != null) contractorTotal += parsed;
-                      }
-                    }
-                    num incentiveTotal = 0;
-                    final incentiveEntries = entry['incentiveEntries'] ?? [];
-                    for (final inc in incentiveEntries) {
-                      final amt = inc['incentiveAmount'] ?? inc['amount'];
-                      if (amt is num) {
-                        incentiveTotal += amt;
-                      } else if (amt is String) {
-                        final parsed = double.tryParse(
-                          amt.toString().replaceAll(
-                            RegExp(r'[^0-9.]'),
-                            '',
-                          ),
-                        );
-                        if (parsed != null) incentiveTotal += parsed;
-                      }
-                    }
-                    num dateTotal =
-                        supervisorTotal +
-                        managerTotal +
-                        orgTotal +
-                        contractorTotal +
-                        incentiveTotal;
-                    grandTotal += dateTotal;
+                    ],
+                  ),
+                );
+              }
 
-                    cards.add(
-                      Container(
+              // Calculate range totals for all 9 categories
+              double totalSup = 0;
+              double totalMat = 0;
+              double totalLab = 0;
+              double totalMgr = 0;
+              double totalOrg = 0;
+              double totalFood = 0;
+              double totalTransport = 0;
+              double totalFuel = 0;
+              double totalPettyCash = 0;
+              double totalContractor = 0;
+              double totalIncentive = 0;
+              double grandTotal = 0;
+
+              for (final entry in entries) {
+                totalSup += _getSupervisorTotalForEntry(entry);
+                totalMat += _getMaterialsTotalForEntry(entry);
+                totalLab += _getLabourTotalForEntry(entry);
+                totalMgr += _getManagerTotalForEntry(entry);
+                totalOrg += _getOrgTotalForEntry(entry);
+                totalFood += _getFoodTotalForEntry(entry);
+                totalTransport += _getTransportTotalForEntry(entry);
+                totalFuel += _getFuelTotalForEntry(entry);
+                totalPettyCash += _getPettyCashTotalForEntry(entry);
+                totalContractor += _getContractorTotalForEntry(entry);
+                totalIncentive += _getIncentiveTotalForEntry(entry);
+                grandTotal += _getDateTotalForEntry(entry);
+              }
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeaderInfo(grandTotal),
+                    const SizedBox(height: 16),
+                    _buildFinanceSummary(grandTotal),
+                    const SizedBox(height: 20),
+                    _buildConsolidatedBreakdownCard(
+                      supervisorTotal: totalSup,
+                      materialsTotal: totalMat,
+                      labourTotal: totalLab,
+                      managerTotal: totalMgr,
+                      organizationTotal: totalOrg,
+                      foodTotal: totalFood,
+                      transportTotal: totalTransport,
+                      fuelTotal: totalFuel,
+                      pettyCashTotal: totalPettyCash,
+                      contractorTotal: totalContractor,
+                      incentiveTotal: totalIncentive,
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'DAILY BREAKDOWN',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${entries.length} ${entries.length == 1 ? 'DAY' : 'DAYS'}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...entries.map((entry) {
+                      final supervisorTotal = _getSupervisorTotalForEntry(entry);
+                      final managerTotal = _getManagerTotalForEntry(entry);
+                      final orgTotal = _getOrgTotalForEntry(entry);
+                      final contractorTotal = _getContractorTotalForEntry(entry);
+                      final incentiveTotal = _getIncentiveTotalForEntry(entry);
+                      final pettyCashTotal = _getPettyCashTotalForEntry(entry);
+                      final dateTotal = _getDateTotalForEntry(entry);
+
+                      final matDay = _getMaterialsTotalForEntry(entry);
+                      final labDay = _getLabourTotalForEntry(entry);
+                      final foodDay = _getFoodTotalForEntry(entry);
+                      final transDay = _getTransportTotalForEntry(entry);
+                      final fuelDay = _getFuelTotalForEntry(entry);
+
+                      final contractorEntries = (entry['contractorEntries'] as List? ?? []);
+                      final incentiveEntries = (entry['incentiveEntries'] as List? ?? []);
+                      final pettyCashEntries = (entry['pettyCashEntries'] as List? ?? []);
+
+                      return Container(
                         margin: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withValues(alpha: 0.1),
-                              blurRadius: 8,
-                              offset: Offset(0, 4),
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
-                          border: Border(
-                            left: BorderSide(color: primaryColor, width: 6),
+                          border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.06),
                           ),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(20.0),
+                          padding: const EdgeInsets.all(18.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -725,186 +869,413 @@ class _SiteExpensesReportPageState extends State<SiteExpensesReportPage> {
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
+                                      horizontal: 14,
+                                      vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
                                       color: primaryColor,
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Text(
                                       entry['date'],
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
-                                  Spacer(),
-                                  Icon(Icons.receipt_long, color: primaryColor),
+                                  const Spacer(),
+                                  Text(
+                                    '₹ ${dateTotal.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: primaryColor,
+                                    ),
+                                  ),
                                 ],
                               ),
-                              SizedBox(height: 16),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  if (supervisorTotal > 0)
+                                    _buildMiniChip('Supervisor', supervisorTotal, Colors.blue),
+                                  if (matDay > 0)
+                                    _buildMiniChip('Materials', matDay, Colors.indigo),
+                                  if (labDay > 0)
+                                    _buildMiniChip('Labour', labDay, Colors.teal),
+                                  if (managerTotal > 0)
+                                    _buildMiniChip('Manager', managerTotal, Colors.deepPurple),
+                                  if (orgTotal > 0)
+                                    _buildMiniChip('Org', orgTotal, Colors.cyan),
+                                  if (foodDay > 0)
+                                    _buildMiniChip('Food', foodDay, Colors.orange),
+                                  if (transDay > 0)
+                                    _buildMiniChip('Transport', transDay, Colors.purple),
+                                  if (fuelDay > 0)
+                                    _buildMiniChip('Fuel', fuelDay, Colors.brown),
+                                  if (pettyCashTotal > 0)
+                                    _buildMiniChip('Petty Cash', pettyCashTotal, Colors.green),
+                                  if (contractorTotal > 0)
+                                    _buildMiniChip('Contractor', contractorTotal, Colors.amber.shade800),
+                                  if (incentiveTotal > 0)
+                                    _buildMiniChip('Incentives', incentiveTotal, Colors.pink),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              const Divider(height: 1),
+                              const SizedBox(height: 12),
                               _buildSection(
                                 'Site Entries',
                                 entry['supervisorData'],
                                 isSupervisor: true,
                               ),
-                              SizedBox(height: 12),
+                              const SizedBox(height: 12),
                               _buildSection(
                                 'Manager Expenses',
                                 entry['managerBills'],
                               ),
-                              SizedBox(height: 12),
+                              const SizedBox(height: 12),
                               _buildSection(
                                 'Organization Expenses',
                                 entry['orgBills'],
                               ),
-                              SizedBox(height: 12),
+                              const SizedBox(height: 12),
                               _buildContractorSection(
                                 'Contractor Expenses',
                                 contractorEntries,
                               ),
-                              SizedBox(height: 12),
-                              _buildIncentiveSection(
-                                'Supervisor & Extra Incentives',
-                                incentiveEntries,
-                              ),
-                              SizedBox(height: 16),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(
-                                  'Total Amount: Rs. $dateTotal',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                    color: primaryColor,
-                                  ),
+                              if (pettyCashEntries.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                _buildPettyCashSection(
+                                  'Petty Cash Expenses',
+                                  pettyCashEntries,
                                 ),
-                              ),
+                              ],
+                              if (incentiveEntries.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                _buildIncentiveSection(
+                                  'Supervisor & Extra Incentives',
+                                  incentiveEntries,
+                                ),
+                              ],
                             ],
                           ),
                         ),
-                      ),
-                    );
-                  }
-                  // Add grand total at the end
-                  cards.add(
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20.0),
-                      child: Card(
-                        color: primaryColor.withValues(alpha: 0.1),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: primaryColor, width: 1),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 2,
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Center(
-                            child: Text(
-                              'Grand Total: Rs. $grandTotal',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 20,
-                                color: primaryColor,
-                              ),
-                            ),
+                        icon: const Icon(Icons.picture_as_pdf, size: 22),
+                        label: const Text(
+                          'Generate PDF',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ),
-                  );
-                  // Add Generate PDF button at the end
-                  cards.add(
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 32.0, top: 0),
-                      child: Center(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 2,
-                          ),
-                          icon: Icon(Icons.picture_as_pdf, size: 24),
-                          label: Text(
-                            'Generate PDF',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          onPressed: () async {
-                            await _generateAndPreviewPDF(entries, grandTotal);
-                          },
-                        ),
+                        onPressed: () async {
+                          await _generateAndPreviewPDF(entries, grandTotal);
+                        },
                       ),
                     ),
-                  );
-                  return ListView.separated(
-                    itemCount: cards.length,
-                    separatorBuilder: (_, _) => SizedBox(height: 12),
-                    itemBuilder: (context, index) => cards[index],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeaderInfo() {
-    final DateFormat displayDateFormat = DateFormat('dd-MMM-yyyy');
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            blurRadius: 6,
-            offset: Offset(0, 2),
+  Widget _buildFinanceSummary(double grandTotal) {
+    return GlassCard(
+      color: primaryColor,
+      child: Column(
+        children: [
+          const Text(
+            'TOTAL EXPENDITURE',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '₹ ${grandTotal.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  Widget _buildConsolidatedBreakdownCard({
+    required double supervisorTotal,
+    required double materialsTotal,
+    required double labourTotal,
+    required double managerTotal,
+    required double organizationTotal,
+    required double foodTotal,
+    required double transportTotal,
+    required double fuelTotal,
+    required double pettyCashTotal,
+    required double contractorTotal,
+    required double incentiveTotal,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'CONSOLIDATED EXPENSES',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _expenseItem(
+          'Site Supervisor Expenses',
+          supervisorTotal,
+          Icons.engineering_outlined,
+        ),
+        _expenseItem(
+          'Materials',
+          materialsTotal,
+          Icons.inventory_2_outlined,
+        ),
+        _expenseItem(
+          'Labour',
+          labourTotal,
+          Icons.handyman_outlined,
+        ),
+        _expenseItem(
+          'Manager Expenses',
+          managerTotal,
+          Icons.manage_accounts_outlined,
+        ),
+        _expenseItem(
+          'Organization Expenses',
+          organizationTotal,
+          Icons.business_outlined,
+        ),
+        _expenseItem(
+          'Food',
+          foodTotal,
+          Icons.restaurant_outlined,
+        ),
+        _expenseItem(
+          'Transport',
+          transportTotal,
+          Icons.local_shipping_outlined,
+        ),
+        _expenseItem(
+          'Fuel',
+          fuelTotal,
+          Icons.local_gas_station_outlined,
+        ),
+        _expenseItem(
+          'Petty Cash',
+          pettyCashTotal,
+          Icons.payments_outlined,
+        ),
+        if (contractorTotal > 0)
+          _expenseItem(
+            'Contractor Expenses',
+            contractorTotal,
+            Icons.construction_outlined,
+          ),
+        if (incentiveTotal > 0)
+          _expenseItem(
+            'Incentives',
+            incentiveTotal,
+            Icons.emoji_events_outlined,
+          ),
+      ],
+    );
+  }
+
+  Widget _expenseItem(
+    String label,
+    double amount,
+    IconData icon,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GlassCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(
           children: [
-            Row(
+            Icon(icon, color: primaryColor, size: 20),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+            Text(
+              '₹ ${amount.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: amount > 0 ? textColor : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniChip(String label, double amount, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+          Text(
+            '₹${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderInfo(double grandTotal) {
+    final DateFormat displayDateFormat = DateFormat('dd-MMM-yyyy');
+    return GlassCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.location_on, color: primaryColor, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                'Report Summary',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildInfoRow('Site', widget.siteId),
+          _buildInfoRow('Year', widget.fromDate.year.toString()),
+          _buildInfoRow('From', displayDateFormat.format(widget.fromDate)),
+          _buildInfoRow('To', displayDateFormat.format(widget.toDate)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPettyCashSection(
+    String title,
+    List<dynamic> pettyCashEntries,
+  ) {
+    if (pettyCashEntries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    double total = 0;
+    for (final pc in pettyCashEntries) {
+      total += _toDouble(pc['amount']);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: primaryColor,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 6),
+        ...pettyCashEntries.map((pc) {
+          final desc = pc['description']?.toString() ?? '';
+          final category = pc['category']?.toString() ?? 'Petty Cash';
+          final amt = _toDouble(pc['amount']);
+          return Padding(
+            padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
+            child: Row(
               children: [
-                Icon(Icons.location_on, color: primaryColor, size: 24),
-                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '• $category${desc.isNotEmpty ? " ($desc)" : ""}',
+                    style: TextStyle(fontSize: 13, color: textColor),
+                  ),
+                ),
                 Text(
-                  'Report Summary',
+                  'Rs. ${amt.toStringAsFixed(2)}',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: primaryColor,
+                    color: textColor,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 16),
-            _buildInfoRow('Site', widget.siteId),
-            _buildInfoRow('Year', widget.fromDate.year.toString()),
-            _buildInfoRow('From', displayDateFormat.format(widget.fromDate)),
-            _buildInfoRow('To', displayDateFormat.format(widget.toDate)),
-          ],
+          );
+        }),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            'Petty Cash Total: Rs. ${total.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: primaryColor,
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 

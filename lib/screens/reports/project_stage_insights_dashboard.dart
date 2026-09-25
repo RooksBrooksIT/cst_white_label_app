@@ -1,4 +1,5 @@
 import 'package:ebricks/screens/supervisor/projectstage_daily_site_report.dart';
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/screens/reports/project_stage_expenses_report_page.dart';
@@ -657,8 +658,13 @@ class _ProjectstageInsightsDashboardState
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'Advanced Financial Analytics',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          'Site/Project Stage Expenses',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -703,31 +709,30 @@ class _ProjectstageInsightsDashboardState
                 return Center(
                   child: Text(
                     'No supervisor entries found.',
-                    style: theme.textTheme.bodyMedium,
+                    style: TextStyle(color: theme.colorScheme.onSurface),
                   ),
                 );
               }
               _allSupervisorEntriesCached ??= snapshot.data!;
 
               return SingleChildScrollView(
-                padding: EdgeInsets.all(isMobile ? 16 : 24),
+                padding: const EdgeInsets.all(20),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Header
                     Text(
-                      'Project Stage Reports',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                      'Generate Reports',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Generate detailed reports by project stage',
+                      'Select a site, project stage, and report type to generate insights',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -1120,6 +1125,7 @@ class _ProjectstageInsightsDashboardState
   }) {
     final isSelected = selectedReportType == type;
     return InkWell(
+      borderRadius: BorderRadius.circular(8),
       onTap: () {
         setState(() {
           selectedReportType = type;
@@ -1133,7 +1139,7 @@ class _ProjectstageInsightsDashboardState
         }
       },
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
             Container(
@@ -1141,7 +1147,7 @@ class _ProjectstageInsightsDashboardState
               decoration: BoxDecoration(
                 color: isSelected
                     ? theme.primaryColor.withValues(alpha: 0.1)
-                    : theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    : theme.cardColor,
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -1161,9 +1167,7 @@ class _ProjectstageInsightsDashboardState
                     title,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.w600,
+                      fontWeight: FontWeight.w600,
                       color: isSelected
                           ? theme.primaryColor
                           : theme.colorScheme.onSurface,
@@ -1173,20 +1177,42 @@ class _ProjectstageInsightsDashboardState
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       color: isSelected
-                          ? theme.primaryColor.withValues(alpha: 0.8)
+                          ? theme.primaryColor.withValues(alpha: 0.7)
                           : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            if (isSelected)
-              Icon(Icons.check_circle, color: theme.primaryColor, size: 20),
+            Radio<ReportType>(
+              value: type,
+              groupValue: selectedReportType,
+              onChanged: (ReportType? value) {
+                if (value == null) return;
+                setState(() {
+                  selectedReportType = value;
+                  selectedDate = null;
+                  fromDate = null;
+                  toDate = null;
+                  currentStageCost = 0.0;
+                });
+                if (value == ReportType.siteSummary) {
+                  _calculateStageCost();
+                }
+              },
+              activeColor: theme.primaryColor,
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildModernCard({required Widget child}) {
+    return GlassCard(
+      child: child,
     );
   }
 
@@ -1196,63 +1222,50 @@ class _ProjectstageInsightsDashboardState
     required VoidCallback onTap,
     required ThemeData theme,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: theme.primaryColor,
-                letterSpacing: 1.2,
-              ),
+    return _buildModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: theme.primaryColor,
+              letterSpacing: 1.2,
             ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: theme.dividerColor),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    date != null
+                        ? DateFormat('MMM dd, yyyy').format(date)
+                        : 'Select Date',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: date != null
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  color: theme.colorScheme.surface.withValues(alpha: 0.5),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      date != null
-                          ? DateFormat('dd MMM, yyyy').format(date)
-                          : 'Select Date',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: date != null
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    Icon(
-                      Icons.calendar_today_outlined,
-                      color: theme.primaryColor,
-                      size: 20,
-                    ),
-                  ],
-                ),
+                  Icon(Icons.calendar_month, color: theme.primaryColor),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1261,23 +1274,19 @@ class _ProjectstageInsightsDashboardState
     return InputDecoration(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(
-          color: theme.colorScheme.outline.withValues(alpha: 0.3),
-        ),
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(
-          color: theme.colorScheme.outline.withValues(alpha: 0.3),
-        ),
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: theme.primaryColor, width: 2),
       ),
       filled: true,
-      fillColor: theme.colorScheme.surface.withValues(alpha: 0.5),
+      fillColor: theme.cardColor,
     );
   }
 }
