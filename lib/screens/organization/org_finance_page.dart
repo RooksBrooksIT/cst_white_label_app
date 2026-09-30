@@ -209,10 +209,9 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
         final currentSpent = _parseNum(existing['amountSpent'] ?? existing['spent']);
         if (totalExp > 0 || currentSpent == 0) {
           existing['amountSpent'] = totalExp > 0 ? totalExp : currentSpent;
-          final budget = _parseNum(existing['projectBudget'] ?? existing['budget']);
-          final income = _parseNum(existing['amountPaid'] ?? existing['paid'] ?? existing['amountReceived']);
+          final income = _parseNum(existing['amountReceived'] ?? existing['amountPaid'] ?? existing['paid'] ?? existing['receivedPayments']);
           final effectiveSpent = existing['amountSpent'] as double;
-          existing['amountBalance'] = budget > 0 ? (budget - effectiveSpent) : (income - effectiveSpent);
+          existing['amountBalance'] = income - effectiveSpent;
         }
         unified[matchKey] = existing;
       }
@@ -1108,10 +1107,11 @@ class _OrgFinancePageState extends State<OrgFinancePage> {
     final statusColor = _getStatusColor(status);
 
     final budget = _parseNum(site['projectBudget'] ?? site['budget']);
-    final income = _parseNum(site['amountPaid'] ?? site['paid'] ?? site['amountReceived']);
+    final income = _parseNum(site['amountReceived'] ?? site['amountPaid'] ?? site['paid'] ?? site['receivedPayments']);
     final expenses = _parseNum(site['amountSpent'] ?? site['amountSpend'] ?? site['spent'] ?? site['totalAllExpenses']);
-    final rawBalance = _parseNum(site['amountBalance'] ?? site['balance']);
-    final balance = rawBalance != 0 ? rawBalance : (budget > 0 ? (budget - expenses) : (income - expenses));
+    final balance = site.containsKey('amountBalance') && site['amountBalance'] != null
+        ? _parseNum(site['amountBalance'])
+        : (income - expenses);
 
     final usageRatio = budget > 0 ? (expenses / budget).clamp(0.0, 1.0) : 0.0;
     final usagePercent = (usageRatio * 100).toStringAsFixed(0);

@@ -1066,31 +1066,34 @@ class _ToolsAtSitePageState extends State<ToolsAtSitePage> {
                                     : const Color(0xFFFECACA),
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  count.toString(),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: isAvailable
-                                        ? const Color(0xFF059669)
-                                        : const Color(0xFFDC2626),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    count.toString(),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: isAvailable
+                                          ? const Color(0xFF059669)
+                                          : const Color(0xFFDC2626),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  unit,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                    color: isAvailable
-                                        ? const Color(0xFF047857)
-                                        : const Color(0xFFB91C1C),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    unit,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                      color: isAvailable
+                                          ? const Color(0xFF047857)
+                                          : const Color(0xFFB91C1C),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 2),

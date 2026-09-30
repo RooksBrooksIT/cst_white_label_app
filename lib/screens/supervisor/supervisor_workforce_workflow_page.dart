@@ -147,23 +147,29 @@ class _SupervisorWorkforceWorkflowPageState
                     ),
                     tabs: const [
                       Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.verified_outlined, size: 16),
-                            SizedBox(width: 6),
-                            Text('Site Approvals'),
-                          ],
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.verified_outlined, size: 16),
+                              SizedBox(width: 6),
+                              Text('Site Approvals'),
+                            ],
+                          ),
                         ),
                       ),
                       Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.person_add_alt_1_rounded, size: 16),
-                            SizedBox(width: 6),
-                            Text('Request Workforce'),
-                          ],
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.person_add_alt_1_rounded, size: 16),
+                              SizedBox(width: 6),
+                              Text('Request Workforce'),
+                            ],
+                          ),
                         ),
                       ),
                     ],

@@ -30,6 +30,82 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
   bool isLoadingSiteDetails = false;
   bool isSubmitting = false;
 
+  // Caching maps for instant Site ID selection and zero-delay field population
+  final Map<String, Map<String, dynamic>> _siteMetadataCache = {};
+  final Map<String, String> _supervisorIdCache = {};
+  final Map<String, String> _supervisorNameCache = {};
+
+  void _storeSiteMeta(String key, Map<String, dynamic> meta, {bool merge = false}) {
+    if (key.trim().isEmpty) return;
+    final k = key.trim().toLowerCase();
+    if (merge && _siteMetadataCache.containsKey(k)) {
+      final existing = _siteMetadataCache[k]!;
+      _siteMetadataCache[k] = {
+        ...existing,
+        ...meta..removeWhere((_, v) => v == null || v.toString().trim().isEmpty),
+      };
+    } else {
+      _siteMetadataCache[k] = Map<String, dynamic>.from(meta);
+    }
+  }
+
+  Map<String, dynamic>? _findCachedSiteMeta(String siteId) {
+    final clean = siteId.trim().toLowerCase();
+    if (_siteMetadataCache.containsKey(clean)) {
+      return _siteMetadataCache[clean];
+    }
+    final cleanNoSpaces = clean.replaceAll(' ', '');
+    if (_siteMetadataCache.containsKey(cleanNoSpaces)) {
+      return _siteMetadataCache[cleanNoSpaces];
+    }
+    if (clean.contains('_')) {
+      final code = clean.split('_').first;
+      if (_siteMetadataCache.containsKey(code)) {
+        return _siteMetadataCache[code];
+      }
+    }
+    return null;
+  }
+
+  void _applySiteDetailsImmediately(String siteId) {
+    final meta = _findCachedSiteMeta(siteId);
+    final cachedDetails = ExpenseService.getCachedSiteDetails(siteId);
+
+    String? supId = meta?['supervisorId']?.toString().trim();
+    if (supId == null || supId.isEmpty) {
+      supId = cachedDetails?.supervisorId?.trim();
+    }
+
+    String? supName = meta?['supervisorName']?.toString().trim();
+    if (supName == null || supName.isEmpty) {
+      supName = cachedDetails?.supervisor?.trim();
+    }
+
+    if ((supId == null || supId.isEmpty) && supName != null && supName.isNotEmpty) {
+      supId = _supervisorIdCache[supName.toLowerCase()] ?? supName;
+    }
+
+    String? stage = meta?['projectStage']?.toString().trim();
+    if (stage == null || stage.isEmpty) {
+      stage = cachedDetails?.projectStage?.trim();
+    }
+
+    final resolvedSupervisorId = (supId != null && supId.isNotEmpty && supId != 'NOT_ASSIGNED')
+        ? supId
+        : ((supName != null && supName.isNotEmpty && supName != 'NOT_ASSIGNED') ? supName : null);
+
+    final resolvedStage = (stage != null && stage.isNotEmpty) ? stage : null;
+
+    if (resolvedSupervisorId != null && resolvedSupervisorId.isNotEmpty) {
+      selectedSupervisorId = resolvedSupervisorId;
+      supervisorController.text = resolvedSupervisorId;
+    }
+    if (resolvedStage != null && resolvedStage.isNotEmpty) {
+      selectedProjectStage = resolvedStage;
+      projectStageController.text = resolvedStage;
+    }
+  }
+
   final billNoController = TextEditingController();
   final billVendorController = TextEditingController();
   final billAmountController = TextEditingController();
@@ -77,75 +153,213 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
         final Map<String, String> nameOrCodeToCanonical = {};
         final Set<String> canonicalIds = {};
 
-        // 1. Fetch from Site collection (Primary Source)
-        final siteSnapshot = await FirestoreService.getCollection('Site').get();
-        for (var doc in siteSnapshot.docs) {
-          if (doc.id.isEmpty) continue;
-          final data = doc.data();
-          final sCode = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
-          final sName = (data['siteName'] ?? data['name'] ?? data['projectName'] ?? data['site'] ?? '').toString().trim();
+        // Fetch sites, siteSupervisorMap, and supervisors concurrently in parallel
+        final results = await Future.wait([
+          FirestoreService.getCollection('Site').get(),
+          FirestoreService.siteSupervisorMap.get().catchError((_) => null as dynamic),
+          FirestoreService.supervisors.get().catchError((_) => null as dynamic),
+        ]);
 
-          final canonical = ExpenseService.formatCanonicalSiteId(
-            rawId: doc.id,
-            siteCode: sCode,
-            siteName: sName,
-          );
+        final siteSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>?;
+        final mapSnapshot = results[1] as QuerySnapshot<Map<String, dynamic>>?;
+        final supSnapshot = results[2] as QuerySnapshot<Map<String, dynamic>>?;
 
-          canonicalIds.add(canonical);
-          if (sName.isNotEmpty) {
-            names[canonical] = sName;
-            nameOrCodeToCanonical[sName.toLowerCase()] = canonical;
-            nameOrCodeToCanonical[sName.replaceAll(' ', '').toLowerCase()] = canonical;
+        // Cache all supervisor mappings in memory for instant O(1) resolution
+        if (supSnapshot != null) {
+          for (var doc in supSnapshot.docs) {
+            final data = doc.data();
+            final supId = (data['Supervisor ID'] ??
+                    data['supervisorId'] ??
+                    data['SupervisorId'] ??
+                    data['supervisor_id'] ??
+                    doc.id)
+                .toString()
+                .trim();
+            final supName = (data['FullName'] ??
+                    data['fullName'] ??
+                    data['supervisor'] ??
+                    data['supervisorName'] ??
+                    data['username'] ??
+                    data['UserName'] ??
+                    data['name'])
+                ?.toString()
+                .trim();
+
+            if (supId.isNotEmpty) {
+              _supervisorIdCache[doc.id.toLowerCase()] = supId;
+              _supervisorIdCache[supId.toLowerCase()] = supId;
+              if (supName != null && supName.isNotEmpty) {
+                _supervisorIdCache[supName.toLowerCase()] = supId;
+                _supervisorNameCache[supId.toLowerCase()] = supName;
+                _supervisorNameCache[supName.toLowerCase()] = supName;
+              }
+              final username = (data['username'] ?? data['UserName'])?.toString().trim();
+              if (username != null && username.isNotEmpty) {
+                _supervisorIdCache[username.toLowerCase()] = supId;
+                _supervisorNameCache[username.toLowerCase()] = supName ?? username;
+              }
+            }
           }
-          if (sCode.isNotEmpty) {
-            nameOrCodeToCanonical[sCode.toLowerCase()] = canonical;
-          }
-          nameOrCodeToCanonical[doc.id.toLowerCase()] = canonical;
         }
 
-        // 2. Fetch from siteSupervisorMap
-        final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
-        for (var doc in mapSnapshot.docs) {
-          final data = doc.data();
-          final sDocId = (data['siteDocId'] ?? '').toString().trim();
-          final sId = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
-          final sSite = (data['site'] ?? '').toString().trim();
-          final sName = (data['siteName'] ?? data['projectName'] ?? data['site_name'] ?? data['location'] ?? '').toString().trim();
+        // 1. Process from Site collection (Primary Source)
+        if (siteSnapshot != null) {
+          for (var doc in siteSnapshot.docs) {
+            if (doc.id.isEmpty) continue;
+            final data = doc.data();
+            final sCode = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+            final sName = (data['siteName'] ?? data['name'] ?? data['projectName'] ?? data['site'] ?? '').toString().trim();
+            final sStage = (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+            final sSup = (data['Supervisor'] ??
+                    data['supervisor'] ??
+                    data['supervisorName'] ??
+                    data['supervisor_name'] ??
+                    data['FullName'] ??
+                    data['fullName'] ??
+                    data['name'] ??
+                    data['username'] ??
+                    data['UserName'])
+                ?.toString()
+                .trim();
+            final sSupId = (data['Supervisor ID'] ??
+                    data['supervisorId'] ??
+                    data['SupervisorId'] ??
+                    data['supervisor_id'] ??
+                    data['assignedSupervisor'])
+                ?.toString()
+                .trim();
 
-          // Check if already mapped
-          String? mapped = nameOrCodeToCanonical[sDocId.toLowerCase()] ??
-              nameOrCodeToCanonical[sSite.toLowerCase()] ??
-              nameOrCodeToCanonical[sId.toLowerCase()] ??
-              nameOrCodeToCanonical[sName.toLowerCase()] ??
-              nameOrCodeToCanonical[doc.id.toLowerCase()];
-
-          if (mapped == null || !mapped.contains('_')) {
-            final formatted = ExpenseService.formatCanonicalSiteId(
-              rawId: sDocId.isNotEmpty ? sDocId : (sSite.isNotEmpty ? sSite : doc.id),
-              siteCode: sId,
+            final canonical = ExpenseService.formatCanonicalSiteId(
+              rawId: doc.id,
+              siteCode: sCode,
               siteName: sName,
             );
-            if (formatted.contains('_')) {
-              mapped = formatted;
-            }
-          }
 
-          if (mapped != null && mapped.isNotEmpty) {
-            canonicalIds.add(mapped);
-            if (sName.isNotEmpty && (!names.containsKey(mapped) || names[mapped]!.isEmpty)) {
-              names[mapped] = sName;
+            canonicalIds.add(canonical);
+            if (sName.isNotEmpty) {
+              names[canonical] = sName;
+              nameOrCodeToCanonical[sName.toLowerCase()] = canonical;
+              nameOrCodeToCanonical[sName.replaceAll(' ', '').toLowerCase()] = canonical;
             }
-          } else {
-            final raw = sDocId.isNotEmpty ? sDocId : (sId.isNotEmpty ? sId : (sSite.isNotEmpty ? sSite : doc.id));
-            if (raw.isNotEmpty) {
-              final resolved = await ExpenseService.resolveCanonicalSiteDocId(raw);
-              if (resolved.isNotEmpty) {
-                canonicalIds.add(resolved);
-                if (sName.isNotEmpty && (!names.containsKey(resolved) || names[resolved]!.isEmpty)) {
-                  names[resolved] = sName;
+            if (sCode.isNotEmpty) {
+              nameOrCodeToCanonical[sCode.toLowerCase()] = canonical;
+            }
+            nameOrCodeToCanonical[doc.id.toLowerCase()] = canonical;
+
+            final resolvedSupId = (sSupId != null && sSupId.isNotEmpty)
+                ? sSupId
+                : (sSup != null && sSup.isNotEmpty ? (_supervisorIdCache[sSup.toLowerCase()] ?? sSup) : '');
+
+            final meta = <String, dynamic>{
+              'projectName': sName.isNotEmpty ? sName : (data['projectName'] ?? '').toString().trim(),
+              'projectStage': sStage ?? '',
+              'supervisorName': sSup ?? '',
+              'supervisorId': resolvedSupId,
+              'siteCode': sCode,
+              'canonical': canonical,
+            };
+
+            _storeSiteMeta(canonical, meta);
+            _storeSiteMeta(doc.id, meta);
+            if (sCode.isNotEmpty) _storeSiteMeta(sCode, meta);
+            if (sName.isNotEmpty) _storeSiteMeta(sName, meta);
+
+            ExpenseService.cacheSiteDetails(SiteDetails(
+              canonicalDocId: canonical,
+              siteCode: sCode,
+              siteName: sName,
+              allKeys: {canonical, doc.id, if (sCode.isNotEmpty) sCode, if (sName.isNotEmpty) sName},
+              supervisor: sSup,
+              supervisorId: resolvedSupId,
+              projectName: sName,
+              projectStage: sStage,
+            ));
+          }
+        }
+
+        // 2. Process from siteSupervisorMap
+        if (mapSnapshot != null) {
+          for (var doc in mapSnapshot.docs) {
+            final data = doc.data();
+            final sDocId = (data['siteDocId'] ?? '').toString().trim();
+            final sId = (data['siteId'] ?? data['siteCode'] ?? '').toString().trim();
+            final sSite = (data['site'] ?? '').toString().trim();
+            final sName = (data['siteName'] ?? data['projectName'] ?? data['site_name'] ?? data['location'] ?? '').toString().trim();
+            final sStage = (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+            final sSup = (data['supervisor'] ??
+                    data['supervisorName'] ??
+                    data['Supervisor'] ??
+                    data['supervisor_name'] ??
+                    data['FullName'] ??
+                    data['fullName'] ??
+                    data['name'] ??
+                    data['username'] ??
+                    data['UserName'])
+                ?.toString()
+                .trim();
+            final sSupId = (data['Supervisor ID'] ??
+                    data['supervisorId'] ??
+                    data['SupervisorId'] ??
+                    data['supervisor_id'] ??
+                    data['assignedSupervisor'])
+                ?.toString()
+                .trim();
+
+            // Check if already mapped
+            String? mapped = nameOrCodeToCanonical[sDocId.toLowerCase()] ??
+                nameOrCodeToCanonical[sSite.toLowerCase()] ??
+                nameOrCodeToCanonical[sId.toLowerCase()] ??
+                nameOrCodeToCanonical[sName.toLowerCase()] ??
+                nameOrCodeToCanonical[doc.id.toLowerCase()];
+
+            if (mapped == null || !mapped.contains('_')) {
+              final formatted = ExpenseService.formatCanonicalSiteId(
+                rawId: sDocId.isNotEmpty ? sDocId : (sSite.isNotEmpty ? sSite : doc.id),
+                siteCode: sId,
+                siteName: sName,
+              );
+              if (formatted.contains('_')) {
+                mapped = formatted;
+              }
+            }
+
+            if (mapped != null && mapped.isNotEmpty) {
+              canonicalIds.add(mapped);
+              if (sName.isNotEmpty && (!names.containsKey(mapped) || names[mapped]!.isEmpty)) {
+                names[mapped] = sName;
+              }
+            } else {
+              final raw = sDocId.isNotEmpty ? sDocId : (sId.isNotEmpty ? sId : (sSite.isNotEmpty ? sSite : doc.id));
+              if (raw.isNotEmpty) {
+                final resolved = await ExpenseService.resolveCanonicalSiteDocId(raw);
+                if (resolved.isNotEmpty) {
+                  canonicalIds.add(resolved);
+                  if (sName.isNotEmpty && (!names.containsKey(resolved) || names[resolved]!.isEmpty)) {
+                    names[resolved] = sName;
+                  }
                 }
               }
             }
+
+            final targetKey = (mapped != null && mapped.isNotEmpty) ? mapped : doc.id;
+            final resolvedSupId = (sSupId != null && sSupId.isNotEmpty)
+                ? sSupId
+                : (sSup != null && sSup.isNotEmpty ? (_supervisorIdCache[sSup.toLowerCase()] ?? sSup) : '');
+
+            final meta = <String, dynamic>{
+              'projectName': sName.isNotEmpty ? sName : (data['projectName'] ?? '').toString().trim(),
+              'projectStage': sStage ?? '',
+              'supervisorName': sSup ?? '',
+              'supervisorId': resolvedSupId,
+              'siteCode': sId,
+              'canonical': targetKey,
+            };
+            _storeSiteMeta(targetKey, meta, merge: true);
+            if (sDocId.isNotEmpty) _storeSiteMeta(sDocId, meta, merge: true);
+            if (sId.isNotEmpty) _storeSiteMeta(sId, meta, merge: true);
+            if (sSite.isNotEmpty) _storeSiteMeta(sSite, meta, merge: true);
+            if (sName.isNotEmpty) _storeSiteMeta(sName, meta, merge: true);
+            _storeSiteMeta(doc.id, meta, merge: true);
           }
         }
 
@@ -154,9 +368,11 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
 
         await OfflineSyncService.cacheMasterData('sites_list', siteIds);
         await OfflineSyncService.cacheMasterData('sites_map', siteNameMap);
+        await OfflineSyncService.cacheMasterData('org_expenses_sites_meta', _siteMetadataCache);
       } else {
         final cachedIds = await OfflineSyncService.getCachedMasterData('sites_list');
         final cachedMap = await OfflineSyncService.getCachedMasterData('sites_map');
+        final cachedMeta = await OfflineSyncService.getCachedMasterData('org_expenses_sites_meta');
 
         if (cachedIds is List) {
           siteIds = ExpenseService.sanitizeSiteIds(cachedIds.map((e) => e.toString()));
@@ -164,14 +380,31 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
         if (cachedMap is Map) {
           siteNameMap = Map<String, String>.from(cachedMap.map((k, v) => MapEntry(k.toString(), v.toString())));
         }
+        if (cachedMeta is Map) {
+          _siteMetadataCache.clear();
+          cachedMeta.forEach((k, v) {
+            if (v is Map) {
+              _siteMetadataCache[k.toString()] = Map<String, dynamic>.from(v);
+            }
+          });
+        }
       }
 
       setState(() {
         isLoadingSites = false;
+        if (siteIds.length == 1) {
+          selectedSiteId = siteIds.first;
+          _applySiteDetailsImmediately(selectedSiteId!);
+          _loadSiteDetails(selectedSiteId!);
+        } else if (selectedSiteId != null && siteIds.contains(selectedSiteId)) {
+          _applySiteDetailsImmediately(selectedSiteId!);
+          _loadSiteDetails(selectedSiteId!);
+        }
       });
     } catch (e) {
       final cachedIds = await OfflineSyncService.getCachedMasterData('sites_list');
       final cachedMap = await OfflineSyncService.getCachedMasterData('sites_map');
+      final cachedMeta = await OfflineSyncService.getCachedMasterData('org_expenses_sites_meta');
 
       if (cachedIds is List) {
         siteIds = ExpenseService.sanitizeSiteIds(cachedIds.map((e) => e.toString()));
@@ -179,9 +412,25 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
       if (cachedMap is Map) {
         siteNameMap = Map<String, String>.from(cachedMap.map((k, v) => MapEntry(k.toString(), v.toString())));
       }
+      if (cachedMeta is Map) {
+        _siteMetadataCache.clear();
+        cachedMeta.forEach((k, v) {
+          if (v is Map) {
+            _siteMetadataCache[k.toString()] = Map<String, dynamic>.from(v);
+          }
+        });
+      }
 
       setState(() {
         isLoadingSites = false;
+        if (siteIds.length == 1) {
+          selectedSiteId = siteIds.first;
+          _applySiteDetailsImmediately(selectedSiteId!);
+          _loadSiteDetails(selectedSiteId!);
+        } else if (selectedSiteId != null && siteIds.contains(selectedSiteId)) {
+          _applySiteDetailsImmediately(selectedSiteId!);
+          _loadSiteDetails(selectedSiteId!);
+        }
       });
     }
   }
@@ -662,16 +911,20 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
     }
 
     try {
-      String projectName = '';
-      try {
-        final projectSnap = await FirestoreService.siteSupervisorMap
-            .where('site', isEqualTo: selectedSiteId)
-            .limit(1)
-            .get();
-        if (projectSnap.docs.isNotEmpty) {
-          projectName = projectSnap.docs.first.data()['projectName'] ?? '';
-        }
-      } catch (_) {}
+      String projectName = siteNameMap[selectedSiteId] ??
+          _findCachedSiteMeta(selectedSiteId!)?['projectName']?.toString() ??
+          '';
+      if (projectName.isEmpty) {
+        try {
+          final projectSnap = await FirestoreService.siteSupervisorMap
+              .where('site', isEqualTo: selectedSiteId)
+              .limit(1)
+              .get();
+          if (projectSnap.docs.isNotEmpty) {
+            projectName = projectSnap.docs.first.data()['projectName'] ?? '';
+          }
+        } catch (_) {}
+      }
 
       final dateStr = DateFormat('ddMMyyyy').format(selectedDate);
       final newDocId = '${selectedSiteId}_$dateStr';
@@ -860,17 +1113,21 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
 
     if (nameOrUser != null && nameOrUser.toString().trim().isNotEmpty) {
       final clean = nameOrUser.toString().trim();
+      final cached = _supervisorIdCache[clean.toLowerCase()];
+      if (cached != null && cached.isNotEmpty) {
+        return cached;
+      }
       try {
         final queries = [
-          FirestoreService.supervisors.where('supervisor', isEqualTo: clean),
-          FirestoreService.supervisors.where('supervisorName', isEqualTo: clean),
-          FirestoreService.supervisors.where('FullName', isEqualTo: clean),
-          FirestoreService.supervisors.where('fullName', isEqualTo: clean),
-          FirestoreService.supervisors.where('username', isEqualTo: clean),
-          FirestoreService.supervisors.where('UserName', isEqualTo: clean),
+          FirestoreService.supervisors.where('supervisor', isEqualTo: clean).limit(1),
+          FirestoreService.supervisors.where('supervisorName', isEqualTo: clean).limit(1),
+          FirestoreService.supervisors.where('FullName', isEqualTo: clean).limit(1),
+          FirestoreService.supervisors.where('fullName', isEqualTo: clean).limit(1),
+          FirestoreService.supervisors.where('username', isEqualTo: clean).limit(1),
+          FirestoreService.supervisors.where('UserName', isEqualTo: clean).limit(1),
         ];
-        for (var q in queries) {
-          final snap = await q.get();
+        final results = await Future.wait(queries.map((q) => q.get()));
+        for (var snap in results) {
           if (snap.docs.isNotEmpty) {
             final supData = snap.docs.first.data();
             final id = supData['Supervisor ID'] ??
@@ -878,7 +1135,11 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
                 supData['SupervisorId'] ??
                 supData['supervisor_id'] ??
                 snap.docs.first.id;
-            if (id.toString().trim().isNotEmpty) return id.toString().trim();
+            if (id.toString().trim().isNotEmpty) {
+              final idStr = id.toString().trim();
+              _supervisorIdCache[clean.toLowerCase()] = idStr;
+              return idStr;
+            }
           }
         }
       } catch (_) {}
@@ -889,114 +1150,121 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
   }
 
   Future<void> _loadSiteDetails(String siteId) async {
-    if (!mounted) return;
+    if (!mounted || selectedSiteId != siteId) return;
+
+    // Fast check: if both supervisor and stage are already populated and valid from immediate cache,
+    // we don't need heavy blocking.
+    final hasValidSupervisor = selectedSupervisorId != null &&
+        selectedSupervisorId!.isNotEmpty &&
+        selectedSupervisorId != 'Not Assigned';
+    final hasValidStage = selectedProjectStage != null &&
+        selectedProjectStage!.isNotEmpty &&
+        selectedProjectStage != 'Not Assigned';
+
+    if (hasValidSupervisor && hasValidStage) {
+      if (isLoadingSiteDetails) {
+        setState(() {
+          isLoadingSiteDetails = false;
+        });
+      }
+      return;
+    }
+
     setState(() {
       isLoadingSiteDetails = true;
     });
 
-    String? foundSupervisorId;
-    String? foundProjectStage;
+    String? foundSupervisorId = (hasValidSupervisor ? selectedSupervisorId : null);
+    String? foundProjectStage = (hasValidStage ? selectedProjectStage : null);
 
     try {
-      final siteKeys = await ExpenseService.resolveSiteKeys(siteId);
-
-      // 1. Check Site collection document for any matching alias
-      for (final key in siteKeys) {
-        final siteDoc = await FirestoreService.getCollection('Site').doc(key).get();
-        if (siteDoc.exists && siteDoc.data() != null) {
-          final data = siteDoc.data()!;
-          foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
-          foundSupervisorId ??= await _resolveSupervisorId(data);
-          if (foundSupervisorId != null && foundProjectStage != null) break;
+      // 1. Check ExpenseService cache or fast resolve
+      final cachedDetails = ExpenseService.getCachedSiteDetails(siteId);
+      if (cachedDetails != null) {
+        if (foundProjectStage == null && cachedDetails.projectStage != null && cachedDetails.projectStage!.isNotEmpty) {
+          foundProjectStage = cachedDetails.projectStage;
         }
-      }
-
-      // 2. Check siteSupervisorMap doc by doc ID == key
-      if (foundSupervisorId == null || foundProjectStage == null) {
-        for (final key in siteKeys) {
-          final mapDoc = await FirestoreService.siteSupervisorMap.doc(key).get();
-          if (mapDoc.exists && mapDoc.data() != null) {
-            final data = mapDoc.data()!;
-            foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
-            foundSupervisorId ??= await _resolveSupervisorId(data);
-            if (foundSupervisorId != null && foundProjectStage != null) break;
+        if (foundSupervisorId == null) {
+          if (cachedDetails.supervisorId != null && cachedDetails.supervisorId!.isNotEmpty) {
+            foundSupervisorId = cachedDetails.supervisorId;
+          } else if (cachedDetails.supervisor != null && cachedDetails.supervisor!.isNotEmpty) {
+            foundSupervisorId = _supervisorIdCache[cachedDetails.supervisor!.toLowerCase()] ?? cachedDetails.supervisor;
           }
         }
       }
 
-      // 3. Query siteSupervisorMap by site / siteId / siteName / siteDocId fields across all siteKeys
       if (foundSupervisorId == null || foundProjectStage == null) {
-        for (final key in siteKeys) {
-          final queriesToTry = [
-            FirestoreService.siteSupervisorMap.where('siteDocId', isEqualTo: key),
-            FirestoreService.siteSupervisorMap.where('site', isEqualTo: key),
-            FirestoreService.siteSupervisorMap.where('siteId', isEqualTo: key),
-            FirestoreService.siteSupervisorMap.where('siteName', isEqualTo: key),
-          ];
+        final siteKeys = await ExpenseService.resolveSiteKeys(siteId);
 
-          for (var q in queriesToTry) {
-            final snap = await q.get();
-            if (snap.docs.isNotEmpty) {
-              final data = snap.docs.first.data();
+        // Parallel fetch across Site, siteSupervisorMap, and projects for all aliases
+        final futures = <Future>[];
+        for (final key in siteKeys) {
+          futures.add(FirestoreService.getCollection('Site').doc(key).get().catchError((_) => null as dynamic));
+          futures.add(FirestoreService.siteSupervisorMap.doc(key).get().catchError((_) => null as dynamic));
+          futures.add(FirestoreService.projects.doc(key).get().catchError((_) => null as dynamic));
+        }
+
+        final results = await Future.wait(futures);
+        for (final snap in results) {
+          if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
+            final data = snap.data()!;
+            foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
+            final supId = await _resolveSupervisorId(data);
+            if (supId != null && supId.isNotEmpty) {
+              foundSupervisorId ??= supId;
+            }
+            if (foundSupervisorId != null && foundProjectStage != null) break;
+          }
+        }
+
+        // Broad scan in siteSupervisorMap if still missing
+        if (foundSupervisorId == null || foundProjectStage == null) {
+          final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
+          final lowerKeys = siteKeys.map((k) => k.toLowerCase().trim()).toSet();
+
+          for (var doc in mapSnapshot.docs) {
+            final data = doc.data();
+            final dSite = (data['site'] ?? '').toString().toLowerCase().trim();
+            final dSiteId = (data['siteId'] ?? '').toString().toLowerCase().trim();
+            final dSiteName = (data['siteName'] ?? '').toString().toLowerCase().trim();
+            final dDocId = doc.id.toLowerCase().trim();
+
+            final matches = lowerKeys.contains(dSite) ||
+                lowerKeys.contains(dSiteId) ||
+                lowerKeys.contains(dSiteName) ||
+                lowerKeys.contains(dDocId) ||
+                lowerKeys.any((k) => dDocId.startsWith('${k}_') || dDocId.contains(k));
+
+            if (matches) {
               foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
-              foundSupervisorId ??= await _resolveSupervisorId(data);
+              final supId = await _resolveSupervisorId(data);
+              if (supId != null && supId.isNotEmpty) {
+                foundSupervisorId ??= supId;
+              }
               if (foundSupervisorId != null && foundProjectStage != null) break;
             }
           }
-          if (foundSupervisorId != null && foundProjectStage != null) break;
         }
       }
 
-      // 4. Broad scan in siteSupervisorMap if still missing
-      if (foundSupervisorId == null || foundProjectStage == null) {
-        final mapSnapshot = await FirestoreService.siteSupervisorMap.get();
-        final lowerKeys = siteKeys.map((k) => k.toLowerCase().trim()).toSet();
-
-        for (var doc in mapSnapshot.docs) {
-          final data = doc.data();
-          final dSite = (data['site'] ?? '').toString().toLowerCase().trim();
-          final dSiteId = (data['siteId'] ?? '').toString().toLowerCase().trim();
-          final dSiteName = (data['siteName'] ?? '').toString().toLowerCase().trim();
-          final dDocId = doc.id.toLowerCase().trim();
-
-          final matches = lowerKeys.contains(dSite) ||
-              lowerKeys.contains(dSiteId) ||
-              lowerKeys.contains(dSiteName) ||
-              lowerKeys.contains(dDocId) ||
-              lowerKeys.any((k) => dDocId.startsWith('${k}_') || dDocId.contains(k));
-
-          if (matches) {
-            foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
-            foundSupervisorId ??= await _resolveSupervisorId(data);
-            if (foundSupervisorId != null && foundProjectStage != null) break;
-          }
-        }
-      }
-
-      // 5. Check projects collection if still missing
-      if (foundSupervisorId == null || foundProjectStage == null) {
-        for (final key in siteKeys) {
-          final projDoc = await FirestoreService.projects.doc(key).get();
-          if (projDoc.exists && projDoc.data() != null) {
-            final data = projDoc.data()!;
-            foundProjectStage ??= (data['projectStage'] ?? data['stage'] ?? data['projectPhase'])?.toString().trim();
-            foundSupervisorId ??= await _resolveSupervisorId(data);
-            if (foundSupervisorId != null && foundProjectStage != null) break;
-          }
-        }
-      }
+      // Update in-memory metadata cache with resolved values for future instant access
+      final meta = <String, dynamic>{
+        if (foundSupervisorId != null) 'supervisorId': foundSupervisorId,
+        if (foundProjectStage != null) 'projectStage': foundProjectStage,
+      };
+      _storeSiteMeta(siteId, meta, merge: true);
     } catch (e) {
       debugPrint('Error loading site details in organization expenses: $e');
     }
 
-    if (!mounted) return;
+    if (!mounted || selectedSiteId != siteId) return;
     setState(() {
       selectedSupervisorId = (foundSupervisorId != null && foundSupervisorId.isNotEmpty)
           ? foundSupervisorId
-          : 'Not Assigned';
+          : (selectedSupervisorId?.isNotEmpty == true ? selectedSupervisorId : 'Not Assigned');
       selectedProjectStage = (foundProjectStage != null && foundProjectStage.isNotEmpty)
           ? foundProjectStage
-          : 'Not Assigned';
+          : (selectedProjectStage?.isNotEmpty == true ? selectedProjectStage : 'Not Assigned');
 
       supervisorController.text = selectedSupervisorId!;
       projectStageController.text = selectedProjectStage!;
@@ -1220,12 +1488,12 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
                                 );
                               }).toList(),
                               onChanged: (value) {
+                                if (value == null) return;
                                 setState(() {
                                   selectedSiteId = value;
+                                  _applySiteDetailsImmediately(value);
                                 });
-                                if (value != null) {
-                                  _loadSiteDetails(value);
-                                }
+                                _loadSiteDetails(value);
                               },
                             ),
                             const SizedBox(height: 14),

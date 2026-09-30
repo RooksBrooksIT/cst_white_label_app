@@ -6,6 +6,7 @@ import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/widgets/project_alert_indicators.dart';
 
 class ProjectScreen extends StatefulWidget {
   final String? projectId;
@@ -152,10 +153,16 @@ class _ProjectScreenState extends State<ProjectScreen>
               totalSiteExpense +
               totalIncentiveExpenses +
               totalContractorExpense;
-          final projectBudget = (doc.data()['projectBudget'] ?? 0).toDouble();
-          final balanceAmount = projectBudget - amountSpent;
+          final projectData = doc.data();
+          final amountReceived = (projectData['amountReceived'] ??
+                  projectData['amountPaid'] ??
+                  projectData['receivedPayments'] ??
+                  0)
+              .toDouble();
+          final balanceAmount = amountReceived - amountSpent;
           await FirestoreService.getCollection('projects').doc(doc.id).update({
             'amountSpent': amountSpent,
+            'amountSpend': amountSpent,
             'amountBalance': balanceAmount,
           });
         }
@@ -292,8 +299,8 @@ class _ProjectScreenState extends State<ProjectScreen>
       _projectNameController.text = data['projectName'] ?? '';
       _ownerNameController.text = data['ownerName'] ?? '';
       _ownerPhoneController.text = data['ownerPhoneNumber'] ?? '';
-      _amountPaidController.text = (data['amountPaid'] ?? '').toString();
-      _projectBudgetController.text = (data['projectBudget'] ?? '').toString();
+      _amountPaidController.text = (data['amountReceived'] ?? data['amountPaid'] ?? data['receivedPayments'] ?? '').toString();
+      _projectBudgetController.text = (data['projectBudget'] ?? data['estimatedBudget'] ?? '').toString();
       projectCategory = data.containsKey('projectCategory') ? data['projectCategory'] : null;
       projectSubCategory = data.containsKey('projectSubCategory') ? data['projectSubCategory'] : null;
       projectContract = data.containsKey('projectContract') ? data['projectContract'] : null;
@@ -309,6 +316,7 @@ class _ProjectScreenState extends State<ProjectScreen>
       _updateSiteIdController.text = data['siteId'] ?? '';
       _isContractWork = data['isContractWork'] ?? false;
     });
+    _fetchAndSetAmountSpentAndBalance(data['siteId'] ?? selectedDoc.id);
   }
 
   void _showProjectSearchModal(BuildContext context) {
@@ -530,7 +538,9 @@ class _ProjectScreenState extends State<ProjectScreen>
                                               'Stage: $stage • Status: $status',
                                               style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                                             ),
-                                          ],
+                                            const SizedBox(height: 6),
+                                           ProjectAlertBadge(projectData: data, docId: doc.id, compact: true),
+                                         ],
                                         ],
                                       ),
                                     ),
@@ -1732,40 +1742,53 @@ class _ProjectScreenState extends State<ProjectScreen>
       _balanceAmountController.text = '';
       return;
     }
-    final canonicalDocId =
-        await ExpenseService.resolveCanonicalSiteDocId(siteId);
-    var expenseSnapshot = await FirestoreService.getCollection(
-      'totalSiteExpensesPerDay',
-    ).doc(canonicalDocId).get();
-    if (!expenseSnapshot.exists && canonicalDocId != siteId) {
-      expenseSnapshot = await FirestoreService.getCollection(
-        'totalSiteExpensesPerDay',
-      ).doc(siteId).get();
+    double amountSpent = 0.0;
+    try {
+      final siteKeys = await ExpenseService.resolveSiteKeys(siteId);
+      for (final key in siteKeys) {
+        final expDoc = await FirestoreService.getCollection(
+          'totalSiteExpensesPerDay',
+        ).doc(key).get();
+        if (expDoc.exists && expDoc.data() != null) {
+          final data = expDoc.data()!;
+          final totalAll = (data['totalAllExpenses'] as num?)?.toDouble() ?? 0.0;
+          if (totalAll > 0) {
+            amountSpent = totalAll;
+            break;
+          } else {
+            final totalMgr = (data['totalMgrExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalOrg = (data['totalOrgExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalSite = (data['totalSiteExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalInc =
+                (data['totalIncentiveExpenses'] as num?)?.toDouble() ?? 0.0;
+            final totalCont =
+                (data['totalContractorExpense'] as num?)?.toDouble() ?? 0.0;
+            final sum = totalMgr + totalOrg + totalSite + totalInc + totalCont;
+            if (sum > 0) {
+              amountSpent = sum;
+              break;
+            }
+          }
+        }
+      }
+      if (amountSpent == 0.0) {
+        final pDoc = await FirestoreService.findLinkedProjectDoc(
+          siteDocId: siteId,
+          siteCode: siteId,
+        );
+        if (pDoc != null && pDoc.exists && pDoc.data() != null) {
+          final pData = pDoc.data()!;
+          amountSpent = (pData['amountSpent'] ?? pData['amountSpend'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching expenses: $e');
     }
-    if (expenseSnapshot.exists) {
-      final data = expenseSnapshot.data()!;
-      final totalMgrExpense = (data['totalMgrExpense'] ?? 0).toDouble();
-      final totalOrgExpense = (data['totalOrgExpense'] ?? 0).toDouble();
-      final totalSiteExpense = (data['totalSiteExpense'] ?? 0).toDouble();
-      final totalIncentiveExpenses = (data['totalIncentiveExpenses'] ?? 0)
-          .toDouble();
-      final totalContractorExpense = (data['totalContractorExpense'] ?? 0)
-          .toDouble();
-      final amountSpent =
-          totalMgrExpense +
-          totalOrgExpense +
-          totalSiteExpense +
-          totalIncentiveExpenses +
-          totalContractorExpense;
-      _amountSpentController.text = amountSpent.toStringAsFixed(2);
-      final budget = double.tryParse(_projectBudgetController.text) ?? 0;
-      final balance = budget - amountSpent;
-      _balanceAmountController.text = balance.toStringAsFixed(2);
-    } else {
-      _amountSpentController.text = '0.00';
-      final budget = double.tryParse(_projectBudgetController.text) ?? 0;
-      _balanceAmountController.text = budget.toStringAsFixed(2);
-    }
+
+    _amountSpentController.text = amountSpent.toStringAsFixed(2);
+    final received = double.tryParse(_amountPaidController.text) ?? 0;
+    final balance = received - amountSpent;
+    _balanceAmountController.text = balance.toStringAsFixed(2);
   }
 
   Widget _buildFieldLabel(String label) {

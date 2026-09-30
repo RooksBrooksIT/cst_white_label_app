@@ -416,49 +416,47 @@ class _SiteScreenState extends State<SiteScreen>
   ) async {
     double amountSpent = 0.0;
     try {
-      final expDoc = await FirestoreService.getCollection(
-        'totalSiteExpensesPerDay',
-      ).doc(siteDocId).get();
+      final siteKeys = await ExpenseService.resolveSiteKeys(siteDocId);
+      if (siteIdStr != null && siteIdStr.isNotEmpty) {
+        siteKeys.addAll(await ExpenseService.resolveSiteKeys(siteIdStr));
+      }
 
-      if (expDoc.exists) {
-        final data = expDoc.data()!;
-        final totalAll = (data['totalAllExpenses'] as num?)?.toDouble() ?? 0.0;
-        if (totalAll > 0) {
-          amountSpent = totalAll;
-        } else {
-          final totalMgr = (data['totalMgrExpense'] as num?)?.toDouble() ?? 0.0;
-          final totalOrg = (data['totalOrgExpense'] as num?)?.toDouble() ?? 0.0;
-          final totalSite = (data['totalSiteExpense'] as num?)?.toDouble() ?? 0.0;
-          final totalInc =
-              (data['totalIncentiveExpenses'] as num?)?.toDouble() ?? 0.0;
-          final totalCont =
-              (data['totalContractorExpense'] as num?)?.toDouble() ?? 0.0;
-          amountSpent = totalMgr + totalOrg + totalSite + totalInc + totalCont;
-        }
-      } else if (siteIdStr != null && siteIdStr.isNotEmpty) {
-        final altExpDoc = await FirestoreService.getCollection(
+      for (final key in siteKeys) {
+        final expDoc = await FirestoreService.getCollection(
           'totalSiteExpensesPerDay',
-        ).doc(siteIdStr).get();
-        if (altExpDoc.exists) {
-          final data = altExpDoc.data()!;
-          final totalAll =
-              (data['totalAllExpenses'] as num?)?.toDouble() ?? 0.0;
+        ).doc(key).get();
+
+        if (expDoc.exists && expDoc.data() != null) {
+          final data = expDoc.data()!;
+          final totalAll = (data['totalAllExpenses'] as num?)?.toDouble() ?? 0.0;
           if (totalAll > 0) {
             amountSpent = totalAll;
+            break;
           } else {
-            final totalMgr =
-                (data['totalMgrExpense'] as num?)?.toDouble() ?? 0.0;
-            final totalOrg =
-                (data['totalOrgExpense'] as num?)?.toDouble() ?? 0.0;
-            final totalSite =
-                (data['totalSiteExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalMgr = (data['totalMgrExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalOrg = (data['totalOrgExpense'] as num?)?.toDouble() ?? 0.0;
+            final totalSite = (data['totalSiteExpense'] as num?)?.toDouble() ?? 0.0;
             final totalInc =
                 (data['totalIncentiveExpenses'] as num?)?.toDouble() ?? 0.0;
             final totalCont =
                 (data['totalContractorExpense'] as num?)?.toDouble() ?? 0.0;
-            amountSpent =
-                totalMgr + totalOrg + totalSite + totalInc + totalCont;
+            final sum = totalMgr + totalOrg + totalSite + totalInc + totalCont;
+            if (sum > 0) {
+              amountSpent = sum;
+              break;
+            }
           }
+        }
+      }
+
+      if (amountSpent == 0.0) {
+        final pDoc = await FirestoreService.findLinkedProjectDoc(
+          siteDocId: siteDocId,
+          siteCode: siteIdStr,
+        );
+        if (pDoc != null && pDoc.exists && pDoc.data() != null) {
+          final pData = pDoc.data()!;
+          amountSpent = (pData['amountSpent'] ?? pData['amountSpend'] as num?)?.toDouble() ?? 0.0;
         }
       }
     } catch (e) {
@@ -1457,7 +1455,6 @@ class _SiteScreenState extends State<SiteScreen>
         'amountSpent': amountSpent,
         'amountSpend': amountSpent,
         'amountBalance': amountBalance,
-        'balance': amountBalance,
         'receivedPayments': amountPaid,
         'projectBudget': budget,
         'estimatedBudget': budget,
@@ -1983,7 +1980,6 @@ class _SiteScreenState extends State<SiteScreen>
       'amountSpent': amountSpent,
       'amountSpend': amountSpent,
       'amountBalance': balance,
-      'balance': balance,
 
       // Schedule Dates (Timestamps & Strings)
       'startDate': _startDate != null ? Timestamp.fromDate(_startDate!) : Timestamp.now(),

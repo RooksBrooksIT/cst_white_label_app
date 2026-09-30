@@ -1050,12 +1050,12 @@ class _SupervisorWorkSchedulePageState
             ),
           ],
           const SizedBox(height: 14),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
             children: [
               _buildLegendItem(const Color(0xFF10B981), 'High'),
-              const SizedBox(width: 12),
               _buildLegendItem(const Color(0xFFF59E0B), 'Limited'),
-              const SizedBox(width: 12),
               _buildLegendItem(const Color(0xFFEF4444), 'Unavailable'),
             ],
           ),
@@ -1166,12 +1166,15 @@ class _SupervisorWorkSchedulePageState
                   value: labour,
                   child: Row(
                     children: [
-                      Text(
-                        '${labour['name'] ?? ''} ',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Color(0xFF0F172A),
+                      Flexible(
+                        child: Text(
+                          '${labour['name'] ?? ''} ',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (designation.isNotEmpty) ...[

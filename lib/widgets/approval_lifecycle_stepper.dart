@@ -132,7 +132,6 @@ class ApprovalLifecycleStepper extends StatelessWidget {
             ],
             const SizedBox(width: 8),
             Flexible(
-              flex: 0,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -186,28 +185,35 @@ class ApprovalLifecycleStepper extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(activeStep),
-                      shape: BoxShape.circle,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(activeStep),
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Approval Pipeline (Stage $activeStep/4)',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Approval Pipeline (Stage $activeStep/4)',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              if (history != null && history!.isNotEmpty)
+              if (history != null && history!.isNotEmpty) ...[
+                const SizedBox(width: 6),
                 InkWell(
                   onTap: () => _showAuditHistorySheet(context),
                   borderRadius: BorderRadius.circular(6),
@@ -233,6 +239,7 @@ class ApprovalLifecycleStepper extends StatelessWidget {
                     ),
                   ),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 14),

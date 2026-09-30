@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/expense_service.dart';
+import 'package:ebricks/services/material_inventory_service.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/site_display_helper.dart';
 import 'package:intl/intl.dart';
@@ -72,9 +73,12 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   // Update mode state
   bool isUpdateMode = false;
   String? _updateDocId;
+  String? _updateCollection;
+  Map<String, dynamic>? _existingEntryOriginalData;
   bool isLoadingEntryDates = false;
   List<Map<String, dynamic>> _existingEntries = [];
   DateTime? _selectedUpdateDate;
+  Map<String, dynamic>? _existingEntryForCurrentDate;
 
   Color get primaryColor => Theme.of(context).primaryColor;
   Color get successColor => const Color(0xFF27ae60);
@@ -302,7 +306,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       if (isUpdateMode) {
         isUpdateMode = false;
         _updateDocId = null;
+        _updateCollection = null;
         _selectedUpdateDate = null;
+        _existingEntryOriginalData = null;
+        _existingEntryForCurrentDate = null;
       }
     });
 
@@ -341,6 +348,58 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
     }
 
     _fetchProjectNameForSite(siteId);
+    _checkExistingEntryForDate(selectedDate ?? DateTime.now());
+  }
+
+  Future<void> _checkExistingEntryForDate(DateTime date) async {
+    if (selectedSiteId == null || selectedSiteId!.isEmpty) return;
+    try {
+      final dateForId = DateFormat('ddMMyyyy').format(date);
+      final keys = await ExpenseService.resolveSiteKeys(selectedSiteId!);
+
+      DocumentSnapshot<Map<String, dynamic>>? foundDoc;
+      String foundColl = 'siteSupervisorEntries';
+
+      for (final key in keys) {
+        final candidateDocId = '${key}_$dateForId';
+        final doc = await FirestoreService.siteSupervisorEntries.doc(candidateDocId).get();
+        if (doc.exists && doc.data() != null) {
+          foundDoc = doc;
+          foundColl = 'siteSupervisorEntries';
+          break;
+        }
+      }
+
+      if (foundDoc == null) {
+        final snaps = await FirestoreService.siteSupervisorEntries
+            .where('siteId', whereIn: keys.take(10).toList())
+            .get();
+        for (final doc in snaps.docs) {
+          final data = doc.data();
+          if (ExpenseService.isSameDay(data['date'] ?? data['createdAt'] ?? data['entryDate'], date)) {
+            foundDoc = doc;
+            foundColl = 'siteSupervisorEntries';
+            break;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          if (foundDoc != null) {
+            _existingEntryForCurrentDate = {
+              'docId': foundDoc.id,
+              'collection': foundColl,
+              'data': foundDoc.data()!,
+            };
+          } else {
+            _existingEntryForCurrentDate = null;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking existing entry for date: $e');
+    }
   }
 
   Future<void> _fetchProjectNameForSite(String siteId) async {
@@ -670,30 +729,79 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   }
 
   Future<void> _openUpdateEntrySelector() async {
-    if (selectedSiteId == null || selectedSiteId!.isEmpty) return;
+    if (selectedSiteId == null || selectedSiteId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a site first')),
+      );
+      return;
+    }
 
     setState(() => isLoadingEntryDates = true);
 
     try {
-      final keys = (await ExpenseService.resolveSiteKeys(selectedSiteId!))
-          .take(10)
-          .toList();
-      final snapshot = await FirestoreService.getCollection('ManagerSiteEntry')
-          .where('siteCode', whereIn: keys)
-          .get();
+      final keys = (await ExpenseService.resolveSiteKeys(selectedSiteId!)).toList();
+      final queryKeys = keys.take(10).toList();
 
-      _existingEntries = snapshot.docs.map((doc) {
-        final data = doc.data();
-        DateTime? date;
-        if (data['date'] is Timestamp) {
-          date = (data['date'] as Timestamp).toDate();
-        } else if (data['createdAt'] is Timestamp) {
-          date = (data['createdAt'] as Timestamp).toDate();
+      final queryFutures = <Future<QuerySnapshot<Map<String, dynamic>>>>[
+        FirestoreService.siteSupervisorEntries.where('siteId', whereIn: queryKeys).get(),
+        FirestoreService.siteSupervisorEntries.where('site', whereIn: queryKeys).get(),
+        FirestoreService.siteSupervisorEntries.where('siteCode', whereIn: queryKeys).get(),
+        FirestoreService.getCollection('ManagerSiteEntry').where('siteCode', whereIn: queryKeys).get(),
+      ];
+
+      final snapshots = await Future.wait(queryFutures);
+      final Map<String, Map<String, dynamic>> deduped = {};
+
+      for (int i = 0; i < snapshots.length; i++) {
+        final snap = snapshots[i];
+        final collName = i == 3 ? 'ManagerSiteEntry' : 'siteSupervisorEntries';
+        for (final doc in snap.docs) {
+          if (!deduped.containsKey(doc.id)) {
+            deduped[doc.id] = {
+              'docId': doc.id,
+              'collection': collName,
+              'data': doc.data(),
+            };
+          }
+        }
+      }
+
+      // Fallback: If deduped is empty or to catch prefix-named docs
+      if (deduped.isEmpty) {
+        try {
+          final allSnap = await FirestoreService.siteSupervisorEntries.limit(100).get();
+          for (final doc in allSnap.docs) {
+            for (final key in queryKeys) {
+              if (doc.id.startsWith('${key}_') ||
+                  doc.id.toLowerCase().startsWith('${key.toLowerCase()}_')) {
+                deduped.putIfAbsent(doc.id, () => {
+                  'docId': doc.id,
+                  'collection': 'siteSupervisorEntries',
+                  'data': doc.data(),
+                });
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      _existingEntries = deduped.values.map((item) {
+        final data = item['data'] as Map<String, dynamic>;
+        final docId = item['docId'] as String;
+        DateTime? date = ExpenseService.parseDate(data['date'] ?? data['createdAt'] ?? data['entryDate']);
+        if (date == null && docId.contains('_')) {
+          try {
+            date = DateFormat('ddMMyyyy').parseStrict(docId.split('_').last);
+          } catch (_) {}
         }
         return {
-          'docId': doc.id,
+          'docId': docId,
+          'collection': item['collection'],
           'date': date,
           'data': data,
+          'stage': (data['projectStage'] ?? data['projectPhase'] ?? '').toString(),
+          'supervisor': (data['supervisorName'] ?? data['supervisor'] ?? '').toString(),
+          'totalAmount': data['totalAmount'] ?? data['amount'] ?? 0,
         };
       }).toList();
 
@@ -711,104 +819,253 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       showModalBottomSheet(
         context: context,
         backgroundColor: Colors.white,
+        isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         builder: (context) {
-          return Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Select Existing Entry to Update',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0A183D),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (_existingEntries.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      'No past entries found for this site.',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
+          return DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            minChildSize: 0.35,
+            maxChildSize: 0.85,
+            expand: false,
+            builder: (context, scrollController) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  )
-                else
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _existingEntries.length,
-                      itemBuilder: (context, index) {
-                        final entry = _existingEntries[index];
-                        final dateStr = entry['date'] != null
-                            ? DateFormat('yyyy-MM-dd HH:mm')
-                                .format(entry['date'])
-                            : 'Unknown Date';
-                        return ListTile(
-                          leading: Icon(
-                            Icons.receipt_long_rounded,
-                            color: primaryColor,
-                          ),
-                          title: Text(
-                            dateStr,
-                            style: const TextStyle(
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Select Daily Site Entry to Edit',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
                               color: Color(0xFF0A183D),
-                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _loadEntryForUpdate(
-                              entry['docId'],
-                              entry['data'],
+                        ),
+                        Text(
+                          '${_existingEntries.length} found',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Review supervisor submissions and edit mismatched values',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    if (_existingEntries.isEmpty)
+                      const Expanded(
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Text(
+                              'No past entries found for this site.',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.separated(
+                          controller: scrollController,
+                          itemCount: _existingEntries.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final entry = _existingEntries[index];
+                            final dateStr = entry['date'] != null
+                                ? DateFormat('yyyy-MM-dd').format(entry['date'])
+                                : 'Unknown Date';
+                            final supervisorText = entry['supervisor'].toString().isNotEmpty
+                                ? entry['supervisor'].toString()
+                                : 'Supervisor';
+                            final stageText = entry['stage'].toString();
+                            final amountText = '₹${NumberFormat('#,##,###').format(entry['totalAmount'] ?? 0)}';
+
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _loadEntryForUpdate(
+                                    entry['docId'],
+                                    entry['data'],
+                                    entry['collection'],
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    color: const Color(0xFFF8FAFC),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: primaryColor.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          Icons.receipt_long_rounded,
+                                          color: primaryColor,
+                                          size: 22,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  dateStr,
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF0A183D),
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 14.5,
+                                                  ),
+                                                ),
+                                                if (stageText.isNotEmpty && stageText != 'Not Available') ...[
+                                                  const SizedBox(width: 8),
+                                                  Flexible(
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFE2E8F0),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: Text(
+                                                        stageText,
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: Color(0xFF475569),
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'By: $supervisorText • Total: $amountText',
+                                              style: const TextStyle(
+                                                color: Color(0xFF64748B),
+                                                fontSize: 12.5,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Icon(
+                                        Icons.edit_note_rounded,
+                                        size: 22,
+                                        color: Color(0xFF2563EB),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             );
                           },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
           );
         },
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load past entries: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load past entries: $e')),
+      );
     } finally {
       if (mounted) setState(() => isLoadingEntryDates = false);
     }
   }
 
-  void _loadEntryForUpdate(String docId, Map<String, dynamic> data) {
+  void _loadEntryForUpdate(String docId, Map<String, dynamic> data, [String? collection]) {
     setState(() {
       isUpdateMode = true;
       _updateDocId = docId;
+      _updateCollection = collection ?? 'siteSupervisorEntries';
+      _existingEntryOriginalData = Map<String, dynamic>.from(data);
 
-      if (data['date'] is Timestamp) {
-        _selectedUpdateDate = (data['date'] as Timestamp).toDate();
-      } else if (data['createdAt'] is Timestamp) {
-        _selectedUpdateDate = (data['createdAt'] as Timestamp).toDate();
+      DateTime? parsedDate = ExpenseService.parseDate(data['date'] ?? data['createdAt'] ?? data['entryDate']);
+      if (parsedDate == null && docId.contains('_')) {
+        try {
+          parsedDate = DateFormat('ddMMyyyy').parseStrict(docId.split('_').last);
+        } catch (_) {}
       }
+      _selectedUpdateDate = parsedDate;
       if (_selectedUpdateDate != null) {
         selectedDate = _selectedUpdateDate;
+      }
+
+      final supName = (data['supervisorName'] ?? data['supervisor'])?.toString();
+      if (supName != null && supName.isNotEmpty && supName != 'Not Available') {
+        supervisorName = supName;
+      }
+      final supId = (data['supervisorId'] ?? data['Supervisor ID'])?.toString();
+      if (supId != null && supId.isNotEmpty && supId != 'Not Available') {
+        supervisorId = supId;
+      }
+      final stage = (data['projectStage'] ?? data['projectPhase'])?.toString();
+      if (stage != null && stage.isNotEmpty && stage != 'Not Available') {
+        projectStage = stage;
+      }
+      final loc = (data['siteLocation'] ?? data['location'])?.toString();
+      if (loc != null && loc.isNotEmpty && loc != 'Not Available') {
+        siteLocation = loc;
+      }
+      final proj = (data['projectName'] ?? data['project'])?.toString();
+      if (proj != null && proj.isNotEmpty && proj != 'Not Available') {
+        projectName = proj;
       }
 
       materials = List<Map<String, dynamic>>.from(
         (data['materials'] as List? ?? []).map((m) {
           final map = Map<String, dynamic>.from(m as Map);
-          final type = map['type']?.toString() ?? '';
+          final type = (map['type'] ?? map['materialName'] ?? map['name'] ?? '').toString();
           final qty = map['quantity'] is num
               ? (map['quantity'] as num).toInt()
               : (int.tryParse(map['quantity']?.toString() ?? '0') ?? 0);
@@ -818,8 +1075,12 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                   (materialPrices[type] ?? 0));
           return {
             'type': type,
+            'materialName': (map['materialName'] ?? type).toString(),
             'quantity': qty,
             'unitPrice': price,
+            'unit': (map['unit'] ?? 'Units').toString(),
+            'category': (map['category'] ?? '').toString(),
+            'amount': map['amount'] ?? (qty * price),
           };
         }),
       );
@@ -827,64 +1088,336 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       labours = List<Map<String, dynamic>>.from(
         (data['labours'] as List? ?? []).map((l) {
           final map = Map<String, dynamic>.from(l as Map);
-          final type = map['type']?.toString() ?? '';
+          final type = (map['type'] ?? map['designation'] ?? map['labourDesignation'] ?? '').toString();
           final count = map['count'] is num
               ? (map['count'] as num).toInt()
               : (int.tryParse(map['count']?.toString() ?? '0') ?? 0);
           final sal = map['salary'] is num
               ? map['salary'] as num
-              : (num.tryParse(map['salary']?.toString() ?? '0') ??
-                  (labourSalaries[type] ?? 0));
+              : (map['unitSalary'] is num
+                  ? map['unitSalary'] as num
+                  : (num.tryParse(map['salary']?.toString() ?? map['unitSalary']?.toString() ?? '0') ??
+                      (labourSalaries[type] ?? 0)));
           return {
             'type': type,
             'count': count,
             'salary': sal,
+            'unitSalary': sal,
+            'amount': map['amount'] ?? (count * sal),
           };
         }),
       );
 
       final expenses = data['expenses'] as Map<String, dynamic>? ?? {};
-      foodCost.text = (expenses['foodCost'] ?? 0).toString();
-      transportCost.text = (expenses['transportCost'] ?? 0).toString();
-      fuelCost.text = (expenses['fuelCost'] ?? 0).toString();
+      final foodVal = data['food'] ?? expenses['foodCost'] ?? 0;
+      final transVal = data['transport'] ?? expenses['transportCost'] ?? 0;
+      final fuelVal = data['fuel'] ?? expenses['fuelCost'] ?? 0;
 
-      morningStatusController.text = data['morningStatus']?.toString() ?? '';
+      foodCost.text = foodVal.toString();
+      transportCost.text = transVal.toString();
+      fuelCost.text = fuelVal.toString();
+
+      morningStatusController.text = data['morningStatus']?.toString() ?? data['notes']?.toString() ?? '';
       afternoonStatusController.text =
-          data['afternoonStatus']?.toString() ?? '';
+          data['afternoonStatus']?.toString() ?? data['remarks']?.toString() ?? '';
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Loaded existing entry for ${DateFormat('yyyy-MM-dd').format(selectedDate ?? DateTime.now())}. Edit mismatched values and click UPDATE.',
+        ),
+        backgroundColor: const Color(0xFF15803D),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _editMaterialRow(int index) {
+    if (index < 0 || index >= materials.length) return;
+    final item = materials[index];
+    final type = (item['type'] ?? item['materialName'] ?? '').toString();
+    final currentQty = item['quantity'] ?? 0;
+    final currentPrice = item['unitPrice'] ?? materialPrices[type] ?? 0;
+
+    final qtyCtrl = TextEditingController(text: currentQty.toString());
+    final priceCtrl = TextEditingController(text: currentPrice.toString());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Edit Material: $type',
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A183D), fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: qtyCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Quantity',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: priceCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Unit Price (₹)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final newQty = int.tryParse(qtyCtrl.text.trim()) ?? (num.tryParse(qtyCtrl.text.trim())?.toInt() ?? currentQty);
+              final newPrice = num.tryParse(priceCtrl.text.trim()) ?? currentPrice;
+              setState(() {
+                materials[index] = {
+                  ...materials[index],
+                  'quantity': newQty,
+                  'unitPrice': newPrice,
+                  'amount': (newQty as num) * (newPrice as num),
+                };
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editLabourRow(int index) {
+    if (index < 0 || index >= labours.length) return;
+    final item = labours[index];
+    final type = (item['type'] ?? '').toString();
+    final currentCount = item['count'] ?? 0;
+    final currentSal = item['salary'] ?? item['unitSalary'] ?? labourSalaries[type] ?? 0;
+
+    final countCtrl = TextEditingController(text: currentCount.toString());
+    final salCtrl = TextEditingController(text: currentSal.toString());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Edit Labour: $type',
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0A183D), fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: countCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Worker Count',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: salCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Salary (₹)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final newCount = int.tryParse(countCtrl.text.trim()) ?? currentCount;
+              final newSal = num.tryParse(salCtrl.text.trim()) ?? currentSal;
+              setState(() {
+                labours[index] = {
+                  ...labours[index],
+                  'count': newCount,
+                  'salary': newSal,
+                  'unitSalary': newSal,
+                  'amount': (newCount as num) * (newSal as num),
+                };
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _updateExistingEntry() async {
     if (_updateDocId == null) return;
     setState(() => isSaving = true);
     try {
-      final entryData = {
+      final foodVal = int.tryParse(foodCost.text) ?? num.tryParse(foodCost.text) ?? 0;
+      final transVal = int.tryParse(transportCost.text) ?? num.tryParse(transportCost.text) ?? 0;
+      final fuelVal = int.tryParse(fuelCost.text) ?? num.tryParse(fuelCost.text) ?? 0;
+      final totalAmt = _getTotalAmount();
+
+      final formattedMaterials = materials.map((m) {
+        final type = (m['type'] ?? m['materialName'] ?? '').toString();
+        final qty = m['quantity'] ?? 0;
+        final price = m['unitPrice'] ?? materialPrices[type] ?? 0;
+        return {
+          "type": type,
+          "materialName": (m['materialName'] ?? type).toString(),
+          "quantity": qty,
+          "unit": (m['unit'] ?? 'Units').toString(),
+          "category": (m['category'] ?? '').toString(),
+          "unitPrice": price,
+          "amount": (price as num) * (qty as num),
+        };
+      }).toList();
+
+      final formattedLabours = labours.map((l) {
+        final type = (l['type'] ?? '').toString();
+        final count = l['count'] ?? 0;
+        final sal = l['salary'] ?? l['unitSalary'] ?? labourSalaries[type] ?? 0;
+        return {
+          "type": type,
+          "count": count,
+          "salary": sal,
+          "unitSalary": sal,
+          "amount": (sal as num) * (count as num),
+        };
+      }).toList();
+
+      final targetCollectionName = _updateCollection ?? 'siteSupervisorEntries';
+      final collRef = FirestoreService.getCollection(targetCollectionName);
+
+      final dateIso = selectedDate != null
+          ? selectedDate!.toIso8601String()
+          : DateTime.now().toIso8601String();
+
+      // Preserve all existing Supervisor fields while updating edited values
+      final entryData = <String, dynamic>{
+        if (_existingEntryOriginalData != null) ..._existingEntryOriginalData!,
+        'siteId': selectedSiteId,
         'siteCode': selectedSiteId,
         'supervisor': supervisorName,
+        'supervisorName': supervisorName,
         'supervisorId': supervisorId,
         'location': siteLocation,
+        'siteLocation': siteLocation,
         'projectStage': projectStage,
         'projectName': projectName,
-        'date': selectedDate != null
-            ? Timestamp.fromDate(selectedDate!)
-            : FieldValue.serverTimestamp(),
-        'materials': materials,
-        'labours': labours,
+        'date': dateIso,
+        'materials': formattedMaterials,
+        'labours': formattedLabours,
+        'food': foodVal,
+        'transport': transVal,
+        'fuel': fuelVal,
+        'totalAmount': totalAmt,
         'expenses': {
-          'foodCost': num.tryParse(foodCost.text) ?? 0,
-          'transportCost': num.tryParse(transportCost.text) ?? 0,
-          'fuelCost': num.tryParse(fuelCost.text) ?? 0,
-          'totalExpense': _getTotalExpenses(),
+          'foodCost': foodVal,
+          'transportCost': transVal,
+          'fuelCost': fuelVal,
+          'totalExpense': foodVal + transVal + fuelVal,
         },
         'morningStatus': morningStatusController.text.trim(),
         'afternoonStatus': afternoonStatusController.text.trim(),
         'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': widget.userName,
+        'lastUpdatedBy': widget.userName,
+        'lastUpdatedByRole': 'manager',
       };
 
-      await FirestoreService.getCollection('ManagerSiteEntry')
-          .doc(_updateDocId)
-          .update(entryData);
+      // Modifies existing backend record directly in-place without duplicate
+      await collRef.doc(_updateDocId).set(entryData, SetOptions(merge: true));
+
+      // Execute secondary sync tasks in parallel
+      final backgroundTasks = <Future<void>>[];
+
+      // 1. Total Site Expense recalculation in ExpenseService
+      backgroundTasks.add(() async {
+        try {
+          if (selectedSiteId != null && selectedSiteId!.isNotEmpty) {
+            await ExpenseService.updateTotalSiteExpense(selectedSiteId!);
+          }
+        } catch (e) {
+          debugPrint('Error updating total site expense: $e');
+        }
+      }());
+
+      // 2. Material consumption update in MaterialInventoryService
+      if (formattedMaterials.isNotEmpty) {
+        backgroundTasks.add(() async {
+          try {
+            final consumedItems = formattedMaterials.map((m) => {
+              'materialName': (m['materialName'] ?? m['type']).toString(),
+              'quantity': m['quantity'] as num,
+              'unit': (m['unit'] ?? 'Units').toString(),
+              'category': (m['category'] ?? '').toString(),
+              'unitPrice': (m['unitPrice'] ?? 0) as num,
+              'remarks': 'Updated by Manager ${widget.userName} for $selectedSiteId',
+            }).toList();
+
+            await MaterialInventoryService.recordDailyMaterialConsumption(
+              siteId: selectedSiteId!,
+              siteName: siteLocation ?? selectedSiteId!,
+              date: dateIso,
+              supervisorId: supervisorId ?? '',
+              supervisorName: supervisorName ?? widget.userName,
+              consumedMaterials: consumedItems,
+              remarks: 'Daily consumption updated by Manager ${widget.userName}',
+            );
+          } catch (e) {
+            debugPrint('Error updating material consumption: $e');
+          }
+        }());
+      }
+
+      // 3. Stage actuals adjustment if applicable
+      final actualColl = FirestoreService.siteSupervisorProjectStageActual;
+      final actualDocId = '${selectedSiteId}_${supervisorName ?? ''}_${projectStage ?? ''}';
+      backgroundTasks.add(() async {
+        try {
+          final actualDoc = await actualColl.doc(actualDocId).get();
+          if (actualDoc.exists) {
+            final existingActData = actualDoc.data()!;
+            final double existingActPayment = (existingActData['actPayment'] ?? 0).toDouble();
+            final num prevEntryTotal = (_existingEntryOriginalData?['totalAmount'] ?? _existingEntryOriginalData?['amount'] ?? 0);
+            final double paymentDiff = totalAmt - prevEntryTotal.toDouble();
+
+            await actualColl.doc(actualDocId).update({
+              "actPayment": existingActPayment + paymentDiff,
+              "updatedAt": FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (e) {
+          debugPrint('Error updating stage actuals: $e');
+        }
+      }());
+
+      await Future.wait(backgroundTasks);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -897,7 +1430,10 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
         setState(() {
           isUpdateMode = false;
           _updateDocId = null;
+          _updateCollection = null;
           _selectedUpdateDate = null;
+          _existingEntryOriginalData = null;
+          _existingEntryForCurrentDate = null;
         });
       }
     } catch (e) {
@@ -973,31 +1509,130 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
   Future<void> _saveSiteEntry() async {
     setState(() => isSaving = true);
     try {
+      final dateForId = DateFormat('ddMMyyyy').format(selectedDate ?? DateTime.now());
+      final docId = '${selectedSiteId}_$dateForId';
+      final dateIso = selectedDate != null
+          ? selectedDate!.toIso8601String()
+          : DateTime.now().toIso8601String();
+
+      // Check for duplicate entry in backend before creating!
+      final existingDoc = await FirestoreService.siteSupervisorEntries.doc(docId).get();
+      if (existingDoc.exists && existingDoc.data() != null) {
+        setState(() => isSaving = false);
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.amber),
+                SizedBox(width: 8),
+                Text('Entry Already Exists'),
+              ],
+            ),
+            content: Text(
+              'A daily site entry for site "$selectedSiteId" on ${DateFormat('yyyy-MM-dd').format(selectedDate!)} already exists.\n\n'
+              'To avoid duplicates, please review and update the existing entry.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _loadEntryForUpdate(
+                    docId,
+                    existingDoc.data()!,
+                    'siteSupervisorEntries',
+                  );
+                },
+                child: const Text('Load Existing Entry'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      final foodVal = int.tryParse(foodCost.text) ?? num.tryParse(foodCost.text) ?? 0;
+      final transVal = int.tryParse(transportCost.text) ?? num.tryParse(transportCost.text) ?? 0;
+      final fuelVal = int.tryParse(fuelCost.text) ?? num.tryParse(fuelCost.text) ?? 0;
+      final totalAmt = _getTotalAmount();
+
+      final formattedMaterials = materials.map((m) {
+        final type = (m['type'] ?? m['materialName'] ?? '').toString();
+        final qty = m['quantity'] ?? 0;
+        final price = m['unitPrice'] ?? materialPrices[type] ?? 0;
+        return {
+          "type": type,
+          "materialName": (m['materialName'] ?? type).toString(),
+          "quantity": qty,
+          "unit": (m['unit'] ?? 'Units').toString(),
+          "category": (m['category'] ?? '').toString(),
+          "unitPrice": price,
+          "amount": (price as num) * (qty as num),
+        };
+      }).toList();
+
+      final formattedLabours = labours.map((l) {
+        final type = (l['type'] ?? '').toString();
+        final count = l['count'] ?? 0;
+        final sal = l['salary'] ?? l['unitSalary'] ?? labourSalaries[type] ?? 0;
+        return {
+          "type": type,
+          "count": count,
+          "salary": sal,
+          "unitSalary": sal,
+          "amount": (sal as num) * (count as num),
+        };
+      }).toList();
+
       final entryData = {
+        'siteId': selectedSiteId,
         'siteCode': selectedSiteId,
         'supervisor': supervisorName,
+        'supervisorName': supervisorName,
         'supervisorId': supervisorId,
         'location': siteLocation,
+        'siteLocation': siteLocation,
         'projectStage': projectStage,
         'projectName': projectName,
-        'date': selectedDate != null
-            ? Timestamp.fromDate(selectedDate!)
-            : FieldValue.serverTimestamp(),
-        'materials': materials,
-        'labours': labours,
+        'date': dateIso,
+        'materials': formattedMaterials,
+        'labours': formattedLabours,
+        'food': foodVal,
+        'transport': transVal,
+        'fuel': fuelVal,
+        'totalAmount': totalAmt,
         'expenses': {
-          'foodCost': num.tryParse(foodCost.text) ?? 0,
-          'transportCost': num.tryParse(transportCost.text) ?? 0,
-          'fuelCost': num.tryParse(fuelCost.text) ?? 0,
-          'totalExpense': _getTotalExpenses(),
+          'foodCost': foodVal,
+          'transportCost': transVal,
+          'fuelCost': fuelVal,
+          'totalExpense': foodVal + transVal + fuelVal,
         },
         'morningStatus': morningStatusController.text.trim(),
         'afternoonStatus': afternoonStatusController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
         'createdBy': widget.userName,
+        'createdRole': 'manager',
       };
 
-      await FirestoreService.getCollection('ManagerSiteEntry').add(entryData);
+      await FirestoreService.siteSupervisorEntries.doc(docId).set(entryData);
+
+      try {
+        if (selectedSiteId != null && selectedSiteId!.isNotEmpty) {
+          await ExpenseService.updateTotalSiteExpense(selectedSiteId!);
+        }
+      } catch (e) {
+        debugPrint('Error updating total expense: $e');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1042,6 +1677,12 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       selectedDate = DateTime.now();
       _showCustomMaterialFields = false;
       _showCustomLabourFields = false;
+      isUpdateMode = false;
+      _updateDocId = null;
+      _updateCollection = null;
+      _selectedUpdateDate = null;
+      _existingEntryOriginalData = null;
+      _existingEntryForCurrentDate = null;
     });
   }
 
@@ -1101,6 +1742,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
       setState(() {
         selectedDate = picked;
       });
+      _checkExistingEntryForDate(picked);
     }
   }
 
@@ -1356,18 +1998,88 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildSectionHeader('Update Entry'),
+                        _buildSectionHeader('Update Existing Entry'),
                         const SizedBox(height: 12),
                         if (isUpdateMode && _selectedUpdateDate != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10.0),
-                            child: Text(
-                              'Loaded entry for: ${DateFormat('yyyy-MM-dd').format(_selectedUpdateDate!)}',
-                              style: const TextStyle(
-                                color: Color(0xFF16A34A),
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13.5,
-                              ),
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF86EFAC)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Editing Entry: ${DateFormat('yyyy-MM-dd').format(_selectedUpdateDate!)}',
+                                        style: const TextStyle(
+                                          color: Color(0xFF15803D),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13.5,
+                                        ),
+                                      ),
+                                      if (supervisorName != null && supervisorName!.isNotEmpty && supervisorName != 'Not Available')
+                                        Text(
+                                          'Supervisor: $supervisorName',
+                                          style: const TextStyle(
+                                            color: Color(0xFF166534),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (!isUpdateMode && _existingEntryForCurrentDate != null)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Entry exists for ${DateFormat('yyyy-MM-dd').format(selectedDate!)}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF1E40AF),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    _loadEntryForUpdate(
+                                      _existingEntryForCurrentDate!['docId'],
+                                      _existingEntryForCurrentDate!['data'],
+                                      _existingEntryForCurrentDate!['collection'],
+                                    );
+                                  },
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: primaryColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: const Text('Review & Edit', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                                ),
+                              ],
                             ),
                           ),
                         Row(
@@ -1414,11 +2126,7 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                                   height: 46,
                                   child: OutlinedButton(
                                     onPressed: () {
-                                      setState(() {
-                                        isUpdateMode = false;
-                                        _updateDocId = null;
-                                        _selectedUpdateDate = null;
-                                      });
+                                      _resetForm();
                                     },
                                     style: OutlinedButton.styleFrom(
                                       backgroundColor: Colors.white,
@@ -2527,13 +3235,28 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                   ),
                 ),
                 DataCell(
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete_rounded,
-                      color: Color(0xFFEF4444),
-                      size: 18,
-                    ),
-                    onPressed: () => _removeMaterial(e.key),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.edit_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 18,
+                        ),
+                        onPressed: () => _editMaterialRow(e.key),
+                        tooltip: 'Edit Quantity / Price',
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_rounded,
+                          color: Color(0xFFEF4444),
+                          size: 18,
+                        ),
+                        onPressed: () => _removeMaterial(e.key),
+                        tooltip: 'Delete Material',
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -2563,13 +3286,28 @@ class _ManagerSiteEntryPageState extends State<ManagerSiteEntryPage> {
                   ),
                 ),
                 DataCell(
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete_rounded,
-                      color: Color(0xFFEF4444),
-                      size: 18,
-                    ),
-                    onPressed: () => _removeLabour(e.key),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.edit_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 18,
+                        ),
+                        onPressed: () => _editLabourRow(e.key),
+                        tooltip: 'Edit Count / Salary',
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_rounded,
+                          color: Color(0xFFEF4444),
+                          size: 18,
+                        ),
+                        onPressed: () => _removeLabour(e.key),
+                        tooltip: 'Delete Labour',
+                      ),
+                    ],
                   ),
                 ),
               ],

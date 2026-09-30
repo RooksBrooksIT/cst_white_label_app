@@ -84,7 +84,11 @@ class FirestoreService {
     );
     // Automatically trigger migration in background when org path is ready
     if (_cachedOrgId != null && _cachedOrgId != 'uninitialized' && !_migratedOrgs.contains(_cachedOrgId)) {
-      Future.microtask(() => migrateSitesIntoProjects());
+      Future.microtask(() {
+        migrateSitesIntoProjects();
+        migrateMaterialTransfers();
+        cleanupDuplicateWorkerSiteMappings();
+      });
     }
   }
 
@@ -99,7 +103,11 @@ class FirestoreService {
     });
     // Trigger migration for the newly set organization if not already completed
     if (_cachedOrgId != null && _cachedOrgId != 'uninitialized' && !_migratedOrgs.contains(_cachedOrgId)) {
-      Future.microtask(() => migrateSitesIntoProjects());
+      Future.microtask(() {
+        migrateSitesIntoProjects();
+        migrateMaterialTransfers();
+        cleanupDuplicateWorkerSiteMappings();
+      });
     }
   }
 
@@ -112,7 +120,7 @@ class FirestoreService {
   ) {
     final effectiveCollection = (collectionName == 'Site' || collectionName == 'sites')
         ? 'projects'
-        : collectionName;
+        : (collectionName == 'materialTransfers' ? 'materialTransfer' : collectionName);
 
     final orgId = _getOrgIdFromPath();
 
@@ -1142,15 +1150,23 @@ class FirestoreService {
     if (siteUpdates.containsKey('currentStatus') && !combinedUpdates.containsKey('status')) {
       combinedUpdates['status'] = siteUpdates['currentStatus'];
     }
-    if (siteUpdates.containsKey('amountPaid')) {
-      combinedUpdates['amountReceived'] = siteUpdates['amountPaid'];
-      combinedUpdates['receivedPayments'] = siteUpdates['amountPaid'];
+    if (siteUpdates.containsKey('amountPaid') || siteUpdates.containsKey('amountReceived')) {
+      final val = siteUpdates['amountPaid'] ?? siteUpdates['amountReceived'];
+      combinedUpdates['amountReceived'] = val;
+      combinedUpdates['amountPaid'] = val;
+      combinedUpdates['receivedPayments'] = val;
     }
-    if (siteUpdates.containsKey('amountSpent')) {
-      combinedUpdates['amountSpend'] = siteUpdates['amountSpent'];
+    if (siteUpdates.containsKey('amountSpent') || siteUpdates.containsKey('amountSpend')) {
+      final val = siteUpdates['amountSpent'] ?? siteUpdates['amountSpend'];
+      combinedUpdates['amountSpent'] = val;
+      combinedUpdates['amountSpend'] = val;
     }
     if (siteUpdates.containsKey('amountBalance')) {
-      combinedUpdates['balance'] = siteUpdates['amountBalance'];
+      combinedUpdates['amountBalance'] = siteUpdates['amountBalance'];
+    } else if (combinedUpdates.containsKey('amountReceived') && combinedUpdates.containsKey('amountSpent')) {
+      final r = (combinedUpdates['amountReceived'] as num).toDouble();
+      final s = (combinedUpdates['amountSpent'] as num).toDouble();
+      combinedUpdates['amountBalance'] = r - s;
     }
     if (siteUpdates.containsKey('projectBudget')) {
       combinedUpdates['estimatedBudget'] = siteUpdates['projectBudget'];
@@ -1261,6 +1277,10 @@ class FirestoreService {
         if (matchedProj != null) {
           // Merge missing/site fields into existing project doc
           final pData = matchedProj.data();
+          final recv = (pData['amountReceived'] ?? sData['amountReceived'] ?? pData['amountPaid'] ?? sData['amountPaid'] ?? 0) as num;
+          final spnt = (pData['amountSpent'] ?? sData['amountSpent'] ?? pData['amountSpend'] ?? sData['amountSpend'] ?? 0) as num;
+          final bal = (pData['amountBalance'] is num) ? (pData['amountBalance'] as num).toDouble() : (recv.toDouble() - spnt.toDouble());
+
           final mergeUpdates = <String, dynamic>{
             'siteId': pData['siteId'] ?? sSiteId,
             'siteName': pData['siteName'] ?? sSiteName,
@@ -1278,12 +1298,12 @@ class FirestoreService {
             'actualStateDate': pData['actualStateDate'] ?? sData['actualStartDate'] ?? sData['actualStateDate'],
             'actualEndDate': pData['actualEndDate'] ?? sData['actualEndDate'],
             'projectBudget': pData['projectBudget'] ?? sData['projectBudget'] ?? 0,
-            'amountReceived': pData['amountReceived'] ?? sData['amountReceived'] ?? sData['amountPaid'] ?? 0,
-            'amountPaid': pData['amountPaid'] ?? sData['amountPaid'] ?? sData['amountReceived'] ?? 0,
-            'amountSpent': pData['amountSpent'] ?? sData['amountSpent'] ?? sData['amountSpend'] ?? 0,
-            'amountSpend': pData['amountSpend'] ?? sData['amountSpend'] ?? sData['amountSpent'] ?? 0,
-            'amountBalance': pData['amountBalance'] ?? sData['amountBalance'] ?? 0,
-            'receivedPayments': pData['receivedPayments'] ?? sData['receivedPayments'] ?? sData['amountReceived'] ?? sData['amountPaid'] ?? 0,
+            'amountReceived': recv,
+            'amountPaid': recv,
+            'amountSpent': spnt,
+            'amountSpend': spnt,
+            'amountBalance': bal,
+            'receivedPayments': recv,
             'isContractWork': pData['isContractWork'] ?? sData['isContractWork'] ?? false,
             'contractorName': pData['contractorName'] ?? sData['contractorName'] ?? '',
             'contractorBudget': pData['contractorBudget'] ?? sData['contractorBudget'] ?? 0,
@@ -1314,47 +1334,51 @@ class FirestoreService {
             siteName: cleanSiteName,
           );
 
-          final newProjectData = <String, dynamic>{
-            'projectId': targetDocId,
-            'projectCode': nextPrCode,
-            'projectName': sSiteName.isNotEmpty ? sSiteName : sDocId,
-            'siteId': sDocId,
-            'siteCode': cleanSiteCode,
-            'siteName': sSiteName,
-            'siteLocation': sData['location'] ?? sData['siteLocation'] ?? '',
-            'latitude': sData['latitude'],
-            'longitude': sData['longitude'],
-            'projectCategory': sData['projectCategory'] ?? '',
-            'projectSubCategory': sData['projectSubCategory'] ?? '',
-            'projectType': sData['projectType'] ?? '',
-            'projectContract': sData['projectContract'] ?? '',
-            'projectStage': sData['projectStage'] ?? '',
-            'currentStatus': sData['status'] ?? sData['currentStatus'] ?? 'Planning',
-            'status': sData['status'] ?? sData['currentStatus'] ?? 'Planning',
-            'ownerName': sData['ownerName'] ?? sData['clientName'] ?? '',
-            'ownerPhoneNumber': sData['ownerPhoneNumber'] ?? sData['clientPhone'] ?? '',
-            'plannedStartDate': sData['startDate'] ?? sData['plannedStartDate'] ?? Timestamp.now(),
-            'plannedEndDate': sData['endDate'] ?? sData['plannedEndDate'],
-            'startDate': sData['startDate'] ?? sData['plannedStartDate'],
-            'endDate': sData['endDate'] ?? sData['plannedEndDate'],
-            'actualStartDate': sData['actualStartDate'] ?? sData['actualStateDate'],
-            'actualStateDate': sData['actualStartDate'] ?? sData['actualStateDate'],
-            'actualEndDate': sData['actualEndDate'],
-            'projectBudget': sData['projectBudget'] ?? 0,
-            'isContractWork': sData['isContractWork'] ?? false,
-            'contractorName': sData['contractorName'] ?? '',
-            'contractorBudget': sData['contractorBudget'] ?? 0,
-            'contractStartDate': sData['contractStartDate'],
-            'contractEndDate': sData['contractEndDate'],
-            'amountReceived': sData['amountReceived'] ?? sData['amountPaid'] ?? 0,
-            'amountPaid': sData['amountPaid'] ?? sData['amountReceived'] ?? 0,
-            'amountSpent': sData['amountSpent'] ?? sData['amountSpend'] ?? 0,
-            'amountSpend': sData['amountSpend'] ?? sData['amountSpent'] ?? 0,
-            'amountBalance': sData['amountBalance'] ?? 0,
-            'receivedPayments': sData['receivedPayments'] ?? sData['amountReceived'] ?? sData['amountPaid'] ?? 0,
-            'createdAt': sData['createdAt'] ?? FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          };
+            final recv = (sData['amountReceived'] ?? sData['amountPaid'] ?? 0) as num;
+            final spnt = (sData['amountSpent'] ?? sData['amountSpend'] ?? 0) as num;
+            final bal = (sData['amountBalance'] is num) ? (sData['amountBalance'] as num).toDouble() : (recv.toDouble() - spnt.toDouble());
+
+            final newProjectData = <String, dynamic>{
+              'projectId': targetDocId,
+              'projectCode': nextPrCode,
+              'projectName': sSiteName.isNotEmpty ? sSiteName : sDocId,
+              'siteId': sDocId,
+              'siteCode': cleanSiteCode,
+              'siteName': sSiteName,
+              'siteLocation': sData['location'] ?? sData['siteLocation'] ?? '',
+              'latitude': sData['latitude'],
+              'longitude': sData['longitude'],
+              'projectCategory': sData['projectCategory'] ?? '',
+              'projectSubCategory': sData['projectSubCategory'] ?? '',
+              'projectType': sData['projectType'] ?? '',
+              'projectContract': sData['projectContract'] ?? '',
+              'projectStage': sData['projectStage'] ?? '',
+              'currentStatus': sData['status'] ?? sData['currentStatus'] ?? 'Planning',
+              'status': sData['status'] ?? sData['currentStatus'] ?? 'Planning',
+              'ownerName': sData['ownerName'] ?? sData['clientName'] ?? '',
+              'ownerPhoneNumber': sData['ownerPhoneNumber'] ?? sData['clientPhone'] ?? '',
+              'plannedStartDate': sData['startDate'] ?? sData['plannedStartDate'] ?? Timestamp.now(),
+              'plannedEndDate': sData['endDate'] ?? sData['plannedEndDate'],
+              'startDate': sData['startDate'] ?? sData['plannedStartDate'],
+              'endDate': sData['endDate'] ?? sData['plannedEndDate'],
+              'actualStartDate': sData['actualStartDate'] ?? sData['actualStateDate'],
+              'actualStateDate': sData['actualStartDate'] ?? sData['actualStateDate'],
+              'actualEndDate': sData['actualEndDate'],
+              'projectBudget': sData['projectBudget'] ?? 0,
+              'isContractWork': sData['isContractWork'] ?? false,
+              'contractorName': sData['contractorName'] ?? '',
+              'contractorBudget': sData['contractorBudget'] ?? 0,
+              'contractStartDate': sData['contractStartDate'],
+              'contractEndDate': sData['contractEndDate'],
+              'amountReceived': recv,
+              'amountPaid': recv,
+              'amountSpent': spnt,
+              'amountSpend': spnt,
+              'amountBalance': bal,
+              'receivedPayments': recv,
+              'createdAt': sData['createdAt'] ?? FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            };
           await projectsCol.doc(targetDocId).set(newProjectData, SetOptions(merge: true));
 
           // Clean up legacy sDocId if it was in projects collection
@@ -1371,6 +1395,141 @@ class FirestoreService {
       debugPrint('FirestoreService: Successfully finished migrating Site documents into projects.');
     } catch (e) {
       debugPrint('FirestoreService: Error during migrateSitesIntoProjects: $e');
+    }
+  }
+
+  /// Migrates existing legacy documents from 'materialTransfers' (plural) into 'materialTransfer' (singular)
+  /// and removes the old 'materialTransfers' documents from backend.
+  static Future<void> migrateMaterialTransfers() async {
+    try {
+      final orgId = _getOrgIdFromPath();
+      if (orgId == 'uninitialized') return;
+
+      final legacyCol = FirebaseFirestore.instance
+          .collection('organisation')
+          .doc(orgId)
+          .collection('materialTransfers');
+
+      final targetCol = FirebaseFirestore.instance
+          .collection('organisation')
+          .doc(orgId)
+          .collection('materialTransfer');
+
+      final snap = await legacyCol.get();
+      if (snap.docs.isEmpty) return;
+
+      debugPrint('FirestoreService: Migrating ${snap.docs.length} documents from materialTransfers to materialTransfer...');
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        await targetCol.add(data);
+        await legacyCol.doc(doc.id).delete();
+      }
+
+      debugPrint('FirestoreService: Successfully migrated materialTransfers to materialTransfer and cleaned up legacy collection.');
+    } catch (e) {
+      debugPrint('FirestoreService: Error during migrateMaterialTransfers: $e');
+    }
+  }
+
+  /// Merges duplicate `workerSiteMapping` documents for the same project/site into a single canonical document
+  /// and safely deletes duplicate non-canonical documents without losing valid worker data.
+  static Future<void> cleanupDuplicateWorkerSiteMappings() async {
+    try {
+      final orgId = _getOrgIdFromPath();
+      if (orgId == 'uninitialized') return;
+
+      final mappingCol = getCollection('workerSiteMapping');
+      final snap = await mappingCol.get();
+      if (snap.docs.isEmpty) return;
+
+      // Group documents by site identifier (siteId or siteName)
+      final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>> siteGroups = {};
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final sId = (data['siteId'] ?? data['site'] ?? '').toString().trim();
+        final sName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
+        final canonicalKey = sId.isNotEmpty ? sId : (sName.isNotEmpty ? sName : doc.id.trim());
+
+        if (!siteGroups.containsKey(canonicalKey)) {
+          siteGroups[canonicalKey] = [];
+        }
+        siteGroups[canonicalKey]!.add(doc);
+      }
+
+      for (final entry in siteGroups.entries) {
+        final canonicalKey = entry.key;
+        final docs = entry.value;
+
+        final Map<String, Map<String, dynamic>> mergedWorkers = {};
+        String siteId = canonicalKey;
+        String siteName = '';
+        String supervisor = '';
+
+        for (final doc in docs) {
+          final data = doc.data();
+          if (siteName.isEmpty) {
+            siteName = (data['siteName'] ?? data['projectName'] ?? '').toString().trim();
+          }
+          if (supervisor.isEmpty) {
+            supervisor = (data['supervisor'] ?? '').toString().trim();
+          }
+
+          final rawList = (data['workers'] ?? data['mappedWorkers']) as List<dynamic>? ?? [];
+          for (final w in rawList) {
+            if (w is Map) {
+              final wMap = Map<String, dynamic>.from(w);
+              final wid = (wMap['workerId'] ?? wMap['id'] ?? '').toString().trim().toLowerCase();
+              final wname = (wMap['workerName'] ?? wMap['name'] ?? '').toString().trim().toLowerCase();
+              final wKey = wid.isNotEmpty ? wid : wname;
+              if (wKey.isNotEmpty) {
+                mergedWorkers[wKey] = wMap;
+              }
+            }
+          }
+        }
+
+        final List<Map<String, dynamic>> finalWorkersList = mergedWorkers.values.toList();
+        final canonicalRef = mappingCol.doc(canonicalKey);
+
+        await canonicalRef.set({
+          'site': siteId,
+          'siteId': siteId,
+          'siteName': siteName,
+          'supervisor': supervisor,
+          'projectName': siteName,
+          'totalWorkersMapped': finalWorkersList.length,
+          'workers': finalWorkersList,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Delete duplicate non-canonical documents (e.g. docs where doc.id != canonicalKey)
+        for (final doc in docs) {
+          if (doc.id.trim() != canonicalKey) {
+            try {
+              await doc.reference.delete();
+              debugPrint('FirestoreService: Deleted duplicate workerSiteMapping document: ${doc.id}');
+            } catch (_) {}
+          }
+        }
+      }
+
+      // Also clean up legacy workerSiteMap collection if duplicates exist there
+      try {
+        final legacyMapCol = getCollection('workerSiteMap');
+        final legSnap = await legacyMapCol.get();
+        for (final doc in legSnap.docs) {
+          final data = doc.data();
+          final sId = (data['siteId'] ?? data['site'] ?? '').toString().trim();
+          if (sId.isNotEmpty && doc.id.trim() != sId) {
+            await doc.reference.delete();
+          }
+        }
+      } catch (_) {}
+
+    } catch (e) {
+      debugPrint('FirestoreService: Error during cleanupDuplicateWorkerSiteMappings: $e');
     }
   }
 
@@ -1562,11 +1721,21 @@ class FirestoreService {
       if (finalData.containsKey('amountSpend') && !finalData.containsKey('amountSpent')) {
         finalData['amountSpent'] = finalData['amountSpend'];
       }
-      if (finalData.containsKey('amountBalance')) {
-        finalData['balance'] = finalData['amountBalance'];
+      // Never store or update 'balance' field in Firestore
+      if (finalData.containsKey('balance')) {
+        if (!finalData.containsKey('amountBalance')) {
+          finalData['amountBalance'] = finalData['balance'];
+        }
+        finalData.remove('balance');
       }
-      if (finalData.containsKey('balance') && !finalData.containsKey('amountBalance')) {
-        finalData['amountBalance'] = finalData['balance'];
+      if (!finalData.containsKey('amountBalance') &&
+          finalData.containsKey('amountReceived') &&
+          finalData.containsKey('amountSpent') &&
+          finalData['amountReceived'] is num &&
+          finalData['amountSpent'] is num) {
+        finalData['amountBalance'] =
+            (finalData['amountReceived'] as num).toDouble() -
+            (finalData['amountSpent'] as num).toDouble();
       }
       if (finalData.containsKey('actualStartDate') && !finalData.containsKey('actualStateDate')) {
         finalData['actualStateDate'] = finalData['actualStartDate'];

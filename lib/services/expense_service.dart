@@ -318,37 +318,41 @@ class ExpenseService {
       final DocumentReference<Map<String, dynamic>>? projectRef = refResults[0];
       final DocumentReference<Map<String, dynamic>>? siteRef = refResults[1];
 
-      // Determine actual customer amount paid across documents
-      double amountPaid = 0.0;
+      // Determine actual customer amount received across documents
+      double amountReceived = 0.0;
       if (projectRef != null) {
         final projectSnap = await projectRef.get();
         if (projectSnap.exists && projectSnap.data() != null) {
           final data = projectSnap.data()!;
-          if (data['amountPaid'] is num) {
-            amountPaid = (data['amountPaid'] as num).toDouble();
-          } else if (data['amountReceived'] is num) {
-            amountPaid = (data['amountReceived'] as num).toDouble();
+          if (data['amountReceived'] is num) {
+            amountReceived = (data['amountReceived'] as num).toDouble();
+          } else if (data['amountPaid'] is num) {
+            amountReceived = (data['amountPaid'] as num).toDouble();
+          } else if (data['receivedPayments'] is num) {
+            amountReceived = (data['receivedPayments'] as num).toDouble();
           } else if (data['paid'] is num) {
-            amountPaid = (data['paid'] as num).toDouble();
+            amountReceived = (data['paid'] as num).toDouble();
           }
         }
       }
 
-      if (amountPaid == 0.0 && siteRef != null) {
+      if (amountReceived == 0.0 && siteRef != null) {
         final siteSnap = await siteRef.get();
         if (siteSnap.exists && siteSnap.data() != null) {
           final sData = siteSnap.data()!;
-          if (sData['amountPaid'] is num) {
-            amountPaid = (sData['amountPaid'] as num).toDouble();
-          } else if (sData['amountReceived'] is num) {
-            amountPaid = (sData['amountReceived'] as num).toDouble();
+          if (sData['amountReceived'] is num) {
+            amountReceived = (sData['amountReceived'] as num).toDouble();
+          } else if (sData['amountPaid'] is num) {
+            amountReceived = (sData['amountPaid'] as num).toDouble();
+          } else if (sData['receivedPayments'] is num) {
+            amountReceived = (sData['receivedPayments'] as num).toDouble();
           } else if (sData['paid'] is num) {
-            amountPaid = (sData['paid'] as num).toDouble();
+            amountReceived = (sData['paid'] as num).toDouble();
           }
         }
       }
 
-      final amountBalance = amountPaid - totalAllExpenses;
+      final amountBalance = amountReceived - totalAllExpenses;
       final batch = firestore.batch();
 
       // Document reference for total site expenses - ALWAYS uses canonical doc ID (e.g. ST001_AbineshHouse)

@@ -55,6 +55,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
     _initAllMappingsListener();
     _loadSites();
     _loadWorkers();
+    FirestoreService.cleanupDuplicateWorkerSiteMappings();
   }
 
   @override
@@ -522,7 +523,24 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
 
       final cleanSiteId = siteId.trim();
       final cleanSiteName = siteName.trim();
-      final combinedKey = '${cleanSiteId}_$cleanSiteName';
+      final canonicalDocId = cleanSiteId.isNotEmpty ? cleanSiteId : cleanSiteName;
+
+      // Deduplicate selected workers list by workerId or workerName
+      final Map<String, Map<String, dynamic>> dedupWorkerMap = {};
+      for (final w in _selectedWorkersList) {
+        final wMap = Map<String, dynamic>.from(w);
+        final wid = (wMap['workerId'] ?? wMap['id'] ?? '').toString().trim().toLowerCase();
+        final wname = (wMap['workerName'] ?? wMap['name'] ?? '').toString().trim().toLowerCase();
+        final key = wid.isNotEmpty ? wid : wname;
+        if (key.isNotEmpty) {
+          // Ensure worker status & assignment details are set
+          wMap['assignmentStatus'] = wMap['assignmentStatus'] ?? 'Active';
+          wMap['mappingDate'] = wMap['mappingDate'] ?? DateFormat('dd/MM/yyyy').format(DateTime.now());
+          wMap['siteId'] = cleanSiteId;
+          dedupWorkerMap[key] = wMap;
+        }
+      }
+      final List<Map<String, dynamic>> cleanWorkersList = dedupWorkerMap.values.toList();
 
       final docData = {
         'site': cleanSiteId,
@@ -530,8 +548,8 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         'siteName': cleanSiteName,
         'supervisor': supervisor,
         'projectName': cleanSiteName,
-        'totalWorkersMapped': _selectedWorkersList.length,
-        'workers': _selectedWorkersList,
+        'totalWorkersMapped': cleanWorkersList.length,
+        'workers': cleanWorkersList,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -539,7 +557,7 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
       bool isUpdate = false;
       try {
         final existingDoc = await FirestoreService.getCollection('workerSiteMapping')
-            .doc(cleanSiteId)
+            .doc(canonicalDocId)
             .get();
         if (existingDoc.exists) {
           final existingCount =
@@ -550,35 +568,36 @@ class _WorkerMappingPageState extends State<WorkerMappingPage> {
         }
       } catch (_) {}
 
-      // 1. Commit mapping to both workerSiteMapping and legacy workerSiteMap across all canonical keys
+      // 1. Commit mapping strictly to canonical document ID (prevents duplicate siteName / combinedKey docs)
       final batch = FirebaseFirestore.instance.batch();
 
-      final Set<String> targetDocKeys = {
-        cleanSiteId,
-        if (cleanSiteName.isNotEmpty) cleanSiteName,
-        if (cleanSiteId.isNotEmpty && cleanSiteName.isNotEmpty) combinedKey,
-      };
-
-      for (final key in targetDocKeys) {
-        final ref1 = FirestoreService.getCollection('workerSiteMapping').doc(key);
-        final ref2 = FirestoreService.getCollection('workerSiteMap').doc(key);
-        batch.set(ref1, docData, SetOptions(merge: true));
-        batch.set(ref2, docData, SetOptions(merge: true));
-      }
+      final ref1 = FirestoreService.getCollection('workerSiteMapping').doc(canonicalDocId);
+      final ref2 = FirestoreService.getCollection('workerSiteMap').doc(canonicalDocId);
+      batch.set(ref1, docData, SetOptions(merge: true));
+      batch.set(ref2, docData, SetOptions(merge: true));
 
       // 2. If workers were transferred from other sites, clean them up from previous site mapping
-      final Set<String> addedWorkerIds = _selectedWorkersList
+      final Set<String> addedWorkerIds = cleanWorkersList
           .map((w) => (w['workerId'] ?? '').toString().toLowerCase())
           .where((id) => id.isNotEmpty)
           .toSet();
-      final Set<String> addedWorkerNames = _selectedWorkersList
+      final Set<String> addedWorkerNames = cleanWorkersList
           .map((w) => (w['workerName'] ?? '').toString().toLowerCase())
           .where((name) => name.isNotEmpty)
           .toSet();
 
       final otherSiteSnapshots = await FirestoreService.getCollection('workerSiteMapping').get();
       for (final otherDoc in otherSiteSnapshots.docs) {
-        if (targetDocKeys.contains(otherDoc.id.trim())) continue;
+        final docId = otherDoc.id.trim();
+        // Skip current site document or duplicate siteName/combinedKey documents for current site
+        if (docId == canonicalDocId || docId == cleanSiteName || docId == '${cleanSiteId}_$cleanSiteName') {
+          // If it's a secondary duplicate document for the same site, delete it
+          if (docId != canonicalDocId) {
+            batch.delete(otherDoc.reference);
+          }
+          continue;
+        }
+
         final data = otherDoc.data();
         final rawList = data['workers'] as List<dynamic>? ?? [];
         bool modified = false;

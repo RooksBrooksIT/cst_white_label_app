@@ -554,7 +554,6 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       'amountSpent': 0.0,
       'amountSpend': 0.0,
       'amountBalance': amountPaid,
-      'balance': amountPaid,
       'receivedPayments': amountPaid,
       'projectBudget': budget,
       'estimatedBudget': budget,

@@ -495,7 +495,9 @@ class _MaterialRequestFormState extends State<MaterialRequestForm> {
             children: [
               Icon(Icons.check_circle_rounded, color: primaryColor, size: 28),
               const SizedBox(width: 10),
-              const Text('Request Submitted', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Expanded(
+                child: Text('Request Submitted', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ],
           ),
           content: Text(

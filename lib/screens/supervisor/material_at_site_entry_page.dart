@@ -621,12 +621,17 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
             fontWeight: FontWeight.w500,
           ),
         ),
-        Text(
-          value.isNotEmpty ? value : '-',
-          style: const TextStyle(
-            fontSize: 13.5,
-            color: Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            value.isNotEmpty ? value : '-',
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -1023,31 +1028,34 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                                         : const Color(0xFFFECACA),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      count.toString(),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: isAvailable
-                                            ? const Color(0xFF059669)
-                                            : const Color(0xFFDC2626),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        count.toString(),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: isAvailable
+                                              ? const Color(0xFF059669)
+                                              : const Color(0xFFDC2626),
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      unit,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12,
-                                        color: isAvailable
-                                            ? const Color(0xFF047857)
-                                            : const Color(0xFFB91C1C),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        unit,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                          color: isAvailable
+                                              ? const Color(0xFF047857)
+                                              : const Color(0xFFB91C1C),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -1074,14 +1082,18 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                       if (mat['allocatedQty'] != null && (mat['allocatedQty'] as num) > 0) ...[
                         const SizedBox(height: 8),
                         Container(
+                          width: double.infinity,
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: const Color(0xFFE2E8F0)),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            runSpacing: 4,
+                            spacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
                                 'Allocated: ${mat['allocatedQty']} $unit',

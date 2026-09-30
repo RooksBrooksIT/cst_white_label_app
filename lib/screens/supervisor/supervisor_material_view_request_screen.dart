@@ -766,20 +766,23 @@ class _RequestCard extends StatelessWidget {
                     color: cs.onPrimary.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_statusIcon(status), color: cs.onPrimary, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        displayBadgeText,
-                        style: TextStyle(
-                          color: cs.onPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_statusIcon(status), color: cs.onPrimary, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          displayBadgeText,
+                          style: TextStyle(
+                            color: cs.onPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

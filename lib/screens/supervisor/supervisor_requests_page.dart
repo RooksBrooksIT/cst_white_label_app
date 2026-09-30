@@ -248,7 +248,10 @@ class SupervisorRequestsPage extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: onNewRequest,
                       icon: const Icon(Icons.add_rounded, size: 16),
-                      label: Text(requestLabel),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(requestLabel),
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: color,
                         backgroundColor: color.withValues(alpha: 0.04),
@@ -272,7 +275,10 @@ class SupervisorRequestsPage extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: onApprovals,
                       icon: const Icon(Icons.fact_check_rounded, size: 15),
-                      label: Text(approvalLabel),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(approvalLabel),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: color,
                         foregroundColor: Colors.white,

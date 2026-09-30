@@ -6,6 +6,7 @@ import 'package:ebricks/screens/manager/project_setup_wizard.dart';
 import 'package:ebricks/screens/organization/site_financial_details_page.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
+import 'package:ebricks/widgets/project_alert_indicators.dart';
 
 class ManagerSitesListPage extends StatefulWidget {
   final String initialFilter;
@@ -795,7 +796,9 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
     final statusBadge = _getStatusBadge(rawStatus, data, primaryColor);
 
     final budget = (data['projectBudget'] is num ? (data['projectBudget'] as num).toDouble() : (data['budget'] is num ? (data['budget'] as num).toDouble() : (double.tryParse(data['projectBudget']?.toString() ?? '') ?? 0.0)));
-    final balance = (data['amountBalance'] is num ? (data['amountBalance'] as num).toDouble() : (data['balance'] is num ? (data['balance'] as num).toDouble() : (data['amountPaid'] is num ? (data['amountPaid'] as num).toDouble() : budget)));
+    final received = (data['amountReceived'] is num ? (data['amountReceived'] as num).toDouble() : (data['amountPaid'] is num ? (data['amountPaid'] as num).toDouble() : (data['receivedPayments'] is num ? (data['receivedPayments'] as num).toDouble() : (double.tryParse(data['amountReceived']?.toString() ?? data['amountPaid']?.toString() ?? '') ?? 0.0))));
+    final spent = (data['amountSpent'] is num ? (data['amountSpent'] as num).toDouble() : (data['amountSpend'] is num ? (data['amountSpend'] as num).toDouble() : (data['spent'] is num ? (data['spent'] as num).toDouble() : (double.tryParse(data['amountSpent']?.toString() ?? '') ?? 0.0))));
+    final balance = (data['amountBalance'] is num ? (data['amountBalance'] as num).toDouble() : (received - spent));
     final progress = _calculateProgress(data);
 
     return Container(
@@ -916,6 +919,8 @@ class _ManagerSitesListPageState extends State<ManagerSitesListPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                ProjectAlertBadge(projectData: data, docId: siteId, compact: true),
                 const SizedBox(height: 14),
 
                 // Project & Supervisor Info

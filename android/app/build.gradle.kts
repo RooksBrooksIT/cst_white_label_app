@@ -32,13 +32,7 @@ val isKeystoreValid = keystorePropertiesFile.exists() &&
 android {
     namespace = "com.rooks.ebricks"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
-
-    packaging {
-        jniLibs {
-            keepDebugSymbols.add("**/*.so")
-        }
-    }
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -57,7 +51,7 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 2
+        versionCode = 3
         versionName = "1.0.0"
     }
 

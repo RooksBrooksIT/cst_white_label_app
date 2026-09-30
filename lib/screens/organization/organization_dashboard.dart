@@ -634,12 +634,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
 
                           final b = _parseNum(data['projectBudget'] ?? data['budget']);
                           final sp = _parseNum(data['amountSpent'] ?? data['amountSpend'] ?? data['spent'] ?? data['totalAllExpenses']);
-                          final pd = _parseNum(data['amountPaid'] ?? data['paid'] ?? data['amountReceived']);
+                          final pd = _parseNum(data['amountReceived'] ?? data['amountPaid'] ?? data['paid'] ?? data['receivedPayments']);
                           final bal = data.containsKey('amountBalance') && data['amountBalance'] != null
                               ? _parseNum(data['amountBalance'])
-                              : (data.containsKey('balance') && data['balance'] != null
-                                  ? _parseNum(data['balance'])
-                                  : (b > 0 ? (b - sp) : (pd - sp)));
+                              : (pd - sp);
 
                           totalBudget += b;
                           totalAmountSpent += sp;
@@ -2200,10 +2198,9 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
         final currentSpent = _parseNum(target['amountSpent'] ?? target['amountSpend'] ?? target['spent']);
         if (totalExp > 0 || currentSpent == 0) {
           target['amountSpent'] = totalExp > 0 ? totalExp : currentSpent;
-          final budget = _parseNum(target['projectBudget'] ?? target['budget']);
-          final income = _parseNum(target['amountPaid'] ?? target['paid'] ?? target['amountReceived']);
+          final income = _parseNum(target['amountReceived'] ?? target['amountPaid'] ?? target['paid'] ?? target['receivedPayments']);
           final effectiveSpent = (target['amountSpent'] as num).toDouble();
-          target['amountBalance'] = budget > 0 ? (budget - effectiveSpent) : (income - effectiveSpent);
+          target['amountBalance'] = income - effectiveSpent;
         }
       }
     }

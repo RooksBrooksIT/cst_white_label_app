@@ -506,7 +506,13 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                 final budget = (project['projectBudget'] ?? 0) as num;
                 final plannedStartDate =
                     project['plannedStartDate'] as Timestamp?;
-                final amountSpent = (project['amountSpent'] ?? 0) as num;
+                final amountSpent = (project['amountSpent'] ?? project['amountSpend'] ?? 0) as num;
+                final amountReceived = (project['amountReceived'] ??
+                        project['amountPaid'] ??
+                        project['receivedPayments'] ??
+                        0) as num;
+                final amountBalance = (project['amountBalance'] ??
+                        (amountReceived - amountSpent)) as num;
                 final currentStatus =
                     project['currentStatus']?.toString() ?? 'N/A';
 
@@ -636,8 +642,16 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                                         formatCurrency(budget),
                                       ),
                                       _buildInfoRow(
+                                        'Amount Received',
+                                        formatCurrency(amountReceived),
+                                      ),
+                                      _buildInfoRow(
                                         'Amount Spent',
                                         formatCurrency(amountSpent),
+                                      ),
+                                      _buildInfoRow(
+                                        'Remaining Balance',
+                                        formatCurrency(amountBalance),
                                       ),
                                       _buildInfoRow(
                                         'Current Status',
@@ -1000,11 +1014,14 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     final projectName = project['projectName']?.toString() ?? 'N/A';
     final budget = (project['projectBudget'] ?? 0) as num;
     final plannedStartDate = project['plannedStartDate'] as Timestamp?;
-    final amountSpent = (project['amountSpent'] ?? 0) as num;
+    final amountSpent = (project['amountSpent'] ?? project['amountSpend'] ?? 0) as num;
+    final amountReceived = (project['amountReceived'] ??
+            project['amountPaid'] ??
+            project['receivedPayments'] ??
+            0) as num;
+    final amountBalance = (project['amountBalance'] ??
+            (amountReceived - amountSpent)) as num;
     final currentStatus = project['currentStatus']?.toString() ?? 'N/A';
-    final dateFormat = DateFormat('dd MMM yyyy');
-
-    final logo = await _getLogoImage();
 
     pdf.addPage(
       pw.MultiPage(
@@ -1032,7 +1049,7 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
               ),
             ],
           ),
-          pw.SizedBox(height: 24),
+          pw.SizedBox(height: 16),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
@@ -1042,8 +1059,24 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                 pdfPrimaryColor,
               ),
               PdfTemplates.buildMetaBox(
+                'Amount Received',
+                '₹${NumberFormat('#,##,###').format(amountReceived)}',
+                pdfPrimaryColor,
+              ),
+              PdfTemplates.buildMetaBox(
                 'Amount Spent',
                 '₹${NumberFormat('#,##,###').format(amountSpent)}',
+                pdfPrimaryColor,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              PdfTemplates.buildMetaBox(
+                'Remaining Balance',
+                '₹${NumberFormat('#,##,###').format(amountBalance)}',
                 pdfPrimaryColor,
               ),
               PdfTemplates.buildMetaBox(

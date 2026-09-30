@@ -147,23 +147,29 @@ class _SupervisorToolsWorkflowPageState
                     ),
                     tabs: const [
                       Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.fact_check_rounded, size: 16),
-                            SizedBox(width: 6),
-                            Text('Track Approvals'),
-                          ],
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.fact_check_rounded, size: 16),
+                              SizedBox(width: 6),
+                              Text('Track Approvals'),
+                            ],
+                          ),
                         ),
                       ),
                       Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.construction_rounded, size: 16),
-                            SizedBox(width: 6),
-                            Text('New Request'),
-                          ],
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.construction_rounded, size: 16),
+                              SizedBox(width: 6),
+                              Text('New Request'),
+                            ],
+                          ),
                         ),
                       ),
                     ],

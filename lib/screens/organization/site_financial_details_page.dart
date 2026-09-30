@@ -10,6 +10,7 @@ import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/utils/responsive.dart';
 import 'package:ebricks/screens/organization/org_petty_cash_page.dart';
 import 'package:ebricks/screens/organization/organization_expenses.dart';
+import 'package:ebricks/widgets/project_alert_indicators.dart';
 
 class SiteFinancialDetailsPage extends StatefulWidget {
   final String siteId;
@@ -670,6 +671,12 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 0. Project Alert Banners
+                ProjectAlertBanner(
+                  projectData: data,
+                  docId: widget.siteId,
+                ),
+
                 // 1. Site Info Header Card
                 _buildSiteHeaderCard(
                   projectName: widget.projectName.isNotEmpty ? widget.projectName : widget.siteName,

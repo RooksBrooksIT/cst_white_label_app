@@ -1621,7 +1621,7 @@ class MaterialInventoryService {
         matTransferRef.set(updatePayload, SetOptions(merge: true)),
       ]);
 
-      // Record transfer log in materialTransfers
+      // Record transfer log in materialTransfer
       await _logTransferRecord(
         transferType: 'CompanyToSite',
         fromSiteId: 'COMPANY',
@@ -2562,7 +2562,7 @@ class MaterialInventoryService {
         'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
       };
 
-      await FirestoreService.getCollection('materialTransfers').add(transferPayload);
+      await FirestoreService.getCollection('materialTransfer').add(transferPayload);
     } catch (e) {
       debugPrint('Error logging transfer record: $e');
     }

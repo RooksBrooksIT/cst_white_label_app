@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ebricks/screens/customer/customer_insight_dashboard.dart';
@@ -134,9 +134,11 @@ class _CustomerDashboardPageState extends State<CustomerDashboardPage> {
           children: [
             Icon(Icons.logout_rounded, color: Colors.red[300], size: 28),
             const SizedBox(width: 12),
-            const Text(
-              'Confirm Logout',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            const Expanded(
+              child: Text(
+                'Confirm Logout',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              ),
             ),
           ],
         ),
