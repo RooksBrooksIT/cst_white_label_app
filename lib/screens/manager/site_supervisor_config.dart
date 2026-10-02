@@ -38,6 +38,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
 
   bool _isCheckingUsername = false;
   String? _usernameError;
+  bool? _isUsernameValid;
+  int _usernameValidationSeq = 0;
 
   bool _isCheckingContactNo = false;
   String? _contactNoError;
@@ -59,14 +61,16 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   @override
   void initState() {
     super.initState();
+    FirestoreService.warmupUsernameCache();
   }
 
   // ── UNIQUENESS CHECKS AGAINST BACKEND/DATABASE ─────────────────────────
 
   Future<bool> _isUsernameUnique(String username, {String? excludeDocId}) async {
-    if (username.trim().isEmpty) return true;
+    final clean = username.trim();
+    if (clean.isEmpty) return true;
     return await FirestoreService.isGlobalSupervisorUsernameUnique(
-      username,
+      clean,
       excludeDocId: excludeDocId,
     );
   }
@@ -143,10 +147,32 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
   void _onUsernameChanged(String value) {
     _usernameDebounceTimer?.cancel();
     final trimmed = value.trim();
+    final seq = ++_usernameValidationSeq;
+
     if (trimmed.isEmpty) {
       setState(() {
         _isCheckingUsername = false;
         _usernameError = null;
+        _isUsernameValid = null;
+      });
+      return;
+    }
+
+    if (trimmed.length < 3) {
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameError = 'Username must be at least 3 characters';
+        _isUsernameValid = false;
+      });
+      return;
+    }
+
+    // Instant 0ms synchronous cache check
+    if (FirestoreService.isUsernameCachedAsTaken(trimmed)) {
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameError = 'Username already exists';
+        _isUsernameValid = false;
       });
       return;
     }
@@ -154,17 +180,22 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     setState(() {
       _isCheckingUsername = true;
       _usernameError = null;
+      _isUsernameValid = null;
     });
 
-    _usernameDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+    _usernameDebounceTimer = Timer(const Duration(milliseconds: 200), () async {
       final isUnique = await _isUsernameUnique(trimmed);
-      if (!mounted) return;
+      if (!mounted || seq != _usernameValidationSeq || _userNameController.text.trim() != trimmed) {
+        return;
+      }
       setState(() {
         _isCheckingUsername = false;
         if (!isUnique) {
-          _usernameError = 'Username already exists. Please choose another username.';
+          _usernameError = 'Username already exists';
+          _isUsernameValid = false;
         } else {
           _usernameError = null;
+          _isUsernameValid = true;
         }
       });
     });
@@ -327,11 +358,11 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
       bool isUsernameUniqueVal = await _isUsernameUnique(username);
       if (!isUsernameUniqueVal) {
         if (!mounted) return;
-        setState(() => _usernameError = 'Username already exists. Please choose another username.');
+        setState(() => _usernameError = 'Username already exists');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Username already exists. Please choose another username.',
+              'Username already exists',
             ),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 3),
@@ -647,7 +678,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Username already exists. Please choose another username.'),
+                              content: Text('Username already exists'),
                               backgroundColor: Colors.red,
                             ),
                           );
@@ -798,6 +829,8 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
       await FirestoreService.getCollection('supervisor')
           .doc(newSupervisorId)
           .set(supervisorData);
+
+      FirestoreService.recordTakenUsername(_userNameController.text.trim());
 
       // Trigger real-time push and in-app notification for Supervisor creation
       try {
@@ -1176,6 +1209,7 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
                     checkingText: 'Checking username...',
                     errorText: _usernameError,
                     successText: 'Username is available ✓',
+                    isValid: _isUsernameValid,
                   ),
                   const SizedBox(height: 14),
                   _buildTextField(
@@ -1350,12 +1384,17 @@ class _SiteSupervisorConfigState extends State<SiteSupervisorConfig> {
     String checkingText = 'Checking availability...',
     String? errorText,
     String? successText,
+    bool? isValid,
     String? Function(String?)? customValidator,
   }) {
     final brandIconColor = Theme.of(context).primaryColor;
     final hasValue = controller.text.trim().isNotEmpty;
     final hasError = errorText != null && errorText.isNotEmpty;
-    final isSuccess = hasValue && !isChecking && !hasError && successText != null;
+    final isSuccess = hasValue &&
+        !isChecking &&
+        !hasError &&
+        successText != null &&
+        (isValid != null ? isValid == true : true);
 
     final activeBorderColor = hasError
         ? const Color(0xFFEF4444)

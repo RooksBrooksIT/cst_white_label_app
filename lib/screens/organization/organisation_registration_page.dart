@@ -56,6 +56,7 @@ class _OrganisationRegistrationPageState
   bool _isCheckingUsername = false;
   String? _usernameStatusText;
   bool? _isUsernameValid;
+  int _usernameValidationSeq = 0;
 
   String _passwordStrength = '';
   Color _strengthColor = Colors.transparent;
@@ -253,6 +254,8 @@ class _OrganisationRegistrationPageState
   void _onUsernameChanged(String val) {
     _usernameDebounce?.cancel();
     final clean = val.trim().toLowerCase();
+    final seq = ++_usernameValidationSeq;
+
     if (clean.isEmpty) {
       setState(() {
         _isCheckingUsername = false;
@@ -271,26 +274,36 @@ class _OrganisationRegistrationPageState
       return;
     }
 
+    // Instant 0ms synchronous cache check
+    if (FirestoreService.isUsernameCachedAsTaken(clean)) {
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameStatusText = 'Username already exists';
+        _isUsernameValid = false;
+      });
+      return;
+    }
+
     setState(() {
       _isCheckingUsername = true;
       _usernameStatusText = 'Checking username...';
       _isUsernameValid = null;
     });
 
-    _usernameDebounce = Timer(const Duration(milliseconds: 250), () async {
+    _usernameDebounce = Timer(const Duration(milliseconds: 200), () async {
       try {
         final isUnique = await FirestoreService.isGlobalUsernameUnique(clean);
-        if (mounted && _usernameController.text.trim().toLowerCase() == clean) {
+        if (mounted && seq == _usernameValidationSeq && _usernameController.text.trim().toLowerCase() == clean) {
           setState(() {
             _isCheckingUsername = false;
             _isUsernameValid = isUnique;
             _usernameStatusText = isUnique
                 ? 'Username is available ✓'
-                : 'Username already exists. Please choose another username.';
+                : 'Username already exists';
           });
         }
       } catch (e) {
-        if (mounted && _usernameController.text.trim().toLowerCase() == clean) {
+        if (mounted && seq == _usernameValidationSeq && _usernameController.text.trim().toLowerCase() == clean) {
           setState(() {
             _isCheckingUsername = false;
             _usernameStatusText = 'Error validating username. Please check network.';
@@ -306,6 +319,7 @@ class _OrganisationRegistrationPageState
   @override
   void initState() {
     super.initState();
+    FirestoreService.warmupUsernameCache();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -360,7 +374,7 @@ class _OrganisationRegistrationPageState
       return;
     }
     if (_isUsernameValid == false) {
-      _showError(_usernameStatusText ?? 'Admin username is already taken');
+      _showError(_usernameStatusText ?? 'Username already exists');
       return;
     }
 

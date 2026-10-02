@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
+import 'dart:async';
 
 class OrganizationValidationResult {
   final bool isValid;
@@ -33,6 +34,79 @@ class FirestoreService {
   static String? _cachedDynamicPath;
   static String? _cachedOrgId;
   static final Set<String> _migratedOrgs = {};
+
+  // ── USERNAME CACHING INFRASTRUCTURE ──────────────────────────────────────
+  static final Set<String> _cachedTakenUsernames = <String>{};
+  static final Map<String, DateTime> _cachedUniqueUsernames = <String, DateTime>{};
+  static bool _isWarmingUp = false;
+  static bool _cacheWarmed = false;
+
+  /// Fast synchronous check if a username is already known to be taken (0ms response).
+  static bool isUsernameCachedAsTaken(String username) {
+    final clean = username.trim().toLowerCase();
+    if (clean.isEmpty) return false;
+    return _cachedTakenUsernames.contains(clean);
+  }
+
+  /// Record a username as taken into memory cache (e.g. after registration).
+  static void recordTakenUsername(String username) {
+    final clean = username.trim().toLowerCase();
+    if (clean.isNotEmpty) {
+      _cachedTakenUsernames.add(clean);
+      _cachedUniqueUsernames.remove(clean);
+    }
+  }
+
+  /// Proactively warms up the username cache in the background without blocking the UI.
+  static void warmupUsernameCache() {
+    if (_cacheWarmed || _isWarmingUp) return;
+    _isWarmingUp = true;
+    Future.microtask(() async {
+      try {
+        final orgSnap = await FirebaseFirestore.instance.collection('organisation').get();
+        for (var doc in orgSnap.docs) {
+          _extractAndCacheDoc(doc);
+        }
+
+        final groups = await Future.wait([
+          FirebaseFirestore.instance.collectionGroup('manager').get().catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get()),
+          FirebaseFirestore.instance.collectionGroup('supervisor').get().catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get()),
+          FirebaseFirestore.instance.collectionGroup('supervisors').get().catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get()),
+        ]);
+
+        for (var group in groups) {
+          for (var doc in group.docs) {
+            _extractAndCacheDoc(doc);
+          }
+        }
+        _cacheWarmed = true;
+      } catch (e) {
+        debugPrint('warmupUsernameCache error: $e');
+      } finally {
+        _isWarmingUp = false;
+      }
+    });
+  }
+
+  static void _extractAndCacheDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    if (data != null) {
+      for (final key in ['UserName', 'username', 'userName', 'adminUsername', 'admin_username']) {
+        final val = data[key]?.toString().trim().toLowerCase();
+        if (val != null && val.isNotEmpty) {
+          _cachedTakenUsernames.add(val);
+        }
+      }
+    }
+    final docId = doc.id.toLowerCase();
+    _cachedTakenUsernames.add(docId);
+    if (docId.contains('_')) {
+      final suffix = docId.substring(docId.lastIndexOf('_') + 1).trim();
+      if (suffix.isNotEmpty) {
+        _cachedTakenUsernames.add(suffix);
+      }
+    }
+  }
 
   /// Application identifier for strict cross-application data isolation in shared Firebase project
   static const String cstAppId = 'cst_white_label';
@@ -637,55 +711,193 @@ class FirestoreService {
     }
   }
 
-  /// Checks if a username is unique globally across organisations, organizationUsers, and managers.
+  /// Checks if a username is unique globally across all organisations, managers, and supervisors (strictly case-insensitive).
   static Future<bool> isGlobalUsernameUnique(String username, {String? excludeDocId}) async {
     final clean = username.trim();
     if (clean.isEmpty) return true;
     final cleanLower = clean.toLowerCase();
 
+    // 0. Instant Cache Checks (0ms)
+    if (_cachedTakenUsernames.contains(cleanLower)) {
+      return false;
+    }
+    final cachedUniqueTime = _cachedUniqueUsernames[cleanLower];
+    if (cachedUniqueTime != null &&
+        DateTime.now().difference(cachedUniqueTime).inSeconds < 60) {
+      return true;
+    }
+
+    // Trigger background cache warmup if not yet warmed
+    if (!_cacheWarmed) {
+      warmupUsernameCache();
+    }
+
+    bool isDocMatch(DocumentSnapshot<Map<String, dynamic>> doc) {
+      if (excludeDocId != null &&
+          (doc.id == excludeDocId ||
+           doc.reference.parent.parent?.id == excludeDocId)) {
+        return false;
+      }
+      final data = doc.data();
+      if (data == null) return false;
+
+      final docUsername = (data['UserName'] ??
+              data['username'] ??
+              data['userName'] ??
+              data['adminUsername'] ??
+              data['admin_username'] ??
+              '')
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      if (docUsername.isNotEmpty && docUsername == cleanLower) {
+        return true;
+      }
+
+      // Check document ID (e.g. MG001_Sharan123, SUP001_Sharan123, or Sharan123)
+      final docId = doc.id.toLowerCase();
+      if (docId == cleanLower) {
+        return true;
+      }
+      if (docId.contains('_')) {
+        final suffix = docId.substring(docId.lastIndexOf('_') + 1).trim();
+        if (suffix.isNotEmpty && suffix == cleanLower) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     try {
-      // 1. Check root organisation collection
-      final orgSnap = await FirebaseFirestore.instance.collection('organisation').get();
-      for (var doc in orgSnap.docs) {
-        if (excludeDocId != null && doc.id == excludeDocId) continue;
-        final data = doc.data();
-        final docUsername = (data['username'] ??
-                data['UserName'] ??
-                data['adminUsername'] ??
-                data['admin_username'] ??
-                '')
-            .toString()
-            .trim()
-            .toLowerCase();
-        if (docUsername.isNotEmpty && (docUsername == cleanLower || docUsername == clean)) {
-          return false;
+      // 1. TIER 1: Fast Parallel Indexed Queries with .limit(1)
+      final variations = <String>{
+        clean,
+        cleanLower,
+        clean.toUpperCase(),
+        if (clean.length > 1)
+          '${clean[0].toUpperCase()}${clean.substring(1).toLowerCase()}',
+      };
+
+      final tier1Futures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+
+      // Current active organization collections (if active org exists)
+      try {
+        final mgrCol = getCollection('manager');
+        final supCol = getCollection('supervisor');
+        for (final v in variations) {
+          tier1Futures.add(mgrCol.where('UserName', isEqualTo: v).limit(1).get());
+          tier1Futures.add(mgrCol.where('username', isEqualTo: v).limit(1).get());
+          tier1Futures.add(supCol.where('UserName', isEqualTo: v).limit(1).get());
+          tier1Futures.add(supCol.where('username', isEqualTo: v).limit(1).get());
+        }
+      } catch (_) {}
+
+      // Collection groups across all organizations (finds managers & supervisors across all orgs)
+      for (final v in variations) {
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('manager').where('UserName', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('manager').where('username', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('supervisor').where('UserName', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('supervisor').where('username', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('supervisors').where('UserName', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('supervisors').where('username', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('configUsers').where('UserName', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('organizationUser').where('UserName', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collection('organisation').where('username', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collection('organisation').where('UserName', isEqualTo: v).limit(1).get());
+      }
+
+      // Root-level collections
+      for (final v in variations) {
+        tier1Futures.add(FirebaseFirestore.instance.collection('manager').where('UserName', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collection('manager').where('username', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collection('supervisor').where('UserName', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collection('supervisor').where('username', isEqualTo: v).limit(1).get());
+      }
+
+      // Check direct Document IDs (e.g. organisation/sharan123)
+      final docIdFutures = <Future<DocumentSnapshot<Map<String, dynamic>>>>[];
+      for (final v in variations) {
+        docIdFutures.add(FirebaseFirestore.instance.collection('organisation').doc(v).get());
+        docIdFutures.add(FirebaseFirestore.instance.collection('manager').doc(v).get());
+        docIdFutures.add(FirebaseFirestore.instance.collection('supervisor').doc(v).get());
+      }
+
+      // Short-circuiting parallel execution: as soon as ANY query finds a match, exit immediately!
+      final completer = Completer<bool>();
+      int pending = tier1Futures.length + docIdFutures.length;
+
+      void onQueryFinished() {
+        pending--;
+        if (pending <= 0 && !completer.isCompleted) {
+          completer.complete(true); // No match found in Tier 1
         }
       }
 
-      // 2. Parallel collectionGroup lookups
-      final futures = [
-        FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: cleanLower).get(),
-        FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('organizationUser').where('UserName', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('manager').where('UserName', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('manager').where('username', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('manager').where('UserName', isEqualTo: cleanLower).get(),
-        FirebaseFirestore.instance.collectionGroup('manager').where('username', isEqualTo: cleanLower).get(),
-        FirebaseFirestore.instance.collectionGroup('configUsers').where('UserName', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: clean).get(),
-      ];
-
-      final results = await Future.wait(futures);
-      for (var snap in results) {
-        for (var doc in snap.docs) {
-          if (excludeDocId != null &&
-              (doc.id == excludeDocId || doc.reference.parent.parent?.id == excludeDocId)) {
-            continue;
+      for (final future in tier1Futures) {
+        future.then((snap) {
+          if (completer.isCompleted) return;
+          for (final doc in snap.docs) {
+            if (isDocMatch(doc)) {
+              _cachedTakenUsernames.add(cleanLower);
+              if (!completer.isCompleted) completer.complete(false);
+              return;
+            }
           }
-          return false;
+          onQueryFinished();
+        }).catchError((_) {
+          onQueryFinished();
+        });
+      }
+
+      for (final future in docIdFutures) {
+        future.then((doc) {
+          if (completer.isCompleted) return;
+          if (doc.exists && isDocMatch(doc)) {
+            _cachedTakenUsernames.add(cleanLower);
+            if (!completer.isCompleted) completer.complete(false);
+            return;
+          }
+          onQueryFinished();
+        }).catchError((_) {
+          onQueryFinished();
+        });
+      }
+
+      final tier1Unique = await completer.future;
+      if (!tier1Unique) {
+        return false;
+      }
+
+      // If the cache is already fully warmed up, Tier 1 is sufficient!
+      if (_cacheWarmed) {
+        _cachedUniqueUsernames[cleanLower] = DateTime.now();
+        return true;
+      }
+
+      // 2. TIER 2: Fast CollectionGroup / Root Collection Scan (5 parallel queries, no per-org subcollection loops)
+      final tier2Results = await Future.wait([
+        FirebaseFirestore.instance.collection('organisation').get().catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get()),
+        FirebaseFirestore.instance.collectionGroup('manager').get().catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get()),
+        FirebaseFirestore.instance.collectionGroup('supervisor').get().catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get()),
+        FirebaseFirestore.instance.collectionGroup('supervisors').get().catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get()),
+        FirebaseFirestore.instance.collectionGroup('configUsers').get().catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get()),
+      ]);
+
+      for (final snap in tier2Results) {
+        for (final doc in snap.docs) {
+          _extractAndCacheDoc(doc);
+          if (isDocMatch(doc)) {
+            _cachedTakenUsernames.add(cleanLower);
+            return false;
+          }
         }
       }
 
+      _cacheWarmed = true;
+      _cachedUniqueUsernames[cleanLower] = DateTime.now();
       return true;
     } catch (e) {
       debugPrint('isGlobalUsernameUnique error: $e');
@@ -693,41 +905,10 @@ class FirestoreService {
     }
   }
 
-  /// Checks if a supervisor username is unique globally across supervisor accounts.
-  static Future<bool> isGlobalSupervisorUsernameUnique(String username, {String? excludeDocId}) async {
-    final clean = username.trim();
-    if (clean.isEmpty) return true;
-    final cleanLower = clean.toLowerCase();
-
-    try {
-      final futures = [
-        FirebaseFirestore.instance.collectionGroup('supervisor').where('UserName', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('supervisor').where('username', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('supervisor').where('UserName', isEqualTo: cleanLower).get(),
-        FirebaseFirestore.instance.collectionGroup('supervisor').where('username', isEqualTo: cleanLower).get(),
-        FirebaseFirestore.instance.collectionGroup('supervisors').where('UserName', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('supervisors').where('username', isEqualTo: clean).get(),
-        FirebaseFirestore.instance.collectionGroup('supervisors').where('UserName', isEqualTo: cleanLower).get(),
-        FirebaseFirestore.instance.collectionGroup('supervisors').where('username', isEqualTo: cleanLower).get(),
-      ];
-
-      final results = await Future.wait(futures);
-      for (var snap in results) {
-        for (var doc in snap.docs) {
-          if (excludeDocId != null &&
-              (doc.id == excludeDocId || doc.reference.parent.parent?.id == excludeDocId)) {
-            continue;
-          }
-          return false;
-        }
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('isGlobalSupervisorUsernameUnique error: $e');
-      return true;
-    }
-  }
+  /// Checks if a supervisor username is unique globally across all accounts.
+  /// Delegates directly to [isGlobalUsernameUnique] for strict case-insensitive cross-role uniqueness.
+  static Future<bool> isGlobalSupervisorUsernameUnique(String username, {String? excludeDocId}) =>
+      isGlobalUsernameUnique(username, excludeDocId: excludeDocId);
 
   /// Alias for backward compatibility
   static Future<bool> isEmailUnique(String email, {String? excludeDocId}) =>
@@ -781,7 +962,7 @@ class FirestoreService {
             'Mobile Number "$cleanPhone" is already registered. Please use a different mobile number.';
       } else if (!isUsernameUniqueVal) {
         errorMessage =
-            'Admin Username "$cleanUsername" is already taken. Please choose a different username.';
+            'Username already exists';
       }
 
       return OrganizationValidationResult(

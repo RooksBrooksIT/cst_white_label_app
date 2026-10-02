@@ -57,6 +57,8 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
 
   bool _isCheckingUsername = false;
   String? _usernameError;
+  bool? _isUsernameValid;
+  int _usernameValidationSeq = 0;
 
   bool _isCheckingContactNo = false;
   String? _contactNoError;
@@ -78,6 +80,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
   @override
   void initState() {
     super.initState();
+    FirestoreService.warmupUsernameCache();
     _tabController = TabController(length: 2, vsync: this);
     _fetchConfigData();
     _searchController.addListener(() {
@@ -123,9 +126,10 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
   // ── UNIQUENESS CHECKS AGAINST BACKEND/DATABASE ─────────────────────────
 
   Future<bool> _isUsernameUnique(String username, {String? excludeDocId}) async {
-    if (username.trim().isEmpty) return true;
+    final clean = username.trim();
+    if (clean.isEmpty) return true;
     return await FirestoreService.isGlobalUsernameUnique(
-      username,
+      clean,
       excludeDocId: excludeDocId,
     );
   }
@@ -199,10 +203,32 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
   void _onUsernameChanged(String value) {
     _usernameDebounceTimer?.cancel();
     final trimmed = value.trim();
+    final seq = ++_usernameValidationSeq;
+
     if (trimmed.isEmpty) {
       setState(() {
         _isCheckingUsername = false;
         _usernameError = null;
+        _isUsernameValid = null;
+      });
+      return;
+    }
+
+    if (trimmed.length < 3) {
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameError = 'Username must be at least 3 characters';
+        _isUsernameValid = false;
+      });
+      return;
+    }
+
+    // Instant 0ms synchronous cache check
+    if (FirestoreService.isUsernameCachedAsTaken(trimmed)) {
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameError = 'Username already exists';
+        _isUsernameValid = false;
       });
       return;
     }
@@ -210,17 +236,22 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     setState(() {
       _isCheckingUsername = true;
       _usernameError = null;
+      _isUsernameValid = null;
     });
 
-    _usernameDebounceTimer = Timer(const Duration(milliseconds: 250), () async {
+    _usernameDebounceTimer = Timer(const Duration(milliseconds: 200), () async {
       final isUnique = await _isUsernameUnique(trimmed);
-      if (!mounted) return;
+      if (!mounted || seq != _usernameValidationSeq || _userNameController.text.trim() != trimmed) {
+        return;
+      }
       setState(() {
         _isCheckingUsername = false;
         if (!isUnique) {
-          _usernameError = 'Username already exists. Please choose another username.';
+          _usernameError = 'Username already exists';
+          _isUsernameValid = false;
         } else {
           _usernameError = null;
+          _isUsernameValid = true;
         }
       });
     });
@@ -364,8 +395,8 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
       }
 
       if (!(await _isUsernameUnique(username))) {
-        setState(() => _usernameError = 'Username already exists. Please choose another username.');
-        _showErrorSnackBar('Username already exists. Please choose another username.');
+        setState(() => _usernameError = 'Username already exists');
+        _showErrorSnackBar('Username already exists');
         setState(() => _isSubmitting = false);
         return;
       }
@@ -461,6 +492,8 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
       await FirestoreService.getCollection(
         'manager',
       ).doc(managerId).set(managerData);
+
+      FirestoreService.recordTakenUsername(username);
 
       // Trigger real-time push and in-app notification for Manager creation
       try {
@@ -953,6 +986,7 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
               checkingText: 'Checking username...',
               errorText: _usernameError,
               successText: 'Username is available ✓',
+              isValid: _isUsernameValid,
             ),
             SizedBox(height: isDesktop ? 16.0 : 14.0),
             _buildTextField(
@@ -1126,11 +1160,16 @@ class _ManagerConfigScreenState extends State<ManagerConfigScreen>
     String checkingText = 'Checking availability...',
     String? errorText,
     String? successText,
+    bool? isValid,
     String? Function(String?)? customValidator,
   }) {
     final hasValue = controller.text.trim().isNotEmpty;
     final hasError = errorText != null && errorText.isNotEmpty;
-    final isSuccess = hasValue && !isChecking && !hasError && successText != null;
+    final isSuccess = hasValue &&
+        !isChecking &&
+        !hasError &&
+        successText != null &&
+        (isValid != null ? isValid == true : true);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2631,7 +2670,7 @@ class _EditManagerModalSheetState extends State<_EditManagerModalSheet> {
 
                               if (!(await widget.isUsernameUnique(editUsername, excludeDocId: widget.docId))) {
                                 setState(() => _isSaving = false);
-                                widget.onError('Username already exists. Please choose another username.');
+                                widget.onError('Username already exists');
                                 return;
                               }
 
