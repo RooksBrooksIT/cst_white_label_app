@@ -57,6 +57,7 @@ function getEmailConfig() {
  * Initialize Nodemailer SMTP Transporter
  */
 let _cachedTransporter = null;
+let _cachedTransporterKey = null;
 
 function getTransporter() {
   const config = getEmailConfig();
@@ -71,7 +72,9 @@ function getTransporter() {
     }
   }
 
-  if (!_cachedTransporter) {
+  const currentKey = `${config.host}:${config.port}:${config.secure}:${config.user}:${config.password}`;
+
+  if (!_cachedTransporter || _cachedTransporterKey !== currentKey) {
     _cachedTransporter = nodemailer.createTransport({
       host: config.host,
       port: config.port,
@@ -87,6 +90,7 @@ function getTransporter() {
       greetingTimeout: 10000,
       socketTimeout: 15000,
     });
+    _cachedTransporterKey = currentKey;
   }
 
   return _cachedTransporter;
@@ -858,6 +862,106 @@ async function sendSubscriptionExpiryReminder(params, db) {
   return result;
 }
 
+/**
+ * HTML Template: Password Reset OTP Email
+ */
+function renderPasswordResetOtpHtml({ customerName = "User", otp, validityMinutes = 5 }) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>eBricks - Password Reset Verification Code</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0d1b2a; margin: 0; padding: 24px; color: #f8fafc; }
+    .container { max-width: 540px; margin: 0 auto; background: #1b2a47; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+    .header { background: linear-gradient(135deg, #1e3a8a, #2563eb); padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 26px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
+    .header p { margin: 8px 0 0; font-size: 13px; color: #bfdbfe; font-weight: 500; }
+    .content { padding: 32px 24px; }
+    .greeting { font-size: 16px; font-weight: 600; color: #ffffff; margin-bottom: 12px; }
+    .text { font-size: 14px; line-height: 1.6; color: #cbd5e1; margin-bottom: 24px; }
+    .otp-container { text-align: center; margin: 30px 0; }
+    .otp-box { display: inline-block; background: rgba(37,99,235,0.15); border: 2px dashed #3b82f6; border-radius: 14px; padding: 18px 36px; }
+    .otp-code { font-size: 38px; font-weight: 800; letter-spacing: 10px; color: #60a5fa; font-family: 'Courier New', Courier, monospace; display: block; }
+    .otp-label { display: block; margin-top: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #93c5fd; }
+    .info-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 20px; margin: 24px 0; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+    .info-row:last-child { border-bottom: none; }
+    .label { color: #94a3b8; }
+    .value { color: #f8fafc; font-weight: 600; text-align: right; }
+    .security-notice { background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 14px 16px; border-radius: 6px; margin-top: 24px; font-size: 12.5px; color: #fca5a5; line-height: 1.5; }
+    .footer { padding: 20px 24px; text-align: center; border-top: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>eBricks</h1>
+      <p>Password Reset Verification Code</p>
+    </div>
+    <div class="content">
+      <div class="greeting">Hello ${customerName || 'User'},</div>
+      <p class="text">
+        We received a request to reset the password for your eBricks account. Please enter the following 6-digit One-Time Password (OTP) into the mobile app to verify your identity.
+      </p>
+      
+      <div class="otp-container">
+        <div class="otp-box">
+          <span class="otp-code">${otp}</span>
+          <span class="otp-label">Verification Code</span>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-row">
+          <span class="label">Valid For</span>
+          <span class="value">${validityMinutes} Minutes</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Action</span>
+          <span class="value">Password Reset Authentication</span>
+        </div>
+      </div>
+
+      <div class="security-notice">
+        <strong>Security Notice:</strong> Never share this OTP with anyone, including eBricks or CST support staff. If you did not request this password reset, your account is secure, and you can safely disregard this email.
+      </div>
+    </div>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} eBricks &bull; Powered by Rooks &amp; Brooks IT. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Dispatch Password Reset OTP Email
+ */
+async function sendPasswordResetOtpEmail({ to, otp, userName = "User", validityMinutes = 5 }) {
+  if (!to || !isValidEmail(to)) {
+    return { success: false, error: `Invalid recipient email: ${to}` };
+  }
+  if (!otp) {
+    return { success: false, error: "OTP code is required" };
+  }
+
+  const html = renderPasswordResetOtpHtml({
+    customerName: userName,
+    otp,
+    validityMinutes,
+  });
+
+  const subject = `${otp} is your eBricks password reset verification code`;
+
+  return await sendEmail({
+    to,
+    subject,
+    html,
+  });
+}
+
 module.exports = {
   getEmailConfig,
   getTransporter,
@@ -865,9 +969,11 @@ module.exports = {
   sendEmail,
   sendSubscriptionInvoice,
   sendSubscriptionExpiryReminder,
+  sendPasswordResetOtpEmail,
   renderTestEmailHtml,
   renderInvoiceHtml,
   renderExpiryReminderHtml,
+  renderPasswordResetOtpHtml,
   maskEmail,
   isValidEmail,
 };

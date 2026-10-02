@@ -19,11 +19,11 @@ PAYU_PROD_PAY_URL=https://secure.payu.in/_payment
 PAYU_SURL="https://us-central1-cst-whitelabel-app.cloudfunctions.net/payuWebhook"
 PAYU_FURL="https://us-central1-cst-whitelabel-app.cloudfunctions.net/payuWebhook"
 
-# Gmail SMTP Email Service Configuration
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_SECURE=false
+# SMTP Email Service Configuration (Hostinger Business Mail)
+EMAIL_HOST=smtp.hostinger.com
+EMAIL_PORT=465
+EMAIL_SECURE=true
 EMAIL_USER=support@rookstechnologies.com
-EMAIL_PASSWORD=l42e-qs7p-z8xi-w3ix
+EMAIL_PASSWORD=rkmu-oe70-happ-qzrl
 EMAIL_FROM="Rooks & Brooks Support <support@rookstechnologies.com>"
 EMAIL_MOCK_MODE=false

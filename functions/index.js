@@ -2379,5 +2379,822 @@ exports.triggerSubscriptionExpiryCheck = functions.region("us-central1").https.o
   }
 });
 
+/**
+ * ---------------------------------------------------------------------------
+ * PASSWORD RESET WITH OTP AUTHENTICATION FLOW
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * Helper: Find registered user by email in Firebase Auth or Firestore
+ */
+async function findRegisteredUser(email) {
+  const cleanEmail = (email || "").trim().toLowerCase();
+  if (!cleanEmail) return null;
+
+  const db = admin.firestore();
+  let authUser = null;
+
+  try {
+    authUser = await admin.auth().getUserByEmail(cleanEmail);
+  } catch (_) {}
+
+  let firestoreUser = null;
+
+  // 1. Check root organisation collection
+  try {
+    const orgSnap = await db.collection("organisation").get();
+    for (const doc of orgSnap.docs) {
+      const d = doc.data() || {};
+      const docEmail = (d.email || d.Email || "").toString().trim().toLowerCase();
+      if (docEmail === cleanEmail) {
+        firestoreUser = {
+          type: "organisation",
+          orgId: doc.id,
+          docPath: doc.ref.path,
+          name: d.org_name || d.name || "Organization Admin",
+          username: d.username || doc.id,
+        };
+        break;
+      }
+    }
+  } catch (e) {
+    logger.warn("findRegisteredUser: organisation lookup note:", e.message || e);
+  }
+
+  // 2. Check data/admin subcollection
+  if (!firestoreUser) {
+    try {
+      const adminSnap = await db.collectionGroup("data").get();
+      for (const doc of adminSnap.docs) {
+        if (doc.id === "admin") {
+          const d = doc.data() || {};
+          const docEmail = (d.email || d.Email || "").toString().trim().toLowerCase();
+          if (docEmail === cleanEmail) {
+            const orgId = doc.ref.parent.parent ? doc.ref.parent.parent.id : null;
+            firestoreUser = {
+              type: "admin",
+              orgId,
+              docPath: doc.ref.path,
+              name: d.username || "Organization Admin",
+              username: d.username || "admin",
+            };
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      logger.warn("findRegisteredUser: admin lookup note:", e.message || e);
+    }
+  }
+
+  // 3. Check manager collectionGroup
+  if (!firestoreUser) {
+    try {
+      let mgrSnap = await db.collectionGroup("manager").where("email", "==", cleanEmail).get();
+      if (mgrSnap.empty) {
+        mgrSnap = await db.collectionGroup("manager").where("Email", "==", cleanEmail).get();
+      }
+      if (!mgrSnap.empty) {
+        const doc = mgrSnap.docs[0];
+        const d = doc.data() || {};
+        const orgId = doc.ref.parent.parent ? doc.ref.parent.parent.id : null;
+        firestoreUser = {
+          type: "manager",
+          orgId,
+          docPath: doc.ref.path,
+          name: d.FullName || d.username || "Manager",
+          username: d.username || doc.id,
+        };
+      }
+    } catch (e) {
+      logger.warn("findRegisteredUser: manager lookup note:", e.message || e);
+    }
+  }
+
+  // 4. Check supervisor & supervisors collectionGroups
+  if (!firestoreUser) {
+    for (const groupName of ["supervisor", "supervisors"]) {
+      try {
+        let supSnap = await db.collectionGroup(groupName).where("email", "==", cleanEmail).get();
+        if (supSnap.empty) {
+          supSnap = await db.collectionGroup(groupName).where("Email", "==", cleanEmail).get();
+        }
+        if (!supSnap.empty) {
+          const doc = supSnap.docs[0];
+          const d = doc.data() || {};
+          const orgId = doc.ref.parent.parent ? doc.ref.parent.parent.id : null;
+          firestoreUser = {
+            type: "supervisor",
+            orgId,
+            docPath: doc.ref.path,
+            name: d.FullName || d.supervisorName || d.username || "Supervisor",
+            username: d.username || d.supervisorId || doc.id,
+          };
+          break;
+        }
+      } catch (e) {
+        logger.warn(`findRegisteredUser: ${groupName} lookup note:`, e.message || e);
+      }
+    }
+  }
+
+  // 5. Check organizationUser & configUsers collectionGroups
+  if (!firestoreUser) {
+    for (const groupName of ["organizationUser", "configUsers"]) {
+      try {
+        let uSnap = await db.collectionGroup(groupName).where("email", "==", cleanEmail).get();
+        if (uSnap.empty) {
+          uSnap = await db.collectionGroup(groupName).where("Email", "==", cleanEmail).get();
+        }
+        if (!uSnap.empty) {
+          const doc = uSnap.docs[0];
+          const d = doc.data() || {};
+          const orgId = doc.ref.parent.parent ? doc.ref.parent.parent.id : null;
+          firestoreUser = {
+            type: groupName,
+            orgId,
+            docPath: doc.ref.path,
+            name: d.FullName || d.username || "User",
+            username: d.username || doc.id,
+          };
+          break;
+        }
+      } catch (e) {
+        logger.warn(`findRegisteredUser: ${groupName} lookup note:`, e.message || e);
+      }
+    }
+  }
+
+  if (!authUser && !firestoreUser) {
+    return null;
+  }
+
+  return {
+    email: cleanEmail,
+    name: (firestoreUser && firestoreUser.name) || (authUser && authUser.displayName) || "User",
+    authUser,
+    firestoreUser,
+  };
+}
+
+/**
+ * Helper: Compute email session document ID
+ */
+function getEmailDocId(email) {
+  return crypto.createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+}
+
+/**
+ * 11. Callable Cloud Function: requestPasswordResetOtp
+ * Generates and sends a 6-digit OTP to the registered email address.
+ * Enforces:
+ * - Email existence verification in backend/Firebase
+ * - 5 minutes validity
+ * - 60 seconds cooldown for resend
+ * - Maximum 5 resends per session
+ * - Immediate invalidation of previous OTP
+ */
+exports.requestPasswordResetOtp = functions.region("us-central1").https.onCall(async (data, context) => {
+  try {
+    const payload = data || {};
+    const email = (payload.email || "").toString().trim().toLowerCase();
+    const isResend = Boolean(payload.isResend);
+    const requestId = (payload.requestId || "").toString().trim();
+
+    if (!email || !emailService.isValidEmail(email)) {
+      return {
+        success: false,
+        error: "Please enter a valid email address.",
+      };
+    }
+
+    logger.info(`Password reset OTP requested for: ${emailService.maskEmail(email)} (isResend: ${isResend}, requestId: ${requestId})`);
+
+    // Verify email existence in backend/Firebase user data
+    const registeredUser = await findRegisteredUser(email);
+    if (!registeredUser) {
+      logger.warn(`Password reset rejected: Email ${emailService.maskEmail(email)} not found in backend.`);
+      return {
+        success: false,
+        error: "This email ID is not registered with eBricks. Please enter a valid registered email.",
+      };
+    }
+
+    const db = admin.firestore();
+    const sessionDocId = getEmailDocId(email);
+    const sessionRef = db.collection("_password_reset_sessions").doc(sessionDocId);
+
+    const now = Date.now();
+    const validityMs = 5 * 60 * 1000; // 5 minutes
+    const resendCooldownMs = 60 * 1000; // 60 seconds
+
+    let otpToSend = null;
+    let sessionIdToUse = null;
+    let resendCountToUse = 0;
+
+    // Use a Firestore transaction to atomically check existing state and lock session
+    const txResult = await db.runTransaction(async (transaction) => {
+      const sessionSnap = await transaction.get(sessionRef);
+      const existing = sessionSnap.exists ? sessionSnap.data() : null;
+
+      if (existing && !existing.isUsed) {
+        // 1. Idempotency Check: if identical requestId was sent within last 30s
+        if (requestId && existing.lastRequestId === requestId && existing.otp) {
+          logger.info(`Idempotent duplicate request caught for ${emailService.maskEmail(email)} (requestId: ${requestId})`);
+          return {
+            isIdempotentDuplicate: true,
+            sessionId: existing.sessionId,
+            resendCount: existing.resendCount || 0,
+            expiresInSeconds: Math.max(0, Math.round(((existing.expiresAt || 0) - now) / 1000)),
+            resendCooldownSeconds: Math.max(0, Math.round(((existing.resendAvailableAt || 0) - now) / 1000)),
+          };
+        }
+
+        // 2. Concurrency Lock: Check if another request is currently generating/dispatching an OTP
+        if (existing.inFlightUntil && now < existing.inFlightUntil) {
+          logger.warn(`Concurrent in-flight OTP generation detected for ${emailService.maskEmail(email)}. Blocking duplicate.`);
+          return {
+            isConcurrentInFlight: true,
+            sessionId: existing.sessionId,
+            resendCount: existing.resendCount || 0,
+            expiresInSeconds: 300,
+            resendCooldownSeconds: 60,
+          };
+        }
+
+        // 3. Debounce: If not a Resend and an OTP was generated within the last 15 seconds, reuse existing active session
+        if (!isResend && existing.otp && existing.createdAt && (now - existing.createdAt < 15000)) {
+          logger.info(`Recent OTP request within 15s for ${emailService.maskEmail(email)}. Reusing active OTP session without duplicate email.`);
+          return {
+            isRecentDuplicate: true,
+            sessionId: existing.sessionId,
+            resendCount: existing.resendCount || 0,
+            expiresInSeconds: Math.max(0, Math.round(((existing.expiresAt || 0) - now) / 1000)),
+            resendCooldownSeconds: Math.max(0, Math.round(((existing.resendAvailableAt || 0) - now) / 1000)),
+          };
+        }
+
+        // 4. Cooldown Check
+        if (existing.resendAvailableAt && now < existing.resendAvailableAt) {
+          const waitSec = Math.ceil((existing.resendAvailableAt - now) / 1000);
+          return {
+            isCooldownActive: true,
+            waitSeconds: waitSec,
+          };
+        }
+
+        // 5. Max Resends Check
+        const currentResends = existing.resendCount || 0;
+        if (isResend && currentResends >= 5) {
+          return {
+            isMaxResendsReached: true,
+          };
+        }
+
+        resendCountToUse = isResend ? currentResends + 1 : currentResends;
+        sessionIdToUse = existing.sessionId || `SES_${now}_${crypto.randomBytes(4).toString("hex")}`;
+      } else {
+        sessionIdToUse = `SES_${now}_${crypto.randomBytes(4).toString("hex")}`;
+        resendCountToUse = 0;
+      }
+
+      // Generate a new secure 6-digit OTP string (preserves leading zeros, e.g. 012345)
+      otpToSend = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+
+      // Atomically write the reservation lock BEFORE sending the email
+      transaction.set(sessionRef, {
+        email,
+        sessionId: sessionIdToUse,
+        otp: otpToSend,
+        createdAt: now,
+        expiresAt: now + validityMs,
+        resendAvailableAt: now + resendCooldownMs,
+        resendCount: resendCountToUse,
+        maxResends: 5,
+        incorrectAttempts: 0,
+        maxIncorrectAttempts: 5,
+        isVerified: false,
+        isUsed: false,
+        verifiedAt: null,
+        resetToken: null,
+        resetTokenExpiresAt: null,
+        inFlightUntil: now + 25000, // 25s in-flight concurrency lock
+        lastRequestId: requestId || null,
+        targetDocPath: registeredUser.firestoreUser ? registeredUser.firestoreUser.docPath : null,
+        targetUserType: registeredUser.firestoreUser ? registeredUser.firestoreUser.type : null,
+        targetOrgId: registeredUser.firestoreUser ? registeredUser.firestoreUser.orgId : null,
+        targetUsername: registeredUser.firestoreUser ? registeredUser.firestoreUser.username : null,
+        updatedAt: new Date(),
+      }, { merge: true });
+
+      return {
+        success: true,
+        proceedToSendEmail: true,
+      };
+    });
+
+    if (txResult.isCooldownActive) {
+      return {
+        success: false,
+        error: `Please wait ${txResult.waitSeconds} seconds before requesting a new OTP.`,
+        waitSeconds: txResult.waitSeconds,
+      };
+    }
+
+    if (txResult.isMaxResendsReached) {
+      return {
+        success: false,
+        error: "Maximum OTP resend limit (5) reached for this session. Please try again later.",
+      };
+    }
+
+    if (txResult.isIdempotentDuplicate || txResult.isConcurrentInFlight || txResult.isRecentDuplicate) {
+      return {
+        success: true,
+        message: "Verification OTP sent to your registered email.",
+        sessionId: txResult.sessionId,
+        maskedEmail: emailService.maskEmail(email),
+        expiresInSeconds: txResult.expiresInSeconds || 300,
+        resendCooldownSeconds: txResult.resendCooldownSeconds || 60,
+        resendCount: txResult.resendCount || 0,
+        maxResends: 5,
+      };
+    }
+
+    // Dispatch the single email with the newly generated OTP
+    const emailResult = await emailService.sendPasswordResetOtpEmail({
+      to: email,
+      otp: otpToSend,
+      userName: registeredUser.name,
+      validityMinutes: 5,
+    });
+
+    if (!emailResult.success) {
+      logger.error(`Failed to send password reset OTP to ${emailService.maskEmail(email)}:`, emailResult.error);
+      
+      // Release in-flight lock and reset cooldown so user can immediately retry
+      await sessionRef.update({
+        inFlightUntil: admin.firestore.FieldValue.delete(),
+        resendAvailableAt: 0,
+        otp: null,
+      }).catch((e) => logger.warn("Error updating session after email failure:", e));
+
+      let clientError = emailResult.error || "Failed to send verification code to your email.";
+      if (typeof clientError === "string" && (clientError.includes("535") || clientError.toLowerCase().includes("badcredentials") || clientError.toLowerCase().includes("username and password not accepted"))) {
+        clientError = "Email delivery failed: SMTP authentication error (Invalid credentials). Please contact administrator.";
+      }
+
+      return {
+        success: false,
+        error: clientError,
+      };
+    }
+
+    // Email delivered successfully: remove inFlightUntil lock
+    await sessionRef.update({
+      inFlightUntil: admin.firestore.FieldValue.delete(),
+      emailDelivered: true,
+      updatedAt: new Date(),
+    }).catch((e) => logger.warn("Error removing inFlightUntil:", e));
+
+    logger.info(`Password reset OTP delivered successfully to ${emailService.maskEmail(email)} (Session: ${sessionIdToUse}, Resend count: ${resendCountToUse})`);
+
+    return {
+      success: true,
+      message: "OTP sent successfully to your registered email address.",
+      sessionId: sessionIdToUse,
+      maskedEmail: emailService.maskEmail(email),
+      expiresInSeconds: 300,
+      resendCooldownSeconds: 60,
+      resendCount: resendCountToUse,
+      maxResends: 5,
+    };
+  } catch (err) {
+    logger.error("requestPasswordResetOtp error:", err);
+    return {
+      success: false,
+      error: err.message || "An unexpected error occurred while requesting OTP.",
+    };
+  }
+});
+
+/**
+ * 12. Callable Cloud Function: verifyPasswordResetOtp
+ * Verifies the 6-digit OTP entered by the user.
+ * Enforces:
+ * - Correct session & email binding
+ * - 5 minutes expiration check
+ * - Maximum 5 incorrect attempts (invalidates OTP after 5th attempt)
+ * - Single-use consumption (cannot be reused)
+ */
+exports.verifyPasswordResetOtp = functions.region("us-central1").https.onCall(async (data, context) => {
+  try {
+    const payload = data || {};
+    const email = (payload.email || "").toString().trim().toLowerCase();
+    const rawOtp = (payload.otp || "").toString().trim().replace(/\D/g, "");
+    const sessionId = (payload.sessionId || "").toString().trim();
+
+    if (!email || !emailService.isValidEmail(email)) {
+      return { success: false, error: "Invalid email address provided." };
+    }
+    if (!rawOtp || rawOtp.length !== 6) {
+      return { success: false, error: "Please enter a valid 6-digit verification code." };
+    }
+
+    const db = admin.firestore();
+    const sessionDocId = getEmailDocId(email);
+    const sessionRef = db.collection("_password_reset_sessions").doc(sessionDocId);
+
+    const sessionSnap = await sessionRef.get();
+    if (!sessionSnap.exists) {
+      return { success: false, error: "No active password reset session found. Please request a new OTP." };
+    }
+
+    const session = sessionSnap.data() || {};
+    const now = Date.now();
+
+    // Verify session ID binding if provided by client
+    if (sessionId && session.sessionId && session.sessionId !== sessionId) {
+      logger.warn(`Session ID mismatch for email ${emailService.maskEmail(email)}: incoming=${sessionId}, stored=${session.sessionId}`);
+      return { success: false, error: "Session mismatch. Please request a new OTP." };
+    }
+
+    // Check if already used
+    if (session.isUsed) {
+      return { success: false, error: "This OTP session has already been completed. Please request a new OTP." };
+    }
+
+    // Check if already verified
+    if (session.isVerified && session.resetToken) {
+      if (session.resetTokenExpiresAt && now < session.resetTokenExpiresAt) {
+        return {
+          success: true,
+          message: "OTP already verified.",
+          resetToken: session.resetToken,
+          sessionId: session.sessionId,
+        };
+      }
+      return { success: false, error: "Verification token expired. Please request a new OTP." };
+    }
+
+    // Check expiration (5 minutes validity)
+    if (session.expiresAt && now > session.expiresAt) {
+      logger.info(`Expired OTP entered for ${emailService.maskEmail(email)}. Expiry: ${session.expiresAt}, Now: ${now}`);
+      await sessionRef.update({ otp: null }); // Invalidate expired OTP
+      return {
+        success: false,
+        isExpired: true,
+        error: "OTP has expired. Please request a new OTP.",
+      };
+    }
+
+    // Check if locked due to 5 incorrect attempts
+    const incorrectAttempts = Number(session.incorrectAttempts || 0);
+    if (incorrectAttempts >= 5 || !session.otp) {
+      logger.warn(`Locked OTP session for ${emailService.maskEmail(email)}. Attempts: ${incorrectAttempts}`);
+      await sessionRef.update({ otp: null });
+      return {
+        success: false,
+        isLocked: true,
+        remainingAttempts: 0,
+        error: "Too many incorrect attempts (5). Current OTP has been invalidated. Please request a new OTP.",
+      };
+    }
+
+    // Normalize both stored OTP and incoming OTP as clean 6-digit strings (preserving leading zeros)
+    const storedOtp = String(session.otp != null ? session.otp : "").trim().replace(/\D/g, "").padStart(6, "0");
+    const incomingOtp = String(rawOtp).trim().replace(/\D/g, "").padStart(6, "0");
+
+    logger.info(`Verifying OTP for session: ${session.sessionId || sessionId}, email: ${emailService.maskEmail(email)}, attempt: ${incorrectAttempts + 1}`);
+
+    // Verify OTP match
+    if (storedOtp !== incomingOtp) {
+      logger.warn(`OTP verification failed (mismatch) for email: ${emailService.maskEmail(email)}, session: ${session.sessionId || sessionId}`);
+      const newAttempts = incorrectAttempts + 1;
+      const remaining = 5 - newAttempts;
+
+      if (remaining <= 0) {
+        // Invalidate current OTP permanently
+        await sessionRef.update({
+          otp: null,
+          incorrectAttempts: newAttempts,
+        });
+        return {
+          success: false,
+          isLocked: true,
+          remainingAttempts: 0,
+          error: "Too many incorrect attempts (5). Current OTP has been invalidated. Please request a new OTP.",
+        };
+      }
+
+      await sessionRef.update({ incorrectAttempts: newAttempts });
+      return {
+        success: false,
+        remainingAttempts: remaining,
+        error: `Incorrect OTP. ${remaining} attempt${remaining > 1 ? "s" : ""} remaining.`,
+      };
+    }
+
+    // Successful OTP verification
+    const resetToken = `RST_${now}_${crypto.randomBytes(24).toString("hex")}`;
+    const tokenValidityMs = 10 * 60 * 1000; // 10 minutes to reset password
+
+    // Immediately nullify OTP so it CANNOT be reused
+    await sessionRef.update({
+      isVerified: true,
+      verifiedAt: now,
+      otp: null, // Single-use consumption rule
+      resetToken,
+      resetTokenExpiresAt: now + tokenValidityMs,
+    });
+
+    logger.info(`OTP successfully verified for ${emailService.maskEmail(email)}`);
+
+    return {
+      success: true,
+      message: "OTP verified successfully.",
+      resetToken,
+      sessionId: session.sessionId,
+    };
+  } catch (err) {
+    logger.error("verifyPasswordResetOtp error:", err);
+    return {
+      success: false,
+      error: err.message || "An unexpected error occurred during OTP verification.",
+    };
+  }
+});
+
+/**
+ * 13. Callable Cloud Function: completePasswordReset
+ * Updates the user's password in Firebase Authentication and existing Firestore user records.
+ * Enforces:
+ * - Successful prior OTP verification via resetToken
+ * - Session binding & token expiration
+ * - New password strength validation
+ * - Updates Firebase Authentication password
+ * - Marks session as used (prevents replay)
+ */
+exports.completePasswordReset = functions.region("us-central1").https.onCall(async (data, context) => {
+  try {
+    const payload = data || {};
+    const email = (payload.email || "").toString().trim().toLowerCase();
+    const resetToken = (payload.resetToken || "").toString().trim();
+    const sessionId = (payload.sessionId || "").toString().trim();
+    const newPassword = (payload.newPassword || "").toString().trim();
+
+    if (!email || !emailService.isValidEmail(email)) {
+      return { success: false, error: "Invalid email address provided." };
+    }
+    if (!resetToken) {
+      return { success: false, error: "Missing password reset token. Please verify OTP first." };
+    }
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: "Password must be at least 6 characters long." };
+    }
+
+    const db = admin.firestore();
+    const sessionDocId = getEmailDocId(email);
+    const sessionRef = db.collection("_password_reset_sessions").doc(sessionDocId);
+
+    const sessionSnap = await sessionRef.get();
+    if (!sessionSnap.exists) {
+      return { success: false, error: "Invalid or expired password reset session." };
+    }
+
+    const session = sessionSnap.data() || {};
+    const now = Date.now();
+
+    // Verify resetToken, verification status, and expiration
+    if (session.resetToken !== resetToken || !session.isVerified) {
+      return { success: false, error: "Unauthorized password reset attempt. Please complete OTP verification." };
+    }
+    if (session.isUsed) {
+      return { success: false, error: "This password reset session has already been used. Please start over." };
+    }
+    if (sessionId && session.sessionId && session.sessionId !== sessionId) {
+      return { success: false, error: "Session mismatch. Please start over." };
+    }
+    if (session.resetTokenExpiresAt && now > session.resetTokenExpiresAt) {
+      return { success: false, error: "Password reset session has expired. Please request a new OTP." };
+    }
+
+    // 1. Update Firebase Authentication Password
+    let firebaseAuthUpdated = false;
+    let authUid = null;
+
+    try {
+      const userRecord = await admin.auth().getUserByEmail(email);
+      authUid = userRecord.uid;
+      await admin.auth().updateUser(authUid, { password: newPassword });
+      firebaseAuthUpdated = true;
+      logger.info(`Successfully updated Firebase Auth password for ${emailService.maskEmail(email)} (UID: ${authUid})`);
+    } catch (authErr) {
+      if (authErr.code === "auth/user-not-found") {
+        logger.info(`User ${emailService.maskEmail(email)} not found in Firebase Auth. Creating user with new password.`);
+        try {
+          const newUser = await admin.auth().createUser({
+            email,
+            password: newPassword,
+          });
+          authUid = newUser.uid;
+          firebaseAuthUpdated = true;
+          logger.info(`Created new Firebase Auth user for ${emailService.maskEmail(email)} (UID: ${authUid})`);
+        } catch (createErr) {
+          logger.warn("Could not create Firebase Auth user:", createErr.message || createErr);
+        }
+      } else {
+        logger.error("Error updating Firebase Auth user:", authErr.message || authErr);
+      }
+    }
+
+    // 2. Update existing Firestore user document's password field
+    const updatedDocPaths = new Set();
+    const updateErrors = [];
+
+    // Step A: Directly update session targetDocPath if stored
+    if (session.targetDocPath) {
+      try {
+        const targetRef = db.doc(session.targetDocPath);
+        const targetSnap = await targetRef.get();
+        if (targetSnap.exists) {
+          await targetRef.update({
+            password: newPassword,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          updatedDocPaths.add(session.targetDocPath);
+          logger.info(`Updated password at identified session document: ${session.targetDocPath}`);
+        }
+      } catch (err) {
+        logger.warn(`Failed direct update at targetDocPath ${session.targetDocPath}:`, err.message || err);
+        updateErrors.push(err.message || String(err));
+      }
+    }
+
+    // Step B: Comprehensive targeted update across organisation root and user subcollections
+    try {
+      const orgSnap = await db.collection("organisation").get();
+      for (const orgDoc of orgSnap.docs) {
+        const orgData = orgDoc.data() || {};
+        const orgEmail = (orgData.email || orgData.Email || "").toString().trim().toLowerCase();
+        const matchesEmail = orgEmail === email;
+        const isTargetOrg = matchesEmail || (session.targetOrgId && orgDoc.id === session.targetOrgId);
+
+        // Update root organisation document if email matches
+        if (matchesEmail) {
+          try {
+            await orgDoc.ref.update({
+              password: newPassword,
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            updatedDocPaths.add(orgDoc.ref.path);
+            logger.info(`Updated password in organisation root doc: ${orgDoc.ref.path}`);
+          } catch (e) {
+            updateErrors.push(e.message || String(e));
+          }
+        }
+
+        if (isTargetOrg) {
+          // Check & update data/admin document
+          try {
+            const adminRef = orgDoc.ref.collection("data").doc("admin");
+            const adminSnap = await adminRef.get();
+            if (adminSnap.exists) {
+              const aData = adminSnap.data() || {};
+              const aEmail = (aData.email || aData.Email || "").toString().trim().toLowerCase();
+              if (matchesEmail || aEmail === email) {
+                await adminRef.update({
+                  password: newPassword,
+                  updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                updatedDocPaths.add(adminRef.path);
+                logger.info(`Updated password in data/admin doc: ${adminRef.path}`);
+              }
+            }
+          } catch (e) {
+            updateErrors.push(e.message || String(e));
+          }
+
+          // Check & update organizationUser subcollection documents
+          try {
+            const orgUserSnap = await orgDoc.ref.collection("organizationUser").get();
+            for (const uDoc of orgUserSnap.docs) {
+              const uData = uDoc.data() || {};
+              const uEmail = (uData.email || uData.Email || "").toString().trim().toLowerCase();
+              const uUser = (uData.username || uData.UserName || "").toString().trim().toLowerCase();
+              if (uEmail === email || (session.targetUsername && uUser === session.targetUsername.toLowerCase())) {
+                await uDoc.ref.update({
+                  password: newPassword,
+                  updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                updatedDocPaths.add(uDoc.ref.path);
+                logger.info(`Updated password in organizationUser doc: ${uDoc.ref.path}`);
+              }
+            }
+          } catch (e) {
+            updateErrors.push(e.message || String(e));
+          }
+
+          // Check & update configUsers subcollection documents
+          try {
+            const cfgSnap = await orgDoc.ref.collection("configUsers").get();
+            for (const cDoc of cfgSnap.docs) {
+              const cData = cDoc.data() || {};
+              const cEmail = (cData.email || cData.Email || "").toString().trim().toLowerCase();
+              if (cEmail === email) {
+                await cDoc.ref.update({
+                  password: newPassword,
+                  updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                updatedDocPaths.add(cDoc.ref.path);
+                logger.info(`Updated password in configUsers doc: ${cDoc.ref.path}`);
+              }
+            }
+          } catch (e) {
+            updateErrors.push(e.message || String(e));
+          }
+
+          // Check & update manager subcollection documents
+          try {
+            const mgrSnap = await orgDoc.ref.collection("manager").get();
+            for (const mDoc of mgrSnap.docs) {
+              const mData = mDoc.data() || {};
+              const mEmail = (mData.email || mData.Email || "").toString().trim().toLowerCase();
+              if (mEmail === email) {
+                await mDoc.ref.update({
+                  password: newPassword,
+                  updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                updatedDocPaths.add(mDoc.ref.path);
+                logger.info(`Updated password in manager doc: ${mDoc.ref.path}`);
+              }
+            }
+          } catch (e) {
+            updateErrors.push(e.message || String(e));
+          }
+
+          // Check & update supervisor subcollection documents
+          try {
+            const supSnap = await orgDoc.ref.collection("supervisor").get();
+            for (const sDoc of supSnap.docs) {
+              const sData = sDoc.data() || {};
+              const sEmail = (sData.email || sData.Email || "").toString().trim().toLowerCase();
+              if (sEmail === email) {
+                await sDoc.ref.update({
+                  password: newPassword,
+                  updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                updatedDocPaths.add(sDoc.ref.path);
+                logger.info(`Updated password in supervisor doc: ${sDoc.ref.path}`);
+              }
+            }
+          } catch (e) {
+            updateErrors.push(e.message || String(e));
+          }
+        }
+      }
+    } catch (fsErr) {
+      logger.error("Error during Firestore organisation scan:", fsErr);
+      updateErrors.push(fsErr.message || String(fsErr));
+    }
+
+    const firestoreUpdatedCount = updatedDocPaths.size;
+
+    // Fail if neither Firestore nor Auth could be updated
+    if (firestoreUpdatedCount === 0 && !firebaseAuthUpdated) {
+      logger.error(`Password reset failed: Could not update any document for ${emailService.maskEmail(email)}`);
+      return {
+        success: false,
+        error: "Failed to update password in existing user document. Please contact administrator.",
+      };
+    }
+
+    // 3. Mark session as completed / used (prevent replay)
+    await sessionRef.update({
+      isUsed: true,
+      usedAt: now,
+      resetToken: null, // Invalidate token permanently
+      otp: null,
+    });
+
+    logger.info(`Password reset successfully completed for ${emailService.maskEmail(email)} (Auth updated: ${firebaseAuthUpdated}, Firestore docs updated: ${firestoreUpdatedCount})`);
+
+    return {
+      success: true,
+      message: "Password has been successfully updated. You can now log in with your new password.",
+      authUpdated: firebaseAuthUpdated,
+      firestoreUpdated: firestoreUpdatedCount > 0,
+      updatedDocs: firestoreUpdatedCount,
+    };
+  } catch (err) {
+    logger.error("completePasswordReset error:", err);
+    return {
+      success: false,
+      error: err.message || "An unexpected error occurred while resetting password.",
+    };
+  }
+});
+
 
 
