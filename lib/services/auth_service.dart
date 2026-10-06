@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import '../utils/app_theme.dart';
 import 'firestore_service.dart';
 import 'notification_service.dart';
@@ -252,7 +254,181 @@ class AuthService {
     });
   }
 
-  /// Send a password reset email using Firebase Authentication
+  /// Cloud Functions Backend URL base
+  static String get cloudFunctionsBaseUrl =>
+      dotenv.env['FIREBASE_FUNCTIONS_URL'] ??
+      'https://us-central1-cst-whitelabel-app.cloudfunctions.net';
+
+  /// Request a password reset OTP for the registered email address
+  Future<Map<String, dynamic>> requestPasswordResetOtp(
+    String email, {
+    bool isResend = false,
+    String? requestId,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.isEmpty ||
+        !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(cleanEmail)) {
+      return {
+        'success': false,
+        'error': 'Please enter a valid email address.',
+      };
+    }
+
+    try {
+      final endpointUrl = '$cloudFunctionsBaseUrl/requestPasswordResetOtp';
+      final response = await http.post(
+        Uri.parse(endpointUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'data': {
+            'email': cleanEmail,
+            'isResend': isResend,
+            'requestId': requestId ?? '${DateTime.now().millisecondsSinceEpoch}_${cleanEmail.hashCode}',
+          }
+        }),
+      ).timeout(const Duration(seconds: 25));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final result = decoded['result'] ?? decoded;
+        if (result is Map<String, dynamic>) {
+          return Map<String, dynamic>.from(result);
+        }
+      } else {
+        try {
+          final decoded = jsonDecode(response.body);
+          final errorMsg =
+              decoded['error']?['message'] ?? decoded['message'] ?? decoded['error'];
+          if (errorMsg != null) {
+            return {'success': false, 'error': errorMsg.toString()};
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('AuthService: requestPasswordResetOtp error: $e');
+    }
+
+    return {
+      'success': false,
+      'error': 'Unable to connect to authentication server. Please check your internet connection.',
+    };
+  }
+
+  /// Verify the 6-digit OTP entered by the user
+  Future<Map<String, dynamic>> verifyPasswordResetOtp({
+    required String email,
+    required String otp,
+    required String sessionId,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanOtp = otp.trim();
+
+    if (cleanOtp.length != 6) {
+      return {
+        'success': false,
+        'error': 'Please enter a valid 6-digit verification code.',
+      };
+    }
+
+    try {
+      final endpointUrl = '$cloudFunctionsBaseUrl/verifyPasswordResetOtp';
+      final response = await http.post(
+        Uri.parse(endpointUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'data': {
+            'email': cleanEmail,
+            'otp': cleanOtp,
+            'sessionId': sessionId,
+          }
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final result = decoded['result'] ?? decoded;
+        if (result is Map<String, dynamic>) {
+          return Map<String, dynamic>.from(result);
+        }
+      } else {
+        try {
+          final decoded = jsonDecode(response.body);
+          final errorMsg =
+              decoded['error']?['message'] ?? decoded['message'] ?? decoded['error'];
+          if (errorMsg != null) {
+            return {'success': false, 'error': errorMsg.toString()};
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('AuthService: verifyPasswordResetOtp error: $e');
+    }
+
+    return {
+      'success': false,
+      'error': 'Unable to verify OTP. Please try again.',
+    };
+  }
+
+  /// Complete the password reset with a new password and verified reset token
+  Future<Map<String, dynamic>> completePasswordReset({
+    required String email,
+    required String resetToken,
+    required String sessionId,
+    required String newPassword,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPassword = newPassword.trim();
+
+    if (cleanPassword.length < 6) {
+      return {
+        'success': false,
+        'error': 'Password must be at least 6 characters long.',
+      };
+    }
+
+    try {
+      final endpointUrl = '$cloudFunctionsBaseUrl/completePasswordReset';
+      final response = await http.post(
+        Uri.parse(endpointUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'data': {
+            'email': cleanEmail,
+            'resetToken': resetToken,
+            'sessionId': sessionId,
+            'newPassword': cleanPassword,
+          }
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final result = decoded['result'] ?? decoded;
+        if (result is Map<String, dynamic>) {
+          return Map<String, dynamic>.from(result);
+        }
+      } else {
+        try {
+          final decoded = jsonDecode(response.body);
+          final errorMsg =
+              decoded['error']?['message'] ?? decoded['message'] ?? decoded['error'];
+          if (errorMsg != null) {
+            return {'success': false, 'error': errorMsg.toString()};
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('AuthService: completePasswordReset error: $e');
+    }
+
+    return {
+      'success': false,
+      'error': 'Unable to reset password. Please check your connection and try again.',
+    };
+  }
+
+  /// Send a password reset email using Firebase Authentication (Legacy)
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email.trim());
