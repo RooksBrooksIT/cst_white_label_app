@@ -1,5 +1,6 @@
+const path = require("path");
 try {
-  require("dotenv").config();
+  require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 } catch (_) {}
 
 const nodemailer = require("nodemailer");
@@ -34,13 +35,25 @@ function isValidEmail(email) {
  * Email Service Configuration
  */
 function getEmailConfig() {
-  const host = process.env.EMAIL_HOST || "smtp.gmail.com";
-  const port = parseInt(process.env.EMAIL_PORT || "587", 10);
+  const host = process.env.EMAIL_HOST || "smtp.hostinger.com";
+  const port = parseInt(process.env.EMAIL_PORT || "465", 10);
   const secure = process.env.EMAIL_SECURE === "true" || port === 465;
   const user = (process.env.EMAIL_USER || "support@rookstechnologies.com").trim();
   const password = (process.env.EMAIL_PASSWORD || "").trim();
-  const from = (process.env.EMAIL_FROM || `eBricks Support <${user}>`).trim();
+  const rawFrom = (process.env.EMAIL_FROM || `"Rooks & Brooks Support" <${user}>`).trim();
   const mockMode = process.env.EMAIL_MOCK_MODE === "true";
+
+  // Ensure From header is RFC 5322 compliant with properly quoted display name
+  let from = rawFrom;
+  const match = rawFrom.match(/^(?:"?([^"<]+)"?\s*)?<([^>]+)>$/);
+  if (match) {
+    const name = (match[1] || "Rooks & Brooks Support").trim();
+    const address = (match[2] || user).trim();
+    from = `"${name}" <${address}>`;
+  } else if (!from.startsWith('"') && from.includes("<")) {
+    const parts = from.split("<");
+    from = `"${parts[0].trim()}" <${parts[1]}`;
+  }
 
   return {
     host,
@@ -196,10 +209,15 @@ async function sendEmail({ to, subject, html, text }) {
 
     const mailOptions = {
       from: config.from,
+      replyTo: config.user,
       to: to.trim(),
       subject: subject.trim(),
       html: html,
       text: text || html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+      envelope: {
+        from: config.user,
+        to: [to.trim()],
+      },
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -477,10 +495,15 @@ async function sendSubscriptionInvoice(params, db) {
     payuMoneyId = "Confirmed by PayU",
     paymentMethod = "UPI",
     startDate = new Date(),
-    endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    endDate,
     isTrial = false,
     isUpgrade = false,
   } = params;
+
+  const numAmount = parseFloat(amount || 0);
+  const isFreeTrial = isTrial || planName.toLowerCase().includes("free trial") || (numAmount === 0 && (String(paymentMethod).toLowerCase().includes("trial") || String(planType).toLowerCase().includes("trial")));
+  const isPlanUpgrade = isUpgrade || String(paymentMethod).toLowerCase().includes("upgrade") || (txnid && String(txnid).startsWith("UPG"));
+  const effectiveEndDate = endDate || new Date(Date.now() + (isFreeTrial ? 14 : 30) * 24 * 60 * 60 * 1000);
 
   if (!payerEmail || !isValidEmail(payerEmail)) {
     logger.warn(`Cannot send invoice for txnid ${txnid}: invalid or missing payer email (${payerEmail})`);
@@ -496,12 +519,14 @@ async function sendSubscriptionInvoice(params, db) {
     try {
       let isAlreadySent = false;
       let existingMessageId = null;
+      var existingInvoiceNo = null;
 
       // Check organization-scoped subcollection first
       if (orgId) {
         const orgInvoiceSnap = await db.collection("organisation").doc(orgId).collection("invoices").doc(txnid).get();
         if (orgInvoiceSnap.exists) {
           const invData = orgInvoiceSnap.data() || {};
+          existingInvoiceNo = invData.invoiceNo || null;
           if (invData.emailStatus === "SENT") {
             isAlreadySent = true;
             existingMessageId = invData.emailMessageId;
@@ -514,6 +539,7 @@ async function sendSubscriptionInvoice(params, db) {
         const legacySnap = await db.collection("invoices").doc(txnid).get();
         if (legacySnap.exists) {
           const invData = legacySnap.data() || {};
+          existingInvoiceNo = existingInvoiceNo || invData.invoiceNo || null;
           if (invData.emailStatus === "SENT") {
             isAlreadySent = true;
             existingMessageId = invData.emailMessageId;
@@ -534,10 +560,10 @@ async function sendSubscriptionInvoice(params, db) {
     }
   }
 
-  const invoiceNo = `INV-${Date.now().toString().slice(-6)}-${txnid.slice(-4)}`;
+  const invoiceNo = params.invoiceNo || (typeof existingInvoiceNo !== "undefined" && existingInvoiceNo ? existingInvoiceNo : null) || `INV-${Date.now().toString().slice(-6)}-${txnid.slice(-4)}`;
   const dateOptions = { day: "2-digit", month: "short", year: "numeric" };
   const formattedStartDate = startDate instanceof Date ? startDate.toLocaleDateString("en-IN", dateOptions) : String(startDate);
-  const formattedEndDate = endDate instanceof Date ? endDate.toLocaleDateString("en-IN", dateOptions) : String(endDate);
+  const formattedEndDate = effectiveEndDate instanceof Date ? effectiveEndDate.toLocaleDateString("en-IN", dateOptions) : String(effectiveEndDate);
   const formattedPaymentDate = new Date().toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -545,10 +571,6 @@ async function sendSubscriptionInvoice(params, db) {
     hour: "2-digit",
     minute: "2-digit",
   });
-
-  const numAmount = parseFloat(amount || 0);
-  const isFreeTrial = isTrial || planName.toLowerCase().includes("free trial") || (numAmount === 0 && (String(paymentMethod).toLowerCase().includes("trial") || String(planType).toLowerCase().includes("trial")));
-  const isPlanUpgrade = isUpgrade || String(paymentMethod).toLowerCase().includes("upgrade") || (txnid && String(txnid).startsWith("UPG"));
 
   const html = renderInvoiceHtml({
     customerName: payerName,
@@ -617,6 +639,7 @@ async function sendSubscriptionInvoice(params, db) {
             emailStatus: result.success ? "SENT" : "FAILED",
             emailSentAt: result.success ? new Date() : null,
             emailMessageId: result.messageId || null,
+            emailError: result.error || null,
           },
         }, { merge: true });
       } else {
@@ -815,7 +838,8 @@ async function sendSubscriptionExpiryReminder(params, db) {
     daysRemaining,
   });
 
-  const subject = `Action Required: Your eBricks Subscription for ${orgName} Expires in ${daysRemaining} Days`;
+  const dayText = daysRemaining === 1 ? "1 Day" : `${daysRemaining} Days`;
+  const subject = `Action Required: Your eBricks Subscription for ${orgName} Expires in ${dayText}`;
 
   // 2. Dispatch Email
   const result = await sendEmail({
@@ -846,12 +870,19 @@ async function sendSubscriptionExpiryReminder(params, db) {
       // Write to organization subcollection (isolated under organisation/{orgId}/subscription_reminders)
       await db.collection("organisation").doc(orgId).collection("subscription_reminders").doc(reminderDocId).set(reminderRecord, { merge: true });
 
-      // Update subscription document to permanently record that this period received its reminder
+      // Update subscription document to permanently record that this period received its reminder or failed
       if (result.success) {
         await db.collection("organisation").doc(orgId).collection("data").doc("subscription").set({
           lastExpiryReminderSentForEndDate: expiryDateIso,
           lastExpiryReminderSentAt: new Date(),
           lastExpiryReminderMessageId: result.messageId || null,
+          lastExpiryReminderError: null,
+        }, { merge: true });
+      } else {
+        logger.error(`Subscription expiry reminder failed to deliver to ${maskEmail(payerEmail)}: ${result.error}`);
+        await db.collection("organisation").doc(orgId).collection("data").doc("subscription").set({
+          lastExpiryReminderError: result.error || "Failed to send email",
+          lastExpiryReminderFailedAt: new Date(),
         }, { merge: true });
       }
     } catch (dbErr) {

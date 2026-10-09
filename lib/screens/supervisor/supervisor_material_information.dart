@@ -72,7 +72,6 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   bool _isLoadingSites = true;
   bool _isLoadingMaterials = true;
   bool _isProcessing = false;
-  bool _isFetchingLiveStock = false;
 
   @override
   void initState() {
@@ -600,13 +599,8 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           materialsList = list;
           _isLoadingMaterials = false;
           if (_selectedMaterialName != null) {
-            final match = list.firstWhere(
-              (m) =>
-                  (m['materialName'] ?? '').toString().trim().toLowerCase() ==
-                  _selectedMaterialName!.trim().toLowerCase(),
-              orElse: () => <String, dynamic>{'count': 0},
-            );
-            availableCount = _parseCount(match['count']);
+            availableCount =
+                _calculateAvailableStockForMaterial(_selectedMaterialName);
           }
         });
       }
@@ -687,13 +681,8 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           siteMaterialsList = list;
           _isLoadingMaterials = false;
           if (_selectedMaterialName != null) {
-            final match = list.firstWhere(
-              (m) =>
-                  (m['materialName'] ?? '').toString().trim().toLowerCase() ==
-                  _selectedMaterialName!.trim().toLowerCase(),
-              orElse: () => <String, dynamic>{'count': 0},
-            );
-            availableCount = _parseCount(match['count']);
+            availableCount =
+                _calculateAvailableStockForMaterial(_selectedMaterialName);
           }
         });
       }
@@ -708,72 +697,101 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     }
   }
 
-  // Handle material selection change with instant in-memory lookup and live background sync
+  // Calculate remaining available stock for a selected material from the valid inventory list,
+  // deducting any quantities already staged in the transfer list.
+  int _calculateAvailableStockForMaterial(String? materialName) {
+    if (materialName == null || materialName.trim().isEmpty) return 0;
+    final trimmed = materialName.trim().toLowerCase();
+    final list = siteMaterialsList.isNotEmpty ? siteMaterialsList : materialsList;
+    final match = list.firstWhere(
+      (m) =>
+          (m['materialName'] ?? '').toString().trim().toLowerCase() == trimmed,
+      orElse: () => <String, dynamic>{'count': 0},
+    );
+    final totalStock = _parseCount(match['count'] ?? match['availableCount']);
+    final alreadyReserved = materialsToTransfer
+        .where((m) =>
+            (m['materialName'] ?? '').toString().trim().toLowerCase() == trimmed)
+        .fold<int>(0, (acc, m) => acc + _parseCount(m['neededCount']));
+
+    final remaining = totalStock - alreadyReserved;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  // Fuzzy match site entry to handle composite IDs (e.g., ST001 vs ST001_sajin) and site names
+  bool _matchesSiteEntry(SiteInventoryEntry s, String targetSiteId) {
+    final cleanLow = targetSiteId.trim().toLowerCase();
+    final sIdLow = s.siteId.trim().toLowerCase();
+    final sNameLow = s.siteName.trim().toLowerCase();
+    return sIdLow == cleanLow ||
+        (sNameLow.isNotEmpty && sNameLow == cleanLow) ||
+        (cleanLow.contains('_') &&
+            sIdLow.isNotEmpty &&
+            (cleanLow.startsWith('${sIdLow}_') || cleanLow.endsWith('_$sIdLow'))) ||
+        (cleanLow.contains('_') &&
+            sNameLow.isNotEmpty &&
+            (cleanLow.startsWith('${sNameLow}_') || cleanLow.endsWith('_$sNameLow'))) ||
+        (sIdLow.contains('_') &&
+            cleanLow.isNotEmpty &&
+            (sIdLow.startsWith('${cleanLow}_') || sIdLow.endsWith('_$cleanLow')));
+  }
+
+  // Handle material selection change with instant in-memory lookup from valid inventory source
+  // and live background sync
   void _onMaterialChanged(String? materialName) async {
     if (materialName == null || materialName.trim().isEmpty) {
       setState(() {
         _selectedMaterialName = null;
         availableCount = 0;
-        _isFetchingLiveStock = false;
       });
       return;
     }
 
     final trimmed = materialName.trim();
-    final list = siteMaterialsList.isNotEmpty ? siteMaterialsList : materialsList;
-
-    final match = list.firstWhere(
-      (m) =>
-          (m['materialName'] ?? '').toString().trim().toLowerCase() ==
-              trimmed.toLowerCase(),
-      orElse: () => <String, dynamic>{'count': 0},
-    );
-
-    final initialCount = _parseCount(match['count']);
+    final calculatedStock = _calculateAvailableStockForMaterial(trimmed);
 
     setState(() {
       _selectedMaterialName = trimmed;
-      availableCount = initialCount;
-      _isFetchingLiveStock = true;
+      availableCount = calculatedStock;
     });
 
     try {
       final freshItem =
           await MaterialInventoryService.fetchMaterialInventory(trimmed);
       if (freshItem != null && mounted && _selectedMaterialName == trimmed) {
-        int backendCount = 0;
         final targetSiteId = _transferMode == 0 ? _fromSiteId : _selectedSiteId;
         if (targetSiteId != null && targetSiteId.isNotEmpty) {
-          final sEntry = freshItem.siteInventories.firstWhere(
-            (s) =>
-                s.siteId.trim().toLowerCase() ==
-                targetSiteId.trim().toLowerCase(),
-            orElse: () => SiteInventoryEntry(
-              siteId: targetSiteId,
-              availableCount: 0,
-            ),
+          final matchingEntries = freshItem.siteInventories.where(
+            (s) => _matchesSiteEntry(s, targetSiteId),
           );
-          backendCount = sEntry.availableCount;
-        } else {
-          backendCount = freshItem.companyAvailableCount;
+          if (matchingEntries.isNotEmpty) {
+            final liveCount = matchingEntries.first.availableCount;
+            final matIndex = siteMaterialsList.indexWhere(
+              (m) =>
+                  (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+                  trimmed.toLowerCase(),
+            );
+            if (matIndex != -1) {
+              siteMaterialsList[matIndex]['count'] = liveCount;
+            }
+          }
+        } else if (siteMaterialsList.isEmpty) {
+          final matIndex = materialsList.indexWhere(
+            (m) =>
+                (m['materialName'] ?? '').toString().trim().toLowerCase() ==
+                trimmed.toLowerCase(),
+          );
+          if (matIndex != -1) {
+            materialsList[matIndex]['count'] = freshItem.companyAvailableCount;
+          }
         }
 
         setState(() {
-          availableCount = backendCount;
-          _isFetchingLiveStock = false;
-        });
-      } else if (mounted) {
-        setState(() {
-          _isFetchingLiveStock = false;
+          availableCount = _calculateAvailableStockForMaterial(trimmed);
         });
       }
     } catch (e) {
       debugPrint('Error syncing live stock for $trimmed: $e');
-      if (mounted) {
-        setState(() {
-          _isFetchingLiveStock = false;
-        });
-      }
     }
   }
 
@@ -815,6 +833,9 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
     final displayName =
         (selectedMaterial['materialName'] ?? _selectedMaterialName!).toString();
 
+    final totalStock =
+        _parseCount(selectedMaterial['count'] ?? selectedMaterial['availableCount']);
+
     final alreadyAddedCount = materialsToTransfer
         .where(
           (m) =>
@@ -823,13 +844,13 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
         )
         .fold<int>(0, (acc, m) => acc + (m['neededCount'] as int));
 
-    final availableRemaining = availableCount - alreadyAddedCount;
+    final availableRemaining = totalStock - alreadyAddedCount;
 
     if (neededCount > availableRemaining) {
       _showSnackBar(
         alreadyAddedCount > 0
-            ? 'Needed count ($neededCount) exceeds remaining available ($availableRemaining). Already added: $alreadyAddedCount, Total available: $availableCount.'
-            : 'Needed count ($neededCount) cannot exceed available count ($availableCount).',
+            ? 'Needed count ($neededCount) exceeds remaining available ($availableRemaining). Already added: $alreadyAddedCount, Total available: $totalStock.'
+            : 'Needed count ($neededCount) cannot exceed available count ($totalStock).',
       );
       return;
     }
@@ -844,7 +865,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       setState(() {
         materialsToTransfer[existingIndex]['neededCount'] =
             (materialsToTransfer[existingIndex]['neededCount'] as int) + neededCount;
-        materialsToTransfer[existingIndex]['availableCount'] = availableCount;
+        materialsToTransfer[existingIndex]['availableCount'] = totalStock;
       });
       _showSnackBar('Material quantity updated in transfer list');
     } else {
@@ -853,7 +874,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
           'materialName': _selectedMaterialName!,
           'displayName': displayName,
           'neededCount': neededCount,
-          'availableCount': availableCount,
+          'availableCount': totalStock,
         });
       });
       _showSnackBar('Material added to transfer list');
@@ -867,6 +888,10 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
   void _removeMaterial(int index) {
     setState(() {
       materialsToTransfer.removeAt(index);
+      if (_selectedMaterialName != null) {
+        availableCount =
+            _calculateAvailableStockForMaterial(_selectedMaterialName);
+      }
     });
     _showSnackBar('Material removed from list');
   }
@@ -1195,7 +1220,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'Material Information',
+          'Materials Movement',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -1620,7 +1645,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 Expanded(
                   child: _buildCountBox(
                     'Available Stock',
-                    _isFetchingLiveStock ? '...' : availableCount.toString(),
+                    availableCount.toString(),
                     availableCount > 0
                         ? const Color(0xFF10B981)
                         : const Color(0xFFEF4444),
@@ -1873,7 +1898,7 @@ class _MaterialInfoScreenState extends State<SupervisorMaterialInfoScreen> {
                 Expanded(
                   child: _buildCountBox(
                     'Available Stock',
-                    _isFetchingLiveStock ? '...' : availableCount.toString(),
+                    availableCount.toString(),
                     availableCount > 0
                         ? const Color(0xFF10B981)
                         : const Color(0xFFEF4444),

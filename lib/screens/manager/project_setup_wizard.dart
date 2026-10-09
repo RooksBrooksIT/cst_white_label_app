@@ -150,7 +150,13 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               .toList();
 
           _statuses = results[3].docs
-              .map((doc) => (doc.data()['projectState'] ?? doc.data()['projectStatus'])?.toString().trim() ?? '')
+              .map(
+                (doc) =>
+                    (doc.data()['projectState'] ?? doc.data()['projectStatus'])
+                        ?.toString()
+                        .trim() ??
+                    '',
+              )
               .where((s) => s.isNotEmpty)
               .toSet()
               .toList();
@@ -196,7 +202,11 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(child: Text(message)),
           ],
@@ -214,9 +224,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: Colors.white,
         title: Row(
           children: [
@@ -247,11 +255,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         ),
         content: const Text(
           'Location is turned off. Would you like to turn on Location on your phone?',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF475569),
-            height: 1.4,
-          ),
+          style: TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.4),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
@@ -344,15 +348,19 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ].where((p) => p != null && p.isNotEmpty).join(', ');
           }
         } catch (geocodingError) {
-          debugPrint('Geocoding error (falling back to coordinates only): $geocodingError');
-          address = 'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+          debugPrint(
+            'Geocoding error (falling back to coordinates only): $geocodingError',
+          );
+          address =
+              'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
         }
       }
 
       setState(() {
         _latitudeController.text = position.latitude.toStringAsFixed(6);
         _longitudeController.text = position.longitude.toStringAsFixed(6);
-        if (_locationController.text.isEmpty || _locationController.text == 'Web Location') {
+        if (_locationController.text.isEmpty ||
+            _locationController.text == 'Web Location') {
           _locationController.text = address;
         }
       });
@@ -365,6 +373,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
   // -------------------- NAVIGATION & SAVE --------------------
   void _nextStep() {
+    if (_advanceExceedsBudget) return;
+
     bool isValid = false;
     if (_currentStep == 0) {
       isValid = _siteFormKey.currentState?.validate() ?? false;
@@ -407,14 +417,22 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     setState(() {});
   }
 
+  bool get _advanceExceedsBudget {
+    final cleanBudget =
+        _projectBudgetController.text.replaceAll(',', '').trim();
+    final cleanAdvance =
+        _amountPaidController.text.replaceAll(',', '').trim();
+    final budget = double.tryParse(cleanBudget);
+    final advance = double.tryParse(cleanAdvance);
+    return budget != null && advance != null && advance > budget;
+  }
+
   Future<String> _getNextId(
     String collection,
     String prefix,
     String? field,
   ) async {
-    final snapshot = await FirestoreService.getCollection(
-      collection,
-    ).get();
+    final snapshot = await FirestoreService.getCollection(collection).get();
     int maxNum = 0;
     final regex = RegExp('^${RegExp.escape(prefix)}(\\d+)');
     for (var doc in snapshot.docs) {
@@ -429,6 +447,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   }
 
   Future<void> _saveAll({bool skipSupervisorMapping = false}) async {
+    if (_advanceExceedsBudget) return;
+
     // Validate active subscription site limit
     final subValidation = await SubscriptionLimitService.canCreateSite();
     if (!subValidation.isAllowed) {
@@ -436,7 +456,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
         await SubscriptionLimitService.showLimitReachedDialog(
           context,
           title: 'Site Limit Reached',
-          message: subValidation.errorMessage ??
+          message:
+              subValidation.errorMessage ??
               'You have reached your subscription plan limit for active sites.',
         );
       }
@@ -503,12 +524,18 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       await Future.wait([saveTask, minWait]);
 
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pop(); // Close loading dialog
         _showSuccessDialog(skippedAssignment: skipSupervisorMapping);
       }
     } catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pop(); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error saving: $e'),
@@ -526,13 +553,24 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     final siteDocId =
         '${siteId}_${_siteNameController.text.trim().replaceAll(' ', '')}';
 
-    final double budget = double.tryParse(_projectBudgetController.text.replaceAll(',', '').trim()) ?? 0.0;
-    final double amountPaid = double.tryParse(_amountPaidController.text.replaceAll(',', '').trim()) ?? 0.0;
+    final double budget =
+        double.tryParse(
+          _projectBudgetController.text.replaceAll(',', '').trim(),
+        ) ??
+        0.0;
+    final double amountPaid =
+        double.tryParse(
+          _amountPaidController.text.replaceAll(',', '').trim(),
+        ) ??
+        0.0;
 
     final parsedLat = double.tryParse(_latitudeController.text.trim());
     final parsedLng = double.tryParse(_longitudeController.text.trim());
     final effectiveCategory = _siteProjectCategory ?? '';
-    final effectiveStatus = _projectStatus ?? _siteStatus ?? (_statuses.isNotEmpty ? _statuses.first : 'Ongoing');
+    final effectiveStatus =
+        _projectStatus ??
+        _siteStatus ??
+        (_statuses.isNotEmpty ? _statuses.first : 'Ongoing');
 
     // Unified Project & Site payload storing all values into projects collection
     final unifiedProjectData = <String, dynamic>{
@@ -593,10 +631,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           ? Timestamp.fromDate(_contractEndDate!)
           : null,
       'isContractWork': _isContractWork,
-      'contractorName':
-          _isContractWork ? _contractorNameController.text.trim() : null,
+      'contractorName': _isContractWork
+          ? _contractorNameController.text.trim()
+          : null,
       'contractorBudget': _isContractWork
-          ? (double.tryParse(_contractorBudgetController.text.replaceAll(',', '')) ?? 0.0)
+          ? (double.tryParse(
+                  _contractorBudgetController.text.replaceAll(',', ''),
+                ) ??
+                0.0)
           : null,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -766,7 +808,11 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
   Widget _buildSuccessCheckRow(String text) {
     return Row(
       children: [
-        const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+        const Icon(
+          Icons.check_circle_rounded,
+          color: Color(0xFF10B981),
+          size: 16,
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -816,7 +862,11 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
               ),
             ),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
             title: Column(
@@ -836,8 +886,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   _currentStep == 0
                       ? 'Step 1 of 3 • Site Details'
                       : _currentStep == 1
-                          ? 'Step 2 of 3 • Project Configuration'
-                          : 'Step 3 of 3 • Supervisor Assignment',
+                      ? 'Step 2 of 3 • Project Configuration'
+                      : 'Step 3 of 3 • Supervisor Assignment',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.82),
                     fontSize: 11.5,
@@ -851,7 +901,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 Padding(
                   padding: const EdgeInsets.only(right: 12.0),
                   child: TextButton(
-                    onPressed: _isSaving
+                    onPressed: (_isSaving || _advanceExceedsBudget)
                         ? null
                         : () => _saveAll(skipSupervisorMapping: true),
                     style: TextButton.styleFrom(
@@ -929,9 +979,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
       ),
       child: Row(
         children: List.generate(steps.length * 2 - 1, (index) {
@@ -943,9 +991,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 height: 2.5,
                 margin: const EdgeInsets.symmetric(horizontal: 6),
                 decoration: BoxDecoration(
-                  color: isPassed
-                      ? primaryColor
-                      : const Color(0xFFE2E8F0),
+                  color: isPassed ? primaryColor : const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -979,14 +1025,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                     color: isCompleted
                         ? const Color(0xFF10B981)
                         : isActive
-                            ? primaryColor
-                            : const Color(0xFFF1F5F9),
+                        ? primaryColor
+                        : const Color(0xFFF1F5F9),
                     border: Border.all(
                       color: isCompleted
                           ? const Color(0xFF10B981)
                           : isActive
-                              ? primaryColor
-                              : const Color(0xFFCBD5E1),
+                          ? primaryColor
+                          : const Color(0xFFCBD5E1),
                       width: 1.5,
                     ),
                   ),
@@ -1011,13 +1057,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   steps[stepIdx]['title'] as String,
                   style: TextStyle(
                     fontSize: 12.5,
-                    fontWeight:
-                        isActive ? FontWeight.w800 : FontWeight.w600,
+                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                     color: isCompleted
                         ? const Color(0xFF0F172A)
                         : isActive
-                            ? primaryColor
-                            : const Color(0xFF64748B),
+                        ? primaryColor
+                        : const Color(0xFF64748B),
                   ),
                 ),
               ],
@@ -1057,8 +1102,9 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   icon: Icons.apartment_rounded,
                   isRequired: true,
                   primaryColor: primaryColor,
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Site name is required' : null,
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Site name is required'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 _buildInputField(
@@ -1068,14 +1114,16 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   icon: Icons.location_on_rounded,
                   isRequired: true,
                   primaryColor: primaryColor,
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Location address is required' : null,
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Location address is required'
+                      : null,
                 ),
               ],
             ),
             _buildSectionCard(
               title: 'Geolocation Coordinates',
-              subtitle: 'GPS precision coordinates for field supervisor check-ins',
+              subtitle:
+                  'GPS precision coordinates for field supervisor check-ins',
               icon: Icons.satellite_alt_rounded,
               primaryColor: primaryColor,
               children: [
@@ -1127,7 +1175,11 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                               color: primaryColor,
                             ),
                           )
-                        : Icon(Icons.my_location_rounded, size: 18, color: primaryColor),
+                        : Icon(
+                            Icons.my_location_rounded,
+                            size: 18,
+                            color: primaryColor,
+                          ),
                     label: Text(
                       _isGettingLocation
                           ? 'Acquiring GPS Position...'
@@ -1259,8 +1311,10 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   isRequired: true,
                   primaryColor: primaryColor,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Phone number is required';
-                    if (v.trim().length != 10) return 'Must be exactly 10 digits';
+                    if (v == null || v.trim().isEmpty)
+                      return 'Phone number is required';
+                    if (v.trim().length != 10)
+                      return 'Must be exactly 10 digits';
                     return null;
                   },
                 ),
@@ -1279,7 +1333,9 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                          color: const Color(
+                            0xFF10B981,
+                          ).withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -1357,7 +1413,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   _projectSubCategory,
                   _subCategories.isNotEmpty
                       ? _subCategories
-                      : ['New Construction', 'Renovation', 'Expansion', 'Interior Fitout'],
+                      : [
+                          'New Construction',
+                          'Renovation',
+                          'Expansion',
+                          'Interior Fitout',
+                        ],
                   (v) => setState(() => _projectSubCategory = v),
                   isLoading: _isLoadingDropdowns,
                   primaryColor: primaryColor,
@@ -1379,7 +1440,13 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   _projectStage,
                   _projectStagesList.isNotEmpty
                       ? _projectStagesList
-                      : ['Planning', 'Foundation', 'Structure', 'Finishing', 'Handover'],
+                      : [
+                          'Planning',
+                          'Foundation',
+                          'Structure',
+                          'Finishing',
+                          'Handover',
+                        ],
                   (v) => setState(() => _projectStage = v),
                   isLoading: _isLoadingDropdowns,
                   primaryColor: primaryColor,
@@ -1390,7 +1457,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   _projectStatus,
                   _statuses.isNotEmpty
                       ? _statuses
-                      : ['Active', 'In Progress', 'Pending Approval', 'Completed'],
+                      : [
+                          'Active',
+                          'In Progress',
+                          'Pending Approval',
+                          'Completed',
+                        ],
                   (v) => setState(() => _projectStatus = v),
                   isLoading: _isLoadingDropdowns,
                   primaryColor: primaryColor,
@@ -1435,10 +1507,16 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
   // Financial Section with interactive progress bar
   Widget _buildFinancialSection(Color primaryColor) {
-    final double budget = double.tryParse(_projectBudgetController.text) ?? 0;
-    final double paid = double.tryParse(_amountPaidController.text) ?? 0;
-    final double balance = budget - paid;
-    final double percentage = budget > 0 ? (paid / budget).clamp(0.0, 1.0) : 0;
+    final double budget =
+        double.tryParse(_projectBudgetController.text.replaceAll(',', '').trim()) ?? 0;
+    final double paid =
+        double.tryParse(_amountPaidController.text.replaceAll(',', '').trim()) ?? 0;
+    final bool advanceExceedsBudget = _advanceExceedsBudget;
+    final double? balance =
+        advanceExceedsBudget ? null : ((budget >= paid) ? (budget - paid) : null);
+    final double percentage = (!advanceExceedsBudget && budget > 0)
+        ? (paid / budget).clamp(0.0, 1.0)
+        : 0;
 
     return _buildSectionCard(
       title: 'Financial & Budgeting',
@@ -1453,9 +1531,11 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           icon: Icons.currency_rupee_rounded,
           keyboardType: TextInputType.number,
           primaryColor: primaryColor,
+          autovalidateMode: AutovalidateMode.always,
           validator: (v) {
-            if (v != null && v.isNotEmpty) {
-              if (double.tryParse(v) == null) return 'Enter a valid number';
+            if (v != null && v.trim().isNotEmpty) {
+              final clean = v.replaceAll(',', '').trim();
+              if (double.tryParse(clean) == null) return 'Enter a valid number';
             }
             return null;
           },
@@ -1468,9 +1548,18 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           icon: Icons.payments_outlined,
           keyboardType: TextInputType.number,
           primaryColor: primaryColor,
+          autovalidateMode: AutovalidateMode.always,
+          hasError: advanceExceedsBudget,
+          errorText: advanceExceedsBudget
+              ? 'Initial amount cannot be greater than the project budget.'
+              : null,
           validator: (v) {
-            if (v != null && v.isNotEmpty) {
-              if (double.tryParse(v) == null) return 'Enter a valid number';
+            if (v != null && v.trim().isNotEmpty) {
+              final clean = v.replaceAll(',', '').trim();
+              if (double.tryParse(clean) == null) return 'Enter a valid number';
+              if (_advanceExceedsBudget) {
+                return 'Initial amount cannot be greater than the project budget.';
+              }
             }
             return null;
           },
@@ -1498,10 +1587,14 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                       ),
                     ),
                     Text(
-                      '${(percentage * 100).toStringAsFixed(1)}%',
+                      advanceExceedsBudget
+                          ? 'Exceeds Budget'
+                          : '${(percentage * 100).toStringAsFixed(1)}%',
                       style: TextStyle(
                         fontSize: 13,
-                        color: primaryColor,
+                        color: advanceExceedsBudget
+                            ? const Color(0xFFEF4444)
+                            : primaryColor,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1511,9 +1604,13 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
-                    value: percentage,
+                    value: advanceExceedsBudget ? 1.0 : percentage,
                     backgroundColor: const Color(0xFFE2E8F0),
-                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      advanceExceedsBudget
+                          ? const Color(0xFFEF4444)
+                          : primaryColor,
+                    ),
                     minHeight: 8,
                   ),
                 ),
@@ -1529,16 +1626,18 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                     _buildFinancialMiniPill(
                       'Customer Received',
                       '₹${NumberFormat('#,##,###').format(paid)}',
-                      const Color(0xFF10B981),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFinancialMiniPill(
-                      'Budget to Collect',
-                      '₹${NumberFormat('#,##,###').format(balance)}',
-                      balance < 0
+                      advanceExceedsBudget
                           ? const Color(0xFFEF4444)
-                          : const Color(0xFFF59E0B),
+                          : const Color(0xFF10B981),
                     ),
+                    if (balance != null) ...[
+                      const SizedBox(width: 8),
+                      _buildFinancialMiniPill(
+                        'Remaining Balance',
+                        '₹${NumberFormat('#,##,###').format(balance)}',
+                        const Color(0xFFF59E0B),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -1563,7 +1662,11 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontSize: 10.5,
+                color: Color(0xFF94A3B8),
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
@@ -1612,7 +1715,12 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 : _contractorNameController.text,
             _contractors.isNotEmpty
                 ? _contractors
-                : ['General Contractor', 'Civil Contractor', 'Electrical Contractor', 'Turnkey Agency'],
+                : [
+                    'General Contractor',
+                    'Civil Contractor',
+                    'Electrical Contractor',
+                    'Turnkey Agency',
+                  ],
             (v) => setState(() => _contractorNameController.text = v ?? ''),
             isLoading: _isLoadingDropdowns,
             primaryColor: primaryColor,
@@ -1707,7 +1815,13 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   _mapProjectStage ?? _projectStage,
                   _projectStagesList.isNotEmpty
                       ? _projectStagesList
-                      : ['Planning', 'Foundation', 'Structure', 'Finishing', 'Handover'],
+                      : [
+                          'Planning',
+                          'Foundation',
+                          'Structure',
+                          'Finishing',
+                          'Handover',
+                        ],
                   (v) => setState(() => _mapProjectStage = v),
                   isLoading: _isLoadingDropdowns,
                   primaryColor: primaryColor,
@@ -1807,7 +1921,10 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 _buildSummaryRow('Site Name', _siteNameController.text),
                 _buildSummaryRow('Project Name', _projectNameController.text),
                 _buildSummaryRow('Owner / Client', _ownerNameController.text),
-                _buildSummaryRow('Assigned Supervisor', _selectedSupervisorName ?? 'Not Assigned'),
+                _buildSummaryRow(
+                  'Assigned Supervisor',
+                  _selectedSupervisorName ?? 'Not Assigned',
+                ),
                 _buildSummaryRow('Current Stage', _projectStage ?? 'Planning'),
                 _buildSummaryRow(
                   'Project Budget',
@@ -1829,7 +1946,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   width: 22,
                   child: Checkbox(
                     value: _isTermsAgreed,
-                    onChanged: (v) => setState(() => _isTermsAgreed = v ?? false),
+                    onChanged: (v) =>
+                        setState(() => _isTermsAgreed = v ?? false),
                     activeColor: primaryColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(6),
@@ -1839,7 +1957,8 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 const SizedBox(width: 12),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => setState(() => _isTermsAgreed = !_isTermsAgreed),
+                    onTap: () =>
+                        setState(() => _isTermsAgreed = !_isTermsAgreed),
                     child: const Text(
                       'I confirm that all site and project parameters have been reviewed and comply with the project standards.',
                       style: TextStyle(
@@ -1947,11 +2066,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                     color: primaryColor.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    icon,
-                    size: 20,
-                    color: primaryColor,
-                  ),
+                  child: Icon(icon, size: 20, color: primaryColor),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -2036,8 +2151,23 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
     bool readOnly = false,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    AutovalidateMode? autovalidateMode,
     String? Function(String?)? validator,
+    bool hasError = false,
+    String? errorText,
+    void Function(String)? onChanged,
   }) {
+    final bool showErrorBorder =
+        hasError || (errorText != null && errorText.isNotEmpty);
+    final Color effectiveBorderColor = showErrorBorder
+        ? const Color(0xFFEF4444)
+        : const Color(0xFFCBD5E1);
+    final Color effectiveFocusedBorderColor = showErrorBorder
+        ? const Color(0xFFEF4444)
+        : primaryColor;
+    final double effectiveBorderWidth = showErrorBorder ? 1.5 : 1.0;
+    final double effectiveFocusedWidth = showErrorBorder ? 2.0 : 1.5;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2048,15 +2178,26 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           maxLines: maxLines,
           keyboardType: keyboardType,
           validator: validator,
+          autovalidateMode: autovalidateMode,
+          onChanged: onChanged,
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Color(0xFF0A183D),
           ),
-          textAlignVertical: maxLines == 1 ? TextAlignVertical.center : TextAlignVertical.top,
+          textAlignVertical: maxLines == 1
+              ? TextAlignVertical.center
+              : TextAlignVertical.top,
           decoration: InputDecoration(
             isDense: true,
             hintText: hint ?? 'Enter ${label.replaceAll('*', '').trim()}',
+            errorText: errorText,
+            errorMaxLines: 2,
+            errorStyle: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFEF4444),
+            ),
             hintStyle: const TextStyle(
               fontSize: 12.5,
               color: Color(0xFF94A3B8),
@@ -2072,7 +2213,13 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                 right: 8,
                 top: maxLines > 1 ? 12 : 0,
               ),
-              child: Icon(icon, size: 18, color: primaryColor),
+              child: Icon(
+                icon,
+                size: 18,
+                color: showErrorBorder
+                    ? const Color(0xFFEF4444)
+                    : primaryColor,
+              ),
             ),
             filled: true,
             fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
@@ -2082,23 +2229,38 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              borderSide: BorderSide(
+                color: effectiveBorderColor,
+                width: effectiveBorderWidth,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              borderSide: BorderSide(
+                color: effectiveBorderColor,
+                width: effectiveBorderWidth,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: primaryColor, width: 1.5),
+              borderSide: BorderSide(
+                color: effectiveFocusedBorderColor,
+                width: effectiveFocusedWidth,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+              borderSide: const BorderSide(
+                color: Color(0xFFEF4444),
+                width: 1.5,
+              ),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFFEF4444),
+                width: 2.0,
+              ),
             ),
           ),
         ),
@@ -2167,8 +2329,9 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                       color: date == null
                           ? const Color(0xFF94A3B8)
                           : const Color(0xFF0A183D),
-                      fontWeight:
-                          date != null ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: date != null
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                       fontSize: 14,
                     ),
                   ),
@@ -2198,10 +2361,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           decoration: BoxDecoration(
             color: const Color(0xFFFFF7ED),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFFFED7AA),
-              width: 1.2,
-            ),
+            border: Border.all(color: const Color(0xFFFED7AA), width: 1.2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2262,7 +2422,10 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                     ),
                   ),
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     backgroundColor: const Color(0xFFFFEDD5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -2314,14 +2477,23 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ),
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12.5),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12.5,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              borderSide: const BorderSide(
+                color: Color(0xFFCBD5E1),
+                width: 1.0,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              borderSide: const BorderSide(
+                color: Color(0xFFCBD5E1),
+                width: 1.0,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -2329,11 +2501,17 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+              borderSide: const BorderSide(
+                color: Color(0xFFEF4444),
+                width: 1.0,
+              ),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFFEF4444),
+                width: 1.5,
+              ),
             ),
             suffixIcon: isLoading
                 ? Padding(
@@ -2373,13 +2551,15 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
 
   // Sticky Bottom Navigation Buttons
   Widget _buildBottomNavBar(Color primaryColor, Color darkAccent) {
+    final bool isActionDisabled = _isSaving ||
+        _advanceExceedsBudget ||
+        (_currentStep == 2 && !_isTermsAgreed);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
       ),
       child: Row(
         children: [
@@ -2404,19 +2584,21 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
           ],
           Expanded(
             flex: 2,
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [primaryColor, darkAccent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                gradient: isActionDisabled
+                    ? null
+                    : LinearGradient(
+                        colors: [primaryColor, darkAccent],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                color: isActionDisabled ? const Color(0xFFCBD5E1) : null,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: ElevatedButton.icon(
-                onPressed: (_isSaving || (_currentStep == 2 && !_isTermsAgreed))
-                    ? null
-                    : _nextStep,
+                onPressed: isActionDisabled ? null : _nextStep,
                 icon: _isSaving
                     ? const SizedBox(
                         width: 18,
@@ -2431,18 +2613,22 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                             ? Icons.check_circle_rounded
                             : Icons.arrow_forward_rounded,
                         size: 18,
-                        color: Colors.white,
+                        color: isActionDisabled
+                            ? const Color(0xFF94A3B8)
+                            : Colors.white,
                       ),
                 label: Text(
                   _isSaving
                       ? 'Saving Project...'
                       : (_currentStep == 2
-                          ? 'Complete & Create Project'
-                          : 'Continue to ${_currentStep == 0 ? 'Project Setup' : 'Supervisor'}'),
-                  style: const TextStyle(
+                            ? 'Complete & Create Project'
+                            : 'Continue to ${_currentStep == 0 ? 'Project Setup' : 'Supervisor'}'),
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
-                    color: Colors.white,
+                    color: isActionDisabled
+                        ? const Color(0xFF94A3B8)
+                        : Colors.white,
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -2450,6 +2636,7 @@ class _ProjectSetupWizardState extends State<ProjectSetupWizard>
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
                   foregroundColor: Colors.white,
+                  disabledForegroundColor: const Color(0xFF94A3B8),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),

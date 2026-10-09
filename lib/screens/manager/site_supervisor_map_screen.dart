@@ -403,9 +403,9 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       projectStageController.text = selectedProjectStage ?? '';
       siteNameController.text = selectedSite ?? '';
 
-      startDate = site['startDate'] as DateTime?;
-      endDate = site['endDate'] as DateTime?;
-      joinedDate = site['joinedDate'] as DateTime?;
+      startDate = _parseDate(site['startDate']);
+      endDate = _parseDate(site['endDate']);
+      joinedDate = _parseDate(site['joinedDate']);
 
       startDateController.text = startDate != null
           ? DateFormat('yyyy-MM-dd').format(startDate!)
@@ -440,6 +440,18 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
       } catch (_) {}
     }
     return null;
+  }
+
+  String _formatDisplayDate(dynamic val) {
+    if (val == null) return '';
+    final dt = _parseDate(val);
+    if (dt != null) {
+      return DateFormat('yyyy-MM-dd').format(dt);
+    }
+    if (val is String) {
+      return val.trim();
+    }
+    return val.toString().trim();
   }
 
   Future<void> _selectAnyDate(BuildContext context,
@@ -1668,22 +1680,22 @@ class _SiteSupervisorMapScreenState extends State<SiteSupervisorMapScreen> {
                       siteName: siteName,
                     );
 
-                    final supervisorName = data['supervisor'] ??
+                    final supervisorName = (data['supervisor'] ??
                         data['supervisorName'] ??
                         data['FullName'] ??
-                        'Not Assigned';
-                    final supervisorId = data['Supervisor ID'] ??
+                        'Not Assigned').toString();
+                    final supervisorId = (data['Supervisor ID'] ??
                         data['supervisorId'] ??
                         data['SupervisorId'] ??
-                        '';
+                        '').toString();
                     final pName =
-                        data['projectName'] ?? data['project'] ?? '';
+                        (data['projectName'] ?? data['project'] ?? '').toString();
                     final pStage =
-                        data['projectStage'] ?? data['stage'] ?? '';
+                        (data['projectStage'] ?? data['stage'] ?? '').toString();
                     final loc =
-                        data['location'] ?? data['address'] ?? '';
-                    final sDate = data['startDate'] ?? '';
-                    final eDate = data['endDate'] ?? '';
+                        (data['location'] ?? data['address'] ?? '').toString();
+                    final sDate = _formatDisplayDate(data['startDate']);
+                    final eDate = _formatDisplayDate(data['endDate']);
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:ebricks/services/expense_service.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/app_storage_service.dart';
 import 'package:ebricks/services/offline_sync_service.dart';
 import 'package:ebricks/widgets/offline_sync_banner.dart';
 import 'package:ebricks/utils/app_theme.dart';
@@ -111,6 +116,10 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
   final billAmountController = TextEditingController();
   final supervisorController = TextEditingController();
   final projectStageController = TextEditingController();
+
+  File? _selectedBillImage;
+  final ImagePicker _picker = ImagePicker();
+  bool isUploadingImage = false;
 
   List<Map<String, String>> bills = [];
 
@@ -618,12 +627,51 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
                             fontSize: 13.5,
                           ),
                         ),
-                        Text(
-                          'Bill No: ${bill['billNo'] ?? 'N/A'}',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: Color(0xFF64748B),
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Bill No: ${bill['billNo'] ?? 'N/A'}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            if (bill['billCopy'] != null &&
+                                bill['billCopy'] != 'billURL' &&
+                                bill['billCopy']!.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () => _showBillImagePreview(
+                                  context,
+                                  bill['billCopy']!,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: primaryColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.attachment_rounded,
+                                          size: 12, color: primaryColor),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'View Attached Bill',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: primaryColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),
@@ -655,7 +703,195 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
     );
   }
 
-  void _addBill() {
+  Future<void> _pickBillImage() async {
+    final source = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded, color: Color(0xFF0A183D)),
+              title: const Text('Take Photo from Camera'),
+              onTap: () => Navigator.pop(context, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF0A183D)),
+              title: const Text('Choose Image from Gallery'),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF0A183D)),
+              title: const Text('Upload Document / PDF'),
+              onTap: () => Navigator.pop(context, 'document'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    if (source == 'document') {
+      try {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
+        );
+        if (result != null && result.files.single.path != null) {
+          setState(() {
+            _selectedBillImage = File(result.files.single.path!);
+          });
+        }
+      } catch (e) {
+        debugPrint('File picker note: $e');
+      }
+    } else {
+      final imgSource =
+          source == 'camera' ? ImageSource.camera : ImageSource.gallery;
+      final XFile? image = await _picker.pickImage(
+        source: imgSource,
+        imageQuality: 75,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+      if (image != null) {
+        setState(() {
+          _selectedBillImage = File(image.path);
+        });
+      }
+    }
+  }
+
+  Future<String?> _uploadBillImage(File image, String billNo) async {
+    try {
+      if (selectedSiteId == null) return null;
+      final siteName = siteNameMap[selectedSiteId] ?? '';
+      return await AppStorageService.uploadOrganizationExpenseBill(
+        siteId: selectedSiteId!,
+        siteName: siteName,
+        billNo: billNo,
+        file: image,
+      );
+    } catch (e) {
+      debugPrint('Error uploading organization bill: $e');
+      return null;
+    }
+  }
+
+  Widget _buildImagePicker(bool isDesktop, bool isTablet, bool isMobile) {
+    final isPdf = _selectedBillImage != null &&
+        _selectedBillImage!.path.toLowerCase().endsWith('.pdf');
+
+    return InkWell(
+      onTap: _pickBillImage,
+      borderRadius: BorderRadius.circular(12.0),
+      child: Container(
+        height: 130.0,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(
+            color: const Color(0xFFCBD5E1),
+            width: 1.2,
+          ),
+        ),
+        child: _selectedBillImage != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(12.0),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    isPdf
+                        ? Container(
+                            color: const Color(0xFFF1F5F9),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.picture_as_pdf_rounded,
+                                  size: 44,
+                                  color: Color(0xFFEF4444),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _selectedBillImage!.path
+                                      .split(RegExp(r'[/\\]'))
+                                      .last,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'PDF Document Attached',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Image.file(_selectedBillImage!, fit: BoxFit.cover),
+                    Positioned(
+                      top: 8.0,
+                      right: 8.0,
+                      child: CircleAvatar(
+                        backgroundColor: const Color(0xFF0A183D),
+                        radius: 16,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.close_rounded,
+                              color: Colors.white, size: 16),
+                          onPressed: () =>
+                              setState(() => _selectedBillImage = null),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_a_photo_rounded,
+                    size: 36.0,
+                    color: primaryColor,
+                  ),
+                  const SizedBox(height: 8.0),
+                  const Text(
+                    'Upload Bill Image / Document (Optional)',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 13.0,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2.0),
+                  Text(
+                    'Camera, Gallery, or PDF document',
+                    style: TextStyle(
+                      color: Colors.grey.shade500,
+                      fontSize: 11.0,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Future<void> _addBill() async {
     final no = billNoController.text.trim();
     final vendor = billVendorController.text.trim();
     final amountStr = billAmountController.text.trim();
@@ -670,16 +906,52 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
       return;
     }
 
-    setState(() {
-      bills.add({
-        'billNo': no,
-        'billVendor': vendor,
-        'billAmount': amountStr,
+    if (selectedSiteId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select Site first.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => isUploadingImage = true);
+
+    try {
+      String billUrl = 'billURL';
+      if (_selectedBillImage != null) {
+        final uploadedUrl = await _uploadBillImage(_selectedBillImage!, no);
+        if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+          billUrl = uploadedUrl;
+        }
+      }
+
+      setState(() {
+        bills.add({
+          'billNo': no,
+          'billVendor': vendor,
+          'billAmount': amountStr,
+          'billCopy': billUrl,
+          'billDate': selectedDate.toIso8601String(),
+        });
+        billNoController.clear();
+        billVendorController.clear();
+        billAmountController.clear();
+        _selectedBillImage = null;
       });
-      billNoController.clear();
-      billVendorController.clear();
-      billAmountController.clear();
-    });
+    } catch (e) {
+      debugPrint('Error adding organization bill: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading bill: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
   }
 
   void _removeBill(int index) {
@@ -699,6 +971,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
       billNoController.clear();
       billVendorController.clear();
       billAmountController.clear();
+      _selectedBillImage = null;
       bills.clear();
     });
   }
@@ -819,7 +1092,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
             'billVendor': bill['billVendor'],
             'billAmount': amount,
             'billDate': selectedDate.toIso8601String(),
-            'billCopy': 'billURL',
+            'billCopy': bill['billCopy'] ?? 'billURL',
           };
         }).toList();
 
@@ -954,7 +1227,7 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
           'billVendor': bill['billVendor'],
           'billAmount': amount,
           'billDate': Timestamp.fromDate(selectedDate),
-          'billCopy': 'billURL',
+          'billCopy': bill['billCopy'] ?? 'billURL',
         };
       }).toList();
 
@@ -1610,19 +1883,33 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
                     isTablet: isTablet,
                     isMobile: isMobile,
                   ),
+                  const SizedBox(height: 16),
+                  _buildImagePicker(isDesktop, isTablet, isMobile),
+                  const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton.icon(
-                      onPressed: _addBill,
-                      icon: const Icon(
-                        Icons.add_circle_outline_rounded,
-                        color: Colors.white,
-                        size: 20.0,
-                      ),
-                      label: const Text(
-                        "Add Bill to List",
-                        style: TextStyle(
+                      onPressed: isUploadingImage ? null : _addBill,
+                      icon: isUploadingImage
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.add_circle_outline_rounded,
+                              color: Colors.white,
+                              size: 20.0,
+                            ),
+                      label: Text(
+                        isUploadingImage
+                            ? "Uploading Bill..."
+                            : "Add Bill to List",
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14.5,
                           fontWeight: FontWeight.bold,
@@ -1847,7 +2134,10 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirestoreService.getCollection('organizationExpenses').snapshots(),
           builder: (context, altOrgSnap) {
-            final Map<String, Map<String, dynamic>> dedupedMap = {};
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirestoreService.managerExpenses.snapshots(),
+              builder: (context, mgrSnap) {
+                final Map<String, Map<String, dynamic>> dedupedMap = {};
 
             void processDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc, String source) {
               final data = doc.data();
@@ -1968,6 +2258,11 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
             if (altOrgSnap.hasData) {
               for (var doc in altOrgSnap.data!.docs) {
                 processDoc(doc, 'Organization Expenses');
+              }
+            }
+            if (mgrSnap.hasData) {
+              for (var doc in mgrSnap.data!.docs) {
+                processDoc(doc, 'Manager Expenses');
               }
             }
 
@@ -2146,6 +2441,8 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
                     ),
                   ),
                 );
+              },
+            );
               },
             );
           },
@@ -3262,57 +3559,151 @@ class OrganizationExpensesState extends State<OrganizationExpenses>
   }
 
   void _showBillImagePreview(BuildContext context, String imageUrl) {
+    final isPdf = imageUrl.toLowerCase().contains('.pdf');
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppBar(
-              title: const Text('Bill Attachment',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              foregroundColor: const Color(0xFF0F172A),
-              automaticallyImplyLeading: false,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.pop(context),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 600,
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppBar(
+                title: Text(
+                  isPdf ? 'Bill Document (PDF)' : 'Bill Attachment',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return const Padding(
-                      padding: EdgeInsets.all(40),
-                      child: CircularProgressIndicator(),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Padding(
-                    padding: const EdgeInsets.all(30),
-                    child: Column(
-                      children: const [
-                        Icon(Icons.broken_image_rounded,
-                            size: 40, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text('Unable to load bill image preview',
-                            style: TextStyle(fontSize: 12)),
-                      ],
-                    ),
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                foregroundColor: const Color(0xFF0F172A),
+                automaticallyImplyLeading: false,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                    tooltip: 'Open Full / Download',
+                    onPressed: () async {
+                      try {
+                        final uri = Uri.parse(imageUrl);
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } catch (e) {
+                        debugPrint('Could not launch URL: $e');
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: isPdf
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.picture_as_pdf_rounded,
+                                    size: 64,
+                                    color: Color(0xFFEF4444),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'PDF Document Attached',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Tap below to open or download the complete PDF bill document.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryColor,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      try {
+                                        final uri = Uri.parse(imageUrl);
+                                        await launchUrl(uri,
+                                            mode: LaunchMode.externalApplication);
+                                      } catch (e) {
+                                        debugPrint('Could not launch PDF: $e');
+                                      }
+                                    },
+                                    icon: const Icon(Icons.open_in_browser_rounded),
+                                    label: const Text('Open PDF Document'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : InteractiveViewer(
+                            panEnabled: true,
+                            minScale: 0.8,
+                            maxScale: 4.0,
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.contain,
+                              gaplessPlayback: true,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(40),
+                                    child: CircularProgressIndicator(
+                                      value: progress.expectedTotalBytes != null
+                                          ? progress.cumulativeBytesLoaded /
+                                              progress.expectedTotalBytes!
+                                          : null,
+                                    ),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) => Padding(
+                                padding: const EdgeInsets.all(30),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.broken_image_rounded,
+                                        size: 40, color: Colors.grey),
+                                    SizedBox(height: 8),
+                                    Text('Unable to load bill image preview',
+                                        style: TextStyle(fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

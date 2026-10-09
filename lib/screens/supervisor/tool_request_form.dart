@@ -798,12 +798,14 @@ class _ToolRequestFormState extends State<ToolRequestForm> {
         children: [
           Row(
             children: [
-              _buildCardTitle(
-                icon: Icons.construction_rounded,
-                iconColor: primaryColor,
-                title: 'Equipment & Tool Details',
+              Expanded(
+                child: _buildCardTitle(
+                  icon: Icons.construction_rounded,
+                  iconColor: primaryColor,
+                  title: 'Equipment & Tool Details',
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               if (_isLoadingToolsList)
                 SizedBox(
                   width: 16,
@@ -948,12 +950,14 @@ class _ToolRequestFormState extends State<ToolRequestForm> {
         children: [
           Row(
             children: [
-              _buildCardTitle(
-                icon: Icons.checklist_rounded,
-                iconColor: primaryColor,
-                title: 'Requested Equipment Items',
+              Expanded(
+                child: _buildCardTitle(
+                  icon: Icons.checklist_rounded,
+                  iconColor: primaryColor,
+                  title: 'Requested Equipment Items',
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -1201,7 +1205,6 @@ class _ToolRequestFormState extends State<ToolRequestForm> {
       ],
     );
   }
-
   Widget _buildDateField() {
     return InkWell(
       onTap: _pickDate,
@@ -1217,30 +1220,34 @@ class _ToolRequestFormState extends State<ToolRequestForm> {
           children: [
             Icon(Icons.calendar_today_rounded, size: 18, color: primaryColor),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Required Date",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF64748B),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Required Date",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  selectedDate != null
-                      ? DateFormat('EEE, MMM d, yyyy').format(selectedDate!)
-                      : 'Select Date',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                  Text(
+                    selectedDate != null
+                        ? DateFormat('EEE, MMM d, yyyy').format(selectedDate!)
+                        : 'Select Date',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const Spacer(),
+            const SizedBox(width: 6),
             const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
           ],
         ),
@@ -1263,36 +1270,43 @@ class _ToolRequestFormState extends State<ToolRequestForm> {
           children: [
             const Icon(Icons.event_repeat_rounded, size: 18, color: Color(0xFFD97706)),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Expected Return Date (Optional)",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF64748B),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Expected Return Date (Optional)",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  returnDate != null
-                      ? DateFormat('EEE, MMM d, yyyy').format(returnDate!)
-                      : 'Not Specified (Indefinite / Permanent)',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: returnDate != null
-                        ? const Color(0xFF0F172A)
-                        : const Color(0xFF94A3B8),
+                  Text(
+                    returnDate != null
+                        ? DateFormat('EEE, MMM d, yyyy').format(returnDate!)
+                        : 'Not Specified (Permanent)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: returnDate != null
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFF94A3B8),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const Spacer(),
+            const SizedBox(width: 6),
             if (returnDate != null)
               IconButton(
                 icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
                 onPressed: () => setState(() => returnDate = null),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               )
             else
               const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
@@ -1308,6 +1322,7 @@ class _ToolRequestFormState extends State<ToolRequestForm> {
     required String title,
   }) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           padding: const EdgeInsets.all(6),
@@ -1318,12 +1333,15 @@ class _ToolRequestFormState extends State<ToolRequestForm> {
           child: Icon(icon, size: 16, color: iconColor),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14.5,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0F172A),
+        Flexible(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -1422,11 +1440,14 @@ class _ToolRequestFormState extends State<ToolRequestForm> {
                 children: [
                   Icon(icon, size: 18, color: const Color(0xFF64748B)),
                   const SizedBox(width: 8),
-                  Text(
-                    hint ?? "Select $label",
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF94A3B8),
+                  Expanded(
+                    child: Text(
+                      hint ?? "Select $label",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF94A3B8),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

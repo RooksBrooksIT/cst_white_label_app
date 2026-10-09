@@ -437,49 +437,56 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Available Stock at Site',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isAvailable
-                                ? const Color(0xFF047857)
-                                : const Color(0xFFB91C1C),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Available Stock at Site',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isAvailable
+                                  ? const Color(0xFF047857)
+                                  : const Color(0xFFB91C1C),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              '$count',
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: isAvailable
-                                    ? const Color(0xFF065F46)
-                                    : const Color(0xFF991B1B),
-                              ),
+                          const SizedBox(height: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(
+                                  '$count',
+                                  style: TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.bold,
+                                    color: isAvailable
+                                        ? const Color(0xFF065F46)
+                                        : const Color(0xFF991B1B),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  unit,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isAvailable
+                                        ? const Color(0xFF047857)
+                                        : const Color(0xFFB91C1C),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              unit,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: isAvailable
-                                    ? const Color(0xFF047857)
-                                    : const Color(0xFFB91C1C),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
@@ -911,14 +918,20 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Available Stock (${selectedSiteId ?? ""})',
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+              Expanded(
+                child: Text(
+                  selectedSiteId != null && selectedSiteId!.isNotEmpty
+                      ? 'Available Stock ($selectedSiteId)'
+                      : 'Available Stock',
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -1010,6 +1023,7 @@ class _MaterialAtSiteEntryPageState extends State<MaterialAtSiteEntryPage> {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
 
                           // Available Stock Count Badge
                           Column(

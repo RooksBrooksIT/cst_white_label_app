@@ -121,20 +121,39 @@ class _SiteScreenState extends State<SiteScreen>
     _amountSpentController.text = '0.00';
     _balanceAmountController.text = '0.00';
     _amountPaidController.addListener(_recalcNewSetupBalance);
+    _projectBudgetController.addListener(_recalcNewSetupBalance);
     _amountSpentController.addListener(_recalcNewSetupBalance);
 
     _updateAmountPaidController.addListener(_recalcUpdateBalance);
     _updateAmountSpentController.addListener(_recalcUpdateBalance);
   }
 
+  bool get _advanceExceedsBudget {
+    final cleanBudget =
+        _projectBudgetController.text.replaceAll(',', '').trim();
+    final cleanAdvance =
+        _amountPaidController.text.replaceAll(',', '').trim();
+    final budget = double.tryParse(cleanBudget);
+    final advance = double.tryParse(cleanAdvance);
+    return budget != null && advance != null && advance > budget;
+  }
+
   void _recalcNewSetupBalance() {
+    if (_advanceExceedsBudget) {
+      if (_balanceAmountController.text.isNotEmpty) {
+        _balanceAmountController.text = '';
+      }
+      setState(() {});
+      return;
+    }
     final received = double.tryParse(_amountPaidController.text.trim().replaceAll(',', '')) ?? 0.0;
     final spent = double.tryParse(_amountSpentController.text.trim().replaceAll(',', '')) ?? 0.0;
     final balance = received - spent;
-    final formatted = balance.toStringAsFixed(2);
+    final formatted = balance >= 0 ? balance.toStringAsFixed(2) : '0.00';
     if (_balanceAmountController.text != formatted) {
       _balanceAmountController.text = formatted;
     }
+    setState(() {});
   }
 
   void _recalcUpdateBalance() {
@@ -1757,7 +1776,7 @@ class _SiteScreenState extends State<SiteScreen>
 
   // -------------------- ATOMIC SAVE LOGIC --------------------
   Future<void> _saveSiteAndProject() async {
-    if (_isSaving) return;
+    if (_isSaving || _advanceExceedsBudget) return;
 
     if (!(_formKey.currentState?.validate() ?? false)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2926,6 +2945,10 @@ class _SiteScreenState extends State<SiteScreen>
                           inputFormatters: [
                             FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                           ],
+                          hasError: _advanceExceedsBudget,
+                          errorText: _advanceExceedsBudget
+                              ? 'Initial amount cannot be greater than the project budget.'
+                              : null,
                           onChanged: (_) => _recalcNewSetupBalance(),
                         ),
                       ),
@@ -3004,23 +3027,32 @@ class _SiteScreenState extends State<SiteScreen>
               height: 54,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  colors: [primaryColor, darkAccent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryColor.withValues(alpha: 0.35),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
+                gradient: (_isSaving || _advanceExceedsBudget)
+                    ? null
+                    : LinearGradient(
+                        colors: [primaryColor, darkAccent],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                color: (_isSaving || _advanceExceedsBudget)
+                    ? const Color(0xFFCBD5E1)
+                    : null,
+                boxShadow: (_isSaving || _advanceExceedsBudget)
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.35),
+                          blurRadius: 14,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
               ),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: _isSaving ? null : _saveSiteAndProject,
+                  onTap: (_isSaving || _advanceExceedsBudget)
+                      ? null
+                      : _saveSiteAndProject,
                   borderRadius: BorderRadius.circular(16),
                   child: Center(
                     child: _isSaving
@@ -3032,17 +3064,25 @@ class _SiteScreenState extends State<SiteScreen>
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : const Row(
+                        : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                              SizedBox(width: 8),
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: (_isSaving || _advanceExceedsBudget)
+                                    ? const Color(0xFF94A3B8)
+                                    : Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
                               Text(
                                 'CREATE SITE & PROJECT',
                                 style: TextStyle(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.white,
+                                  color: (_isSaving || _advanceExceedsBudget)
+                                      ? const Color(0xFF94A3B8)
+                                      : Colors.white,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -4095,9 +4135,21 @@ class _SiteScreenState extends State<SiteScreen>
     bool readOnly = false,
     void Function(String)? onChanged,
     List<TextInputFormatter>? inputFormatters,
+    bool hasError = false,
+    String? errorText,
   }) {
     final theme = Theme.of(context);
     final effectivePrimary = primaryColor ?? theme.primaryColor;
+    final bool showErrorBorder =
+        hasError || (errorText != null && errorText.isNotEmpty);
+    final Color effectiveBorderColor = showErrorBorder
+        ? const Color(0xFFEF4444)
+        : const Color(0xFFCBD5E1);
+    final Color effectiveFocusedBorderColor = showErrorBorder
+        ? const Color(0xFFEF4444)
+        : effectivePrimary;
+    final double effectiveBorderWidth = showErrorBorder ? 1.5 : 1.0;
+    final double effectiveFocusedWidth = showErrorBorder ? 2.0 : 1.5;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4119,6 +4171,13 @@ class _SiteScreenState extends State<SiteScreen>
           decoration: InputDecoration(
             isDense: true,
             hintText: hintText,
+            errorText: errorText,
+            errorMaxLines: 2,
+            errorStyle: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFEF4444),
+            ),
             hintStyle: const TextStyle(
               color: Color(0xFF94A3B8),
               fontSize: 12.5,
@@ -4129,26 +4188,32 @@ class _SiteScreenState extends State<SiteScreen>
             fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              borderSide: BorderSide(
+                color: effectiveBorderColor,
+                width: effectiveBorderWidth,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+              borderSide: BorderSide(
+                color: effectiveBorderColor,
+                width: effectiveBorderWidth,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: effectivePrimary,
-                width: 1.5,
+                color: effectiveFocusedBorderColor,
+                width: effectiveFocusedWidth,
               ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2.0),
             ),
           ),
         ),

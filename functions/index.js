@@ -1,5 +1,6 @@
+const path = require("path");
 try {
-  require("dotenv").config();
+  require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 } catch (_) {}
 
 const functions = require("firebase-functions/v1");
@@ -273,7 +274,7 @@ exports.verifySubscription = functions.region("us-central1").https.onCall(async 
     let days = 30;
     if (planType === "6 Months") days = 180;
     if (planType === "Yearly") days = 365;
-    if (planType === "Free Trial") days = 14;
+    if (planType === "Free Trial" || (planDetails?.planName && planDetails.planName.toLowerCase().includes("trial"))) days = 14;
 
     const endDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
@@ -866,7 +867,35 @@ exports.resendSubscriptionInvoice = functions.region("us-central1").https.onCall
         emailMessageId: result.messageId,
         emailSentAt: new Date(),
         resentAt: new Date(),
+        emailError: null,
       }, { merge: true });
+
+      if (effectiveOrgId) {
+        await db.collection("organisation").doc(effectiveOrgId).collection("data").doc("subscription").set({
+          lastInvoice: {
+            invoiceNo: invoiceData.invoiceNo || `INV-${txnid.slice(-6)}`,
+            emailStatus: "SENT",
+            emailSentAt: new Date(),
+            emailMessageId: result.messageId,
+            emailError: null,
+          },
+        }, { merge: true }).catch(() => {});
+      }
+    } else {
+      await invoiceRef.set({
+        emailStatus: "FAILED",
+        emailError: result.error || "Failed to deliver email",
+        lastFailedAt: new Date(),
+      }, { merge: true });
+
+      if (effectiveOrgId) {
+        await db.collection("organisation").doc(effectiveOrgId).collection("data").doc("subscription").set({
+          lastInvoice: {
+            emailStatus: "FAILED",
+            emailError: result.error || "Failed to deliver email",
+          },
+        }, { merge: true }).catch(() => {});
+      }
     }
 
     return {
@@ -2261,16 +2290,29 @@ async function executeSubscriptionExpiryScan(db) {
 
         const endDate = endDateTimestamp.toDate();
         const diffMs = endDate.getTime() - now.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
         // 1. Expired subscriptions must NOT receive reminders
-        if (diffMs <= 0 || diffDays <= 0) {
+        if (diffMs <= 0) {
           skippedCount++;
           continue;
         }
 
-        // 2. Only target subscriptions that are 2 days away (e.g. <= 2.05 days and > 0 days)
-        if (diffDays > 2.05) {
+        // Calculate whole calendar day difference in Asia/Kolkata timezone
+        const timeZone = "Asia/Kolkata";
+        const nowKolkataStr = now.toLocaleDateString("en-CA", { timeZone });
+        const endKolkataStr = endDate.toLocaleDateString("en-CA", { timeZone });
+        const nowMidnight = new Date(nowKolkataStr + "T00:00:00Z");
+        const endMidnight = new Date(endKolkataStr + "T00:00:00Z");
+        const calendarDiffDays = Math.round((endMidnight.getTime() - nowMidnight.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Expired on or before current date
+        if (calendarDiffDays <= 0) {
+          skippedCount++;
+          continue;
+        }
+
+        // 2. Only target subscriptions that are 2 days away (1 or 2 calendar days remaining)
+        if (calendarDiffDays > 2) {
           // Expiry is more than 2 days away
           continue;
         }
@@ -2313,10 +2355,10 @@ async function executeSubscriptionExpiryScan(db) {
           continue;
         }
 
-        const daysRemaining = Math.max(1, Math.ceil(diffDays));
+        const daysRemaining = calendarDiffDays;
         const planName = subData.subscriptionPlan || "Subscription";
 
-        logger.info(`Sending 2-day expiry reminder to ${emailService.maskEmail(payerEmail)} for org ${orgId} (Expires in ${daysRemaining} days on ${endDateIso})`);
+        logger.info(`Sending expiry reminder to ${emailService.maskEmail(payerEmail)} for org ${orgId} (Expires in ${daysRemaining} day(s) on ${endDateIso})`);
 
         const emailResult = await emailService.sendSubscriptionExpiryReminder({
           orgId,

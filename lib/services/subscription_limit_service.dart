@@ -175,12 +175,12 @@ class SubscriptionLimitService {
     } else if (norm.contains('silver')) {
       return const SubscriptionPlanLimits(
         planName: 'Silver',
-        maxProjects: 3,
+        maxProjects: 5,
         maxManagers: null, // Silver has no separate manager limit
         maxSupervisors: null, // Silver has no separate supervisor limit
         maxTotalUsers: 5,
         features: [
-          'Basic Project Management (up to 3 sites)',
+          'Basic Project Management (up to 5 sites)',
           'Layout & Drawings: 1 doc per site (view only, no delete/re-upload)',
           'Task Tracking & Updates',
           'Limited Team Members (3-5)',

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:ebricks/services/firestore_service.dart';
+import 'package:ebricks/services/auth_service.dart';
 
 /// Result object returned after a successful storage upload
 class StorageUploadResult {
@@ -37,10 +38,23 @@ class StorageUploadResult {
 class AppStorageService {
   static final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  /// Retrieves the active Organization ID, throwing a descriptive exception
-  /// if attempting an upload before tenant initialization.
+  /// Retrieves the active Organization / Tenant ID robustly.
   static String get currentOrgId {
-    final orgId = FirestoreService.currentOrgId;
+    String orgId = FirestoreService.currentOrgId;
+    if (orgId.isEmpty || orgId == 'uninitialized') {
+      try {
+        final auth = AuthService();
+        final resolved = (auth.userData['dynamicPath'] ?? auth.userData['orgId'] ?? '').toString();
+        if (resolved.isNotEmpty) {
+          if (resolved.contains('/')) {
+            final parts = resolved.split('/');
+            orgId = (parts.length > 1 && parts[0] == 'organisation') ? parts[1] : parts[0];
+          } else {
+            orgId = resolved;
+          }
+        }
+      } catch (_) {}
+    }
     if (orgId.isEmpty || orgId == 'uninitialized') {
       debugPrint('WARNING: Storage accessed without active organization ID.');
       return 'default_org';
@@ -211,27 +225,161 @@ class AppStorageService {
     return result?.downloadUrl;
   }
 
-  /// Uploads expense bill / receipt scoped to:
-  /// `organisation/{orgId}/expenses/{siteId}_{dateFormatted}/bill_{billNo}_{timestamp}.jpg`
+  /// Uploads a Manager Expense bill image/document to:
+  /// `manager expenses/organisation/{tenantId}/manager expenses/{siteId_siteName}/{image}`
+  static Future<String?> uploadManagerExpenseBill({
+    required String siteId,
+    required String siteName,
+    required String billNo,
+    File? file,
+    Uint8List? bytes,
+    String? explicitTenantId,
+  }) async {
+    return _uploadExpenseBillToScopedPath(
+      expenseType: 'manager expenses',
+      siteId: siteId,
+      siteName: siteName,
+      billNo: billNo,
+      file: file,
+      bytes: bytes,
+      explicitTenantId: explicitTenantId,
+    );
+  }
+
+  /// Uploads an Organization Expense bill image/document to:
+  /// `manager expenses/organisation/{tenantId}/organization expenses/{siteId_siteName}/{image}`
+  static Future<String?> uploadOrganizationExpenseBill({
+    required String siteId,
+    required String siteName,
+    required String billNo,
+    File? file,
+    Uint8List? bytes,
+    String? explicitTenantId,
+  }) async {
+    return _uploadExpenseBillToScopedPath(
+      expenseType: 'organization expenses',
+      siteId: siteId,
+      siteName: siteName,
+      billNo: billNo,
+      file: file,
+      bytes: bytes,
+      explicitTenantId: explicitTenantId,
+    );
+  }
+
+  /// Internal scoped upload engine implementing exact required directory hierarchy:
+  /// manager expenses/organisation/{tenantId}/{expenseType}/{siteId_siteName}/{image}
+  static Future<String?> _uploadExpenseBillToScopedPath({
+    required String expenseType,
+    required String siteId,
+    required String siteName,
+    required String billNo,
+    File? file,
+    Uint8List? bytes,
+    String? explicitTenantId,
+  }) async {
+    try {
+      // 1. Resolve Tenant ID
+      String tenantId = (explicitTenantId != null && explicitTenantId.trim().isNotEmpty)
+          ? explicitTenantId.trim()
+          : currentOrgId;
+
+      if (tenantId.isEmpty || tenantId == 'uninitialized' || tenantId == 'default_org') {
+        try {
+          final auth = AuthService();
+          final resolved = (auth.userData['dynamicPath'] ?? auth.userData['orgId'] ?? '').toString();
+          if (resolved.isNotEmpty) {
+            if (resolved.contains('/')) {
+              final parts = resolved.split('/');
+              tenantId = (parts.length > 1 && parts[0] == 'organisation') ? parts[1] : parts[0];
+            } else {
+              tenantId = resolved;
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (tenantId.isEmpty || tenantId == 'uninitialized') {
+        tenantId = 'default_org';
+      }
+
+      // 2. Resolve Site Folder: {siteId_siteName}
+      final cleanSiteId = sanitizeFileName(siteId.trim());
+      String cleanSiteName = sanitizeFileName(siteName.trim());
+      if (cleanSiteName.isEmpty || cleanSiteName.toLowerCase() == cleanSiteId.toLowerCase()) {
+        cleanSiteName = 'site';
+      }
+      final siteFolder = '${cleanSiteId}_$cleanSiteName';
+
+      // 3. Resolve Image / Document File Name
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final cleanBillNo = sanitizeFileName(billNo.trim());
+      String ext = 'jpg';
+      if (file != null && file.path.contains('.')) {
+        ext = file.path.split('.').last.toLowerCase();
+      }
+      final billTag = cleanBillNo.isNotEmpty ? cleanBillNo : 'doc';
+      final fileName = 'bill_${billTag}_$timestamp.$ext';
+
+      // 4. Exact path required:
+      // manager expenses/organisation/{tenantId}/{expenseType}/{siteId_siteName}/{image}
+      final fullStoragePath =
+          'manager expenses/organisation/$tenantId/$expenseType/$siteFolder/$fileName';
+      final storageRef = _storage.ref().child(fullStoragePath);
+
+      final metadata = SettableMetadata(
+        contentType: detectMetadata(fileName).contentType ?? 'image/jpeg',
+        cacheControl: 'public, max-age=2592000', // 30 days cache for fast loading
+      );
+
+      UploadTask uploadTask;
+      if (bytes != null && bytes.isNotEmpty) {
+        uploadTask = storageRef.putData(bytes, metadata);
+      } else if (file != null) {
+        if (!kIsWeb) {
+          if (!await file.exists()) {
+            debugPrint('AppStorageService: File does not exist at ${file.path}');
+            return null;
+          }
+          uploadTask = storageRef.putFile(file, metadata);
+        } else {
+          final fileBytes = await file.readAsBytes();
+          uploadTask = storageRef.putData(fileBytes, metadata);
+        }
+      } else {
+        debugPrint('AppStorageService: No file or bytes provided');
+        return null;
+      }
+
+      final TaskSnapshot snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      debugPrint('AppStorageService: Bill uploaded successfully -> $fullStoragePath');
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('AppStorageService: Error uploading expense bill: $e');
+      return null;
+    }
+  }
+
+  /// Backward compatible uploadExpenseBill redirecting to manager expenses path
   static Future<String?> uploadExpenseBill({
     required String siteId,
     required String billNo,
     required String dateFormatted,
+    String? siteName,
     File? file,
     Uint8List? bytes,
     String extension = 'jpg',
+    String? explicitTenantId,
   }) async {
-    final cleanSite = sanitizeFileName(siteId);
-    final cleanBill = sanitizeFileName(billNo);
-    final fileName = 'bill_$cleanBill.$extension';
-
-    final result = await uploadFile(
-      category: 'expenses/${cleanSite}_$dateFormatted',
-      fileName: fileName,
+    return uploadManagerExpenseBill(
+      siteId: siteId,
+      siteName: siteName ?? '',
+      billNo: billNo,
       file: file,
       bytes: bytes,
+      explicitTenantId: explicitTenantId,
     );
-    return result?.downloadUrl;
   }
 
   /// Uploads construction drawings and blueprint documents scoped to:
@@ -275,8 +423,9 @@ class AppStorageService {
   /// Deletes a file only if it strictly belongs to the current tenant organization
   static Future<bool> deleteFileByPath(String storagePath) async {
     try {
-      final expectedPrefix = 'organisation/$currentOrgId/';
-      if (!storagePath.startsWith(expectedPrefix)) {
+      final expectedPrefix1 = 'organisation/$currentOrgId/';
+      final expectedPrefix2 = 'manager expenses/organisation/$currentOrgId/';
+      if (!storagePath.startsWith(expectedPrefix1) && !storagePath.startsWith(expectedPrefix2)) {
         debugPrint('AppStorageService: Security check failed. Cannot delete cross-tenant file: $storagePath');
         return false;
       }
@@ -294,8 +443,9 @@ class AppStorageService {
   static Future<bool> deleteFileByUrl(String downloadUrl) async {
     try {
       final ref = _storage.refFromURL(downloadUrl);
-      final expectedPrefix = 'organisation/$currentOrgId/';
-      if (!ref.fullPath.startsWith(expectedPrefix)) {
+      final expectedPrefix1 = 'organisation/$currentOrgId/';
+      final expectedPrefix2 = 'manager expenses/organisation/$currentOrgId/';
+      if (!ref.fullPath.startsWith(expectedPrefix1) && !ref.fullPath.startsWith(expectedPrefix2)) {
         debugPrint('AppStorageService: Security check failed. Cannot delete cross-tenant file URL: ${ref.fullPath}');
         return false;
       }

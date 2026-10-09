@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/services/auth_service.dart';
@@ -790,28 +792,79 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   }
 
   Future<void> _pickBillImage() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 70,
+    final source = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded, color: Color(0xFF0A183D)),
+              title: const Text('Take Photo from Camera'),
+              onTap: () => Navigator.pop(context, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF0A183D)),
+              title: const Text('Choose Image from Gallery'),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF0A183D)),
+              title: const Text('Upload Document / PDF'),
+              onTap: () => Navigator.pop(context, 'document'),
+            ),
+          ],
+        ),
+      ),
     );
-    if (image != null) {
-      setState(() {
-        _selectedBillImage = File(image.path);
-      });
+
+    if (source == null) return;
+
+    if (source == 'document') {
+      try {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
+        );
+        if (result != null && result.files.single.path != null) {
+          setState(() {
+            _selectedBillImage = File(result.files.single.path!);
+          });
+        }
+      } catch (e) {
+        debugPrint('File picker note: $e');
+      }
+    } else {
+      final imgSource =
+          source == 'camera' ? ImageSource.camera : ImageSource.gallery;
+      final XFile? image = await _picker.pickImage(
+        source: imgSource,
+        imageQuality: 75,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+      if (image != null) {
+        setState(() {
+          _selectedBillImage = File(image.path);
+        });
+      }
     }
   }
 
   Future<String?> _uploadBillImage(File image, String billNo) async {
     try {
       if (selectedSiteId == null) return null;
-      return await AppStorageService.uploadExpenseBill(
+      final siteName = selectedProjectName ?? siteNameMap[selectedSiteId] ?? '';
+      return await AppStorageService.uploadManagerExpenseBill(
         siteId: selectedSiteId!,
+        siteName: siteName,
         billNo: billNo,
-        dateFormatted: DateFormat('ddMMyyyy').format(selectedDate),
         file: image,
       );
     } catch (e) {
-      debugPrint('Error uploading image: $e');
+      debugPrint('Error uploading manager expense bill: $e');
       return null;
     }
   }
@@ -3114,57 +3167,151 @@ class _ManagerExpensesState extends State<ManagerExpenses>
   }
 
   void _showBillImagePreview(BuildContext context, String imageUrl) {
+    final isPdf = imageUrl.toLowerCase().contains('.pdf');
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppBar(
-              title: const Text('Bill Attachment',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              foregroundColor: const Color(0xFF0F172A),
-              automaticallyImplyLeading: false,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.pop(context),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 600,
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppBar(
+                title: Text(
+                  isPdf ? 'Bill Document (PDF)' : 'Bill Attachment',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return const Padding(
-                      padding: EdgeInsets.all(40),
-                      child: CircularProgressIndicator(),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Padding(
-                    padding: const EdgeInsets.all(30),
-                    child: Column(
-                      children: const [
-                        Icon(Icons.broken_image_rounded,
-                            size: 40, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text('Unable to load bill image preview',
-                            style: TextStyle(fontSize: 12)),
-                      ],
-                    ),
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                foregroundColor: const Color(0xFF0F172A),
+                automaticallyImplyLeading: false,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                    tooltip: 'Open Full / Download',
+                    onPressed: () async {
+                      try {
+                        final uri = Uri.parse(imageUrl);
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } catch (e) {
+                        debugPrint('Could not launch URL: $e');
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: isPdf
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.picture_as_pdf_rounded,
+                                    size: 64,
+                                    color: Color(0xFFEF4444),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'PDF Document Attached',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Tap below to open or download the complete PDF bill document.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryColor,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      try {
+                                        final uri = Uri.parse(imageUrl);
+                                        await launchUrl(uri,
+                                            mode: LaunchMode.externalApplication);
+                                      } catch (e) {
+                                        debugPrint('Could not launch PDF: $e');
+                                      }
+                                    },
+                                    icon: const Icon(Icons.open_in_browser_rounded),
+                                    label: const Text('Open PDF Document'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : InteractiveViewer(
+                            panEnabled: true,
+                            minScale: 0.8,
+                            maxScale: 4.0,
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.contain,
+                              gaplessPlayback: true,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(40),
+                                    child: CircularProgressIndicator(
+                                      value: progress.expectedTotalBytes != null
+                                          ? progress.cumulativeBytesLoaded /
+                                              progress.expectedTotalBytes!
+                                          : null,
+                                    ),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) => Padding(
+                                padding: const EdgeInsets.all(30),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.broken_image_rounded,
+                                        size: 40, color: Colors.grey),
+                                    SizedBox(height: 8),
+                                    Text('Unable to load bill image preview',
+                                        style: TextStyle(fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -3382,6 +3529,9 @@ class _ManagerExpensesState extends State<ManagerExpenses>
     bool isTablet,
     bool isMobile,
   ) {
+    final isPdf = _selectedBillImage != null &&
+        _selectedBillImage!.path.toLowerCase().endsWith('.pdf');
+
     return InkWell(
       onTap: _pickBillImage,
       borderRadius: BorderRadius.circular(12.0),
@@ -3402,7 +3552,43 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.file(_selectedBillImage!, fit: BoxFit.cover),
+                    isPdf
+                        ? Container(
+                            color: const Color(0xFFF1F5F9),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.picture_as_pdf_rounded,
+                                  size: 44,
+                                  color: Color(0xFFEF4444),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _selectedBillImage!.path
+                                      .split(RegExp(r'[/\\]'))
+                                      .last,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'PDF Document Attached',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Image.file(_selectedBillImage!, fit: BoxFit.cover),
                     Positioned(
                       top: 8.0,
                       right: 8.0,
@@ -3431,11 +3617,19 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                   ),
                   const SizedBox(height: 8.0),
                   const Text(
-                    'Upload Bill Copy (Optional)',
+                    'Upload Bill Image / Document (Optional)',
                     style: TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 13.0,
                       fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2.0),
+                  Text(
+                    'Camera, Gallery, or PDF document',
+                    style: TextStyle(
+                      color: Colors.grey.shade500,
+                      fontSize: 11.0,
                     ),
                   ),
                 ],
@@ -3574,6 +3768,41 @@ class _ManagerExpensesState extends State<ManagerExpenses>
                             color: Color(0xFF64748B),
                           ),
                         ),
+                        if (bill['billCopy'] != null &&
+                            bill['billCopy'] != 'billURL' &&
+                            bill['billCopy'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: () => _showBillImagePreview(
+                              context,
+                              bill['billCopy'].toString(),
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.attachment_rounded,
+                                      size: 12, color: primaryColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'View Attached Bill',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

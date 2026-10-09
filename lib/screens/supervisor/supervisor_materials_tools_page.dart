@@ -77,11 +77,11 @@ class SupervisorMaterialsToolsPage extends StatelessWidget {
             },
           ),
           _MenuItemData(
-            title: 'Materials Info',
-            subtitle: 'Material specifications catalog, unit costs & usage guidelines',
-            icon: Icons.info_rounded,
+            title: 'Materials Movement',
+            subtitle: 'Transfer and return materials between sites & company warehouse',
+            icon: Icons.sync_alt_rounded,
             accentColor: const Color(0xFFA855F7),
-            badgeText: 'Catalog',
+            badgeText: 'Movement',
             onTap: () {
               Navigator.push(
                 context,

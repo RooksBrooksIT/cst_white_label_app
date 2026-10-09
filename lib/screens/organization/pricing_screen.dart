@@ -248,7 +248,7 @@ class _PricingScreenState extends State<PricingScreen> {
       case 'Gold':
         return 10;
       case 'Silver':
-        return 3;
+        return 5;
       case 'Free Trial':
       default:
         return 1;
@@ -311,7 +311,7 @@ class _PricingScreenState extends State<PricingScreen> {
     if (_selectedPlan == 'Silver') {
       if (_selectedPlanType == '6 Months') return 594.0;
       if (_selectedPlanType == 'Yearly') return 1188.0;
-      return 1.0;
+      return 99.0;
     } else if (_selectedPlan == 'Gold') {
       if (_selectedPlanType == '6 Months') return 1194.0;
       if (_selectedPlanType == 'Yearly') return 2388.0;
@@ -1534,7 +1534,7 @@ class _PricingScreenState extends State<PricingScreen> {
               ? '₹594'
               : isYearly
               ? '₹1,188'
-              : '₹1',
+              : '₹99',
           originalPrice: is6Months
               ? '₹894'
               : isYearly
