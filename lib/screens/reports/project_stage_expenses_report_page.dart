@@ -14,6 +14,7 @@ class ProjectStageExpensesReportPage extends StatefulWidget {
   final String projectStage;
   final DateTime fromDate;
   final DateTime toDate;
+  final String? supervisorId;
 
   const ProjectStageExpensesReportPage({
     super.key,
@@ -21,6 +22,7 @@ class ProjectStageExpensesReportPage extends StatefulWidget {
     required this.projectStage,
     required this.fromDate,
     required this.toDate,
+    this.supervisorId,
   });
 
   @override
@@ -30,6 +32,7 @@ class ProjectStageExpensesReportPage extends StatefulWidget {
 
 class _ProjectStageExpensesReportPageState
     extends State<ProjectStageExpensesReportPage> {
+  Map<String, String> siteHeader = {};
   double supervisorTotal = 0;
   double materialsTotal = 0;
   double labourTotal = 0;
@@ -292,8 +295,44 @@ class _ProjectStageExpensesReportPageState
         pcTotal += _toDouble(pc['amount']);
       }
 
+      // Find candidate supervisor entry for metadata if available
+      Map<String, dynamic>? supervisorEntryData;
+      for (final doc in allSupDocs) {
+        final data = doc.data();
+        if (data['isManagerEntry'] == true || data['createdBy'] == 'manager' ||
+            data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+          continue;
+        }
+        final docStage = (data['projectStage'] ?? data['projectField'] ?? data['stage'])
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        if (targetStage.isNotEmpty && docStage != null && docStage != targetStage) {
+          continue;
+        }
+        supervisorEntryData = data;
+        break;
+      }
+      if (supervisorEntryData == null) {
+        for (final doc in allSupDocs) {
+          final data = doc.data();
+          if (data['isManagerEntry'] == true || data['createdBy'] == 'manager' ||
+              data['isOrgEntry'] == true || data['createdBy'] == 'manager_org') {
+            continue;
+          }
+          supervisorEntryData = data;
+          break;
+        }
+      }
+
+      final resolvedHeader = await _resolveHeaderDetails(
+        siteKeys: siteKeys,
+        supervisorEntryData: supervisorEntryData,
+      );
+
       if (mounted) {
         setState(() {
+          siteHeader = resolvedHeader;
           supervisorTotal = sTotal;
           materialsTotal = matTotal;
           labourTotal = labTotal;
@@ -388,6 +427,7 @@ class _ProjectStageExpensesReportPageState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      _buildSiteHeaderSummary(theme, siteHeader),
                       _buildHeader(theme),
                       const SizedBox(height: 24),
                       _buildFinanceSummary(theme),
@@ -619,5 +659,427 @@ class _ProjectStageExpensesReportPageState
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to generate PDF: $e')));
     }
+  }
+
+  Future<Map<String, String>> _resolveHeaderDetails({
+    required List<String> siteKeys,
+    Map<String, dynamic>? supervisorEntryData,
+  }) async {
+    String siteName = '';
+    String supervisorName = '';
+    String siteAddress = '';
+
+    final rawSiteId = widget.siteId.trim();
+
+    // 1. Resolve canonical details via ExpenseService
+    if (rawSiteId.isNotEmpty) {
+      try {
+        final details = await ExpenseService.resolveSiteDetails(rawSiteId);
+        if (details.siteName.trim().isNotEmpty) {
+          siteName = details.siteName.trim();
+        } else if (details.projectName != null &&
+            details.projectName!.trim().isNotEmpty) {
+          siteName = details.projectName!.trim();
+        }
+
+        if (details.supervisor != null && details.supervisor!.trim().isNotEmpty) {
+          supervisorName = details.supervisor!.trim();
+        }
+
+        if (details.location != null && details.location!.trim().isNotEmpty) {
+          siteAddress = details.location!.trim();
+        }
+      } catch (e) {
+        debugPrint('ProjectStageExpensesReportPage: Error resolving SiteDetails: $e');
+      }
+    }
+
+    // 2. Extract from supervisorEntryData if available
+    if (supervisorEntryData != null) {
+      if (siteName.isEmpty) {
+        final fromEntry = (supervisorEntryData['projectName'] ??
+                supervisorEntryData['siteName'] ??
+                supervisorEntryData['site'])
+            ?.toString()
+            .trim();
+        if (fromEntry != null && fromEntry.isNotEmpty) {
+          siteName = fromEntry;
+        }
+      }
+
+      if (supervisorName.isEmpty) {
+        final fromEntry = (supervisorEntryData['supervisorName'] ??
+                supervisorEntryData['userName'] ??
+                supervisorEntryData['supervisor'])
+            ?.toString()
+            .trim();
+        if (fromEntry != null && fromEntry.isNotEmpty) {
+          supervisorName = fromEntry;
+        }
+      }
+
+      if (siteAddress.isEmpty) {
+        final fromEntry = (supervisorEntryData['siteLocation'] ??
+                supervisorEntryData['location'] ??
+                supervisorEntryData['address'] ??
+                supervisorEntryData['siteAddress'])
+            ?.toString()
+            .trim();
+        if (fromEntry != null && fromEntry.isNotEmpty) {
+          siteAddress = fromEntry;
+        }
+      }
+    }
+
+    // 3. Fallback: Query 'Site' collection directly
+    if (siteName.isEmpty || siteAddress.isEmpty || supervisorName.isEmpty) {
+      final keysToCheck = [if (rawSiteId.isNotEmpty) rawSiteId, ...siteKeys];
+      for (final key in keysToCheck) {
+        if (key.isEmpty) continue;
+        try {
+          final doc = await FirestoreService.sites.doc(key).get();
+          if (doc.exists && doc.data() != null) {
+            final data = doc.data()!;
+            if (siteName.isEmpty) {
+              final n = (data['siteName'] ?? data['name'] ?? data['projectName'])
+                  ?.toString()
+                  .trim();
+              if (n != null && n.isNotEmpty) siteName = n;
+            }
+            if (siteAddress.isEmpty) {
+              final a = (data['address'] ??
+                      data['siteAddress'] ??
+                      data['location'] ??
+                      data['siteLocation'])
+                  ?.toString()
+                  .trim();
+              if (a != null && a.isNotEmpty) siteAddress = a;
+            }
+            if (supervisorName.isEmpty) {
+              final s = (data['supervisor'] ?? data['supervisorName'])
+                  ?.toString()
+                  .trim();
+              if (s != null && s.isNotEmpty) supervisorName = s;
+            }
+          }
+        } catch (_) {}
+        if (siteName.isNotEmpty &&
+            siteAddress.isNotEmpty &&
+            supervisorName.isNotEmpty) {
+          break;
+        }
+      }
+    }
+
+    // 4. Fallback: Query 'projects' collection directly
+    if (siteName.isEmpty || siteAddress.isEmpty || supervisorName.isEmpty) {
+      final keysToCheck = [if (rawSiteId.isNotEmpty) rawSiteId, ...siteKeys];
+      for (final key in keysToCheck) {
+        if (key.isEmpty) continue;
+        try {
+          final doc = await FirestoreService.projects.doc(key).get();
+          if (doc.exists && doc.data() != null) {
+            final data = doc.data()!;
+            if (siteName.isEmpty) {
+              final n = (data['siteName'] ??
+                      data['projectName'] ??
+                      data['name'])
+                  ?.toString()
+                  .trim();
+              if (n != null && n.isNotEmpty) siteName = n;
+            }
+            if (siteAddress.isEmpty) {
+              final a = (data['location'] ??
+                      data['address'] ??
+                      data['siteLocation'] ??
+                      data['siteAddress'])
+                  ?.toString()
+                  .trim();
+              if (a != null && a.isNotEmpty) siteAddress = a;
+            }
+            if (supervisorName.isEmpty) {
+              final s = (data['supervisor'] ?? data['supervisorName'])
+                  ?.toString()
+                  .trim();
+              if (s != null && s.isNotEmpty) supervisorName = s;
+            }
+          }
+        } catch (_) {}
+        if (siteName.isNotEmpty &&
+            siteAddress.isNotEmpty &&
+            supervisorName.isNotEmpty) {
+          break;
+        }
+      }
+    }
+
+    // 5. Fallback: Query 'supervisors' collection for Supervisor Name
+    if (supervisorName.isEmpty) {
+      final supId = (widget.supervisorId ??
+              supervisorEntryData?['supervisorId'] ??
+              supervisorEntryData?['userId'] ??
+              '').trim();
+      if (supId.isNotEmpty) {
+        try {
+          final supDoc = await FirestoreService.supervisors.doc(supId).get();
+          if (supDoc.exists && supDoc.data() != null) {
+            final data = supDoc.data()!;
+            final n = (data['name'] ??
+                    data['supervisorName'] ??
+                    data['userName'] ??
+                    data['fullName'])
+                ?.toString()
+                .trim();
+            if (n != null && n.isNotEmpty) supervisorName = n;
+          }
+        } catch (_) {}
+
+        if (supervisorName.isEmpty) {
+          try {
+            final q = await FirestoreService.supervisors
+                .where('supervisorId', isEqualTo: supId)
+                .limit(1)
+                .get();
+            if (q.docs.isNotEmpty) {
+              final data = q.docs.first.data();
+              final n = (data['name'] ??
+                      data['supervisorName'] ??
+                      data['userName'] ??
+                      data['fullName'])
+                  ?.toString()
+                  .trim();
+              if (n != null && n.isNotEmpty) supervisorName = n;
+            }
+          } catch (_) {}
+        }
+
+        if (supervisorName.isEmpty &&
+            !supId.contains(RegExp(r'^[0-9a-fA-F\-]{16,}'))) {
+          supervisorName = supId;
+        }
+      }
+    }
+
+    // 6. Ensure clean fallbacks
+    if (siteName.isEmpty) {
+      siteName = rawSiteId.isNotEmpty ? rawSiteId : 'N/A';
+    }
+    if (supervisorName.isEmpty) {
+      supervisorName = 'N/A';
+    }
+    if (siteAddress.isEmpty) {
+      siteAddress = 'N/A';
+    }
+
+    return {
+      'siteName': siteName,
+      'supervisorName': supervisorName,
+      'siteAddress': siteAddress,
+    };
+  }
+
+  Widget _buildSiteHeaderSummary(
+      ThemeData theme, Map<String, dynamic> siteHeader) {
+    final siteName =
+        (siteHeader['siteName']?.toString().trim().isNotEmpty == true)
+            ? siteHeader['siteName'].toString().trim()
+            : 'N/A';
+    final supervisorName =
+        (siteHeader['supervisorName']?.toString().trim().isNotEmpty == true)
+            ? siteHeader['supervisorName'].toString().trim()
+            : 'N/A';
+    final siteAddress =
+        (siteHeader['siteAddress']?.toString().trim().isNotEmpty == true)
+            ? siteHeader['siteAddress'].toString().trim()
+            : 'N/A';
+
+    final primaryColor = theme.primaryColor;
+    final isDark = theme.brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
+    final labelColor =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Site Name
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child:
+                    Icon(Icons.business_rounded, color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SITE NAME',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                        color: labelColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      siteName,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(color: borderColor, height: 1),
+          ),
+          // 2. Supervisor Name & 3. Site Address (Responsive Layout)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 420;
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeaderDetailItem(
+                      icon: Icons.person_rounded,
+                      label: 'SUPERVISOR NAME',
+                      value: supervisorName,
+                      iconColor: const Color(0xFF0284C7),
+                      labelColor: labelColor,
+                      textColor: textColor,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildHeaderDetailItem(
+                      icon: Icons.location_on_rounded,
+                      label: 'SITE ADDRESS',
+                      value: siteAddress,
+                      iconColor: const Color(0xFFE11D48),
+                      labelColor: labelColor,
+                      textColor: textColor,
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _buildHeaderDetailItem(
+                      icon: Icons.person_rounded,
+                      label: 'SUPERVISOR NAME',
+                      value: supervisorName,
+                      iconColor: const Color(0xFF0284C7),
+                      labelColor: labelColor,
+                      textColor: textColor,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildHeaderDetailItem(
+                      icon: Icons.location_on_rounded,
+                      label: 'SITE ADDRESS',
+                      value: siteAddress,
+                      iconColor: const Color(0xFFE11D48),
+                      labelColor: labelColor,
+                      textColor: textColor,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderDetailItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color iconColor,
+    required Color labelColor,
+    required Color textColor,
+  }) {
+    final isUnset = value == 'N/A' ||
+        value == 'Not Available' ||
+        value == 'Not Assigned';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 2),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: iconColor, size: 16),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                  color: labelColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isUnset ? FontWeight.normal : FontWeight.w600,
+                  fontStyle: isUnset ? FontStyle.italic : FontStyle.normal,
+                  color: isUnset ? labelColor : textColor,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

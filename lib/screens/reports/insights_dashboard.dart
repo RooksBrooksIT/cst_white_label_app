@@ -5,6 +5,7 @@ import 'package:ebricks/screens/organization/organization_insights_screen.dart';
 import 'package:ebricks/screens/reports/organization_petty_cash_insights_screen.dart';
 import 'package:ebricks/screens/reports/project_financial_status_report_page.dart';
 import 'package:ebricks/screens/reports/site_status_report.dart';
+import 'package:ebricks/screens/reports/incentive_calculation.dart';
 import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/widgets/bottom_nav.dart';
 
@@ -176,6 +177,21 @@ class InsightsDashboard extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const OrganizationPettyCashInsightsScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSectionCard(
+                    context,
+                    icon: Icons.calculate_rounded,
+                    title: 'Incentive Calculation',
+                    description:
+                        'Calculate, review, and record supervisor performance incentives based on project stage savings.',
+                    primaryColor: primaryColor,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const IncentiveCalculation(),
                       ),
                     ),
                   ),

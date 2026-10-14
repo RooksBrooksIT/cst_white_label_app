@@ -1290,11 +1290,22 @@ class ExpenseService {
         queryFutures.add(FirestoreService.siteSupervisorIncentives.where('siteId', isEqualTo: key).get());
         queryFutures.add(FirestoreService.getCollection('supervisorIncentives').where('siteId', isEqualTo: key).get());
       }
+      queryFutures.add(FirestoreService.siteSupervisorIncentives.get());
 
       final snapshots = await Future.wait(queryFutures);
       for (final snap in snapshots) {
         for (final doc in snap.docs) {
-          matchedDocs[doc.id] = doc.data();
+          final data = doc.data();
+          final docSiteId = (data['siteId'] ?? '').toString().trim().toLowerCase();
+          final docSiteCode = (data['siteCode'] ?? '').toString().trim().toLowerCase();
+          final docIdLower = doc.id.trim().toLowerCase();
+          final isMatch = siteKeys.any((k) {
+            final lk = k.trim().toLowerCase();
+            return lk.isNotEmpty && (docSiteId == lk || docSiteCode == lk || docIdLower.startsWith('${lk}_') || docIdLower.contains(lk));
+          });
+          if (isMatch) {
+            matchedDocs[doc.id] = data;
+          }
         }
       }
 

@@ -29,6 +29,7 @@ class _ProjectstageSiteSummaryReportState
   bool isLoading = true;
   Map<String, dynamic>? projectInfo;
   Map<String, num> expenseTotals = {};
+  List<Map<String, dynamic>> stageIncentives = [];
   num grandTotal = 0;
 
   @override
@@ -85,6 +86,7 @@ class _ProjectstageSiteSummaryReportState
       'contractorEntries',
       'managerEntries',
       'organizationEntries',
+      'siteSupervisorIncentives',
     ];
 
     final futures = collections.map((c) => _fetchCollectionBySite(c, siteKeys)).toList();
@@ -96,11 +98,13 @@ class _ProjectstageSiteSummaryReportState
     final contractorDocs = results[3];
     final managerEntryDocs = results[4];
     final orgEntryDocs = results[5];
+    final incentiveDocs = results[6];
 
     final targetStage = widget.projectStage.trim().toLowerCase();
 
     num food = 0, fuel = 0, transport = 0, labours = 0, materials = 0;
-    num managerTotal = 0, organizationTotal = 0, contractorTotal = 0;
+    num managerTotal = 0, organizationTotal = 0, contractorTotal = 0, incentiveTotal = 0;
+    final List<Map<String, dynamic>> loadedIncentives = [];
 
     num getDocTotal(Map<String, dynamic> data) {
       if (data.containsKey('bills') && data['bills'] is List) {
@@ -176,7 +180,17 @@ class _ProjectstageSiteSummaryReportState
       contractorTotal += _toNum(data['totalAmount'] ?? data['amount']);
     }
 
-    return {
+    // 5. Supervisor Incentives
+    for (var doc in incentiveDocs) {
+      final data = doc.data() as Map<String, dynamic>;
+      if (!matchesStage(data)) continue;
+      final amt = _toNum(data['incentiveAmount'] ?? data['amount'] ?? data['totalAmount']);
+      incentiveTotal += amt;
+      loadedIncentives.add(data);
+    }
+    stageIncentives = loadedIncentives;
+
+    final totalsMap = <String, num>{
       'Food': food,
       'Fuel': fuel,
       'Transport': transport,
@@ -186,6 +200,11 @@ class _ProjectstageSiteSummaryReportState
       'Organization Expenses': organizationTotal,
       'Contractor Expenses': contractorTotal,
     };
+    if (incentiveTotal > 0) {
+      totalsMap['Supervisor Incentives'] = incentiveTotal;
+    }
+
+    return totalsMap;
   }
 
   Future<List<DocumentSnapshot>> _fetchCollectionBySite(
@@ -279,6 +298,10 @@ class _ProjectstageSiteSummaryReportState
                       _buildFinanceCard(theme),
                       const SizedBox(height: 24),
                       _buildBreakdownSection(theme),
+                      if (stageIncentives.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _buildIncentiveExpensesSection(theme),
+                      ],
                     ],
                   ),
                 ),
@@ -415,6 +438,77 @@ class _ProjectstageSiteSummaryReportState
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildIncentiveExpensesSection(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'SUPERVISOR INCENTIVES',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...stageIncentives.map((inc) {
+          final supervisor = inc['supervisorName'] ?? inc['supervisor'] ?? 'Supervisor';
+          final amount = _toNum(inc['incentiveAmount'] ?? inc['amount']);
+          final pct = inc['incentivePercentage'] != null ? '${inc['incentivePercentage']}%' : '';
+          final saved = _toNum(inc['savedAmount']);
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.savings_rounded,
+                      color: Color(0xFF10B981),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          supervisor,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        if (pct.isNotEmpty || saved > 0)
+                          Text(
+                            'Saved: ₹${saved.toStringAsFixed(0)} ($pct)',
+                            style: const TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '₹ ${amount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: Color(0xFF10B981),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ],
     );
   }

@@ -17,6 +17,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
   String? _selectedSiteId;
   String? _selectedProjectStage;
   String _supervisorName = '';
+  final TextEditingController _supervisorController = TextEditingController();
 
   List<String> _siteIds = [];
   List<String> _filteredProjectStages = [];
@@ -32,6 +33,12 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
   void initState() {
     super.initState();
     _fetchSiteSupervisorData();
+  }
+
+  @override
+  void dispose() {
+    _supervisorController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchSiteSupervisorData() async {
@@ -149,6 +156,16 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
         }
       } catch (e) {
         debugPrint('IncentiveCalc: Error fetching projectStages collection: $e');
+      }
+
+      // 7. Fetch from siteSupervisorIncentives
+      try {
+        final incSnap = await FirestoreService.siteSupervisorIncentives.get();
+        for (var doc in incSnap.docs) {
+          processDoc(doc.data(), doc.id);
+        }
+      } catch (e) {
+        debugPrint('IncentiveCalc: Error fetching siteSupervisorIncentives: $e');
       }
 
       final validSiteIds = ExpenseService.sanitizeSiteIds(siteIds);
@@ -302,11 +319,13 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                     value: _selectedSiteId,
                                     items: _siteIds,
                                     onChanged: (newValue) async {
+                                      final newSupervisor = newValue != null
+                                          ? (_siteSupervisors[newValue] ?? '')
+                                          : '';
                                       setState(() {
                                         _selectedSiteId = newValue;
-                                        _supervisorName = newValue != null
-                                            ? (_siteSupervisors[newValue] ?? '')
-                                            : '';
+                                        _supervisorName = newSupervisor;
+                                        _supervisorController.text = newSupervisor;
                                         _filteredProjectStages = (newValue != null &&
                                                 _siteProjectStages[newValue] != null &&
                                                 _siteProjectStages[newValue]!.isNotEmpty)
@@ -324,6 +343,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                         if (mounted && _selectedSiteId == newValue && details.supervisor != null) {
                                           setState(() {
                                             _supervisorName = details.supervisor!;
+                                            _supervisorController.text = details.supervisor!;
                                           });
                                         }
                                       }
@@ -347,12 +367,22 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                       ),
                                       const SizedBox(height: 6),
                                       TextFormField(
+                                        controller: _supervisorController,
+                                        onChanged: (val) {
+                                          _supervisorName = val.trim();
+                                        },
                                         style: const TextStyle(
                                           color: Color(0xFF0A183D),
                                           fontWeight: FontWeight.w800,
                                           fontSize: 14.5,
                                         ),
                                         decoration: InputDecoration(
+                                          hintText: 'Enter supervisor name',
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey.shade400,
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 13.5,
+                                          ),
                                           prefixIcon: Icon(
                                             Icons.person_rounded,
                                             color: primaryColor,
@@ -377,10 +407,6 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                             vertical: 14,
                                           ),
                                         ),
-                                        controller: TextEditingController(
-                                          text: _supervisorName,
-                                        ),
-                                        readOnly: true,
                                       ),
                                     ],
                                   ),
@@ -451,6 +477,28 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
                                         ),
                                       ),
                                       onPressed: _reset,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+
+                                  // Cancel Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 46,
+                                    child: TextButton.icon(
+                                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                                      label: const Text(
+                                        'CANCEL',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: const Color(0xFF64748B),
+                                      ),
+                                      onPressed: () => Navigator.pop(context),
                                     ),
                                   ),
                                 ],
@@ -593,6 +641,7 @@ class _IncentiveCalculationState extends State<IncentiveCalculation> {
   }
 
   void _reset() {
+    _supervisorController.clear();
     setState(() {
       _selectedSiteId = null;
       _selectedProjectStage = null;

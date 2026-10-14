@@ -5,6 +5,7 @@ import 'package:ebricks/utils/responsive.dart';
 import 'package:ebricks/screens/manager/manager_material_approval_screen.dart';
 import 'package:ebricks/screens/manager/manager_approval_screen.dart';
 import 'package:ebricks/screens/organization/org_petty_cash_page.dart';
+import 'package:ebricks/screens/reports/incentive_calculation.dart';
 
 class OrgApprovalsMenuPage extends StatelessWidget {
   const OrgApprovalsMenuPage({super.key});
@@ -58,6 +59,21 @@ class OrgApprovalsMenuPage extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const OrgPettyCashPage(initialTabIndex: 0),
+                ),
+              );
+            },
+          ),
+          _MenuItemData(
+            title: 'Incentive Calculation',
+            subtitle: 'Calculate and authorize supervisor incentives for completed project stages',
+            icon: Icons.calculate_rounded,
+            accentColor: const Color(0xFF6366F1),
+            badgeText: 'Incentives',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const IncentiveCalculation(),
                 ),
               );
             },

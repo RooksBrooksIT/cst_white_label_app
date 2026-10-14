@@ -20,6 +20,7 @@ import 'package:ebricks/screens/organization/org_menu_screen.dart';
 import 'package:ebricks/screens/organization/org_sites_list_page.dart';
 import 'package:ebricks/screens/organization/org_finance_page.dart';
 import 'package:ebricks/screens/manager/manager_config_screen.dart';
+import 'package:ebricks/screens/reports/incentive_calculation.dart';
 import 'package:ebricks/widgets/bottom_nav.dart';
 
 class OrganizationDashboard extends StatefulWidget {
@@ -1929,6 +1930,15 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
                   ),
                 ),
               ),
+
+              // 7. Incentive Calculation
+              _buildConstructionActionCard(
+                title: 'Incentive Calculation',
+                subtitle: 'Site supervisor savings',
+                icon: Icons.calculate_rounded,
+                accentColor: const Color(0xFF6366F1),
+                onTap: () => _navigateToIncentiveCaliculation(context),
+              ),
             ],
           ),
         ],
@@ -2085,6 +2095,11 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     MaterialPageRoute(
       builder: (context) => const OrgMenuScreen(standalone: true),
     ),
+  );
+
+  void _navigateToIncentiveCaliculation(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const IncentiveCalculation()),
   );
 
   Map<String, Map<String, dynamic>> _buildUnifiedSiteDocs({

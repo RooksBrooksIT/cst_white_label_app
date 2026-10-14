@@ -628,6 +628,7 @@ class _ProjectstageInsightsDashboardState
         MaterialPageRoute(
           builder: (_) => ProjectStageExpensesReportPage(
             siteId: selectedSiteId!,
+            supervisorId: currentSupervisorId,
             fromDate: fromDate!,
             toDate: toDate!,
             projectStage: selectedProjectStage!,
