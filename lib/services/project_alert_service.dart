@@ -103,6 +103,58 @@ class ProjectAlertService {
     return double.tryParse(val.toString().trim()) ?? 0.0;
   }
 
+  /// Returns true if the project status is marked as completed
+  static bool isProjectCompleted(Map<String, dynamic> projectData) {
+    if (projectData['isCompleted'] == true || projectData['completed'] == true) {
+      return true;
+    }
+
+    final statusKeys = [
+      'currentStatus',
+      'status',
+      'projectStatus',
+      'siteStatus',
+      'projectState',
+      'state',
+    ];
+
+    for (final key in statusKeys) {
+      final val = projectData[key];
+      if (val != null) {
+        final s = val.toString().toLowerCase().trim();
+        if (s == 'completed' ||
+            s == 'complete' ||
+            s.contains('complete') ||
+            s == 'finished' ||
+            s == 'finish' ||
+            s == 'closed' ||
+            s == 'done' ||
+            s == 'archived') {
+          return true;
+        }
+      }
+    }
+
+    final stageKeys = ['projectStage', 'stage'];
+    for (final key in stageKeys) {
+      final val = projectData[key];
+      if (val != null) {
+        final s = val.toString().toLowerCase().trim();
+        if (s == 'completed' ||
+            s == 'complete' ||
+            s == 'closed' ||
+            s == 'archived' ||
+            s == 'done' ||
+            s == 'finished' ||
+            s == 'handover') {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   /// Evaluates all active alerts for a given project data map
   static List<ProjectAlert> getAlertsForProject(
     Map<String, dynamic> projectData, {
@@ -133,18 +185,7 @@ class ProjectAlertService {
           projectData['totalExpenses'],
     );
 
-    final stage = (projectData['projectStage'] ??
-            projectData['status'] ??
-            projectData['stage'] ??
-            '')
-        .toString()
-        .toLowerCase()
-        .trim();
-
-    final isCompleted = stage == 'completed' ||
-        stage == 'closed' ||
-        stage == 'finished' ||
-        stage == 'archived';
+    final isCompleted = isProjectCompleted(projectData);
 
     // -------------------------------------------------------------------------
     // 1. BUDGET EXPENSE ALERT

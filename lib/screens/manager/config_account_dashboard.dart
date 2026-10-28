@@ -2938,6 +2938,30 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
                           ? _managerEmail
                           : 'Not Provided',
                     ),
+
+                    const SizedBox(height: 18),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      child: Text(
+                        'DESKTOP APPLICATION',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF94A3B8),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Download eBricks MSI Item
+                    _buildDrawerActionCard(
+                      icon: Icons.desktop_windows_rounded,
+                      iconColor: const Color(0xFF2563EB),
+                      label: 'Download eBricks MSI',
+                      subtitle: 'Get desktop installer for Windows',
+                      onTap: () => _launchDownloadMSI(context),
+                    ),
                   ],
                 ),
               ),
@@ -3063,6 +3087,119 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
         ],
       ),
     );
+  }
+
+  Widget _buildDrawerActionCard({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Icon(
+                    Icons.open_in_new_rounded,
+                    color: Color(0xFF64748B),
+                    size: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchDownloadMSI(BuildContext context) async {
+    final Uri url = Uri.parse(
+      'https://rookstechnologies.com/work/rooks-cst',
+    );
+    try {
+      final bool launched = await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && context.mounted) {
+        await launchUrl(url);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open download page')),
+        );
+      }
+    }
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -3303,6 +3440,13 @@ class _ConfigAccountDashboardState extends State<ConfigAccountDashboard> {
               context,
               MaterialPageRoute(builder: (_) => const ContactSupportScreen()),
             ),
+          },
+          {
+            'title': 'Download eBricks MSI',
+            'subtitle': 'Download desktop installer for Windows',
+            'icon': Icons.desktop_windows_rounded,
+            'color': const Color(0xFF2563EB),
+            'action': () => _launchDownloadMSI(context),
           },
         ],
       },

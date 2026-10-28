@@ -11,6 +11,7 @@ import 'package:ebricks/utils/responsive.dart';
 import 'package:ebricks/screens/organization/org_petty_cash_page.dart';
 import 'package:ebricks/screens/organization/organization_expenses.dart';
 import 'package:ebricks/widgets/project_alert_indicators.dart';
+import 'package:ebricks/services/project_alert_service.dart';
 
 class SiteFinancialDetailsPage extends StatefulWidget {
   final String siteId;
@@ -663,6 +664,20 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
     final usageRatio = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : 0.0;
     final usagePercent = (usageRatio * 100).toStringAsFixed(1);
 
+    final isCompleted = ProjectAlertService.isProjectCompleted(data) ||
+        status.toLowerCase().contains('complete') ||
+        status.toLowerCase().contains('finish') ||
+        status.toLowerCase().contains('closed') ||
+        status.toLowerCase().contains('done');
+
+    final alertData = Map<String, dynamic>.from(data);
+    alertData['currentStatus'] = data['currentStatus'] ?? status;
+    alertData['status'] = data['status'] ?? status;
+    if (isCompleted) {
+      alertData['isCompleted'] = true;
+      alertData['completed'] = true;
+    }
+
     return NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) => [
         SliverToBoxAdapter(
@@ -673,7 +688,7 @@ class _SiteFinancialDetailsPageState extends State<SiteFinancialDetailsPage>
               children: [
                 // 0. Project Alert Banners
                 ProjectAlertBanner(
-                  projectData: data,
+                  projectData: alertData,
                   docId: widget.siteId,
                 ),
 

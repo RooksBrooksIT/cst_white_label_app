@@ -18,10 +18,20 @@ class ProjectAlertBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeAlerts = alerts ??
+    var activeAlerts = alerts ??
         (projectData != null
             ? ProjectAlertService.getAlertsForProject(projectData!, docId: docId)
             : <ProjectAlert>[]);
+
+    // If project is completed, hide or remove Project Overdue alert
+    if (projectData != null && ProjectAlertService.isProjectCompleted(projectData!)) {
+      activeAlerts = activeAlerts
+          .where((alert) =>
+              alert.title != 'Project Overdue' &&
+              !alert.title.toLowerCase().contains('overdue') &&
+              !(alert.type == ProjectAlertType.endDate && alert.daysRemaining <= 0))
+          .toList();
+    }
 
     if (activeAlerts.isEmpty) {
       return const SizedBox.shrink();
@@ -79,23 +89,35 @@ class ProjectAlertBadge extends StatelessWidget {
   }
 }
 
-/// Detailed alert banner widget for project details and financial pages
 class ProjectAlertBanner extends StatelessWidget {
   final Map<String, dynamic> projectData;
   final String? docId;
+  final List<ProjectAlert>? alerts;
 
   const ProjectAlertBanner({
     super.key,
     required this.projectData,
     this.docId,
+    this.alerts,
   });
 
   @override
   Widget build(BuildContext context) {
-    final activeAlerts = ProjectAlertService.getAlertsForProject(
-      projectData,
-      docId: docId,
-    );
+    var activeAlerts = alerts ??
+        ProjectAlertService.getAlertsForProject(
+          projectData,
+          docId: docId,
+        );
+
+    // If project is completed, hide or remove Project Overdue alert
+    if (ProjectAlertService.isProjectCompleted(projectData)) {
+      activeAlerts = activeAlerts
+          .where((alert) =>
+              alert.title != 'Project Overdue' &&
+              !alert.title.toLowerCase().contains('overdue') &&
+              !(alert.type == ProjectAlertType.endDate && alert.daysRemaining <= 0))
+          .toList();
+    }
 
     if (activeAlerts.isEmpty) {
       return const SizedBox.shrink();

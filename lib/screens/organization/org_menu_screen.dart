@@ -206,6 +206,48 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
         ),
         _buildSettingsTile(
           theme: theme,
+          icon: Icons.desktop_windows_rounded,
+          iconColor: const Color(0xFF2563EB),
+          title: 'Download eBricks MSI',
+          subtitle: 'Download desktop application for Windows',
+          trailing: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Icon(
+              Icons.open_in_new_rounded,
+              color: Color(0xFF64748B),
+              size: 16,
+            ),
+          ),
+          onTap: () async {
+            final Uri url = Uri.parse(
+              'https://rookstechnologies.com/work/rooks-cst',
+            );
+            try {
+              final bool launched = await launchUrl(
+                url,
+                mode: LaunchMode.externalApplication,
+              );
+              if (!launched && mounted) {
+                await launchUrl(url);
+              }
+            } catch (e) {
+              if (mounted) {
+                AppTheme.showErrorToast(
+                  context,
+                  'Could not open download page',
+                );
+              }
+            }
+          },
+        ),
+        _buildSettingsTile(
+          theme: theme,
           icon: Icons.headset_mic_rounded,
           iconColor: const Color(0xFF8B5CF6),
           title: 'Contact Support',
