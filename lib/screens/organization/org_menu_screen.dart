@@ -11,6 +11,7 @@ import 'package:ebricks/screens/organization/org_subscription_page.dart';
 import 'package:ebricks/screens/organization/org_information_screen.dart';
 import 'package:ebricks/screens/common/about_us_screen.dart';
 import 'package:ebricks/widgets/bottom_nav.dart';
+import 'package:ebricks/services/subscription_sync_service.dart';
 
 class OrgMenuScreen extends StatefulWidget {
   final bool standalone;
@@ -39,23 +40,31 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
 
       // Fetch subscription status
       try {
-        final subDoc = await FirestoreService.subscriptionDoc.get();
+        var subDoc = await FirestoreService.subscriptionDoc.get();
+        if (!subDoc.exists) {
+          subDoc = await FirestoreService.rootOrgDoc.get();
+        }
         if (subDoc.exists && mounted) {
           final data = subDoc.data();
+          final rawPlan = data?['subscriptionPlan'] ?? data?['planName'];
+          final planName = SubscriptionSyncService.normalizePlanName(rawPlan?.toString());
+          final expiry = data?['subscriptionEndDate'] ?? data?['expiresAt'];
+          final isActiveField = data?['isSubscriptionActive'] as bool? ?? true;
+
           setState(() {
-            _subscriptionPlan = data?['planName'] ?? 'Pro Plan';
-            final expiry = data?['expiresAt'];
+            _subscriptionPlan = '$planName Plan';
             if (expiry != null && expiry is Timestamp) {
               _subscriptionExpiry = DateFormat('dd MMM yyyy').format(expiry.toDate());
-              _isSubscriptionActive = expiry.toDate().isAfter(DateTime.now());
+              final isNotExpired = expiry.toDate().isAfter(DateTime.now());
+              _isSubscriptionActive = isActiveField && isNotExpired;
             } else {
               _subscriptionExpiry = 'Active';
-              _isSubscriptionActive = true;
+              _isSubscriptionActive = isActiveField;
             }
           });
         } else if (mounted) {
           setState(() {
-            _subscriptionPlan = 'Standard Plan';
+            _subscriptionPlan = 'Free Trial Plan';
             _subscriptionExpiry = 'Active';
             _isSubscriptionActive = true;
           });
@@ -63,7 +72,7 @@ class _OrgMenuScreenState extends State<OrgMenuScreen> {
       } catch (_) {
         if (mounted) {
           setState(() {
-            _subscriptionPlan = 'Standard Plan';
+            _subscriptionPlan = 'Free Trial Plan';
             _subscriptionExpiry = 'Active';
             _isSubscriptionActive = true;
           });

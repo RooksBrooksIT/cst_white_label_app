@@ -204,6 +204,105 @@ exports.generatePayUHash = functions.region("us-central1").https.onCall(async (d
 });
 
 /**
+ * Atomically synchronizes subscription status across root, authoritative subscription doc,
+ * canonical data/admin doc, and legacy profile documents (admin/data, data/data) if they exist.
+ */
+async function syncOrganisationSubscriptionBackend(db, orgId, subscriptionUpdate, finalStatus, isSubscriptionActive, planType, txnid) {
+  if (!orgId || orgId === "uninitialized" || orgId === "onboarding_temp") return;
+
+  const orgRef = db.collection("organisation").doc(orgId);
+  const subRef = orgRef.collection("data").doc("subscription");
+  const dataAdminRef = orgRef.collection("data").doc("admin");
+
+  const batch = db.batch();
+
+  // 1. Authoritative subscription doc
+  batch.set(subRef, subscriptionUpdate, { merge: true });
+
+  // 2. Root organisation doc
+  const rootUpdate = {
+    isSubscriptionActive,
+    paymentStatus: finalStatus,
+    payuMoneyId: subscriptionUpdate.payuMoneyId || "",
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (subscriptionUpdate.subscriptionPlan) {
+    rootUpdate.subscriptionPlan = subscriptionUpdate.subscriptionPlan;
+  }
+  if (planType) {
+    rootUpdate.subscriptionType = planType;
+  }
+  if (subscriptionUpdate.subscriptionStartDate) {
+    rootUpdate.subscriptionStartDate = subscriptionUpdate.subscriptionStartDate;
+  }
+  if (subscriptionUpdate.subscriptionEndDate) {
+    rootUpdate.subscriptionEndDate = subscriptionUpdate.subscriptionEndDate;
+  }
+  if (txnid) {
+    rootUpdate.paymentTxnId = txnid;
+  }
+  if (subscriptionUpdate.paymentAmount !== undefined) {
+    rootUpdate.paymentAmount = subscriptionUpdate.paymentAmount;
+  }
+  if (subscriptionUpdate.maxProjects !== undefined) {
+    rootUpdate.maxProjects = subscriptionUpdate.maxProjects;
+  }
+  if (subscriptionUpdate.maxUsers !== undefined) {
+    rootUpdate.maxUsers = subscriptionUpdate.maxUsers;
+  }
+  if (subscriptionUpdate.maxManagers !== undefined) {
+    rootUpdate.maxManagers = subscriptionUpdate.maxManagers;
+  }
+  if (subscriptionUpdate.maxSupervisors !== undefined) {
+    rootUpdate.maxSupervisors = subscriptionUpdate.maxSupervisors;
+  }
+  batch.set(orgRef, rootUpdate, { merge: true });
+
+  // 3. Canonical data/admin doc
+  const adminDocUpdate = {
+    isSubscriptionActive,
+    paymentStatus: finalStatus,
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (subscriptionUpdate.subscriptionPlan) {
+    adminDocUpdate.subscriptionPlan = subscriptionUpdate.subscriptionPlan;
+  }
+  batch.set(dataAdminRef, adminDocUpdate, { merge: true });
+
+  // 4. Check legacy duplicate docs and synchronize if they already exist
+  try {
+    const legacyAdminRef = orgRef.collection("admin").doc("data");
+    const legacyAdminSnap = await legacyAdminRef.get();
+    if (legacyAdminSnap.exists) {
+      batch.set(legacyAdminRef, adminDocUpdate, { merge: true });
+    }
+  } catch (_) {}
+
+  try {
+    const legacyDataRef = orgRef.collection("data").doc("data");
+    const legacyDataSnap = await legacyDataRef.get();
+    if (legacyDataSnap.exists) {
+      batch.set(legacyDataRef, adminDocUpdate, { merge: true });
+    }
+  } catch (_) {}
+
+  // 5. Alternate namespace doc if existing
+  const altOrgId = orgId.startsWith("cst_") ? orgId.substring(4) : `cst_${orgId}`;
+  try {
+    const altOrgSnap = await db.collection("organisation").doc(altOrgId).get();
+    if (altOrgSnap.exists) {
+      batch.set(altOrgSnap.ref, rootUpdate, { merge: true });
+      batch.set(altOrgSnap.ref.collection("data").doc("subscription"), subscriptionUpdate, { merge: true });
+      batch.set(altOrgSnap.ref.collection("data").doc("admin"), adminDocUpdate, { merge: true });
+    }
+  } catch (_) {}
+
+  await batch.commit().catch((err) => {
+    logger.warn(`[syncOrganisationSubscriptionBackend] Batch commit warning for ${orgId}:`, err);
+  });
+}
+
+/**
  * 2. Callable Cloud Function (v1): verifySubscription
  * Verifies PayU transaction, confirms response hash signature, activates Firestore subscription,
  * and sends authoritative invoice email through Gmail SMTP.
@@ -312,20 +411,16 @@ exports.verifySubscription = functions.region("us-central1").https.onCall(async 
       if (planDetails.maxSupervisors !== undefined) subscriptionUpdate.maxSupervisors = planDetails.maxSupervisors;
     }
 
-    await subRef.set(subscriptionUpdate, { merge: true });
-
-    // Synchronize root organisation document in real-time
-    await orgRef.set({
+    // Atomically synchronize subscription across data/subscription, root, data/admin, and legacy duplicates
+    await syncOrganisationSubscriptionBackend(
+      db,
+      orgId,
+      subscriptionUpdate,
+      finalStatus,
       isSubscriptionActive,
-      subscriptionPlan: subscriptionUpdate.subscriptionPlan,
-      subscriptionType: planType,
-      subscriptionStartDate: subscriptionUpdate.subscriptionStartDate,
-      subscriptionEndDate: subscriptionUpdate.subscriptionEndDate,
-      paymentStatus: finalStatus,
-      paymentTxnId: txnid,
-      payuMoneyId: subscriptionUpdate.payuMoneyId,
-      updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true }).catch(() => {});
+      planType,
+      txnid
+    );
 
     // Ensure we have the user's registered email - check Firestore admin & root org doc if missing from request
     let effectiveEmail = (subscriptionUpdate.payerEmail || "").trim();
@@ -590,17 +685,9 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
           await db.collection("payment_logs").doc(txnid).set(paymentLogData, { merge: true }).catch((err) => logger.warn("Log write warning:", err));
         }
 
-        // 3. If effectiveOrgId is valid, update organisation and subscription document directly
+        // 3. If effectiveOrgId is valid, atomically synchronize organisation and subscription documents
         if (effectiveOrgId && effectiveOrgId !== "onboarding_temp") {
-          const orgRef = db.collection("organisation").doc(effectiveOrgId);
-          await orgRef.set({
-            isSubscriptionActive: isSuccess,
-            paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
-            payuMoneyId: mihpayid,
-            updated_at: admin.firestore.FieldValue.serverTimestamp(),
-          }, { merge: true }).catch(() => {});
-
-          await orgRef.collection("data").doc("subscription").set({
+          const webhookSubUpdate = {
             webhookStatus: status,
             webhookVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
             isSubscriptionActive: isSuccess,
@@ -608,7 +695,17 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
             payuMoneyId: mihpayid,
             ...(isSuccess ? { lastExpiryReminderSentForEndDate: null } : {}),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          }, { merge: true }).catch(() => {});
+          };
+
+          await syncOrganisationSubscriptionBackend(
+            db,
+            effectiveOrgId,
+            webhookSubUpdate,
+            isSuccess ? "SUCCESS" : "FAILED",
+            isSuccess,
+            null,
+            txnid
+          );
         }
 
         // 4. Query top-level organisation collection by paymentTxnId
@@ -622,22 +719,28 @@ exports.payuWebhook = functions.region("us-central1").https.onRequest((req, res)
         
         if (!orgQuery.empty) {
           for (const doc of orgQuery.docs) {
-            await doc.ref.set({
-              isSubscriptionActive: isSuccess,
-              paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
-              payuMoneyId: mihpayid,
-              updated_at: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true }).catch(() => {});
+            const matchedOrgId = doc.id;
+            if (matchedOrgId !== effectiveOrgId) {
+              const matchedSubUpdate = {
+                webhookStatus: status,
+                webhookVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+                isSubscriptionActive: isSuccess,
+                paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
+                payuMoneyId: mihpayid,
+                ...(isSuccess ? { lastExpiryReminderSentForEndDate: null } : {}),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              };
 
-            await doc.ref.collection("data").doc("subscription").set({
-              webhookStatus: status,
-              webhookVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-              isSubscriptionActive: isSuccess,
-              paymentStatus: isSuccess ? "SUCCESS" : "FAILED",
-              payuMoneyId: mihpayid,
-              ...(isSuccess ? { lastExpiryReminderSentForEndDate: null } : {}),
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true }).catch(() => {});
+              await syncOrganisationSubscriptionBackend(
+                db,
+                matchedOrgId,
+                matchedSubUpdate,
+                isSuccess ? "SUCCESS" : "FAILED",
+                isSuccess,
+                null,
+                txnid
+              );
+            }
           }
         }
 
@@ -2419,6 +2522,49 @@ exports.triggerSubscriptionExpiryCheck = functions.region("us-central1").https.o
     logger.error("triggerSubscriptionExpiryCheck callable error:", err);
     throw new HttpsError("internal", err.message || "Failed to execute subscription expiry scan");
   }
+});
+
+/**
+ * Callable function to safely synchronize subscription status across all Firestore documents
+ * for an organization, establishing data/subscription as authoritative.
+ */
+exports.syncOrganizationSubscription = functions.region("us-central1").https.onCall(async (data, context) => {
+  const payload = data || {};
+  const orgId = (payload.orgId || "").trim();
+  if (!orgId) {
+    throw new HttpsError("invalid-argument", "Missing required parameter: orgId");
+  }
+
+  const db = admin.firestore();
+  const orgRef = db.collection("organisation").doc(orgId);
+  const subSnap = await orgRef.collection("data").doc("subscription").get().catch(() => null);
+
+  let subData = {};
+  if (subSnap && subSnap.exists) {
+    subData = subSnap.data() || {};
+  } else {
+    const rootSnap = await orgRef.get().catch(() => null);
+    if (rootSnap && rootSnap.exists) {
+      subData = rootSnap.data() || {};
+    }
+  }
+
+  const isSubscriptionActive = subData.isSubscriptionActive === true;
+  const paymentStatus = subData.paymentStatus || (isSubscriptionActive ? "SUCCESS" : "PENDING");
+  const planType = subData.subscriptionType || "Monthly";
+  const txnid = subData.paymentTxnId || "";
+
+  await syncOrganisationSubscriptionBackend(
+    db,
+    orgId,
+    subData,
+    paymentStatus,
+    isSubscriptionActive,
+    planType,
+    txnid
+  );
+
+  return { success: true, orgId, isSubscriptionActive, plan: subData.subscriptionPlan };
 });
 
 /**

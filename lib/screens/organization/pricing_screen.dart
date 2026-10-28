@@ -12,6 +12,7 @@ import 'package:ebricks/screens/organization/organization_dashboard.dart';
 import 'package:ebricks/screens/organization/transaction_completed_screen.dart';
 import 'package:ebricks/screens/organization/org_subscription_page.dart';
 import 'package:ebricks/screens/common/contact_support_screen.dart';
+import 'package:ebricks/services/subscription_sync_service.dart';
 
 class PricingScreen extends StatefulWidget {
   final String orgName;
@@ -477,10 +478,28 @@ class _PricingScreenState extends State<PricingScreen> {
           'updatedAt': FieldValue.serverTimestamp(),
         };
 
+        final orgPath = FirestoreService.subscriptionDoc.path.split('/')[1];
         await FirestoreService.subscriptionDoc.set(
           updateData,
           SetOptions(merge: true),
         );
+
+        // Also sync queued metadata to alternate namespace if existing
+        final altOrgId = orgPath.startsWith(FirestoreService.cstNamespacePrefix)
+            ? orgPath.substring(FirestoreService.cstNamespacePrefix.length)
+            : '${FirestoreService.cstNamespacePrefix}$orgPath';
+        try {
+          final altDoc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(altOrgId)
+              .get();
+          if (altDoc.exists) {
+            await altDoc.reference
+                .collection('data')
+                .doc('subscription')
+                .set(updateData, SetOptions(merge: true));
+          }
+        } catch (_) {}
 
         if (payuResult != null && payuResult.isSuccess) {
           try {
@@ -590,22 +609,12 @@ class _PricingScreenState extends State<PricingScreen> {
           'updatedAt': FieldValue.serverTimestamp(),
         };
 
-        await FirestoreService.subscriptionDoc.set(
-          updateData,
-          SetOptions(merge: true),
+        final orgPath = FirestoreService.subscriptionDoc.path.split('/')[1];
+        await SubscriptionSyncService.syncOrganizationSubscription(
+          orgPath,
+          authoritativeOverride: updateData,
+          updateAuthService: true,
         );
-
-        try {
-          await FirestoreService.rootOrgDoc.set({
-            'subscriptionPlan': _selectedPlan,
-            'subscriptionType': _selectedPlanType,
-            'subscriptionStartDate': Timestamp.fromDate(startDate),
-            'subscriptionEndDate': Timestamp.fromDate(endDate),
-            'isSubscriptionActive': true,
-            'onboardingStep': 'COMPLETED',
-            'updated_at': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } catch (_) {}
 
         if (payuResult != null && payuResult.isSuccess) {
           try {
@@ -950,7 +959,7 @@ class _PricingScreenState extends State<PricingScreen> {
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // 4. Admin credentials and metadata under data/admin, data/data, admin/data
+      // 4. Admin credentials and metadata under canonical profile doc data/admin
       final adminData = {
         'org_name': widget.orgName,
         'app_name': widget.appName,
@@ -973,23 +982,50 @@ class _PricingScreenState extends State<PricingScreen> {
         'updated_at': FieldValue.serverTimestamp(),
       };
 
-      await FirebaseFirestore.instance
-          .doc(orgConfigDocPath)
-          .collection('data')
-          .doc('admin')
-          .set(adminData, SetOptions(merge: true));
+      // Atomic batched write for registration across root, subscription, branding, referral, and canonical admin
+      final regBatch = FirebaseFirestore.instance.batch();
+      final rootDocRef = FirebaseFirestore.instance.doc(orgConfigDocPath);
 
-      await FirebaseFirestore.instance
-          .doc(orgConfigDocPath)
-          .collection('data')
-          .doc('data')
-          .set(adminData, SetOptions(merge: true));
+      regBatch.set(rootDocRef, rootDocData, SetOptions(merge: true));
+      regBatch.set(
+        rootDocRef.collection('data').doc('subscription'),
+        subscriptionData,
+        SetOptions(merge: true),
+      );
+      regBatch.set(
+        rootDocRef.collection('data').doc('branding'),
+        brandingData,
+        SetOptions(merge: true),
+      );
+      regBatch.set(
+        rootDocRef.collection('data').doc('referralCode'),
+        {
+          'referralCode': referralCode,
+          'orgReferralCode': referralCode,
+          'updated_at': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+      regBatch.set(
+        rootDocRef.collection('data').doc('admin'),
+        adminData,
+        SetOptions(merge: true),
+      );
 
-      await FirebaseFirestore.instance
-          .doc(orgConfigDocPath)
-          .collection('admin')
-          .doc('data')
-          .set(adminData, SetOptions(merge: true));
+      // If legacy duplicate docs exist for this org, keep them synchronized to prevent stale records
+      try {
+        final legacyAdminSnap = await rootDocRef.collection('admin').doc('data').get();
+        if (legacyAdminSnap.exists) {
+          regBatch.set(legacyAdminSnap.reference, adminData, SetOptions(merge: true));
+        }
+      } catch (_) {}
+
+      try {
+        final legacyDataSnap = await rootDocRef.collection('data').doc('data').get();
+        if (legacyDataSnap.exists) {
+          regBatch.set(legacyDataSnap.reference, adminData, SetOptions(merge: true));
+        }
+      } catch (_) {}
 
       // Also mirror to alternate namespace if existing to prevent stale pending records
       final altOrgId = orgId.startsWith(FirestoreService.cstNamespacePrefix)
@@ -1001,24 +1037,21 @@ class _PricingScreenState extends State<PricingScreen> {
             .doc(altOrgId)
             .get();
         if (altDoc.exists) {
-          await FirebaseFirestore.instance
-              .collection('organisation')
-              .doc(altOrgId)
-              .set(rootDocData, SetOptions(merge: true));
-          await FirebaseFirestore.instance
-              .collection('organisation')
-              .doc(altOrgId)
-              .collection('data')
-              .doc('subscription')
-              .set(subscriptionData, SetOptions(merge: true));
-          await FirebaseFirestore.instance
-              .collection('organisation')
-              .doc(altOrgId)
-              .collection('data')
-              .doc('admin')
-              .set(adminData, SetOptions(merge: true));
+          regBatch.set(altDoc.reference, rootDocData, SetOptions(merge: true));
+          regBatch.set(
+            altDoc.reference.collection('data').doc('subscription'),
+            subscriptionData,
+            SetOptions(merge: true),
+          );
+          regBatch.set(
+            altDoc.reference.collection('data').doc('admin'),
+            adminData,
+            SetOptions(merge: true),
+          );
         }
       } catch (_) {}
+
+      await regBatch.commit();
 
       final userData = {
         'org_name': widget.orgName,

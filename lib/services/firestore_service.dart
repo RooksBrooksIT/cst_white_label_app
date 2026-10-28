@@ -336,8 +336,8 @@ class FirestoreService {
       return FirebaseFirestore.instance
           .collection('organisation')
           .doc('uninitialized')
-          .collection('admin')
-          .doc('data');
+          .collection('data')
+          .doc('admin');
     }
 
     return FirebaseFirestore.instance
