@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,17 +37,37 @@ class _MainDashboardState extends State<MainDashboard> {
         // Sync branding for referral users immediately
         await AppTheme.syncWithFirestore(tempOrgPath);
 
-        // Fetch org details
-        final doc = await FirebaseFirestore.instance
+        // Fetch org details from canonical doc with fallback
+        DocumentSnapshot<Map<String, dynamic>> doc = await FirebaseFirestore.instance
             .collection('organisation')
             .doc(tempOrgPath)
-            .collection('admin')
-            .doc('data')
+            .collection('data')
+            .doc('admin')
             .get();
 
+        if (!doc.exists) {
+          doc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(tempOrgPath)
+              .collection('admin')
+              .doc('data')
+              .get();
+        }
+
+        if (!doc.exists) {
+          doc = await FirebaseFirestore.instance
+              .collection('organisation')
+              .doc(tempOrgPath)
+              .get();
+        }
+
         if (doc.exists && mounted) {
-          final orgName = doc.data()?['orgName'] as String?;
-          final logoUrl = doc.data()?['logoUrl'] as String?;
+          final data = doc.data() ?? {};
+          final orgName = (data['orgName'] ??
+                  data['org_name'] ??
+                  data['appName'] ??
+                  data['app_name']) as String?;
+          final logoUrl = data['logoUrl'] as String?;
 
           setState(() {
             _orgName = orgName;

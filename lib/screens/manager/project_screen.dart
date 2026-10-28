@@ -140,13 +140,22 @@ class _ProjectScreenState extends State<ProjectScreen>
         }
         if (expenseSnapshot.exists) {
           final data = expenseSnapshot.data()!;
-          final totalMgrExpense = (data['totalMgrExpense'] ?? 0).toDouble();
-          final totalOrgExpense = (data['totalOrgExpense'] ?? 0).toDouble();
-          final totalSiteExpense = (data['totalSiteExpense'] ?? 0).toDouble();
-          final totalIncentiveExpenses = (data['totalIncentiveExpenses'] ?? 0)
-              .toDouble();
-          final totalContractorExpense = (data['totalContractorExpense'] ?? 0)
-              .toDouble();
+          double parseNum(dynamic v) {
+            if (v == null) return 0.0;
+            if (v is num) return v.toDouble();
+            if (v is String) return double.tryParse(v.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+            if (v is Map) {
+              final inner = v['amount'] ?? v['total'] ?? v['value'] ?? v['paid'];
+              if (inner != null && inner is! Map) return parseNum(inner);
+            }
+            return 0.0;
+          }
+
+          final totalMgrExpense = parseNum(data['totalMgrExpense']);
+          final totalOrgExpense = parseNum(data['totalOrgExpense']);
+          final totalSiteExpense = parseNum(data['totalSiteExpense']);
+          final totalIncentiveExpenses = parseNum(data['totalIncentiveExpenses']);
+          final totalContractorExpense = parseNum(data['totalContractorExpense']);
           final amountSpent =
               totalMgrExpense +
               totalOrgExpense +
@@ -154,11 +163,10 @@ class _ProjectScreenState extends State<ProjectScreen>
               totalIncentiveExpenses +
               totalContractorExpense;
           final projectData = doc.data();
-          final amountReceived = (projectData['amountReceived'] ??
+          final amountReceived = parseNum(projectData['amountReceived'] ??
                   projectData['amountPaid'] ??
                   projectData['receivedPayments'] ??
-                  0)
-              .toDouble();
+                  projectData['paid']);
           final balanceAmount = amountReceived - amountSpent;
           await FirestoreService.getCollection('projects').doc(doc.id).update({
             'amountSpent': amountSpent,

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../utils/app_theme.dart';
 import 'firestore_service.dart';
 import 'notification_service.dart';
+import 'subscription_sync_service.dart';
 
 enum UserRole { organization, manager, supervisor, customer, none }
 
@@ -91,14 +92,17 @@ class AuthService {
       if (!doc.exists) return false;
 
       final data = doc.data()!;
-      // Default to true if fields are missing to avoid locking out valid users
+      final planName = data['subscriptionPlan']?.toString();
+      final paymentStatus = data['paymentStatus']?.toString();
       final isActive = data['isSubscriptionActive'] as bool? ?? true;
       final endDate = data['subscriptionEndDate'] as Timestamp?;
 
-      if (!isActive) return false;
-      if (endDate == null) return true; // Assume lifetime/trial if no end date
-
-      return endDate.toDate().isAfter(DateTime.now());
+      return SubscriptionSyncService.calculateIsActive(
+        isSubscriptionActive: isActive,
+        planName: planName,
+        paymentStatus: paymentStatus,
+        endDate: endDate,
+      );
     } catch (e) {
       debugPrint('Error checking subscription status: $e');
       return true; // Default to true to avoid locking users out on network issues

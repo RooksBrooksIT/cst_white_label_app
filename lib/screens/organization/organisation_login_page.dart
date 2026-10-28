@@ -10,6 +10,7 @@ import 'package:ebricks/services/notification_service.dart';
 import 'package:ebricks/widgets/glass_scaffold.dart';
 import 'package:ebricks/utils/firestore_error_handler.dart';
 import 'package:ebricks/screens/common/portal_loading_screen.dart';
+import 'package:ebricks/services/subscription_sync_service.dart';
 
 class Organisation_LoginPage extends StatefulWidget {
   const Organisation_LoginPage({super.key});
@@ -245,18 +246,45 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
       final Map<String, dynamic> resolvedUserData = Map<String, dynamic>.from(userData);
       final String resolvedDynamicPath = dynamicPath;
 
-      // Fully aggregate profile across root, data/admin, and organizationUser documents
+      // Fully aggregate profile across root, data/admin, organizationUser, and authoritative subscription documents
       try {
         final profileFetches = await Future.wait([
           FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).get(),
           FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('data').doc('admin').get(),
           FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('organizationUser').doc(cleanLower).get(),
           FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('organizationUser').doc(cleanInput).get(),
+          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('data').doc('subscription').get(),
         ]);
 
-        for (final pDoc in profileFetches) {
+        // Aggregate root, data/admin, organizationUser first
+        for (int i = 0; i < 4; i++) {
+          final pDoc = profileFetches[i];
           if (pDoc.exists && pDoc.data() != null) {
             resolvedUserData.addAll(pDoc.data()!);
+          }
+        }
+
+        // Authoritative subscription document takes strict precedence for subscription fields
+        final subDoc = profileFetches[4];
+        if (subDoc.exists && subDoc.data() != null) {
+          final sData = subDoc.data()!;
+          resolvedUserData['subscriptionPlan'] = SubscriptionSyncService.normalizePlanName(
+            sData['subscriptionPlan']?.toString(),
+          );
+          if (sData.containsKey('isSubscriptionActive')) {
+            resolvedUserData['isSubscriptionActive'] = sData['isSubscriptionActive'];
+          }
+          if (sData.containsKey('paymentStatus')) {
+            resolvedUserData['paymentStatus'] = sData['paymentStatus'];
+          }
+          if (sData.containsKey('subscriptionStartDate')) {
+            resolvedUserData['subscriptionStartDate'] = sData['subscriptionStartDate'];
+          }
+          if (sData.containsKey('subscriptionEndDate')) {
+            resolvedUserData['subscriptionEndDate'] = sData['subscriptionEndDate'];
+          }
+          if (sData.containsKey('subscriptionType')) {
+            resolvedUserData['subscriptionType'] = sData['subscriptionType'];
           }
         }
       } catch (_) {}
@@ -347,6 +375,12 @@ class _Organisation_LoginPageState extends State<Organisation_LoginPage> {
 
       final String? referralCode = resolvedUserData['referralCode']?.toString() ??
           resolvedUserData['orgReferralCode']?.toString();
+
+      // Safely and idempotently synchronize inconsistent legacy records
+      await SubscriptionSyncService.syncOrganizationSubscription(
+        resolvedDynamicPath,
+        updateAuthService: false,
+      );
 
       // Write organization info to AuthService
       await AuthService().login(UserRole.organization, {

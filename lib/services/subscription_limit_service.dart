@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ebricks/services/firestore_service.dart';
 import 'package:ebricks/screens/organization/pricing_screen.dart';
+import 'package:ebricks/services/subscription_sync_service.dart';
 
 /// Centralized data model defining exact subscription limits for each plan.
 class SubscriptionPlanLimits {
@@ -292,7 +293,7 @@ class SubscriptionLimitService {
           final queuedManagers = (data['queuedMaxManagers'] as num?)?.toInt();
           final queuedSupervisors = (data['queuedMaxSupervisors'] as num?)?.toInt();
 
-          await FirestoreService.subscriptionDoc.set({
+          final promotedData = <String, dynamic>{
             'subscriptionPlan': queuedPlan,
             'subscriptionType': queuedType,
             'subscriptionStartDate': Timestamp.fromDate(queuedStart),
@@ -312,7 +313,21 @@ class SubscriptionLimitService {
             if (queuedManagers != null) 'maxManagers': queuedManagers,
             if (queuedSupervisors != null) 'maxSupervisors': queuedSupervisors,
             'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+          };
+
+          await FirestoreService.subscriptionDoc.set(
+            promotedData,
+            SetOptions(merge: true),
+          );
+
+          final orgId = FirestoreService.currentOrgId;
+          if (orgId.isNotEmpty && orgId != 'uninitialized') {
+            await SubscriptionSyncService.syncOrganizationSubscription(
+              orgId,
+              authoritativeOverride: promotedData,
+              updateAuthService: true,
+            );
+          }
 
           return getLimitsForPlan(queuedPlan, platinumSitesCount: queuedProjects);
         }
