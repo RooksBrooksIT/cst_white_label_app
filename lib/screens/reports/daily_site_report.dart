@@ -1065,7 +1065,7 @@ class _DailySiteExpensesReportPageState
           _buildDetailRow('Fuel', '', '₹${data['fuel'] ?? 0}'),
           _buildDetailRow('Transport', '', '₹${data['transport'] ?? 0}'),
           const Divider(height: 24),
-          _buildTotalRow(theme, 'Supervisor Total', data['totalAmount'] ?? 0),
+          _buildTotalRow(theme, 'Supervisor Total', _parseAmount(data['totalAmount'])),
         ],
       ),
     );
@@ -1119,7 +1119,8 @@ class _DailySiteExpensesReportPageState
   ) {
     num total = 0;
     for (var doc in entries) {
-      total += (doc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
+      final cData = doc.data() as Map<String, dynamic>?;
+      total += _parseAmount(cData?['totalAmount'] ?? cData?['amount']);
     }
 
     return GlassCard(
@@ -1254,41 +1255,50 @@ class _DailySiteExpensesReportPageState
     num total = 0;
     final supervisorDoc = data['supervisor'] as DocumentSnapshot?;
     if (supervisorDoc != null) {
-      total +=
-          (supervisorDoc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
+      final sData = supervisorDoc.data() as Map<String, dynamic>?;
+      total += _parseAmount(sData?['totalAmount']);
     }
 
     for (var doc
         in (data['managerEntries'] as List? ?? []).cast<DocumentSnapshot>()) {
-      final bills =
-          (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
+      final mData = doc.data() as Map<String, dynamic>?;
+      final bills = mData?['bills'] as List? ?? [];
       for (var b in bills) {
-        total += _parseAmount(b['billAmount']);
+        if (b is Map) {
+          total += _parseAmount(b['billAmount'] ?? b['amount']);
+        }
       }
     }
 
     for (var doc
         in (data['organizationEntries'] as List? ?? [])
             .cast<DocumentSnapshot>()) {
-      final bills =
-          (doc.data() as Map<String, dynamic>)['bills'] as List? ?? [];
+      final oData = doc.data() as Map<String, dynamic>?;
+      final bills = oData?['bills'] as List? ?? [];
       for (var b in bills) {
-        total += _parseAmount(b['billAmount']);
+        if (b is Map) {
+          total += _parseAmount(b['billAmount'] ?? b['amount']);
+        }
       }
     }
 
     for (var doc
         in (data['contractorEntries'] as List? ?? [])
             .cast<DocumentSnapshot>()) {
-      total += (doc.data() as Map<String, dynamic>)['totalAmount'] ?? 0;
+      final cData = doc.data() as Map<String, dynamic>?;
+      total += _parseAmount(cData?['totalAmount'] ?? cData?['amount']);
     }
 
     if (data['incentiveDoc'] != null) {
-      total +=
-          (data['incentiveDoc'] as DocumentSnapshot).data()
-              as Map<String, dynamic>? ??
-          {}['totalIncentiveExpenses'] ??
-          0;
+      final incDoc = data['incentiveDoc'] as DocumentSnapshot?;
+      final incData = incDoc?.data() as Map<String, dynamic>?;
+      if (incData != null) {
+        total += _parseAmount(
+          incData['totalIncentiveExpenses'] ??
+              incData['incentiveAmount'] ??
+              incData['amount'],
+        );
+      }
     }
 
     final pettyCash = (data['pettyCashEntries'] as List? ?? []);
@@ -1304,7 +1314,29 @@ class _DailySiteExpensesReportPageState
   num _parseAmount(dynamic v) {
     if (v == null) return 0;
     if (v is num) return v;
-    return num.tryParse(v.toString().replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+    if (v is String) {
+      return num.tryParse(v.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+    }
+    if (v is Map) {
+      final inner = v['amount'] ??
+          v['total'] ??
+          v['totalAmount'] ??
+          v['value'] ??
+          v['billAmount'] ??
+          v['totalIncentiveExpenses'];
+      if (inner != null && inner is! Map) {
+        return _parseAmount(inner);
+      }
+      return 0;
+    }
+    if (v is List) {
+      num sum = 0;
+      for (final item in v) {
+        sum += _parseAmount(item);
+      }
+      return sum;
+    }
+    return 0;
   }
 
   Future<void> _handlePdfExport(BuildContext context) async {
@@ -1543,7 +1575,7 @@ class _DailySiteExpensesReportPageState
                 return [
                   doc.id,
                   d['site'] ?? 'N/A',
-                  '₹${d['totalAmount'] ?? 0}',
+                  '₹${_parseAmount(d['totalAmount'] ?? d['amount']).toStringAsFixed(2)}',
                 ];
               }).toList(),
               headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),

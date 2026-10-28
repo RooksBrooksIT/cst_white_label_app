@@ -53,6 +53,36 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     return DateFormat('dd MMM yyyy').format(date);
   }
 
+  num _parseAmount(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v;
+    if (v is String) {
+      return num.tryParse(v.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+    }
+    if (v is Map) {
+      final inner = v['amount'] ??
+          v['total'] ??
+          v['totalAmount'] ??
+          v['value'] ??
+          v['billAmount'] ??
+          v['paid'] ??
+          v['totalContractorExpense'] ??
+          v['totalIncentiveExpenses'];
+      if (inner != null && inner is! Map) {
+        return _parseAmount(inner);
+      }
+      return 0;
+    }
+    if (v is List) {
+      num sum = 0;
+      for (final item in v) {
+        sum += _parseAmount(item);
+      }
+      return sum;
+    }
+    return 0;
+  }
+
   Future<Map<String, num>> fetchExpenseTotals() async {
     try {
       final siteKeys = (await ExpenseService.resolveSiteKeys(widget.siteId)).toList();
@@ -287,11 +317,11 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
 
       if (totalsDoc.exists && totalsDoc.data() != null) {
         final data = totalsDoc.data()!;
-        if (data['totalContractorExpense'] is num) {
-          totalContractorExpense = (data['totalContractorExpense'] as num);
+        if (data['totalContractorExpense'] != null) {
+          totalContractorExpense = _parseAmount(data['totalContractorExpense']);
         }
-        if (data['totalIncentiveExpenses'] is num) {
-          totalIncentiveExpenses = (data['totalIncentiveExpenses'] as num);
+        if (data['totalIncentiveExpenses'] != null) {
+          totalIncentiveExpenses = _parseAmount(data['totalIncentiveExpenses']);
         }
       }
 
@@ -503,16 +533,22 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                     project['location']?.toString() ??
                     'N/A';
                 final projectName = project['projectName']?.toString() ?? 'N/A';
-                final budget = (project['projectBudget'] ?? 0) as num;
+                final budget = _parseAmount(project['projectBudget'] ?? project['budget']);
                 final plannedStartDate =
-                    project['plannedStartDate'] as Timestamp?;
-                final amountSpent = (project['amountSpent'] ?? project['amountSpend'] ?? 0) as num;
-                final amountReceived = (project['amountReceived'] ??
-                        project['amountPaid'] ??
-                        project['receivedPayments'] ??
-                        0) as num;
-                final amountBalance = (project['amountBalance'] ??
-                        (amountReceived - amountSpent)) as num;
+                    project['plannedStartDate'] is Timestamp
+                        ? project['plannedStartDate'] as Timestamp
+                        : null;
+                final amountSpent = _parseAmount(project['amountSpent'] ??
+                    project['amountSpend'] ??
+                    project['spent'] ??
+                    project['totalAllExpenses']);
+                final amountReceived = _parseAmount(project['amountReceived'] ??
+                    project['amountPaid'] ??
+                    project['paid'] ??
+                    project['receivedPayments']);
+                final amountBalance = project['amountBalance'] != null
+                    ? _parseAmount(project['amountBalance'])
+                    : (amountReceived - amountSpent);
                 final currentStatus =
                     project['currentStatus']?.toString() ?? 'N/A';
 
@@ -575,16 +611,17 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
                             ),
                           );
                         }
-                        final managerExpenses = otherSnapshot.data?[0] ?? 0;
-                        final orgExpenses = otherSnapshot.data?[1] ?? 0;
+                        final managerExpenses = _parseAmount(otherSnapshot.data?[0]);
+                        final orgExpenses = _parseAmount(otherSnapshot.data?[1]);
                         final contractorIncentive =
-                            otherSnapshot.data?[2] ??
-                            {'contractor': 0, 'incentive': 0};
+                            otherSnapshot.data?[2] is Map
+                                ? (otherSnapshot.data![2] as Map)
+                                : const {'contractor': 0, 'incentive': 0};
 
                         final contractorExpenses =
-                            contractorIncentive['contractor'] ?? 0;
+                            _parseAmount(contractorIncentive['contractor']);
                         final incentiveExpenses =
-                            contractorIncentive['incentive'] ?? 0;
+                            _parseAmount(contractorIncentive['incentive']);
 
                         final grandTotal =
                             totalSupervisorExpenses +
@@ -1012,15 +1049,21 @@ class _SiteSummaryPageState extends State<SiteSummaryPage> {
     final orgDetails = await PdfTemplates.fetchOrgDetails();
     final site = project['siteLocation']?.toString() ?? 'N/A';
     final projectName = project['projectName']?.toString() ?? 'N/A';
-    final budget = (project['projectBudget'] ?? 0) as num;
-    final plannedStartDate = project['plannedStartDate'] as Timestamp?;
-    final amountSpent = (project['amountSpent'] ?? project['amountSpend'] ?? 0) as num;
-    final amountReceived = (project['amountReceived'] ??
-            project['amountPaid'] ??
-            project['receivedPayments'] ??
-            0) as num;
-    final amountBalance = (project['amountBalance'] ??
-            (amountReceived - amountSpent)) as num;
+    final budget = _parseAmount(project['projectBudget'] ?? project['budget']);
+    final plannedStartDate = project['plannedStartDate'] is Timestamp
+        ? project['plannedStartDate'] as Timestamp
+        : null;
+    final amountSpent = _parseAmount(project['amountSpent'] ??
+        project['amountSpend'] ??
+        project['spent'] ??
+        project['totalAllExpenses']);
+    final amountReceived = _parseAmount(project['amountReceived'] ??
+        project['amountPaid'] ??
+        project['paid'] ??
+        project['receivedPayments']);
+    final amountBalance = project['amountBalance'] != null
+        ? _parseAmount(project['amountBalance'])
+        : (amountReceived - amountSpent);
     final currentStatus = project['currentStatus']?.toString() ?? 'N/A';
 
     pdf.addPage(
