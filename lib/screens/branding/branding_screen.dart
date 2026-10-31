@@ -1,4 +1,4 @@
-﻿import 'package:ebricks/utils/app_theme.dart';
+import 'package:ebricks/utils/app_theme.dart';
 import 'package:ebricks/widgets/glass_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -131,6 +131,16 @@ class _BrandingScreenState extends State<BrandingScreen> {
           FirebaseFirestore.instance
               .collection('organisation')
               .where('username', isEqualTo: widget.username)
+              .limit(1)
+              .get(),
+          FirebaseFirestore.instance
+              .collectionGroup('data')
+              .where('email', isEqualTo: widget.email.trim().toLowerCase())
+              .limit(1)
+              .get(),
+          FirebaseFirestore.instance
+              .collectionGroup('data')
+              .where('username', isEqualTo: widget.username.trim().toLowerCase())
               .limit(1)
               .get(),
         ]);

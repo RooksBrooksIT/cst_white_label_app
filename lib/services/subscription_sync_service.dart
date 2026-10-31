@@ -281,8 +281,16 @@ class SubscriptionSyncService {
       // (a) Authoritative subscription doc
       batch.set(subDocRef, authoritativeSubPayload, SetOptions(merge: true));
 
-      // (b) Root org doc
-      batch.set(orgDocRef, rootSyncPayload, SetOptions(merge: true));
+      // (b) Root org doc - maintain backward compatibility only for existing legacy orgs with root fields
+      final hasLegacyRootFields = rootSnap != null &&
+          rootSnap.exists &&
+          rootSnap.data() != null &&
+          (rootSnap.data()!.containsKey('subscriptionPlan') ||
+              rootSnap.data()!.containsKey('isSubscriptionActive'));
+
+      if (hasLegacyRootFields) {
+        batch.set(orgDocRef, rootSyncPayload, SetOptions(merge: true));
+      }
 
       // (c) Canonical admin doc (data/admin)
       batch.set(adminDocRef, adminSyncPayload, SetOptions(merge: true));
@@ -299,7 +307,12 @@ class SubscriptionSyncService {
 
       // (f) Synchronize alternate namespace doc if it exists
       if (altDocSnap != null && altDocSnap.exists) {
-        batch.set(altDocRef, rootSyncPayload, SetOptions(merge: true));
+        final hasAltLegacyRootFields = altDocSnap.data() != null &&
+            (altDocSnap.data()!.containsKey('subscriptionPlan') ||
+                altDocSnap.data()!.containsKey('isSubscriptionActive'));
+        if (hasAltLegacyRootFields) {
+          batch.set(altDocRef, rootSyncPayload, SetOptions(merge: true));
+        }
         batch.set(altDocRef.collection('data').doc(authoritativeSubDocName),
             authoritativeSubPayload, SetOptions(merge: true));
         batch.set(altDocRef.collection('data').doc('admin'), adminSyncPayload,

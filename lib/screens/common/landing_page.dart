@@ -123,7 +123,7 @@ class _LandingPageState extends State<LandingPage> {
         if (dEmail.isNotEmpty && dEmail == cleanLower) return true;
         if (dUser.isNotEmpty && (dUser == cleanLower || dUser == cleanInput.toLowerCase())) return true;
         if (cleanDigits.isNotEmpty && dPhone.isNotEmpty && dPhone == cleanDigits) return true;
-        if (cleanLower.isNotEmpty && (dOrgName == cleanLower || idLower == cleanLower || idLower == 'cst_$cleanLower')) return true;
+        if (cleanLower.isNotEmpty && (dOrgName == cleanLower || idLower == cleanLower || idLower == 'cst_$cleanLower' || (cleanLower.length >= 3 && (idLower.startsWith('cst_${cleanLower}_') || idLower.startsWith('${cleanLower}_'))))) return true;
         return false;
       }
 
@@ -140,9 +140,17 @@ class _LandingPageState extends State<LandingPage> {
           FirebaseFirestore.instance.collectionGroup('data').where('UserName', isEqualTo: cleanInput).limit(1).get(),
           FirebaseFirestore.instance.collectionGroup('data').where('email', isEqualTo: cleanLower).limit(1).get(),
           FirebaseFirestore.instance.collectionGroup('data').where('Email', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('admin').where('username', isEqualTo: cleanLower).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('admin').where('username', isEqualTo: cleanInput).limit(1).get(),
+          FirebaseFirestore.instance.collectionGroup('admin').where('email', isEqualTo: cleanLower).limit(1).get(),
           FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: cleanLower).limit(1).get(),
           FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: cleanInput).limit(1).get(),
           FirebaseFirestore.instance.collectionGroup('configUsers').where('email', isEqualTo: cleanLower).limit(1).get(),
+          if (cleanDigits.isNotEmpty) ...[
+            FirebaseFirestore.instance.collectionGroup('organizationUser').where('phone', isEqualTo: cleanDigits).limit(1).get(),
+            FirebaseFirestore.instance.collectionGroup('data').where('phone', isEqualTo: cleanDigits).limit(1).get(),
+            FirebaseFirestore.instance.collectionGroup('admin').where('phone', isEqualTo: cleanDigits).limit(1).get(),
+          ],
         ]);
 
         for (final snap in userQueries) {
@@ -173,7 +181,7 @@ class _LandingPageState extends State<LandingPage> {
         }
       }
 
-      // Strategy C: Parallel search inside organisation subcollections (data/admin, organizationUser)
+      // Strategy C: Parallel search inside organisation subcollections (data/admin, legacy admin/data, legacy data/data, organizationUser)
       if (userData == null && orgDocs.isNotEmpty) {
         final searchFutures = orgDocs.map((doc) async {
           try {
@@ -186,6 +194,32 @@ class _LandingPageState extends State<LandingPage> {
                   'data': aData,
                   'dynamicPath': doc.id,
                   'path': adminDoc.reference.path,
+                };
+              }
+            }
+
+            // Check legacy admin/data
+            final legAdminDoc = await doc.reference.collection('admin').doc('data').get();
+            if (legAdminDoc.exists && legAdminDoc.data() != null) {
+              final laData = legAdminDoc.data()!;
+              if (isMatch(laData, legAdminDoc.id)) {
+                return {
+                  'data': laData,
+                  'dynamicPath': doc.id,
+                  'path': legAdminDoc.reference.path,
+                };
+              }
+            }
+
+            // Check legacy data/data
+            final legDataDoc = await doc.reference.collection('data').doc('data').get();
+            if (legDataDoc.exists && legDataDoc.data() != null) {
+              final ldData = legDataDoc.data()!;
+              if (isMatch(ldData, legDataDoc.id)) {
+                return {
+                  'data': ldData,
+                  'dynamicPath': doc.id,
+                  'path': legDataDoc.reference.path,
                 };
               }
             }
@@ -255,27 +289,58 @@ class _LandingPageState extends State<LandingPage> {
       final Map<String, dynamic> resolvedUserData = Map<String, dynamic>.from(userData);
       final String resolvedDynamicPath = dynamicPath;
 
-      // Fully aggregate profile across root, data/admin, organizationUser, and authoritative subscription documents
+      // Fully aggregate profile across root, data/admin, legacy admin/data, legacy data/data,
+      // organizationUser subcollection, and authoritative subscription documents
+      String matchedOrgUserDocId = '';
       try {
         final profileFetches = await Future.wait([
           FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).get(),
           FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('data').doc('admin').get(),
-          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('organizationUser').doc(cleanLower).get(),
-          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('organizationUser').doc(cleanInput).get(),
+          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('admin').doc('data').get(),
+          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('data').doc('data').get(),
           FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('data').doc('subscription').get(),
+          FirebaseFirestore.instance.collection('organisation').doc(resolvedDynamicPath).collection('organizationUser').get(),
         ]);
 
-        // Aggregate root, data/admin, organizationUser first
+        // Aggregate root, data/admin, legacy admin/data, legacy data/data
         for (int i = 0; i < 4; i++) {
           final pDoc = profileFetches[i];
-          if (pDoc.exists && pDoc.data() != null) {
+          if (pDoc is DocumentSnapshot<Map<String, dynamic>> && pDoc.exists && pDoc.data() != null) {
             resolvedUserData.addAll(pDoc.data()!);
           }
         }
 
+        // Aggregate matched organizationUser doc
+        final orgUsersSnap = profileFetches[5] as QuerySnapshot<Map<String, dynamic>>?;
+        if (orgUsersSnap != null && orgUsersSnap.docs.isNotEmpty) {
+          DocumentSnapshot<Map<String, dynamic>>? matchedDoc;
+          for (final uDoc in orgUsersSnap.docs) {
+            final uData = uDoc.data();
+            final uIdLower = uDoc.id.toLowerCase();
+            final uName = (uData['username'] ?? uData['UserName'] ?? uData['userName'] ?? '').toString().trim().toLowerCase();
+            final uEmail = (uData['email'] ?? uData['Email'] ?? '').toString().trim().toLowerCase();
+            final uPhone = (uData['phone'] ?? uData['contactNo'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+
+            if (uIdLower == cleanLower ||
+                uIdLower == cleanInput.toLowerCase() ||
+                (uName.isNotEmpty && (uName == cleanLower || uName == cleanInput.toLowerCase())) ||
+                (uEmail.isNotEmpty && uEmail == cleanLower) ||
+                (cleanDigits.isNotEmpty && uPhone.isNotEmpty && uPhone == cleanDigits)) {
+              matchedDoc = uDoc;
+              break;
+            }
+          }
+
+          // If no specific user matched, pick the first admin or organization user doc
+          matchedDoc ??= orgUsersSnap.docs.first;
+
+          matchedOrgUserDocId = matchedDoc.id;
+          resolvedUserData.addAll(matchedDoc.data()!);
+        }
+
         // Authoritative subscription document takes strict precedence for subscription fields
-        final subDoc = profileFetches[4];
-        if (subDoc.exists && subDoc.data() != null) {
+        final subDoc = profileFetches[4] as DocumentSnapshot<Map<String, dynamic>>?;
+        if (subDoc != null && subDoc.exists && subDoc.data() != null) {
           final sData = subDoc.data()!;
           resolvedUserData['subscriptionPlan'] = SubscriptionSyncService.normalizePlanName(
             sData['subscriptionPlan']?.toString(),
@@ -318,14 +383,38 @@ class _LandingPageState extends State<LandingPage> {
           .toString()
           .trim();
 
-      final String actualUsername = (resolvedUserData['username'] ??
-              resolvedUserData['UserName'] ??
-              resolvedUserData['userName'] ??
-              resolvedUserData['adminUsername'] ??
-              resolvedUserData['admin_username'] ??
-              cleanInput)
-          .toString()
-          .trim();
+      // Resolve true username with comprehensive fallback order
+      String actualUsername = '';
+      for (final key in ['username', 'UserName', 'userName', 'adminUsername', 'admin_username']) {
+        final val = resolvedUserData[key]?.toString().trim() ?? '';
+        if (val.isNotEmpty && !val.contains('@')) {
+          actualUsername = val;
+          break;
+        }
+      }
+
+      if (actualUsername.isEmpty && matchedOrgUserDocId.isNotEmpty && !matchedOrgUserDocId.contains('@')) {
+        actualUsername = matchedOrgUserDocId;
+      }
+
+      if (actualUsername.isEmpty) {
+        if (!cleanInput.contains('@') && cleanDigits != cleanInput) {
+          actualUsername = cleanInput;
+        } else {
+          final fallback = (resolvedUserData['name'] ??
+                  resolvedUserData['org_name'] ??
+                  resolvedUserData['appName'] ??
+                  (cleanInput.contains('@') ? cleanInput.split('@').first : ''))
+              .toString()
+              .trim();
+          actualUsername = fallback.isNotEmpty
+              ? fallback
+              : (cleanInput.contains('@') ? cleanInput.split('@').first : 'User');
+        }
+      }
+
+      resolvedUserData['username'] = actualUsername;
+      resolvedUserData['UserName'] = actualUsername;
 
       final String? storedOrgName = (resolvedUserData['org_name'] ??
               resolvedUserData['orgName'] ??
@@ -347,31 +436,6 @@ class _LandingPageState extends State<LandingPage> {
         try {
           await AuthService().loginWithEmail(email, cleanPass);
           isPasswordValid = true;
-
-          // Sync password if updated
-          if (storedPassword != cleanPass && fullConfigPath != null) {
-            final WriteBatch batch = FirebaseFirestore.instance.batch();
-            batch.update(FirebaseFirestore.instance.doc(fullConfigPath), {
-              'password': cleanPass,
-            });
-            if (resolvedDynamicPath != 'uninitialized') {
-              batch.update(
-                FirebaseFirestore.instance
-                    .collection('organisation')
-                    .doc(resolvedDynamicPath)
-                    .collection('organizationUser')
-                    .doc(actualUsername),
-                {'password': cleanPass},
-              );
-              batch.update(
-                FirebaseFirestore.instance
-                    .collection('organisation')
-                    .doc(resolvedDynamicPath),
-                {'password': cleanPass},
-              );
-            }
-            batch.commit().catchError((_) {});
-          }
         } catch (authErr) {
           debugPrint('LandingPage: Firebase Auth note: $authErr');
         }
@@ -396,13 +460,26 @@ class _LandingPageState extends State<LandingPage> {
         updateAuthService: false,
       );
 
+      // Backward-compatible consistency: ensure username is recorded in data/admin for existing active users
+      if (resolvedDynamicPath != 'uninitialized' && actualUsername.isNotEmpty) {
+        final updatePayload = {'username': actualUsername};
+        FirebaseFirestore.instance
+            .collection('organisation')
+            .doc(resolvedDynamicPath)
+            .collection('data')
+            .doc('admin')
+            .set(updatePayload, SetOptions(merge: true))
+            .catchError((_) {});
+      }
+
       await AuthService().login(UserRole.organization, {
+        ...resolvedUserData,
         'username': actualUsername,
+        'UserName': actualUsername,
         'dynamicPath': resolvedDynamicPath,
         'org_name': storedOrgName,
         'org_doc_path': fullConfigPath ?? 'organisation/$resolvedDynamicPath/data/admin',
         if (referralCode != null && referralCode.isNotEmpty) 'referral_code': referralCode,
-        ...resolvedUserData,
       });
 
       NotificationService.saveToken(

@@ -81,7 +81,11 @@ async function syncOrganisationSubscriptionBackend(db, orgId, subscriptionUpdate
   if (subscriptionUpdate.paymentAmount !== undefined) rootUpdate.paymentAmount = subscriptionUpdate.paymentAmount;
   if (subscriptionUpdate.maxProjects !== undefined) rootUpdate.maxProjects = subscriptionUpdate.maxProjects;
   if (subscriptionUpdate.maxUsers !== undefined) rootUpdate.maxUsers = subscriptionUpdate.maxUsers;
-  batch.set(orgRef, rootUpdate, { merge: true });
+  
+  const orgSnap = await orgRef.get();
+  if (orgSnap && orgSnap.exists && (orgSnap.data().subscriptionPlan || orgSnap.data().isSubscriptionActive !== undefined)) {
+    batch.set(orgRef, rootUpdate, { merge: true });
+  }
 
   // 3. Canonical data/admin doc
   const adminDocUpdate = {

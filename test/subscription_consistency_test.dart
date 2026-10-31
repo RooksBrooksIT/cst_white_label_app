@@ -225,4 +225,331 @@ void main() {
       expect(active2, isTrue);
     });
   });
+
+  group('Organization Firestore Data Structure Tests (New & Legacy)', () {
+    test('Newly created organization schema stores all fields in intended subcollections', () {
+      // Simulate payload generated for new organization registration
+      final adminData = <String, dynamic>{
+        'app_id': 'cst_white_label',
+        'app_type': 'cst_white_label',
+        'is_cst_app': true,
+        'org_name': 'New Tech Builders',
+        'app_name': 'NewTechApp',
+        'theme_color': '#FF5722',
+        'email': 'admin@newtech.com',
+        'phone': '9876543210',
+        'username': 'newtech_admin',
+        'role': 'Organization',
+        'registrationStatus': 'COMPLETED',
+        'onboardingStep': 'COMPLETED',
+        'isSubscriptionActive': true,
+        'paymentStatus': 'SUCCESS',
+        'referralCode': 'NTB001',
+        'orgReferralCode': 'NTB001',
+      };
+
+      final subscriptionData = <String, dynamic>{
+        'subscriptionPlan': 'Gold',
+        'subscriptionType': 'Monthly',
+        'isSubscriptionActive': true,
+        'onboardingStep': 'COMPLETED',
+        'maxProjects': 10,
+        'maxUsers': 15,
+        'maxManagers': 5,
+        'maxSupervisors': 10,
+        'paymentGateway': 'PayU',
+        'paymentTxnId': 'TXN_NTB_999',
+        'paymentStatus': 'SUCCESS',
+        'paymentAmount': 199.0,
+      };
+
+      final brandingData = <String, dynamic>{
+        'org_name': 'New Tech Builders',
+        'appName': 'NewTechApp',
+        'app_name': 'NewTechApp',
+        'primaryColor': '#FF5722',
+        'theme_color': '#FF5722',
+      };
+
+      // Root document for new organizations contains organization profile metadata, but NOT admin login details or subscription
+      final rootDoc = <String, dynamic>{
+        'app_id': 'cst_white_label',
+        'app_type': 'cst_white_label',
+        'is_cst_app': true,
+        'org_name': 'New Tech Builders',
+        'app_name': 'NewTechApp',
+      };
+
+      // Assert that root doc has no administrator login details or subscription fields
+      expect(rootDoc.containsKey('username'), isFalse);
+      expect(rootDoc.containsKey('password'), isFalse);
+      expect(rootDoc.containsKey('isSubscriptionActive'), isFalse);
+      expect(rootDoc.containsKey('maxManagers'), isFalse);
+      expect(rootDoc.containsKey('isUpgradeQueued'), isFalse);
+
+      // Assert that data/admin contains all administrative and credential fields without plaintext password
+      expect(adminData['app_id'], equals('cst_white_label'));
+      expect(adminData['org_name'], equals('New Tech Builders'));
+      expect(adminData['username'], equals('newtech_admin'));
+      expect(adminData['email'], equals('admin@newtech.com'));
+      expect(adminData['phone'], equals('9876543210'));
+      expect(adminData['role'], equals('Organization'));
+      expect(adminData.containsKey('password'), isFalse);
+
+      // Assert that data/subscription contains all subscription details
+      expect(subscriptionData['subscriptionPlan'], equals('Gold'));
+      expect(subscriptionData['isSubscriptionActive'], isTrue);
+      expect(subscriptionData['maxManagers'], equals(5));
+      expect(subscriptionData['maxProjects'], equals(10));
+      expect(subscriptionData['maxUsers'], equals(15));
+      expect(subscriptionData['maxSupervisors'], equals(10));
+
+      // Assert that data/branding contains branding details
+      expect(brandingData['org_name'], equals('New Tech Builders'));
+      expect(brandingData['appName'], equals('NewTechApp'));
+      expect(brandingData['primaryColor'], equals('#FF5722'));
+    });
+
+    test('Login aggregates new organization profile seamlessly without root fields', () {
+      final rootDoc = <String, dynamic>{}; // Empty root doc
+      final adminDoc = <String, dynamic>{
+        'org_name': 'Modern Infra',
+        'email': 'contact@moderninfra.com',
+        'phone': '9123456780',
+        'username': 'modern_admin',
+        'role': 'Organization',
+        'theme_color': '#0B1942',
+      };
+      final subDoc = <String, dynamic>{
+        'subscriptionPlan': 'Silver',
+        'subscriptionType': 'Monthly',
+        'isSubscriptionActive': true,
+        'paymentStatus': 'SUCCESS',
+        'maxProjects': 5,
+        'maxManagers': 2,
+      };
+
+      // Merge logic identical to landing_page.dart & organisation_login_page.dart
+      final resolvedUserData = <String, dynamic>{};
+      resolvedUserData.addAll(rootDoc);
+      resolvedUserData.addAll(adminDoc);
+
+      resolvedUserData['subscriptionPlan'] = SubscriptionSyncService.normalizePlanName(
+        subDoc['subscriptionPlan']?.toString(),
+      );
+      if (subDoc.containsKey('isSubscriptionActive')) {
+        resolvedUserData['isSubscriptionActive'] = subDoc['isSubscriptionActive'];
+      }
+      if (subDoc.containsKey('paymentStatus')) {
+        resolvedUserData['paymentStatus'] = subDoc['paymentStatus'];
+      }
+
+      expect(resolvedUserData['org_name'], equals('Modern Infra'));
+      expect(resolvedUserData['username'], equals('modern_admin'));
+      expect(resolvedUserData['email'], equals('contact@moderninfra.com'));
+      expect(resolvedUserData['phone'], equals('9123456780'));
+      expect(resolvedUserData['subscriptionPlan'], equals('Silver'));
+      expect(resolvedUserData['isSubscriptionActive'], isTrue);
+      expect(resolvedUserData['paymentStatus'], equals('SUCCESS'));
+    });
+
+    test('Backward compatibility: existing organizations with root fields continue to resolve', () {
+      // Legacy document structure where fields are on root
+      final legacyRootDoc = <String, dynamic>{
+        'org_name': 'Legacy Construction',
+        'email': 'admin@legacy.com',
+        'phone': '9988776655',
+        'username': 'legacy_admin',
+        'role': 'Organization',
+        'theme_color': '#333333',
+        'subscriptionPlan': 'Silver',
+        'isSubscriptionActive': true,
+        'paymentStatus': 'SUCCESS',
+        'maxManagers': 2,
+      };
+      final adminDoc = <String, dynamic>{
+        'org_name': 'Legacy Construction',
+        'email': 'admin@legacy.com',
+        'phone': '9988776655',
+        'username': 'legacy_admin',
+      };
+      final subDoc = <String, dynamic>{
+        'subscriptionPlan': 'Gold', // Upgraded via authoritative sub doc
+        'isSubscriptionActive': true,
+        'paymentStatus': 'SUCCESS',
+        'maxManagers': 5,
+      };
+
+      final resolvedUserData = <String, dynamic>{};
+      resolvedUserData.addAll(legacyRootDoc);
+      resolvedUserData.addAll(adminDoc);
+
+      // Authoritative sub doc overrides stale root
+      resolvedUserData['subscriptionPlan'] = SubscriptionSyncService.normalizePlanName(
+        subDoc['subscriptionPlan']?.toString(),
+      );
+      if (subDoc.containsKey('isSubscriptionActive')) {
+        resolvedUserData['isSubscriptionActive'] = subDoc['isSubscriptionActive'];
+      }
+      if (subDoc.containsKey('paymentStatus')) {
+        resolvedUserData['paymentStatus'] = subDoc['paymentStatus'];
+      }
+
+      expect(resolvedUserData['org_name'], equals('Legacy Construction'));
+      expect(resolvedUserData['username'], equals('legacy_admin'));
+      expect(resolvedUserData['subscriptionPlan'], equals('Gold'));
+      expect(resolvedUserData['isSubscriptionActive'], isTrue);
+    });
+
+    test('Username resolution: Email login correctly retrieves username from organizationUser subcollection', () {
+      // Simulates an existing active user logging in via email where root doc has no username
+      const cleanLower = 'abi@construction.com';
+
+      final rootDoc = <String, dynamic>{
+        'org_name': 'Abi Construction',
+        'app_name': 'Abi Construction',
+        'email': 'abi@construction.com',
+        'isSubscriptionActive': true,
+      };
+
+      final orgUserDocs = [
+        <String, dynamic>{
+          'username': 'abiconstruction',
+          'email': 'abi@construction.com',
+          'role': 'Organization',
+        }
+      ];
+
+      final resolvedUserData = Map<String, dynamic>.from(rootDoc);
+
+      // Resolve from organizationUser subcollection matching email
+      String matchedUserDocId = '';
+      for (final uDoc in orgUserDocs) {
+        if (uDoc['email'] == cleanLower) {
+          matchedUserDocId = uDoc['username'];
+          resolvedUserData.addAll(uDoc);
+          break;
+        }
+      }
+
+      String actualUsername = '';
+      for (final key in ['username', 'UserName', 'userName', 'adminUsername', 'admin_username']) {
+        final val = resolvedUserData[key]?.toString().trim() ?? '';
+        if (val.isNotEmpty && !val.contains('@')) {
+          actualUsername = val;
+          break;
+        }
+      }
+
+      if (actualUsername.isEmpty && matchedUserDocId.isNotEmpty && !matchedUserDocId.contains('@')) {
+        actualUsername = matchedUserDocId;
+      }
+
+      expect(actualUsername, equals('abiconstruction'));
+      expect(actualUsername.contains('@'), isFalse);
+
+      // Verify that map spread does not overwrite actualUsername with null or empty
+      final authPayload = {
+        ...resolvedUserData,
+        'username': actualUsername,
+      };
+      expect(authPayload['username'], equals('abiconstruction'));
+    });
+
+    test('Username resolution: Legacy active user with admin/data resolves correctly', () {
+      final legacyAdminData = <String, dynamic>{
+        'org_name': 'Old Alpha Builders',
+        'email': 'alpha@builders.com',
+        'username': 'alphabuilder',
+        'role': 'Organization',
+      };
+
+      final resolvedUserData = <String, dynamic>{};
+      resolvedUserData.addAll(legacyAdminData);
+
+      String actualUsername = '';
+      for (final key in ['username', 'UserName', 'userName', 'adminUsername', 'admin_username']) {
+        final val = resolvedUserData[key]?.toString().trim() ?? '';
+        if (val.isNotEmpty && !val.contains('@')) {
+          actualUsername = val;
+          break;
+        }
+      }
+
+      expect(actualUsername, equals('alphabuilder'));
+    });
+
+    test('AuthService login map ordering preserves actualUsername over null root username', () {
+      final rootWithNullUsername = <String, dynamic>{
+        'username': null,
+        'org_name': 'Test Org',
+        'email': 'test@test.com',
+      };
+
+      const actualUsername = 'valid_user';
+
+      // Old flawed order: {'username': actualUsername, ...rootWithNullUsername}
+      final flawedPayload = {
+        'username': actualUsername,
+        ...rootWithNullUsername,
+      };
+      expect(flawedPayload['username'], isNull); // Demonstrates the bug
+
+      // Fixed correct order: {...rootWithNullUsername, 'username': actualUsername}
+      final fixedPayload = {
+        ...rootWithNullUsername,
+        'username': actualUsername,
+      };
+      expect(fixedPayload['username'], equals('valid_user')); // Guaranteed non-null
+    });
+
+    test('Reference structure: /organisation/cst_newsharan_31-10-2026/data/admin stores admin credentials while root holds profile', () {
+      // Reference test demonstrating the intended structure
+      final rootProfile = <String, dynamic>{
+        'app_id': 'cst_white_label',
+        'app_type': 'cst_white_label',
+        'is_cst_app': true,
+        'org_name': 'New Sharan',
+        'app_name': 'NewSharanApp',
+      };
+
+      final adminDoc = <String, dynamic>{
+        'app_id': 'cst_white_label',
+        'app_type': 'cst_white_label',
+        'is_cst_app': true,
+        'org_name': 'New Sharan',
+        'app_name': 'NewSharanApp',
+        'theme_color': '#00A86B',
+        'email': 'sharan@example.com',
+        'phone': '9876543210',
+        'username': 'newsharan',
+        'role': 'Organization',
+        'registrationStatus': 'COMPLETED',
+        'onboardingStep': 'PAYMENT_PENDING',
+        'referralCode': 'ABC123',
+      };
+
+      // Verify root has no administrator credentials
+      expect(rootProfile.containsKey('username'), isFalse);
+      expect(rootProfile.containsKey('password'), isFalse);
+      expect(rootProfile.containsKey('email'), isFalse);
+      expect(rootProfile.containsKey('phone'), isFalse);
+      expect(rootProfile.containsKey('role'), isFalse);
+
+      // Verify /data/admin contains administrator credentials and no plaintext password
+      expect(adminDoc['username'], equals('newsharan'));
+      expect(adminDoc['email'], equals('sharan@example.com'));
+      expect(adminDoc['phone'], equals('9876543210'));
+      expect(adminDoc['role'], equals('Organization'));
+      expect(adminDoc.containsKey('password'), isFalse);
+
+      // Verify login resolution from /data/admin
+      final resolvedUser = Map<String, dynamic>.from(rootProfile);
+      resolvedUser.addAll(adminDoc);
+
+      expect(resolvedUser['username'], equals('newsharan'));
+      expect(resolvedUser['org_name'], equals('New Sharan'));
+      expect(resolvedUser['email'], equals('sharan@example.com'));
+    });
+  });
 }

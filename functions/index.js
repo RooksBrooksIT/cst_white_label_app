@@ -256,7 +256,10 @@ async function syncOrganisationSubscriptionBackend(db, orgId, subscriptionUpdate
   if (subscriptionUpdate.maxSupervisors !== undefined) {
     rootUpdate.maxSupervisors = subscriptionUpdate.maxSupervisors;
   }
-  batch.set(orgRef, rootUpdate, { merge: true });
+  const orgSnap = await orgRef.get().catch(() => null);
+  if (orgSnap && orgSnap.exists && (orgSnap.data().subscriptionPlan || orgSnap.data().isSubscriptionActive !== undefined)) {
+    batch.set(orgRef, rootUpdate, { merge: true });
+  }
 
   // 3. Canonical data/admin doc
   const adminDocUpdate = {
@@ -291,7 +294,9 @@ async function syncOrganisationSubscriptionBackend(db, orgId, subscriptionUpdate
   try {
     const altOrgSnap = await db.collection("organisation").doc(altOrgId).get();
     if (altOrgSnap.exists) {
-      batch.set(altOrgSnap.ref, rootUpdate, { merge: true });
+      if (altOrgSnap.data() && (altOrgSnap.data().subscriptionPlan || altOrgSnap.data().isSubscriptionActive !== undefined)) {
+        batch.set(altOrgSnap.ref, rootUpdate, { merge: true });
+      }
       batch.set(altOrgSnap.ref.collection("data").doc("subscription"), subscriptionUpdate, { merge: true });
       batch.set(altOrgSnap.ref.collection("data").doc("admin"), adminDocUpdate, { merge: true });
     }

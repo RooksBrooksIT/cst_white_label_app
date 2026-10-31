@@ -599,6 +599,15 @@ class FirestoreService {
           return false;
         }
       }
+
+      // Check subcollection data/admin across organizations for new structure records
+      final dataQuery = await FirebaseFirestore.instance
+          .collectionGroup('data')
+          .where('org_name', isEqualTo: clean)
+          .limit(1)
+          .get()
+          .catchError((_) => FirebaseFirestore.instance.collection('dummy').limit(0).get());
+      if (dataQuery.docs.isNotEmpty) return false;
       return true;
     } catch (e) {
       debugPrint('isOrgNameUnique error: $e');
@@ -633,6 +642,8 @@ class FirestoreService {
         FirebaseFirestore.instance.collectionGroup('organizationUser').where('Email', isEqualTo: clean).get(),
         FirebaseFirestore.instance.collectionGroup('configUsers').where('email', isEqualTo: clean).get(),
         FirebaseFirestore.instance.collectionGroup('configUsers').where('Email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('data').where('email', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('data').where('Email', isEqualTo: clean).get(),
       ];
 
       final results = await Future.wait(futures);
@@ -688,9 +699,12 @@ class FirestoreService {
         FirebaseFirestore.instance.collectionGroup('supervisors').where('contactNo', isEqualTo: clean).get(),
         FirebaseFirestore.instance.collectionGroup('organizationUser').where('ContactNo', isEqualTo: clean).get(),
         FirebaseFirestore.instance.collectionGroup('organizationUser').where('contactNo', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('organizationUser').where('phone', isEqualTo: clean).get(),
         FirebaseFirestore.instance.collectionGroup('configUsers').where('MobileNumber', isEqualTo: clean).get(),
         FirebaseFirestore.instance.collectionGroup('customers').where('ownerPhoneNumber', isEqualTo: clean).get(),
         FirebaseFirestore.instance.collectionGroup('customers').where('phone', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('data').where('phone', isEqualTo: clean).get(),
+        FirebaseFirestore.instance.collectionGroup('data').where('contactNo', isEqualTo: clean).get(),
       ];
 
       final results = await Future.wait(futures);
@@ -805,6 +819,8 @@ class FirestoreService {
         tier1Futures.add(FirebaseFirestore.instance.collectionGroup('configUsers').where('username', isEqualTo: v).limit(1).get());
         tier1Futures.add(FirebaseFirestore.instance.collectionGroup('organizationUser').where('username', isEqualTo: v).limit(1).get());
         tier1Futures.add(FirebaseFirestore.instance.collectionGroup('organizationUser').where('UserName', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('data').where('username', isEqualTo: v).limit(1).get());
+        tier1Futures.add(FirebaseFirestore.instance.collectionGroup('data').where('UserName', isEqualTo: v).limit(1).get());
         tier1Futures.add(FirebaseFirestore.instance.collection('organisation').where('username', isEqualTo: v).limit(1).get());
         tier1Futures.add(FirebaseFirestore.instance.collection('organisation').where('UserName', isEqualTo: v).limit(1).get());
       }
@@ -1009,33 +1025,20 @@ class FirestoreService {
       referralCode = List.generate(6, (i) => chars[random.nextInt(chars.length)]).join();
     }
 
-    final rootDocPayload = {
+    // 1. Root Org Document Reference with basic organization profile metadata
+    final rootRef = FirebaseFirestore.instance.doc(orgConfigDocPath);
+    final rootData = {
       'app_id': cstAppId,
       'app_type': cstAppId,
       'is_cst_app': true,
       'org_name': orgName,
       'app_name': appName,
-      'theme_color': themeHex,
-      'email': email,
-      'phone': phone,
-      'username': username,
-      'password': password,
-      'role': 'Organization',
-      'registrationStatus': 'COMPLETED',
-      'onboardingStep': 'PAYMENT_PENDING',
-      'isSubscriptionActive': false,
-      'paymentStatus': 'PENDING',
-      'referralCode': referralCode,
-      'orgReferralCode': referralCode,
       'created_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     };
+    batch.set(rootRef, rootData, SetOptions(merge: true));
 
-    // 1. Root Org Document
-    final rootRef = FirebaseFirestore.instance.doc(orgConfigDocPath);
-    batch.set(rootRef, rootDocPayload, SetOptions(merge: true));
-
-    // 2. Data / admin doc
+    // 2. Data / admin doc - Canonical administrator credentials and account details
     final dataAdminRef = rootRef.collection('data').doc('admin');
     batch.set(
       dataAdminRef,
@@ -1049,7 +1052,6 @@ class FirestoreService {
         'email': email,
         'phone': phone,
         'username': username,
-        'password': password,
         'role': 'Organization',
         'registrationStatus': 'COMPLETED',
         'onboardingStep': 'PAYMENT_PENDING',
@@ -1058,6 +1060,7 @@ class FirestoreService {
         'referralCode': referralCode,
         'orgReferralCode': referralCode,
         'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
     );
@@ -1069,11 +1072,13 @@ class FirestoreService {
       {
         'app_id': cstAppId,
         'is_cst_app': true,
+        'org_name': orgName,
         'appName': appName,
         'app_name': appName,
         'primaryColor': themeHex,
         'theme_color': themeHex,
         'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
     );
@@ -1108,26 +1113,6 @@ class FirestoreService {
     batch.set(
       rootRef.collection('data').doc('subscription'),
       initialSubData,
-      SetOptions(merge: true),
-    );
-
-    // 6. Organization User doc (keyed uniquely by username)
-    final userPayload = {
-      'app_id': cstAppId,
-      'is_cst_app': true,
-      'org_name': orgName,
-      'email': email,
-      'phone': phone,
-      'username': username,
-      'password': password,
-      'role': 'Organization',
-      'created_at': FieldValue.serverTimestamp(),
-    };
-
-    final userDocId = username.isNotEmpty ? username : (phone.isNotEmpty ? phone : 'admin');
-    batch.set(
-      rootRef.collection('organizationUser').doc(userDocId),
-      userPayload,
       SetOptions(merge: true),
     );
 

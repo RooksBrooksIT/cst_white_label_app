@@ -120,8 +120,10 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
     final fbUser = FirebaseAuth.instance.currentUser;
     String name =
         (userData['username'] ??
-                userData['name'] ??
+                userData['UserName'] ??
                 userData['userName'] ??
+                userData['adminUsername'] ??
+                userData['name'] ??
                 fbUser?.displayName ??
                 userData['org_name'] ??
                 userData['orgName'] ??
@@ -129,19 +131,61 @@ class _OrganizationDashboardState extends State<OrganizationDashboard> {
             .toString()
             .trim();
 
-    if (name.isEmpty) {
+    // If name is an email address, try to find a better non-email display name
+    if (name.contains('@')) {
+      final nonEmail = (userData['name'] ??
+              userData['org_name'] ??
+              userData['orgName'] ??
+              '')
+          .toString()
+          .trim();
+      if (nonEmail.isNotEmpty) {
+        name = nonEmail;
+      }
+    }
+
+    if (name.isEmpty || name.contains('@')) {
       try {
-        final adminDoc = await FirestoreService.orgDataDoc.get();
-        if (adminDoc.exists) {
-          final data = adminDoc.data();
-          name =
-              (data?['username'] ??
-                      data?['name'] ??
-                      data?['userName'] ??
-                      data?['org_name'] ??
-                      '')
-                  .toString()
-                  .trim();
+        final docs = await Future.wait([
+          FirestoreService.orgDataDoc.get(),
+          FirestoreService.rootOrgDoc.get(),
+          FirestoreService.getCollection('admin').doc('data').get(),
+          FirestoreService.organizationUsers.limit(5).get(),
+        ]);
+
+        for (int i = 0; i < 3; i++) {
+          final doc = docs[i];
+          if (doc is DocumentSnapshot<Map<String, dynamic>> && doc.exists && doc.data() != null) {
+            final data = doc.data()!;
+            for (final k in ['username', 'UserName', 'userName', 'adminUsername', 'name', 'org_name']) {
+              final val = data[k]?.toString().trim() ?? '';
+              if (val.isNotEmpty && !val.contains('@')) {
+                name = val;
+                break;
+              }
+            }
+            if (name.isNotEmpty && !name.contains('@')) break;
+          }
+        }
+
+        if (name.isEmpty || name.contains('@')) {
+          final usersSnap = docs[3] as QuerySnapshot<Map<String, dynamic>>?;
+          if (usersSnap != null && usersSnap.docs.isNotEmpty) {
+            for (final uDoc in usersSnap.docs) {
+              final uData = uDoc.data();
+              for (final k in ['username', 'UserName', 'userName', 'fullName', 'name']) {
+                final val = uData[k]?.toString().trim() ?? '';
+                if (val.isNotEmpty && !val.contains('@')) {
+                  name = val;
+                  break;
+                }
+              }
+              if (name.isEmpty && !uDoc.id.contains('@')) {
+                name = uDoc.id;
+              }
+              if (name.isNotEmpty && !name.contains('@')) break;
+            }
+          }
         }
       } catch (_) {}
     }

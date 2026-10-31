@@ -859,6 +859,9 @@ class _PricingScreenState extends State<PricingScreen> {
       final rootDocData = {
         'org_name': widget.orgName,
         'app_name': widget.appName,
+        'username': widget.username,
+        'email': widget.email,
+        'phone': widget.phone,
         'theme_color':
             '#${widget.selectedColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
         'subscriptionPlan': _selectedPlan,
@@ -882,10 +885,6 @@ class _PricingScreenState extends State<PricingScreen> {
         'paymentAmount': amount,
         'updated_at': FieldValue.serverTimestamp(),
       };
-
-      await FirebaseFirestore.instance
-          .doc(orgConfigDocPath)
-          .set(rootDocData, SetOptions(merge: true));
 
       final subscriptionData = {
         'subscriptionPlan': _selectedPlan,
@@ -917,6 +916,7 @@ class _PricingScreenState extends State<PricingScreen> {
 
       // 2. Branding document under data/branding
       final brandingData = {
+        'org_name': widget.orgName,
         'appName': widget.appName,
         'app_name': widget.appName,
         'primaryColor':
@@ -968,7 +968,6 @@ class _PricingScreenState extends State<PricingScreen> {
         'email': widget.email,
         'phone': widget.phone,
         'username': widget.username,
-        'password': widget.password,
         'role': 'Organization',
         'isSubscriptionActive': true,
         'subscriptionPlan': _selectedPlan,
@@ -982,11 +981,29 @@ class _PricingScreenState extends State<PricingScreen> {
         'updated_at': FieldValue.serverTimestamp(),
       };
 
-      // Atomic batched write for registration across root, subscription, branding, referral, and canonical admin
+      // Atomic batched write for registration across subscription, branding, referral, and canonical admin
       final regBatch = FirebaseFirestore.instance.batch();
       final rootDocRef = FirebaseFirestore.instance.doc(orgConfigDocPath);
 
-      regBatch.set(rootDocRef, rootDocData, SetOptions(merge: true));
+      // Update root organization profile metadata
+      final rootMetadata = {
+        'org_name': widget.orgName,
+        'app_name': widget.appName,
+        'updated_at': FieldValue.serverTimestamp(),
+      };
+      regBatch.set(rootDocRef, rootMetadata, SetOptions(merge: true));
+
+      // Maintain backward compatibility for existing legacy organizations that store subscription fields at root
+      try {
+        final rootSnap = await FirebaseFirestore.instance.doc(orgConfigDocPath).get();
+        if (rootSnap.exists && rootSnap.data() != null) {
+          final rData = rootSnap.data()!;
+          if (rData.containsKey('subscriptionPlan') || rData.containsKey('isSubscriptionActive')) {
+            regBatch.set(rootDocRef, rootDocData, SetOptions(merge: true));
+          }
+        }
+      } catch (_) {}
+
       regBatch.set(
         rootDocRef.collection('data').doc('subscription'),
         subscriptionData,
@@ -1037,7 +1054,11 @@ class _PricingScreenState extends State<PricingScreen> {
             .doc(altOrgId)
             .get();
         if (altDoc.exists) {
-          regBatch.set(altDoc.reference, rootDocData, SetOptions(merge: true));
+          final altData = altDoc.data();
+          if (altData != null &&
+              (altData.containsKey('subscriptionPlan') || altData.containsKey('isSubscriptionActive'))) {
+            regBatch.set(altDoc.reference, rootDocData, SetOptions(merge: true));
+          }
           regBatch.set(
             altDoc.reference.collection('data').doc('subscription'),
             subscriptionData,
@@ -1052,27 +1073,6 @@ class _PricingScreenState extends State<PricingScreen> {
       } catch (_) {}
 
       await regBatch.commit();
-
-      final userData = {
-        'org_name': widget.orgName,
-        'email': widget.email,
-        'phone': widget.phone,
-        'username': widget.username,
-        'password': widget.password,
-        'role': 'Organization',
-        'updated_at': FieldValue.serverTimestamp(),
-      };
-
-      final userDocId = widget.username.isNotEmpty
-          ? widget.username
-          : (widget.phone.isNotEmpty ? widget.phone : 'admin');
-
-      await FirebaseFirestore.instance
-          .doc(orgConfigDocPath)
-          .collection('organizationUser')
-          .doc(userDocId)
-          .set(userData, SetOptions(merge: true))
-          .catchError((_) {});
 
       if (payuResult != null && payuResult.isSuccess) {
         try {
